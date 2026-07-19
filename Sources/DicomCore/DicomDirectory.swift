@@ -457,7 +457,12 @@ public enum DicomDirectoryWriter {
         while let range = data[searchOffset..<data.count].range(of: itemTag) {
             let itemStart = range.lowerBound
             guard itemStart + 8 <= data.count else { break }
-            let length = Int(readUInt32LittleEndian(data, at: itemStart + 4))
+            guard let encodedLength = data.dicomIntegerIfPresent(
+                at: itemStart + 4,
+                as: UInt32.self,
+                littleEndian: true
+            ) else { break }
+            let length = Int(encodedLength)
             let itemEnd = itemStart + 8 + length
             guard itemEnd <= data.count else { break }
             offsets.append((itemStart, itemEnd))
@@ -478,13 +483,6 @@ public enum DicomDirectoryWriter {
             throw DicomDirectoryError.invalidDICOMDIR("Unable to patch directory record offset")
         }
         writeUInt32LittleEndian(value, to: &data, at: headerRange.upperBound)
-    }
-
-    private static func readUInt32LittleEndian(_ data: Data, at offset: Int) -> UInt32 {
-        UInt32(data[offset]) |
-            UInt32(data[offset + 1]) << 8 |
-            UInt32(data[offset + 2]) << 16 |
-            UInt32(data[offset + 3]) << 24
     }
 
     private static func writeUInt32LittleEndian(_ value: UInt32, to data: inout Data, at offset: Int) {
@@ -608,6 +606,7 @@ private enum DicomDirectoryDataSetParser {
             offset: &offset,
             end: data.count,
             littleEndian: true,
+            inheritedCharacterSet: .defaultCharacterSet,
             directoryRecordItemOffsets: &directoryRecordItemOffsets
         )
         return ParsedDicomDirectoryDataSet(dataSet: dataSet,
@@ -618,8 +617,10 @@ private enum DicomDirectoryDataSetParser {
                                      offset: inout Int,
                                      end: Int,
                                      littleEndian: Bool,
+                                     inheritedCharacterSet: DicomSpecificCharacterSet,
                                      directoryRecordItemOffsets: inout [Int]) throws -> DicomDataSet {
         var elements: [DicomDataElement] = []
+        var characterSet = inheritedCharacterSet
         while offset + 8 <= end {
             let tag = try readTag(data, offset: &offset, littleEndian: littleEndian)
             if tag == 0xFFFEE00D || tag == 0xFFFEE0DD {
@@ -648,6 +649,7 @@ private enum DicomDirectoryDataSetParser {
                     offset: &offset,
                     end: sequenceEnd,
                     littleEndian: littleEndian,
+                    characterSet: characterSet,
                     captureItemOffsets: tag == DicomDirectoryTags.directoryRecordSequence,
                     directoryRecordItemOffsets: &directoryRecordItemOffsets
                 )
@@ -655,7 +657,17 @@ private enum DicomDirectoryDataSetParser {
             } else {
                 let value = data[offset..<(offset + length)]
                 offset += length
-                elements.append(DicomDataElement(tag: tag, vr: vr, value: valueData(vr: vr, data: Data(value), littleEndian: littleEndian)))
+                let decodedValue = valueData(
+                    vr: vr,
+                    data: Data(value),
+                    littleEndian: littleEndian,
+                    characterSet: characterSet
+                )
+                elements.append(DicomDataElement(tag: tag, vr: vr, value: decodedValue))
+                if tag == DicomTag.specificCharacterSet.rawValue,
+                   case .strings(let terms) = decodedValue {
+                    characterSet = DicomSpecificCharacterSet(terms.joined(separator: "\\"))
+                }
             }
         }
         return DicomDataSet(elements: elements)
@@ -665,6 +677,7 @@ private enum DicomDirectoryDataSetParser {
                                            offset: inout Int,
                                            end: Int,
                                            littleEndian: Bool,
+                                           characterSet: DicomSpecificCharacterSet,
                                            captureItemOffsets: Bool,
                                            directoryRecordItemOffsets: inout [Int]) throws -> [DicomSequenceItem] {
         var items: [DicomSequenceItem] = []
@@ -685,6 +698,7 @@ private enum DicomDirectoryDataSetParser {
                 offset: &offset,
                 end: itemEnd,
                 littleEndian: littleEndian,
+                inheritedCharacterSet: characterSet,
                 directoryRecordItemOffsets: &directoryRecordItemOffsets
             )
             items.append(DicomSequenceItem(dataSet: dataSet))
@@ -693,7 +707,12 @@ private enum DicomDirectoryDataSetParser {
         return items
     }
 
-    private static func valueData(vr: DicomVR, data: Data, littleEndian: Bool) -> DicomDataValue {
+    private static func valueData(
+        vr: DicomVR,
+        data: Data,
+        littleEndian: Bool,
+        characterSet: DicomSpecificCharacterSet
+    ) -> DicomDataValue {
         switch vr {
         case .US:
             return .unsignedIntegers(stride(from: 0, to: data.count - data.count % 2, by: 2).map {
@@ -714,7 +733,7 @@ private enum DicomDirectoryDataSetParser {
         case .OB, .OW, .OV, .UN:
             return .bytes(data)
         default:
-            let text = DicomSpecificCharacterSet.defaultCharacterSet.decode(data)
+            let text = characterSet.decode(data)
                 .trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "\0")))
             let values = text.split(separator: "\\", omittingEmptySubsequences: false).map {
                 String($0).trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "\0")))
@@ -757,16 +776,10 @@ private enum DicomDirectoryDataSetParser {
     }
 
     private static func readUInt16Value(_ data: Data, at offset: Int, littleEndian: Bool) -> UInt16 {
-        let b0 = UInt16(data[offset])
-        let b1 = UInt16(data[offset + 1])
-        return littleEndian ? (b1 << 8 | b0) : (b0 << 8 | b1)
+        data.dicomIntegerIfPresent(at: offset, as: UInt16.self, littleEndian: littleEndian) ?? 0
     }
 
     private static func readUInt32Value(_ data: Data, at offset: Int, littleEndian: Bool) -> UInt32 {
-        let b0 = UInt32(data[offset])
-        let b1 = UInt32(data[offset + 1])
-        let b2 = UInt32(data[offset + 2])
-        let b3 = UInt32(data[offset + 3])
-        return littleEndian ? (b3 << 24 | b2 << 16 | b1 << 8 | b0) : (b0 << 24 | b1 << 16 | b2 << 8 | b3)
+        data.dicomIntegerIfPresent(at: offset, as: UInt32.self, littleEndian: littleEndian) ?? 0
     }
 }

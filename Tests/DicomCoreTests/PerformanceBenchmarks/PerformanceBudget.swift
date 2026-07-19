@@ -9,10 +9,8 @@ import Foundation
 
 enum PerformanceBudgetStage: String, CaseIterable, Codable {
     case decode
-    case volumeAssembly
     case gpuUpload
-    case mprRender
-    case volumeRender
+    case progressiveFrame
     case snapshot
     case peakMemory
 }
@@ -37,7 +35,15 @@ enum PerformanceBudgetStatus: String, Equatable {
 struct PerformanceBudgetComparisonProfile: Codable {
     let referenceDeviceClass: String
     let comparisonRule: String
+    let relativeWarningPercent: Double
+    let relativeFailurePercent: Double
     let requiredResultEnvironmentFields: [String]
+}
+
+struct PerformanceBudgetTier: Codable {
+    let id: ClinicalPerformanceTier
+    let purpose: String
+    let hostPolicy: String
 }
 
 struct PerformanceBudgetDatasetSize: Codable {
@@ -71,17 +77,32 @@ struct PerformanceBudgetScenario: Codable {
     let id: String
     let component: String
     let fixtureID: String
+    let fixtureIDs: [String]
+    let conformanceCaseIDs: [String]
     let fixturePolicy: String
     let benchmarkMode: String
+    let benchmarkModes: [ClinicalPerformanceBenchmarkMode]
+    let tiers: [ClinicalPerformanceTier]
+    let backends: [String]
     let datasetSize: PerformanceBudgetDatasetSize
+    let warmupIterations: Int
+    let benchmarkIterations: Int
     let benchmarkCommand: String
+    let correctnessGate: String
+    let workflowMetrics: [String]
     let budgets: [PerformanceBudgetEntry]
 }
 
 struct PerformanceBudgetManifest: Codable {
     let version: Int
     let issue: Int
+    let conformanceManifest: String
+    let privacyPolicy: String
     let requiredStages: [PerformanceBudgetStage]
+    let requiredWorkflowMetrics: [String]
+    let benchmarkModes: [ClinicalPerformanceBenchmarkMode]
+    let tiers: [PerformanceBudgetTier]
+    let reportFormats: [String]
     let buildConfigurations: [PerformanceBudgetBuildConfiguration]
     let warningRatio: Double
     let comparisonProfile: PerformanceBudgetComparisonProfile

@@ -71,7 +71,7 @@
                 @Step {
                     Use the async throwing initializer to load files in the background.
 
-                    This is especially useful in UI applications where you want to keep the interface responsive while loading large medical images.
+                    This is especially useful when a caller must remain responsive while loading large medical images.
 
                     @Code(name: "BasicUsage.swift", file: BasicUsage.swift) {
                         @Image(source: "async-step1.png", alt: "Async loading")
@@ -81,7 +81,7 @@
                 @Step {
                     Call the async function from a Task or async context.
 
-                    In SwiftUI, you can use the `.task` modifier. In UIKit, use `Task { }` to create an async context.
+                    Call the initializer from an existing asynchronous task or function.
 
                     @Code(name: "BasicUsage.swift", file: BasicUsage.swift) {
                         @Image(source: "async-step2.png", alt: "Call async function")

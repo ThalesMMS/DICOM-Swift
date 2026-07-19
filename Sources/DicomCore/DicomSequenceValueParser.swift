@@ -1,6 +1,12 @@
 import Foundation
 
 public enum DicomDataSetParser {
+    /// Parses metadata elements from an encoded dataset.
+    ///
+    /// Pixel Data is intentionally omitted because the value-type dataset does not preserve
+    /// encapsulated fragment boundaries. The parser still skips the encoded pixel payload and
+    /// continues parsing any following metadata elements. Callers that need pixels must retain
+    /// and consume the original encoded dataset bytes.
     public static func dataSet(from data: Data,
                                transferSyntax: DicomTransferSyntax = .explicitVRLittleEndian) throws -> DicomDataSet {
         let payload = transferSyntax.usesDataSetDeflate
@@ -28,7 +34,8 @@ enum DicomSequenceValueParser {
         valueOffset: Int,
         end: Int,
         littleEndian: Bool,
-        explicitVR: Bool
+        explicitVR: Bool,
+        characterSet: DicomSpecificCharacterSet = .defaultCharacterSet
     ) throws -> (valueLength: Int, endOffset: Int) {
         var offset = valueOffset
         let result = try parseSequenceItemsResult(
@@ -37,6 +44,7 @@ enum DicomSequenceValueParser {
             end: end,
             littleEndian: littleEndian,
             explicitVR: explicitVR,
+            characterSet: characterSet,
             requiresSequenceDelimiter: true
         )
         guard let delimiterOffset = result.delimiterOffset else {
@@ -50,7 +58,8 @@ enum DicomSequenceValueParser {
         valueOffset: Int,
         valueLength: Int,
         littleEndian: Bool,
-        explicitVR: Bool
+        explicitVR: Bool,
+        characterSet: DicomSpecificCharacterSet = .defaultCharacterSet
     ) throws -> [DicomSequenceItem] {
         guard valueOffset >= 0,
               valueLength >= 0,
@@ -65,6 +74,7 @@ enum DicomSequenceValueParser {
             end: valueOffset + valueLength,
             littleEndian: littleEndian,
             explicitVR: explicitVR,
+            characterSet: characterSet,
             requiresSequenceDelimiter: false
         ).items
     }
@@ -74,7 +84,8 @@ enum DicomSequenceValueParser {
         offset: inout Int,
         end: Int,
         littleEndian: Bool,
-        explicitVR: Bool
+        explicitVR: Bool,
+        characterSet: DicomSpecificCharacterSet = .defaultCharacterSet
     ) throws -> DicomDataSet {
         try parseDataSet(
             in: data,
@@ -82,6 +93,7 @@ enum DicomSequenceValueParser {
             end: end,
             littleEndian: littleEndian,
             explicitVR: explicitVR,
+            inheritedCharacterSet: characterSet,
             requiresItemDelimiter: false
         )
     }
@@ -92,9 +104,11 @@ enum DicomSequenceValueParser {
         end: Int,
         littleEndian: Bool,
         explicitVR: Bool,
+        inheritedCharacterSet: DicomSpecificCharacterSet,
         requiresItemDelimiter: Bool
     ) throws -> DicomDataSet {
         var elements: [DicomDataElement] = []
+        var characterSet = inheritedCharacterSet
 
         while offset < end {
             guard offset + 8 <= end else {
@@ -114,10 +128,6 @@ enum DicomSequenceValueParser {
                     ? DicomSequenceValueParserError.unexpectedItemDelimiter
                     : DicomSequenceValueParserError.unexpectedSequenceDelimiter
             }
-            if tag == DicomTag.pixelData.rawValue {
-                break
-            }
-
             let elementHeader = try readElementHeader(
                 data,
                 offset: &offset,
@@ -125,6 +135,17 @@ enum DicomSequenceValueParser {
                 littleEndian: littleEndian,
                 explicitVR: explicitVR
             )
+
+            if tag == DicomTag.pixelData.rawValue {
+                try skipPixelData(
+                    in: data,
+                    offset: &offset,
+                    end: end,
+                    length: elementHeader.length,
+                    littleEndian: littleEndian
+                )
+                continue
+            }
 
             if elementHeader.vr == .SQ {
                 let items: [DicomSequenceItem]
@@ -135,6 +156,7 @@ enum DicomSequenceValueParser {
                         end: end,
                         littleEndian: littleEndian,
                         explicitVR: explicitVR,
+                        characterSet: characterSet,
                         requiresSequenceDelimiter: true
                     ).items
                 } else {
@@ -148,6 +170,7 @@ enum DicomSequenceValueParser {
                         end: sequenceEnd,
                         littleEndian: littleEndian,
                         explicitVR: explicitVR,
+                        characterSet: characterSet,
                         requiresSequenceDelimiter: false
                     ).items
                     offset = sequenceEnd
@@ -161,6 +184,7 @@ enum DicomSequenceValueParser {
                         end: end,
                         littleEndian: littleEndian,
                         explicitVR: false,
+                        characterSet: characterSet,
                         requiresSequenceDelimiter: true
                     ).items
                     elements.append(DicomDataElement(tag: tag, vr: .SQ, value: .sequence(items)))
@@ -175,11 +199,21 @@ enum DicomSequenceValueParser {
                 }
                 let valueData = Data(data[offset..<valueEnd])
                 offset = valueEnd
+                let decodedValue = value(
+                    for: elementHeader.vr,
+                    data: valueData,
+                    littleEndian: littleEndian,
+                    characterSet: characterSet
+                )
                 elements.append(DicomDataElement(
                     tag: tag,
                     vr: elementHeader.vr,
-                    value: value(for: elementHeader.vr, data: valueData, littleEndian: littleEndian)
+                    value: decodedValue
                 ))
+                if tag == DicomTag.specificCharacterSet.rawValue,
+                   case .strings(let terms) = decodedValue {
+                    characterSet = DicomSpecificCharacterSet(terms.joined(separator: "\\"))
+                }
             }
         }
 
@@ -200,6 +234,7 @@ enum DicomSequenceValueParser {
         end: Int,
         littleEndian: Bool,
         explicitVR: Bool,
+        characterSet: DicomSpecificCharacterSet,
         requiresSequenceDelimiter: Bool
     ) throws -> SequenceParseResult {
         var items: [DicomSequenceItem] = []
@@ -239,6 +274,7 @@ enum DicomSequenceValueParser {
                     end: end,
                     littleEndian: littleEndian,
                     explicitVR: explicitVR,
+                    inheritedCharacterSet: characterSet,
                     requiresItemDelimiter: true
                 )
                 items.append(DicomSequenceItem(dataSet: dataSet))
@@ -253,6 +289,7 @@ enum DicomSequenceValueParser {
                     end: itemEnd,
                     littleEndian: littleEndian,
                     explicitVR: explicitVR,
+                    inheritedCharacterSet: characterSet,
                     requiresItemDelimiter: false
                 )
                 items.append(DicomSequenceItem(dataSet: dataSet))
@@ -587,34 +624,62 @@ enum DicomSequenceValueParser {
         }
     }
 
-    private static func value(for vr: DicomVR, data: Data, littleEndian: Bool) -> DicomDataValue {
-        switch vr {
-        case .US:
-            return .unsignedIntegers(data.readUInt16Values(littleEndian: littleEndian).map(UInt.init))
-        case .UL:
-            return .unsignedIntegers(data.readUInt32Values(littleEndian: littleEndian).map(UInt.init))
-        case .SS:
-            return .signedIntegers(data.readInt16Values(littleEndian: littleEndian).map(Int.init))
-        case .SL:
-            return .signedIntegers(data.readInt32Values(littleEndian: littleEndian).map(Int.init))
-        case .FL:
-            return .floats(data.readFloat32Values(littleEndian: littleEndian).map(Double.init))
-        case .FD:
-            return .floats(data.readFloat64Values(littleEndian: littleEndian))
-        case .OF:
-            return .floats(data.readFloat32Values(littleEndian: littleEndian).map(Double.init))
-        case .OD:
-            return .floats(data.readFloat64Values(littleEndian: littleEndian))
-        case .OB, .OW, .OV, .UN:
-            return .bytes(data)
-        default:
-            let text = DicomSpecificCharacterSet.defaultCharacterSet.decode(data)
-                .trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "\0")))
-            let values = text.split(separator: "\\", omittingEmptySubsequences: false).map {
-                String($0).trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "\0")))
-            }
-            return values.isEmpty || (values.count == 1 && values[0].isEmpty) ? .empty : .strings(values)
+    private static func value(
+        for vr: DicomVR,
+        data: Data,
+        littleEndian: Bool,
+        characterSet: DicomSpecificCharacterSet
+    ) -> DicomDataValue {
+        if let value = DicomDataValueDecoder.binaryValue(for: vr, data: data, littleEndian: littleEndian) {
+            return value
         }
+        let text = characterSet.decode(data)
+            .trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "\0")))
+        let values = text.split(separator: "\\", omittingEmptySubsequences: false).map {
+            String($0).trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "\0")))
+        }
+        return values.isEmpty || (values.count == 1 && values[0].isEmpty) ? .empty : .strings(values)
+    }
+
+    private static func skipPixelData(
+        in data: Data,
+        offset: inout Int,
+        end: Int,
+        length: UInt32,
+        littleEndian: Bool
+    ) throws {
+        if length != undefinedLength {
+            let valueEnd = offset + Int(length)
+            guard valueEnd <= end else {
+                throw DicomSequenceValueParserError.elementExceedsBounds(DicomTag.pixelData.rawValue)
+            }
+            offset = valueEnd
+            return
+        }
+
+        while offset < end {
+            guard offset + 8 <= end else {
+                throw DicomSequenceValueParserError.unexpectedEnd
+            }
+            let tag = try readTag(data, offset: &offset, littleEndian: littleEndian)
+            let itemLength = try readUInt32(data, offset: &offset, littleEndian: littleEndian)
+            if tag == sequenceDelimiterTag {
+                try validateDelimiterLength(itemLength, tag: tag)
+                return
+            }
+            guard tag == itemTag else {
+                throw DicomSequenceValueParserError.expectedItem(tag)
+            }
+            guard itemLength != undefinedLength else {
+                throw DicomSequenceValueParserError.unsupportedUndefinedLengthElement(tag)
+            }
+            let itemEnd = offset + Int(itemLength)
+            guard itemEnd <= end else {
+                throw DicomSequenceValueParserError.elementExceedsBounds(tag)
+            }
+            offset = itemEnd
+        }
+        throw DicomSequenceValueParserError.missingSequenceDelimiter
     }
 
     private static func readTag(_ data: Data, offset: inout Int, littleEndian: Bool) throws -> Int {
@@ -636,7 +701,7 @@ enum DicomSequenceValueParser {
         guard offset + 2 <= data.count else {
             throw DicomSequenceValueParserError.unexpectedEnd
         }
-        let value = data.readUInt16(at: offset, littleEndian: littleEndian)
+        let value = data.dicomInteger(at: offset, as: UInt16.self, littleEndian: littleEndian)
         offset += 2
         return value
     }
@@ -645,7 +710,7 @@ enum DicomSequenceValueParser {
         guard offset + 4 <= data.count else {
             throw DicomSequenceValueParserError.unexpectedEnd
         }
-        let value = data.readUInt32(at: offset, littleEndian: littleEndian)
+        let value = data.dicomInteger(at: offset, as: UInt32.self, littleEndian: littleEndian)
         offset += 4
         return value
     }
@@ -664,59 +729,4 @@ enum DicomSequenceValueParserError: Error, Equatable {
     case unexpectedItemDelimiter
     case unexpectedSequenceDelimiter
     case invalidDelimiterLength(tag: Int, length: UInt32)
-}
-
-private extension Data {
-    func readUInt16Values(littleEndian: Bool) -> [UInt16] {
-        stride(from: 0, to: count - count % 2, by: 2).map { readUInt16(at: $0, littleEndian: littleEndian) }
-    }
-
-    func readInt16Values(littleEndian: Bool) -> [Int16] {
-        readUInt16Values(littleEndian: littleEndian).map { Int16(bitPattern: $0) }
-    }
-
-    func readUInt32Values(littleEndian: Bool) -> [UInt32] {
-        stride(from: 0, to: count - count % 4, by: 4).map { readUInt32(at: $0, littleEndian: littleEndian) }
-    }
-
-    func readInt32Values(littleEndian: Bool) -> [Int32] {
-        readUInt32Values(littleEndian: littleEndian).map { Int32(bitPattern: $0) }
-    }
-
-    func readFloat32Values(littleEndian: Bool) -> [Float] {
-        readUInt32Values(littleEndian: littleEndian).map { Float(bitPattern: $0) }
-    }
-
-    func readFloat64Values(littleEndian: Bool) -> [Double] {
-        stride(from: 0, to: count - count % 8, by: 8).map {
-            Double(bitPattern: readUInt64(at: $0, littleEndian: littleEndian))
-        }
-    }
-
-    func readUInt16(at offset: Int, littleEndian: Bool) -> UInt16 {
-        let b0 = UInt16(self[offset])
-        let b1 = UInt16(self[offset + 1])
-        return littleEndian ? (b1 << 8 | b0) : (b0 << 8 | b1)
-    }
-
-    func readUInt32(at offset: Int, littleEndian: Bool) -> UInt32 {
-        let b0 = UInt32(self[offset])
-        let b1 = UInt32(self[offset + 1])
-        let b2 = UInt32(self[offset + 2])
-        let b3 = UInt32(self[offset + 3])
-        if littleEndian {
-            return b3 << 24 | b2 << 16 | b1 << 8 | b0
-        }
-        return b0 << 24 | b1 << 16 | b2 << 8 | b3
-    }
-
-    func readUInt64(at offset: Int, littleEndian: Bool) -> UInt64 {
-        let bytes = (0..<8).map { UInt64(self[offset + $0]) }
-        if littleEndian {
-            return bytes[7] << 56 | bytes[6] << 48 | bytes[5] << 40 | bytes[4] << 32 |
-                   bytes[3] << 24 | bytes[2] << 16 | bytes[1] << 8 | bytes[0]
-        }
-        return bytes[0] << 56 | bytes[1] << 48 | bytes[2] << 40 | bytes[3] << 32 |
-               bytes[4] << 24 | bytes[5] << 16 | bytes[6] << 8 | bytes[7]
-    }
 }

@@ -4,7 +4,7 @@ Comprehensive DICOM conformance documentation detailing supported transfer synta
 
 ## Overview
 
-This DICOM Conformance Statement describes the capabilities and limitations of the DicomCore library (version 1.2.0) in accordance with DICOM Part 2: Conformance. DicomCore is a pure Swift DICOM file library for iOS 13+ and macOS 12+ that parses DICOM medical imaging files, extracts metadata, provides pixel data access with optional GPU-accelerated image processing, writes controlled Part 10 datasets, and exposes transport-injected DICOMweb service helpers covered by package tests.
+This DICOM Conformance Statement describes the capabilities and limitations of the DicomCore library (version 1.2.0) in accordance with DICOM Part 2: Conformance. DicomCore is a Swift DICOM file library for iOS 18+ and macOS 15+ that parses DICOM medical imaging files, extracts metadata, provides pixel data access with optional GPU-accelerated image processing, writes controlled Part 10 datasets, and exposes transport-injected DICOMweb service helpers covered by package tests.
 
 **Implementation Type:** DICOM File Decoder/Writer Library with transport-injected DICOMweb helpers and JPIP progressive pixel streaming
 
@@ -61,7 +61,7 @@ DicomCore provides the following functional capabilities:
 | **Video Objects** | Build and parse Video Endoscopic/Microscopic/Photographic objects, preserving MPEG-2/H.264/H.265 streams and timing metadata for player handoff | ✅ Synthetic video |
 | **JPEG 2000 Part 2 Volume Documents** | Decode multi-component component collections into `DicomSeriesVolume` buffers with geometry metadata | ⚠️ Best-Effort OpenJPEG runtime |
 | **JPIP Progressive Pixel Data** | Recognize referenced pixel URLs and expose ordered progressive volume update streams with cancellation/backpressure | ⚠️ Transport-injected client |
-| **Transfer Syntax Conversion** | Plan safe conversion paths with codec diagnostics; compressed encoders and recompression are not implemented | Planning API plus writer guards |
+| **Transfer Syntax Conversion** | Plan safe conversion paths and execute qualified explicit-intent codec routes, including experimental JPEG XL | Planning API, typed guards, and `DicomTranscoder` |
 | **DICOMweb Service Helpers** | Serialize and test scoped QIDO-RS, WADO-RS, WADO-URI, STOW-RS, BulkDataURI, auth-header, pagination, multipart, and stable-error behavior | Scoped matrix |
 | **Production PACS Networking** | Persistent archive, full UPS, server-side rendered frames, JPIP proxying, authorization policy, PHI audit logging, TLS termination, and zero-copy large-payload streaming | ❌ Not Supported |
 | **DICOM File Creation** | Write native/Deflated Part 10 datasets, referenced JPIP metadata, DICOMDIR files, and caller-provided encapsulated pixel/video streams without recompression | ✅ Supported with scoped writer matrix |
@@ -102,7 +102,7 @@ remote archive qualification.
 | --- | --- | --- | --- |
 | C-ECHO | Verification SCU | `DicomDIMSEServiceSCU.verify` | Association negotiation, progress, retry, timeout, and success status are covered by package tests. |
 | C-FIND | Study Root and Modality Worklist SCU | `DicomDIMSEServiceSCU.find` and `findModalityWorklist` | Pending identifiers, final status, and scheduled procedure step mapping are tested. |
-| C-GET | Study Root retrieve SCU with C-STORE suboperation handling | `DicomDIMSEServiceSCU.get` | Retrieved instances and C-STORE responses on the same association are tested. |
+| C-GET | Study Root retrieve SCU with C-STORE suboperation handling | `DicomDIMSEServiceSCU.get` | Per-instance delivery after the C-STORE response and collector compatibility are tested. |
 | C-MOVE | Study Root retrieve SCU | `DicomDIMSEServiceSCU.move` | Pending/completed suboperation progress and move destination AE title propagation are tested. |
 | C-STORE | Storage SCU and Storage SCP | `DicomDIMSEServiceSCU.store`, `DicomStorageSCPService`, `DicomStorageSCPServer` | Part 10 payload parsing, transfer-syntax mismatch rejection, file cache writes, and association handling are tested. |
 | Storage Commitment | Push-model tracking/report helpers | `DicomStorageCommitmentTracker` and `DicomStorageSCPService` | Commitment event report datasets and partial success reports are tested; production archive policy is caller-owned. |
@@ -190,23 +190,26 @@ Use ``DicomTransferSyntaxRegistry`` to inspect encapsulation, fragmentation, dec
 | **JPEG Lossless, Non-Hierarchical (Process 14)** | 1.2.840.10008.1.2.4.57 | JPEG Lossless | decoded | Native `JPEGLosslessDecoder`; all selection values 0-7 |
 | **JPEG Baseline (Process 1)** | 1.2.840.10008.1.2.4.50 | JPEG Lossy | delegated | ImageIO for platform-supported 8-bit payloads |
 | **JPEG Extended (Process 2 & 4)** | 1.2.840.10008.1.2.4.51 | JPEG Lossy | decoded | Native 12-bit grayscale decode preserves precision; <=8-bit payloads delegate to ImageIO |
-| **JPEG-LS Lossless Image Compression** | 1.2.840.10008.1.2.4.80 | JPEG-LS | delegated | Preflighted CharLS runtime; supported only when the release gate proves the backend active (`DicomCodecCapabilities`) |
-| **JPEG-LS Lossy (Near-Lossless) Image Compression** | 1.2.840.10008.1.2.4.81 | JPEG-LS | delegated | Preflighted CharLS runtime; supported only when the release gate proves the backend active (`DicomCodecCapabilities`) |
-| **JPEG 2000 Image Compression (Lossless Only)** | 1.2.840.10008.1.2.4.90 | JPEG 2000 | delegated | Preflighted OpenJPEG up to 16-bit grayscale; ImageIO 8-bit fallback |
-| **JPEG 2000 Image Compression** | 1.2.840.10008.1.2.4.91 | JPEG 2000 | delegated | Preflighted OpenJPEG up to 16-bit grayscale; ImageIO 8-bit fallback |
+| **JPEG-LS Lossless Image Compression** | 1.2.840.10008.1.2.4.80 | JPEG-LS | delegated | Async JLSwift 0.9.0 candidate with CharLS shadow/fallback; reversible JLSwift encode route for qualified shapes |
+| **JPEG-LS Lossy (Near-Lossless) Image Compression** | 1.2.840.10008.1.2.4.81 | JPEG-LS | delegated | Async JLSwift 0.9.0 candidate with CharLS shadow/fallback; encode requires explicit NEAR intent and records lossy metadata |
+| **JPEG 2000 Image Compression (Lossless Only)** | 1.2.840.10008.1.2.4.90 | JPEG 2000 | delegated | Decode: async J2KSwift candidate with OpenJPEG shadow/fallback. Encode: explicit reversible J2KSwift CPU route. |
+| **JPEG 2000 Image Compression** | 1.2.840.10008.1.2.4.91 | JPEG 2000 | delegated | Decode: async J2KSwift candidate with OpenJPEG shadow/fallback. Encode: explicit reversible/irreversible J2KSwift CPU route. |
 | **JPEG 2000 Part 2 Multi-component Image Compression (Lossless Only)** | 1.2.840.10008.1.2.4.92 | JPEG 2000 Part 2 | delegated | Preflighted OpenJPEG through `DicomJP3DVolumeDocument` |
 | **JPEG 2000 Part 2 Multi-component Image Compression** | 1.2.840.10008.1.2.4.93 | JPEG 2000 Part 2 | delegated | Preflighted OpenJPEG through `DicomJP3DVolumeDocument` |
+| **JPEG XL Lossless** | 1.2.840.10008.1.2.4.110 | JPEG XL | experimental | JXLSwift 1.4.0 reversible 8/16-bit grayscale and RGB8; disabled by default |
+| **JPEG XL JPEG Recompression** | 1.2.840.10008.1.2.4.111 | JPEG XL | experimental | Qualified JPEG Baseline reconstructs byte-for-byte; disabled by default |
+| **JPEG XL** | 1.2.840.10008.1.2.4.112 | JPEG XL | experimental | Explicit reversible or irreversible JXLSwift route; disabled by default |
 | **DICOM JPIP Referenced Transfer Syntax** | 1.2.840.10008.1.2.4.94 | JPIP referenced pixel data | streamed-only | Metadata and Pixel Data Provider URL; transport supplied by application |
 | **DICOM JPIP Referenced Deflate Transfer Syntax** | 1.2.840.10008.1.2.4.95 | JPIP referenced pixel data with dataset deflate | streamed-only | Dataset inflate plus Pixel Data Provider URL; transport supplied by application |
 | **MPEG-2 Video Transfer Syntaxes** | 1.2.840.10008.1.2.4.100-.101.1 | MPEG-2 video | streamed-only | Encoded stream exposed for player backend; native frame decode is not implemented |
 | **MPEG-4 AVC/H.264 Video Transfer Syntaxes** | 1.2.840.10008.1.2.4.102-.106.1 | H.264 video | streamed-only | Encoded stream exposed for player backend; native frame decode is not implemented |
 | **HEVC/H.265 Video Transfer Syntaxes** | 1.2.840.10008.1.2.4.107-.108 | HEVC video | streamed-only | Encoded stream exposed for player backend; native frame decode is not implemented |
-| **HTJ2K Image Compression (Lossless Only)** | 1.2.840.10008.1.2.4.201 | HTJ2K | delegated | Preflighted OpenJPEG runtime >= 2.5 (HT block decoder); no ImageIO JPEG 2000 fallback |
-| **HTJ2K Image Compression (Lossless RPCL)** | 1.2.840.10008.1.2.4.202 | HTJ2K | delegated | Preflighted OpenJPEG runtime >= 2.5 (HT block decoder); no ImageIO JPEG 2000 fallback |
-| **HTJ2K Image Compression** | 1.2.840.10008.1.2.4.203 | HTJ2K | delegated | Preflighted OpenJPEG runtime >= 2.5 (HT block decoder); no ImageIO JPEG 2000 fallback |
+| **HTJ2K Image Compression (Lossless Only)** | 1.2.840.10008.1.2.4.201 | HTJ2K | delegated | Decode: OpenJPEG >= 2.5 production. Encode: explicit reversible J2KSwift CPU route. |
+| **HTJ2K Image Compression (Lossless RPCL)** | 1.2.840.10008.1.2.4.202 | HTJ2K | delegated | Decode: OpenJPEG >= 2.5 production. Encode: explicit reversible J2KSwift CPU RPCL route. |
+| **HTJ2K Image Compression** | 1.2.840.10008.1.2.4.203 | HTJ2K | delegated | Decode: OpenJPEG >= 2.5 production. Encode: explicit reversible/irreversible J2KSwift CPU route. |
 | **RLE Lossless** | 1.2.840.10008.1.2.5 | RLE | decoded | Native `DicomRLELosslessDecoder` |
 
-**Pixel Status Values:** `decoded`, `delegated`, `streamed-only`, `unsupported`, and `out-of-scope`.
+**Pixel Status Values:** `decoded`, `delegated`, `experimental`, `streamed-only`, `unsupported`, and `out-of-scope`.
 The same rows are available programmatically through
 `DicomTransferSyntaxRegistry.standard.compressedPixelSupportMatrix`.
 
@@ -613,6 +616,8 @@ No runtime configuration files are required. Optional features:
 | **Tag Caching** | Enabled | Always enabled, not configurable |
 | **CharLS runtime path** | Auto-detect | Optional `DICOM_DECODER_CHARLS_LIBRARY_PATH` override |
 | **OpenJPEG runtime path** | Auto-detect | Optional `DICOM_DECODER_OPENJPEG_LIBRARY_PATH` override |
+| **JLSwift rollout** | `shadow` | `DICOM_JLSWIFT_MODE=disabled`, `shadow`, `preferred`, or `forced-for-tests` |
+| **JXLSwift rollout** | `disabled` | `DICOM_JXLSWIFT_MODE=disabled`, `experimental`, or `forced-for-tests` |
 
 ### 7.3 Framework Dependencies
 
@@ -624,7 +629,7 @@ DicomCore uses Apple-provided frameworks for its core pipeline:
 - **Accelerate (vDSP):** CPU-based image processing
 - **Metal:** GPU-based image processing (optional)
 
-Deflated Explicit VR Little Endian uses system zlib for raw deflate/inflate. JPEG-LS decoding can use CharLS when `DicomCodecRuntimePreflight.status(for: .charLS)` reports availability. JPEG 2000 decoding can use OpenJPEG when `DicomCodecRuntimePreflight.status(for: .openJPEG)` reports availability. The Swift package does not add SPM dependencies for these codecs; by decision of record (issue #1230) CharLS and OpenJPEG are SYSTEM dependencies loaded dynamically (default Homebrew//usr/local candidates, per-runtime `DICOM_DECODER_<RUNTIME>_LIBRARY_PATH` override) and are never bundled. The codec bridges return typed unsupported-transfer-syntax errors when runtimes are absent, invalid, missing required symbols, or not the supported major version (2.x). `DicomCodecCapabilities` is the single capability API reporting, per backend: availability, version, library path, source (override vs default search path), supported bit depths, and the deterministic unsupported reason. The release gate (`Scripts/test_gates.sh release`) exports `DICOM_REQUIRE_CHARLS=1` and `DICOM_REQUIRE_OPENJPEG=1` so a release candidate fails fast unless both backends are active — JPEG-LS/JPEG 2000 must not be described as supported for a build whose release gate did not prove the backends.
+Deflated Explicit VR Little Endian uses system zlib for raw deflate/inflate. JPEG-LS links JLSwift 0.9.0 behind the async compressed-frame adapter while CharLS remains the dynamically loaded production oracle and fallback. JLSwift defaults to shadow mode and is qualified for JPEG-LS UIDs .80/.81 on aligned 8–16-bit grayscale and RGB8; async encode supports reversible .80 and explicit-NEAR .81. JPEG 2000 decoding can use OpenJPEG when `DicomCodecRuntimePreflight.status(for: .openJPEG)` reports availability. CharLS and OpenJPEG remain SYSTEM dependencies loaded dynamically (default Homebrew//usr/local candidates, per-runtime `DICOM_DECODER_<RUNTIME>_LIBRARY_PATH` override) and are never bundled. J2KSwift 11.0.2 is a versioned SwiftPM dependency behind the JPEG 2000 adapter. Decode defaults to shadow mode and is qualified for JPEG 2000 UIDs .90/.91 while HTJ2K stays on OpenJPEG fallback. Encode is separately qualified on CPU for JPEG 2000 .90/.91 and HTJ2K .201-.203. The codec bridges return typed unsupported-transfer-syntax errors when runtimes are absent or incompatible. `DicomCodecCapabilities.backendStatuses()` reports backend availability, version, source, bit depths, operations, and deterministic unsupported reasons.
 
 ---
 
@@ -636,9 +641,11 @@ Deflated Explicit VR Little Endian uses system zlib for raw deflate/inflate. JPE
 |------------|--------|------------|
 | **Encapsulated multi-frame images** | Frame indexing is supported; full decode depends on codec support for the transfer syntax | Extract frames with `getEncapsulatedFrame(_:)` and decode with a supported codec |
 | **JPEG Lossless Non-RGB Color and Separate-Scan Frames** | Native Process 14 decode handles restart intervals and single interleaved scans of 1 or 3 components; non-RGB photometric interpretations, >8-bit color, and separate-scan multicomponent streams are rejected with stable diagnostics | Convert to interleaved 8-bit RGB or grayscale Process 14, or use another validated backend |
-| **JPEG-LS Runtime Availability** | JPEG-LS requires `DicomCodecRuntimePreflight.status(for: .charLS)` to be available | Install CharLS, set `DICOM_DECODER_CHARLS_LIBRARY_PATH`, or convert to a native lossless syntax |
+| **JPEG-LS Runtime Availability** | Default shadow decode requires CharLS; JLSwift is package-linked and available in preferred/forced modes for qualified shapes | Install/set CharLS, select `preferred`, or use a qualified native syntax |
+| **JLSwift JPEG-LS shapes** | Grayscale below 8 Bits Stored, color above 8 Bits Stored, and non-RGB color are not qualified | Use CharLS through the synchronous path or convert to aligned 8–16-bit grayscale/RGB8 |
+| **Experimental JPEG XL shapes** | 10/12-bit, signed 8-bit, custom ICC, high-depth color, alpha, and oversized frames are not qualified | Use aligned unsigned 8/16-bit or signed 16-bit grayscale, RGB8, or another qualified syntax |
 | **JPEG 2000 Runtime Availability** | JPEG 2000 >8-bit and Part 2 paths require `DicomCodecRuntimePreflight.status(for: .openJPEG)` to be available | Install OpenJPEG, set `DICOM_DECODER_OPENJPEG_LIBRARY_PATH`, or convert to a native supported syntax |
-| **HTJ2K Pixel Decode** | HTJ2K decodes only through the preflighted OpenJPEG runtime version 2.5 or newer (explicit capability check); older runtimes or absent libraries fail typed | Install OpenJPEG >= 2.5 or convert to a supported transfer syntax |
+| **HTJ2K Pixel Decode** | J2KSwift 11.0.2 remains shadow-only after a pinned OpenJPH parity mismatch; production decode uses preflighted OpenJPEG 2.5+ | Install OpenJPEG >= 2.5, disable J2KSwift shadowing, or convert to a supported transfer syntax |
 | **JPEG Hierarchical** | JPEG processes other than Process 14 unsupported | Convert to supported transfer syntax |
 | **Unsupported color combinations** | `DicomColorConversionError.unsupportedColorPath` reports photometric interpretation, sample count, planar layout, bit depth, and transfer syntax context | Convert through a supported transfer syntax/color layout |
 | **Undefined-length non-SQ** | Non-SQ undefined values inside sequences throw parser errors | Use explicit lengths |
@@ -658,7 +665,7 @@ Deflated Explicit VR Little Endian uses system zlib for raw deflate/inflate. JPE
 | **Limited Video Scope** | Video writing/parsing encapsulates and exposes caller-provided MPEG-2/H.264/H.265 streams with metadata; native video decoding is delegated to the application/player backend |
 | **Limited Presentation State Scope** | GSPS graphic annotations are parsed/built for object exchange; display application of GSPS transforms remains caller-owned |
 
-### 8.3 Backlog Alignment
+### 8.3 Current Scope
 
 Remaining limitations in this conformance statement are explicitly scoped:
 
@@ -676,22 +683,19 @@ Remaining limitations in this conformance statement are explicitly scoped:
   ``DicomSRSupportMatrix`` and ``DicomSRSemanticValidator``.
 - Export, print, waveform, and video limitations are exposed through
   ``DicomExportSupportMatrix/packageDefault`` and typed unsupported-path errors.
-- SwiftUI preview mocks and sample data are documented as preview-only support
-  API and are not clinical/runtime decoder surfaces.
-- Isis-level decoder parity documentation was closed separately in issue #1064;
-  package documentation reconciliation is covered by issue #1077.
-- MTK rendering and viewer workflow limitations are outside DICOM-Swift
-  package conformance and are tracked by the open MTK issues #1078 through
-  #1090.
+- Decoder parity documentation is covered by the package-local conformance
+  manifests and reconciliation tests.
+- Presentation and interaction policy is caller-owned. DICOM-Swift ends at
+  decoded values, frames, series, and explicit exports.
 
 ### 8.4 Performance Considerations
 
 | Scenario | Expected Performance | Recommendation |
 |----------|---------------------|----------------|
-| **File Opening** | <50ms for typical files | Use async APIs for UI responsiveness |
+| **File Opening** | <50ms for typical files | Use async APIs to avoid blocking callers |
 | **Pixel Loading** | 100-500ms for compressed data | Load pixels in background task |
 | **Series Loading** | 2-5s for 100-slice CT series | Use progress callbacks, enable concurrency |
-| **Window/Level (CPU)** | ~2ms per 512×512 image | Acceptable for interactive UI |
+| **Window/Level (CPU)** | ~2ms per 512×512 image | Suitable for batch or interactive consumers |
 | **Window/Level (GPU)** | ~2.2ms per 1024×1024 image | Use for high-res or batch processing |
 
 ---
@@ -843,11 +847,30 @@ output:
   full-range, self-inverse transform, so it is undone exactly during
   stored-value reconstruction and the Photometric Interpretation tag is
   preserved.
-- **JPEG-LS Lossless encoding** is the one executable lossless encoder
-  route, gated on the preflighted CharLS runtime; single-sample MONOCHROME2
-  frames encode per frame into a Basic Offset Table encapsulation.
-- Every other native-to-compressed and compressed-to-compressed route stays
-  a typed `routeUnsupported` error carrying the planner diagnostics.
+- **JPEG-LS encoding** is available through the async explicit-intent path:
+  JLSwift 0.9.0 writes lossless .80 for reversible intent and near-lossless
+  .81 only for an explicit NEAR value. Aligned 8–16-bit grayscale and RGB8
+  encode per frame through the shared encapsulation path. The synchronous
+  compatibility route remains CharLS lossless.
+- **JPEG 2000/HTJ2K encoding** is exposed by async overloads that require a
+  ``DicomEncodingIntent``. J2KSwift CPU writes .90/.91 and .201-.203 for
+  aligned 8/16-bit grayscale (1-16 Bits Stored, signed or unsigned) and
+  unsigned RGB8. Reversible routes are bit-exact and never select Metal;
+  irreversible output is allowed only by general-purpose .91/.203 UIDs.
+- Encapsulation writes one padded fragment per frame, a Basic Offset Table
+  while 32-bit offsets fit, and Extended Offset Table/Lengths otherwise.
+  The complete encoded object is assembled in memory before return.
+- Irreversible output records lossy status, method, ratio, DERIVED semantics,
+  derivation description, and a new SOP Instance UID in both the dataset and
+  File Meta Information. Reversible output preserves any existing lossy
+  history. JPEG 2000 Part 2 .92/.93 and ambiguous color/bit layouts stay
+  typed unsupported.
+- **JPEG XL encoding** is experimental and disabled by default. With
+  `DICOM_JXLSWIFT_MODE=experimental`, async overloads write reversible .110,
+  reversible or explicit irreversible .112, and reversible JPEG Baseline
+  recompression .111. `.111` verifies byte-identical reconstruction and
+  preserves SOP/lossy history; irreversible `.112` records `ISO_18181_1` and
+  derives a new SOP Instance UID.
 
 ### Pixel Object Families and Typed Payloads
 
@@ -907,18 +930,21 @@ Complete list of DICOM Transfer Syntax UIDs mentioned in this document:
 | 1.2.840.10008.1.2.4.51 | JPEG Extended (Process 2 & 4) | native 12-bit grayscale decode; <=8-bit via ImageIO |
 | 1.2.840.10008.1.2.4.57 | JPEG Lossless, Non-Hierarchical (Process 14) | decoded native |
 | 1.2.840.10008.1.2.4.70 | JPEG Lossless, Non-Hierarchical, First-Order Prediction | decoded native |
-| 1.2.840.10008.1.2.4.80 | JPEG-LS Lossless Image Compression | delegated preflighted CharLS |
-| 1.2.840.10008.1.2.4.81 | JPEG-LS Lossy Near-Lossless Image Compression | delegated preflighted CharLS |
-| 1.2.840.10008.1.2.4.90 | JPEG 2000 Image Compression (Lossless Only) | delegated OpenJPEG; ImageIO 8-bit fallback |
-| 1.2.840.10008.1.2.4.91 | JPEG 2000 Image Compression | delegated OpenJPEG; ImageIO 8-bit fallback |
+| 1.2.840.10008.1.2.4.80 | JPEG-LS Lossless Image Compression | async JLSwift candidate/CharLS fallback; reversible CPU encode/transcode |
+| 1.2.840.10008.1.2.4.81 | JPEG-LS Lossy Near-Lossless Image Compression | async JLSwift candidate/CharLS fallback; explicit-NEAR CPU encode/transcode |
+| 1.2.840.10008.1.2.4.90 | JPEG 2000 Image Compression (Lossless Only) | async decode candidate/fallback; reversible CPU encode/transcode |
+| 1.2.840.10008.1.2.4.91 | JPEG 2000 Image Compression | async decode candidate/fallback; reversible or irreversible CPU encode/transcode |
 | 1.2.840.10008.1.2.4.92 | JPEG 2000 Part 2 Multi-component Image Compression (Lossless Only) | delegated OpenJPEG volume document |
 | 1.2.840.10008.1.2.4.93 | JPEG 2000 Part 2 Multi-component Image Compression | delegated OpenJPEG volume document |
+| 1.2.840.10008.1.2.4.110 | JPEG XL Lossless | experimental JXLSwift reversible decode/encode; disabled by default |
+| 1.2.840.10008.1.2.4.111 | JPEG XL JPEG Recompression | experimental byte-identical JPEG Baseline bridge; disabled by default |
+| 1.2.840.10008.1.2.4.112 | JPEG XL | experimental reversible/irreversible decode/encode; disabled by default |
 | 1.2.840.10008.1.2.4.94 | JPIP Referenced Transfer Syntax | streamed-only |
 | 1.2.840.10008.1.2.4.95 | JPIP Referenced Deflate Transfer Syntax | streamed-only |
 | 1.2.840.10008.1.2.4.100-.108 | MPEG-2/H.264/HEVC video families | streamed-only |
-| 1.2.840.10008.1.2.4.201 | HTJ2K Image Compression (Lossless Only) | delegated OpenJPEG >= 2.5 |
-| 1.2.840.10008.1.2.4.202 | HTJ2K Image Compression (Lossless RPCL) | delegated OpenJPEG >= 2.5 |
-| 1.2.840.10008.1.2.4.203 | HTJ2K Image Compression | delegated OpenJPEG >= 2.5 |
+| 1.2.840.10008.1.2.4.201 | HTJ2K Image Compression (Lossless Only) | OpenJPEG decode; reversible CPU encode/transcode |
+| 1.2.840.10008.1.2.4.202 | HTJ2K Image Compression (Lossless RPCL) | OpenJPEG decode; reversible CPU RPCL encode/transcode |
+| 1.2.840.10008.1.2.4.203 | HTJ2K Image Compression | OpenJPEG decode; reversible or irreversible CPU encode/transcode |
 | 1.2.840.10008.1.2.5 | RLE Lossless | decoded native |
 
 ---

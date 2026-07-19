@@ -45,19 +45,22 @@ final class HTJ2KDecodeTests: XCTestCase {
         XCTAssertEqual(frame.metadata.height, 8)
     }
 
-    /// Byte-drift guard: the committed fixture must match the deterministic
-    /// builder output (regenerate with DICOM_REGENERATE_PARITY_FIXTURES=1).
-    func testCommittedFixtureMatchesDeterministicBuilder() throws {
+    /// Regeneration guard for the committed fixture. OpenJPH codestream bytes
+    /// may change between tool versions while remaining lossless, so normal
+    /// validation pins the committed checksum and decoded samples instead of
+    /// rebuilding with whichever ojph_compress happens to be installed.
+    func testCommittedFixtureMatchesBuilderDuringExplicitRegeneration() throws {
+        guard ProcessInfo.processInfo.environment["DICOM_REGENERATE_PARITY_FIXTURES"] == "1" else {
+            throw XCTSkip("Set DICOM_REGENERATE_PARITY_FIXTURES=1 to rebuild the HTJ2K fixture.")
+        }
         let rebuilt = try Self.makeFixtureData()
         let url = Self.repoRoot().appendingPathComponent(Self.fixtureRelativePath)
 
-        if ProcessInfo.processInfo.environment["DICOM_REGENERATE_PARITY_FIXTURES"] == "1" {
-            try FileManager.default.createDirectory(
-                at: url.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            try rebuilt.write(to: url)
-        }
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try rebuilt.write(to: url)
 
         let committed = try Data(contentsOf: url)
         XCTAssertEqual(committed, rebuilt, "committed HTJ2K fixture drifted from the deterministic builder")

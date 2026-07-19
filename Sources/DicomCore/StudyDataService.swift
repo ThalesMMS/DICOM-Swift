@@ -616,8 +616,7 @@ public final class StudyDataService: StudyDataServiceProtocol, @unchecked Sendab
     /// ## Example
     /// ```swift
     /// if let thumbData = await service.extractThumbnail(from: filePath, maxSize: CGSize(width: 200, height: 200)) {
-    ///     let image = UIImage(data: thumbData)
-    ///     imageView.image = image
+    ///     try thumbData.write(to: outputURL)
     /// }
     /// ```
     ///

@@ -11,6 +11,7 @@ public enum DicomTransferSyntaxCodec: String, Equatable, Sendable {
     case jpegLS
     case jpeg2000
     case jpeg2000Part2
+    case jpegXL
     case mpeg2
     case h264
     case hevc
@@ -71,6 +72,9 @@ public enum DicomCompressedPixelSupportStatus: String, Codable, Equatable, Senda
 
     /// DicomCore rejects native frame decode with a stable unsupported-transfer diagnostic.
     case unsupported
+
+    /// DicomCore exposes a feature-gated codec route that has not completed clinical qualification.
+    case experimental
 
     /// The syntax is compressed at the dataset level, not a compressed pixel codec.
     case outOfScope = "out-of-scope"
@@ -576,6 +580,8 @@ private extension DicomCompressedPixelSupport {
             return .decoded
         case .jpegBaseline, .jpegLS, .jpeg2000, .jpeg2000Part2:
             return .delegated
+        case .jpegXL:
+            return .experimental
         case .jpip, .mpeg2, .h264, .hevc:
             return .streamedOnly
         case .htj2k:
@@ -620,6 +626,9 @@ private extension DicomCompressedPixelSupport {
             return "Delegated to the preflighted OpenJPEG runtime only when it "
                 + "includes the HTJ2K block decoder (version 2.5 or newer); "
                 + "ImageIO JPEG 2000 fallback is never used for HTJ2K."
+        case .jpegXL:
+            return "Experimental JXLSwift route; disabled by default and never negotiated over DIMSE "
+                + "without an explicit caller policy."
         case .native:
             return "Native uncompressed transfer syntax is outside the compressed pixel codec matrix."
         }
@@ -689,14 +698,16 @@ private extension DicomTransferSyntaxRegistry {
             name: "JPEG 2000 Image Compression (Lossless Only)",
             codec: .jpeg2000,
             compression: .lossless,
-            decoderSupport: .bestEffort("Explicit OpenJPEG backend decodes single-frame JPEG 2000 up to 16-bit grayscale when the runtime library is available; ImageIO is limited to 8-bit fallback.")
+            decoderSupport: .bestEffort("Explicit OpenJPEG backend decodes single-frame JPEG 2000 up to 16-bit grayscale when the runtime library is available; ImageIO is limited to 8-bit fallback."),
+            encoderSupport: .bestEffort("J2KSwift CPU encoding is executable through the async DicomTranscoder route.")
         ),
         compressed(
             .jpeg2000,
             name: "JPEG 2000 Image Compression",
             codec: .jpeg2000,
             compression: .lossy,
-            decoderSupport: .bestEffort("Explicit OpenJPEG backend decodes single-frame JPEG 2000 up to 16-bit grayscale when the runtime library is available; ImageIO is limited to 8-bit fallback.")
+            decoderSupport: .bestEffort("Explicit OpenJPEG backend decodes single-frame JPEG 2000 up to 16-bit grayscale when the runtime library is available; ImageIO is limited to 8-bit fallback."),
+            encoderSupport: .bestEffort("J2KSwift CPU encoding is executable through the async DicomTranscoder route.")
         ),
         compressed(
             .jpeg2000Part2MulticomponentLossless,
@@ -805,25 +816,52 @@ private extension DicomTransferSyntaxRegistry {
             codec: .hevc
         ),
         compressed(
+            .jpegXLLossless,
+            name: "JPEG XL Lossless",
+            codec: .jpegXL,
+            compression: .lossless,
+            decoderSupport: .bestEffort("Experimental JXLSwift route is disabled unless DICOM_JXLSWIFT_MODE=experimental."),
+            encoderSupport: .bestEffort("Experimental JXLSwift route is executable only through the async DicomTranscoder API with explicit intent.")
+        ),
+        compressed(
+            .jpegXLJPEGRecompression,
+            name: "JPEG XL JPEG Recompression",
+            codec: .jpegXL,
+            compression: .lossless,
+            decoderSupport: .bestEffort("Experimental JXLSwift route reconstructs qualified JPEG Baseline frames byte-for-byte when explicitly enabled."),
+            encoderSupport: .bestEffort("Experimental JXLSwift route accepts qualified JPEG Baseline 8-bit frames only.")
+        ),
+        compressed(
+            .jpegXL,
+            name: "JPEG XL",
+            codec: .jpegXL,
+            compression: .lossy,
+            decoderSupport: .bestEffort("Experimental JXLSwift route is disabled unless DICOM_JXLSWIFT_MODE=experimental."),
+            encoderSupport: .bestEffort("Experimental JXLSwift route is executable only through the async DicomTranscoder API with explicit reversible or irreversible intent.")
+        ),
+        compressed(
             .htj2kLossless,
             name: "HTJ2K Image Compression (Lossless Only)",
             codec: .htj2k,
             compression: .lossless,
-            decoderSupport: .bestEffort("HTJ2K decoding requires the preflighted OpenJPEG runtime version 2.5 or newer (HT block decoder); ImageIO JPEG 2000 fallback is not used.")
+            decoderSupport: .bestEffort("HTJ2K decoding requires the preflighted OpenJPEG runtime version 2.5 or newer (HT block decoder); ImageIO JPEG 2000 fallback is not used."),
+            encoderSupport: .bestEffort("Conformant J2KSwift CPU encoding is executable through the async DicomTranscoder route.")
         ),
         compressed(
             .htj2kLosslessRPCL,
             name: "HTJ2K Image Compression (Lossless RPCL)",
             codec: .htj2k,
             compression: .lossless,
-            decoderSupport: .bestEffort("HTJ2K RPCL decoding requires the preflighted OpenJPEG runtime version 2.5 or newer (HT block decoder); ImageIO JPEG 2000 fallback is not used.")
+            decoderSupport: .bestEffort("HTJ2K RPCL decoding requires the preflighted OpenJPEG runtime version 2.5 or newer (HT block decoder); ImageIO JPEG 2000 fallback is not used."),
+            encoderSupport: .bestEffort("Conformant J2KSwift CPU RPCL encoding is executable through the async DicomTranscoder route.")
         ),
         compressed(
             .htj2k,
             name: "HTJ2K Image Compression",
             codec: .htj2k,
             compression: .lossy,
-            decoderSupport: .bestEffort("HTJ2K decoding requires the preflighted OpenJPEG runtime version 2.5 or newer (HT block decoder); ImageIO JPEG 2000 fallback is not used.")
+            decoderSupport: .bestEffort("HTJ2K decoding requires the preflighted OpenJPEG runtime version 2.5 or newer (HT block decoder); ImageIO JPEG 2000 fallback is not used."),
+            encoderSupport: .bestEffort("Conformant J2KSwift CPU encoding is executable through the async DicomTranscoder route.")
         ),
         compressed(
             .rleLossless,

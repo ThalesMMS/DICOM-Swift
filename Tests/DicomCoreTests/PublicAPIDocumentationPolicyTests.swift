@@ -31,17 +31,17 @@ final class PublicAPIDocumentationPolicyTests: XCTestCase {
             "codecs",
             "network",
             "clinicalObjects",
-            "rendering",
+            "export",
             "fixtures",
             "device"
         ]))
     }
 
-    func testDemoWorkflowsAreDocumentedInDemoReadme() throws {
+    func testCoreWorkflowsAreDocumented() throws {
         let manifest = try loadManifest()
 
-        XCTAssertGreaterThanOrEqual(manifest.demoWorkflows.count, 4)
-        for workflow in manifest.demoWorkflows {
+        XCTAssertGreaterThanOrEqual(manifest.coreWorkflows.count, 4)
+        for workflow in manifest.coreWorkflows {
             let document = try String(contentsOf: repoRoot.appendingPathComponent(workflow.path), encoding: .utf8)
             XCTAssertTrue(document.contains(workflow.visibleFlow),
                           "\(workflow.path) should mention \(workflow.visibleFlow)")
@@ -105,7 +105,7 @@ private struct PublicAPIDocumentationManifest: Decodable {
     var policy: String
     var gate: PublicAPIDocumentationGate
     var ownerDocumentation: [PublicAPIDocumentationOwner]
-    var demoWorkflows: [PublicAPIDocumentationDemoWorkflow]
+    var coreWorkflows: [PublicAPIDocumentationCoreWorkflow]
     var tests: [String]
 }
 
@@ -125,7 +125,7 @@ private struct PublicAPIDocumentationLimitation: Decodable {
     var path: String
 }
 
-private struct PublicAPIDocumentationDemoWorkflow: Decodable {
+private struct PublicAPIDocumentationCoreWorkflow: Decodable {
     var id: String
     var path: String
     var visibleFlow: String

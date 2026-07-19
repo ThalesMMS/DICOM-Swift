@@ -58,6 +58,25 @@ final class DicomTransferSyntaxRegistryTests: XCTestCase {
             htj2k.decoderSupport,
             .bestEffort("HTJ2K decoding requires the preflighted OpenJPEG runtime version 2.5 or newer (HT block decoder); ImageIO JPEG 2000 fallback is not used.")
         )
+
+        let jpegXLLossless = try XCTUnwrap(
+            DicomTransferSyntaxRegistry.standard.entry(for: .jpegXLLossless)
+        )
+        XCTAssertEqual(jpegXLLossless.codec, .jpegXL)
+        XCTAssertEqual(jpegXLLossless.compression, .lossless)
+        XCTAssertEqual(DicomTransferSyntax.jpegXLLossless.compressedPixelSupport?.status, .experimental)
+
+        let jpegRecompression = try XCTUnwrap(
+            DicomTransferSyntaxRegistry.standard.entry(for: .jpegXLJPEGRecompression)
+        )
+        XCTAssertEqual(jpegRecompression.codec, .jpegXL)
+        XCTAssertEqual(jpegRecompression.compression, .lossless)
+        XCTAssertTrue("\(jpegRecompression.decoderSupport)".contains("byte-for-byte"))
+
+        let jpegXL = try XCTUnwrap(DicomTransferSyntaxRegistry.standard.entry(for: .jpegXL))
+        XCTAssertEqual(jpegXL.codec, .jpegXL)
+        XCTAssertEqual(jpegXL.compression, .lossy)
+        XCTAssertTrue("\(jpegXL.encoderSupport)".contains("explicit reversible or irreversible intent"))
     }
 
     func testWriteSupportMatrixCoversAllRecognizedTransferSyntaxes() throws {
@@ -156,21 +175,22 @@ final class DicomTransferSyntaxRegistryTests: XCTestCase {
         XCTAssertTrue(diagnosticText(plan).contains("single-frame"))
     }
 
-    func testRecompressionReportsDecoderAndEncoderDiagnostics() {
+    func testRecompressionReportsBestEffortDecoderAndJ2KEncoderDiagnostics() {
         let plan = DicomTransferSyntax.transcodePlan(
             from: .jpegLSLossless,
             to: .jpeg2000Lossless
         )
 
         XCTAssertFalse(plan.canTranscode)
-        XCTAssertEqual(plan.status, .unsupported)
+        XCTAssertEqual(plan.status, .ambiguous)
         XCTAssertEqual(plan.route, .recompress)
         XCTAssertTrue(plan.requiresDecompression)
         XCTAssertTrue(plan.requiresCompression)
 
         let text = diagnosticText(plan)
         XCTAssertTrue(text.contains("Decoder for JPEG-LS Lossless Image Compression is best-effort"))
-        XCTAssertTrue(text.contains("Encoder for JPEG 2000 Image Compression (Lossless Only) is unavailable"))
+        XCTAssertTrue(text.contains("Encoder for JPEG 2000 Image Compression (Lossless Only) is best-effort"))
+        XCTAssertTrue(text.contains("async DicomTranscoder route"))
     }
 
     func testSameSyntaxPassThroughDoesNotRequireCodecs() {

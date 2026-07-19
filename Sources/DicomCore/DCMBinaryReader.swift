@@ -80,32 +80,18 @@ internal final class DCMBinaryReader {
     /// endianness and advances the cursor.
     internal func readShort(location: inout Int) -> UInt16 {
         guard location + 1 < data.count else { return 0 }
-        let b0 = data[location]
-        let b1 = data[location + 1]
+        let value = data.dicomInteger(at: location, as: UInt16.self, littleEndian: littleEndian)
         location += 2
-        if littleEndian {
-            return UInt16(b1) << 8 | UInt16(b0)
-        } else {
-            return UInt16(b0) << 8 | UInt16(b1)
-        }
+        return value
     }
 
     /// Reads a 32‑bit signed integer respecting the current
     /// endianness and advances the cursor.
     internal func readInt(location: inout Int) -> Int {
         guard location + 3 < data.count else { return 0 }
-        let b0 = data[location]
-        let b1 = data[location + 1]
-        let b2 = data[location + 2]
-        let b3 = data[location + 3]
+        let value = data.dicomInteger(at: location, as: UInt32.self, littleEndian: littleEndian)
         location += 4
-        let value: Int
-        if littleEndian {
-            value = Int(b3) << 24 | Int(b2) << 16 | Int(b1) << 8 | Int(b0)
-        } else {
-            value = Int(b0) << 24 | Int(b1) << 16 | Int(b2) << 8 | Int(b3)
-        }
-        return value
+        return Int(value)
     }
 
     /// Reads a 64‑bit double precision floating point number.  The
@@ -115,30 +101,8 @@ internal final class DCMBinaryReader {
     /// initializer.
     internal func readDouble(location: inout Int) -> Double {
         guard location + 7 < data.count else { return 0.0 }
-        var high: UInt32 = 0
-        var low: UInt32 = 0
-        if littleEndian {
-            // bytes 4..7 become the high word
-            high = UInt32(data[location + 7]) << 24 |
-                   UInt32(data[location + 6]) << 16 |
-                   UInt32(data[location + 5]) << 8  |
-                   UInt32(data[location + 4])
-            low  = UInt32(data[location + 3]) << 24 |
-                   UInt32(data[location + 2]) << 16 |
-                   UInt32(data[location + 1]) << 8  |
-                   UInt32(data[location])
-        } else {
-            high = UInt32(data[location]) << 24 |
-                   UInt32(data[location + 1]) << 16 |
-                   UInt32(data[location + 2]) << 8  |
-                   UInt32(data[location + 3])
-            low  = UInt32(data[location + 4]) << 24 |
-                   UInt32(data[location + 5]) << 16 |
-                   UInt32(data[location + 6]) << 8  |
-                   UInt32(data[location + 7])
-        }
+        let bits = data.dicomInteger(at: location, as: UInt64.self, littleEndian: littleEndian)
         location += 8
-        let bits = UInt64(high) << 32 | UInt64(low)
         return Double(bitPattern: bits)
     }
 
@@ -148,18 +112,7 @@ internal final class DCMBinaryReader {
     /// bytes accordingly then reinterpret the bits.
     internal func readFloat(location: inout Int) -> Float {
         guard location + 3 < data.count else { return 0.0 }
-        let value: UInt32
-        if littleEndian {
-            value = UInt32(data[location + 3]) << 24 |
-                    UInt32(data[location + 2]) << 16 |
-                    UInt32(data[location + 1]) << 8  |
-                    UInt32(data[location])
-        } else {
-            value = UInt32(data[location]) << 24 |
-                    UInt32(data[location + 1]) << 16 |
-                    UInt32(data[location + 2]) << 8  |
-                    UInt32(data[location + 3])
-        }
+        let value = data.dicomInteger(at: location, as: UInt32.self, littleEndian: littleEndian)
         location += 4
         return Float(bitPattern: value)
     }

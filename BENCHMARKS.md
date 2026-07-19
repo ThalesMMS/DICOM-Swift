@@ -461,28 +461,32 @@ swift test --filter PerformanceBenchmarkSuite
 
 ## Clinical Performance Budgets
 
-The cross-component budget contract for decoder import, volume assembly, GPU
-upload, MPR, volume rendering, snapshot, and memory is tracked as a test
-resource in
+The cross-component correctness-first contract for codecs, partial decode,
+JPIP progression, decoder import, volume assembly, GPU upload, MPR, volume
+rendering, snapshots, JP3D artifacts, and memory is tracked as a test resource in
 `Tests/DicomCoreTests/Resources/ReleaseGates/ClinicalPerformanceBudgetManifest.json`
 and summarized in
 `Tests/DicomCoreTests/Resources/ReleaseGates/ClinicalPerformanceBudgets.md`.
 
-Budget reports must include enough environment context for fair comparison:
-device name, OS version, architecture, model identifier, build configuration,
-benchmark mode, and fixture identifier. DICOM benchmark JSON now records build
-configuration, physical memory, and per-result peak resident memory when the
-platform exposes it.
+Budget reports include enough environment context for fair comparison: device
+name, OS version, architecture, model identifier, build configuration,
+benchmark mode, fixture identifier, tier, and whether CLI startup is included.
+The clinical reporter emits JSON, CSV, and Markdown with warmups/iterations,
+mean/stddev/CV, p50/p95/p99, throughput, stage/resource/work counters,
+conformance linkage, baseline delta, and verdict.
 
 Run the fast budget gate with:
 
 ```bash
 swift test --filter PerformanceBudgetTests
+swift test --filter ClinicalPerformanceReporterTests
 ```
 
 Budget failures are visible even without a historical baseline. Values at or
 above 90% of a configured budget are warnings; values above the budget are
-failures. Baseline comparison remains the review gate for relative regressions.
+failures. Same-host relative deltas warn at 10% and fail at 20%; mismatched
+mode, fixture, build, tier, or startup scope is never compared. The integrated
+runner is `../Tools/Scripts/Performance/run_clinical_performance_gates.sh`.
 
 ---
 

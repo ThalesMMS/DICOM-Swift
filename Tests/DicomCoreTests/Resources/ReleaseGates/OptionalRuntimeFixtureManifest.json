@@ -49,6 +49,48 @@
       "ciBehavior": "Optional by default. Set DICOM_REQUIRE_JPEG_LOSSLESS_CONFORMANCE_FIXTURES=1 when CI installs these fixtures."
     },
     {
+      "id": "j2kswift-backend",
+      "kind": "package-runtime",
+      "source": "J2KSwift 11.0.2 linked through SwiftPM; no host installation is required.",
+      "phiStatus": "Package dependency only; qualification uses synthetic pixel buffers and provenance-tracked fixtures.",
+      "expectedMetadata": "Backend status reports package-linked source, version 11.0.2, JPEG 2000 decode, JPEG 2000 and HTJ2K encode, and explicit experimental/fallback verdicts.",
+      "expectedPixelBehavior": "J2KSwift and OpenJPEG cross-decode lossless samples exactly; lossy cases declare a fixture-specific metric; the pinned OpenJPH HTJ2K mismatch remains visible.",
+      "testCoverage": [
+        "Tests/DicomCoreTests/DicomJ2KSwiftBackendTests.swift",
+        "Tests/DicomCoreTests/DicomJ2KSwiftEncoderTests.swift"
+      ],
+      "preflight": "DicomCodecCapabilities.backendStatuses() contains the package-linked j2kswift-cpu backend at version 11.0.2",
+      "ciBehavior": "Required in default CI because the dependency is package-linked and deterministic."
+    },
+    {
+      "id": "jlswift-backend",
+      "kind": "package-runtime",
+      "source": "JLSwift 0.9.0 linked through SwiftPM; no host installation is required.",
+      "phiStatus": "Package dependency only; qualification uses synthetic pixel buffers.",
+      "expectedMetadata": "Backend status reports package-linked source, version 0.9.0, JPEG-LS .80/.81 decode and encode, and qualified bit-depth ranges.",
+      "expectedPixelBehavior": "JLSwift and CharLS cross-decode lossless frames bit-exactly and near-lossless frames within the explicit NEAR bound.",
+      "testCoverage": [
+        "Tests/DicomCoreTests/DicomJLSwiftBackendTests.swift",
+        "Tests/DicomCoreTests/DicomTranscoderTests.swift"
+      ],
+      "preflight": "DicomCodecCapabilities.backendStatuses() contains the package-linked jlswift backend at version 0.9.0",
+      "ciBehavior": "Required in default CI because the dependency is package-linked and deterministic."
+    },
+    {
+      "id": "jxlswift-backend",
+      "kind": "package-runtime",
+      "source": "JXLSwift 1.4.0 linked through SwiftPM; no host installation is required.",
+      "phiStatus": "Package dependency only; qualification uses synthetic pixel buffers.",
+      "expectedMetadata": "Backend status reports package-linked source, version 1.4.0, JPEG XL .110/.111/.112 decode, raster .110/.112 encode, and explicit experimental status; the specialized .111 JPEG bridge is covered separately.",
+      "expectedPixelBehavior": "Qualified 8/16-bit grayscale and RGB8 frames round-trip; JPEG Baseline recompression reconstructs byte-for-byte.",
+      "testCoverage": [
+        "Tests/DicomCoreTests/DicomJXLSwiftBackendTests.swift",
+        "Tests/DicomCoreTests/DicomTranscoderTests.swift"
+      ],
+      "preflight": "DicomCodecCapabilities.backendStatuses() contains the package-linked jxlswift backend at version 1.4.0",
+      "ciBehavior": "Required in default CI because the dependency is package-linked; clinical use remains disabled by default."
+    },
+    {
       "id": "charls-runtime",
       "kind": "optional-runtime",
       "source": "System CharLS dynamic library resolved by DicomCodecRuntimePreflight. Set DICOM_DECODER_CHARLS_LIBRARY_PATH for a non-standard install.",
@@ -90,6 +132,34 @@
       ],
       "preflight": "DicomTestRuntimePreflight.status(for: .opjCompress)",
       "ciBehavior": "Optional by default. Set DICOM_REQUIRE_OPJ_COMPRESS=1 when CI provisions opj_compress."
+    },
+    {
+      "id": "libjxl-tools",
+      "kind": "optional-tool",
+      "source": "cjxl and djxl executables from libjxl, discovered through PATH, /opt/homebrew/bin, or /usr/local/bin.",
+      "phiStatus": "Tool dependency only; generated codestreams use synthetic pixel buffers.",
+      "expectedMetadata": "Not applicable.",
+      "expectedPixelBehavior": "JXLSwift output decodes byte-exactly with djxl, cjxl lossless output decodes byte-exactly with JXLSwift, and JPEG reconstruction is byte-identical.",
+      "testCoverage": [
+        "Tests/DicomCoreTests/DicomJXLSwiftBackendTests.swift"
+      ],
+      "preflight": "DicomTestRuntimePreflight.status(for: .libjxlTools)",
+      "ciBehavior": "Optional in quick CI and required by the release gate. Set DICOM_REQUIRE_LIBJXL_TOOLS=1 when provisioning manually."
+    },
+    {
+      "id": "dicomkit-interop",
+      "kind": "optional-tool",
+      "source": "Pinned Raster-Lab DICOMKit checkout at commit 9348075fcd7500a1c15c2ff3e6a796f554c066b4 provided through DICOMKIT_CHECKOUT.",
+      "phiStatus": "Only DICOMKit synthetic CLI parity fixtures and DICOM-Swift synthetic non-PHI object fixtures are exchanged.",
+      "expectedMetadata": "DICOMKit level-1 validation and DICOM-Swift validation preserve Part 10, transfer syntax, object family, dimensions, and required geometry metadata.",
+      "expectedPixelBehavior": "DICOMKit synthetic CT and its RLE/JPEG Lossless transcodes decode to the exact stored sample sequence in DICOM-Swift.",
+      "testCoverage": [
+        "Tests/DicomCoreTests/ClinicalDICOMKitInteropTests.swift",
+        "Tests/DicomCoreTests/ClinicalInteropFixtureExportTests.swift",
+        "Scripts/conformance/run_dicomkit_interop.sh"
+      ],
+      "preflight": "dicomtool verifies DICOMKIT_CHECKOUT is a Git checkout at the manifest-pinned commit",
+      "ciBehavior": "Optional in default CI. Set DICOM_REQUIRE_DICOMKIT_INTEROP=1 when CI provisions the pinned checkout."
     },
     {
       "id": "metal-device",

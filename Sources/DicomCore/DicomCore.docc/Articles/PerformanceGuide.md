@@ -27,7 +27,7 @@ public enum ProcessingMode {
 | Mode | Use Case | Performance | Availability |
 |------|----------|-------------|--------------|
 | `.vdsp` | Small images (<800×800), guaranteed compatibility | ~1-2ms for 512×512 images | Always available |
-| `.metal` | Large images (≥800×800), modern hardware | ~2.20ms for 1024×1024 (3.94× speedup) | Metal-capable devices (iOS 13+, macOS 12+) |
+| `.metal` | Large images (≥800×800), modern hardware | ~2.20ms for 1024×1024 (3.94× speedup) | Metal-capable supported devices |
 | `.auto` | General purpose, adapts to image size | Optimal for all sizes | Graceful fallback to vDSP |
 
 ### Usage Examples

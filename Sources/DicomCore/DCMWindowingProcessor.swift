@@ -186,10 +186,10 @@ public enum ProcessingMode {
 ///     processingMode: .metal
 /// )
 ///
-/// // Display with CGImage
+/// // Create a CGImage for export or downstream processing
 /// if let pixels8 = pixels8,
 ///    let cgImage = createCGImage(from: pixels8, width: decoder.width, height: decoder.height) {
-///     imageView.image = UIImage(cgImage: cgImage)
+///     export(cgImage)
 /// }
 /// ```
 ///

@@ -8,6 +8,110 @@ final class DicomSequenceValueParserTests: XCTestCase {
     private let codeMeaningTag = 0x00080104
     private let privateUndefinedLengthUNTag = 0x77771001
 
+    func testDataSetParserDecodesCyrillicSpecificCharacterSet() throws {
+        let source = DicomDataSet(elements: [
+            DicomDataElement(
+                tag: DicomTag.specificCharacterSet.rawValue,
+                vr: .CS,
+                value: .strings(["ISO_IR 144"])
+            ),
+            DicomDataElement(
+                tag: DicomTag.patientName.rawValue,
+                vr: .PN,
+                value: .strings(["Иванов^Иван"])
+            )
+        ])
+
+        let parsed = try DicomDataSetParser.dataSet(
+            from: DicomDataSetWriter.dataSetData(from: source)
+        )
+
+        XCTAssertEqual(parsed.string(for: .patientName), "Иванов^Иван")
+    }
+
+    func testDataSetParserDecodesISO2022SpecificCharacterSet() throws {
+        let source = DicomDataSet(elements: [
+            DicomDataElement(
+                tag: DicomTag.specificCharacterSet.rawValue,
+                vr: .CS,
+                value: .strings(["ISO 2022 IR 87"])
+            ),
+            DicomDataElement(
+                tag: DicomTag.studyDescription.rawValue,
+                vr: .LO,
+                value: .strings(["検査"])
+            )
+        ])
+
+        let encoded = try DicomDataSetWriter.dataSetData(from: source)
+        XCTAssertTrue(encoded.contains(0x1B))
+
+        let parsed = try DicomDataSetParser.dataSet(from: encoded)
+
+        XCTAssertEqual(parsed.string(for: .studyDescription), "検査")
+    }
+
+    func testNestedSequenceInheritsSpecificCharacterSet() throws {
+        let source = DicomDataSet(elements: [
+            DicomDataElement(
+                tag: DicomTag.specificCharacterSet.rawValue,
+                vr: .CS,
+                value: .strings(["ISO_IR 144"])
+            ),
+            DicomDataElement(
+                tag: procedureCodeSequenceTag,
+                vr: .SQ,
+                value: .sequence([
+                    DicomSequenceItem(dataSet: DicomDataSet(elements: [
+                        DicomDataElement(
+                            tag: codeMeaningTag,
+                            vr: .LO,
+                            value: .strings(["Голова"])
+                        )
+                    ]))
+                ])
+            )
+        ])
+
+        let parsed = try DicomDataSetParser.dataSet(
+            from: DicomDataSetWriter.dataSetData(from: source)
+        )
+        let item = try XCTUnwrap(parsed.sequenceItems(for: procedureCodeSequenceTag).first)
+
+        XCTAssertEqual(item.dataSet.string(for: codeMeaningTag), "Голова")
+    }
+
+    func testMetadataParserSkipsPixelDataAndContinuesWithTrailingElements() throws {
+        let data = element(DicomTag.patientName.rawValue, vr: "PN", value: "DOE^JANE")
+            + pixelData(UInt16(7))
+            + element(DicomTag.studyDescription.rawValue, vr: "LO", value: "After pixels")
+
+        let parsed = try DicomDataSetParser.dataSet(from: data)
+
+        XCTAssertNil(parsed.element(for: .pixelData))
+        XCTAssertEqual(parsed.string(for: .studyDescription), "After pixels")
+    }
+
+    func testMetadataParserSkipsEncapsulatedPixelDataAndContinuesWithTrailingElements() throws {
+        let pixelHeader = elementHeader(
+            DicomTag.pixelData.rawValue,
+            vr: "OB",
+            length: .max,
+            uses32BitLength: true
+        )
+        let fragment = itemHeader(length: 2) + Data([0x01, 0x02])
+        let data = pixelHeader
+            + itemHeader(length: 0)
+            + fragment
+            + delimiter(0xFFFE_E0DD)
+            + element(DicomTag.studyDescription.rawValue, vr: "LO", value: "After pixels")
+
+        let parsed = try DicomDataSetParser.dataSet(from: data)
+
+        XCTAssertNil(parsed.element(for: .pixelData))
+        XCTAssertEqual(parsed.string(for: .studyDescription), "After pixels")
+    }
+
     func testExplicitLengthSequenceParsingContinuesToReturnItems() throws {
         let item = item(explicitValue: element(codeValueTag, vr: "SH", value: "CHEST"))
         let data = sequence(procedureCodeSequenceTag, explicitValue: item)

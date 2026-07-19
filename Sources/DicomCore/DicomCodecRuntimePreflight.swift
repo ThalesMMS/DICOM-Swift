@@ -62,6 +62,7 @@ public enum DicomCodecRuntime: String, CaseIterable, Sendable {
                 "charls_jpegls_decoder_read_header",
                 "charls_jpegls_decoder_get_frame_info",
                 "charls_jpegls_decoder_get_near_lossless",
+                "charls_jpegls_decoder_get_interleave_mode",
                 "charls_jpegls_decoder_get_destination_size",
                 "charls_jpegls_decoder_decode_to_buffer",
                 "charls_jpegls_encoder_create",

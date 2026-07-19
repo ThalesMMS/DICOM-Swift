@@ -58,9 +58,21 @@ public enum DicomDeflatedDataSetCodec {
 
         while offset + 8 <= data.count {
             let tagOffset = offset
-            let group = data.readUInt16(at: offset, littleEndian: true)
+            guard let group = data.dicomIntegerIfPresent(
+                at: offset,
+                as: UInt16.self,
+                littleEndian: true
+            ) else {
+                throw DicomDeflatedDataSetError.malformedFileMetaInformation
+            }
             offset += 2
-            let element = data.readUInt16(at: offset, littleEndian: true)
+            guard let element = data.dicomIntegerIfPresent(
+                at: offset,
+                as: UInt16.self,
+                littleEndian: true
+            ) else {
+                throw DicomDeflatedDataSetError.malformedFileMetaInformation
+            }
             offset += 2
 
             guard group == 0x0002 else {
@@ -79,13 +91,27 @@ public enum DicomDeflatedDataSetCodec {
                     throw DicomDeflatedDataSetError.malformedFileMetaInformation
                 }
                 offset += 2
-                length = Int(data.readUInt32(at: offset, littleEndian: true))
+                guard let encodedLength = data.dicomIntegerIfPresent(
+                    at: offset,
+                    as: UInt32.self,
+                    littleEndian: true
+                ) else {
+                    throw DicomDeflatedDataSetError.malformedFileMetaInformation
+                }
+                length = Int(encodedLength)
                 offset += 4
             } else {
                 guard offset + 2 <= data.count else {
                     throw DicomDeflatedDataSetError.malformedFileMetaInformation
                 }
-                length = Int(data.readUInt16(at: offset, littleEndian: true))
+                guard let encodedLength = data.dicomIntegerIfPresent(
+                    at: offset,
+                    as: UInt16.self,
+                    littleEndian: true
+                ) else {
+                    throw DicomDeflatedDataSetError.malformedFileMetaInformation
+                }
+                length = Int(encodedLength)
                 offset += 2
             }
 
@@ -209,23 +235,4 @@ private struct Part10Layout {
 private enum Operation {
     case deflate
     case inflate(limit: Int)
-}
-
-private extension Data {
-    func readUInt16(at offset: Int, littleEndian: Bool) -> UInt16 {
-        let b0 = UInt16(self[offset])
-        let b1 = UInt16(self[offset + 1])
-        return littleEndian ? (b1 << 8 | b0) : (b0 << 8 | b1)
-    }
-
-    func readUInt32(at offset: Int, littleEndian: Bool) -> UInt32 {
-        let b0 = UInt32(self[offset])
-        let b1 = UInt32(self[offset + 1])
-        let b2 = UInt32(self[offset + 2])
-        let b3 = UInt32(self[offset + 3])
-        if littleEndian {
-            return b3 << 24 | b2 << 16 | b1 << 8 | b0
-        }
-        return b0 << 24 | b1 << 16 | b2 << 8 | b3
-    }
 }

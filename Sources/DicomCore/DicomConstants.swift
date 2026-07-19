@@ -1383,6 +1383,9 @@ public enum DicomVR: Int, Sendable {
 /// - ``init(uid:)``
 /// - ``matches(_:)``
 public enum DicomTransferSyntax: String, CaseIterable, Sendable {
+    private static let uidPaddingCharacters = CharacterSet.whitespacesAndNewlines.union(
+        CharacterSet(charactersIn: "\0")
+    )
 
     // MARK: - Uncompressed Transfer Syntaxes
 
@@ -1525,6 +1528,20 @@ public enum DicomTransferSyntax: String, CaseIterable, Sendable {
     /// UID: 1.2.840.10008.1.2.4.108
     case hevcH265Main10ProfileLevel51 = "1.2.840.10008.1.2.4.108"
 
+    // MARK: - JPEG XL Compressed Transfer Syntaxes
+
+    /// JPEG XL Lossless
+    /// UID: 1.2.840.10008.1.2.4.110
+    case jpegXLLossless = "1.2.840.10008.1.2.4.110"
+
+    /// JPEG XL JPEG Recompression
+    /// UID: 1.2.840.10008.1.2.4.111
+    case jpegXLJPEGRecompression = "1.2.840.10008.1.2.4.111"
+
+    /// JPEG XL (lossy, lossless, or JPEG recompression)
+    /// UID: 1.2.840.10008.1.2.4.112
+    case jpegXL = "1.2.840.10008.1.2.4.112"
+
     // MARK: - High-Throughput JPEG 2000 Compressed Transfer Syntaxes
 
     /// High-Throughput JPEG 2000 Image Compression (Lossless Only)
@@ -1586,6 +1603,9 @@ public enum DicomTransferSyntax: String, CaseIterable, Sendable {
              .mpeg4AVCH264StereoHighProfileLevel42Fragmentable,
              .hevcH265MainProfileLevel51,
              .hevcH265Main10ProfileLevel51,
+             .jpegXLLossless,
+             .jpegXLJPEGRecompression,
+             .jpegXL,
              .htj2kLossless,
              .htj2kLosslessRPCL,
              .htj2k,
@@ -1626,8 +1646,7 @@ public enum DicomTransferSyntax: String, CaseIterable, Sendable {
     ///
     /// - Parameter uid: The transfer syntax UID string
     public init?(uid: String) {
-        let trimmed = uid.trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "\0"))
+        let trimmed = uid.trimmingCharacters(in: Self.uidPaddingCharacters)
         self.init(rawValue: trimmed)
     }
 
@@ -1637,8 +1656,7 @@ public enum DicomTransferSyntax: String, CaseIterable, Sendable {
     /// - Parameter uid: The UID string to check
     /// - Returns: True if the UID matches this transfer syntax
     public func matches(_ uid: String) -> Bool {
-        let trimmed = uid.trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "\0"))
+        let trimmed = uid.trimmingCharacters(in: Self.uidPaddingCharacters)
         return self.rawValue == trimmed
     }
 

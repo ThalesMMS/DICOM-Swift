@@ -8,7 +8,8 @@
 //  search path), what bit depths the decode pipeline supports, and the
 //  deterministic reason when the backend is unusable.
 //
-//  Loading strategy of record: CharLS (JPEG-LS) and OpenJPEG (JPEG 2000)
+//  Loading strategy of record: JLSwift is a package-linked JPEG-LS candidate;
+//  CharLS (JPEG-LS production/fallback) and OpenJPEG (JPEG 2000)
 //  are SYSTEM dependencies loaded dynamically at runtime — default
 //  Homebrew/usr-local candidates, overridable per runtime with
 //  DICOM_DECODER_<RUNTIME>_LIBRARY_PATH. They are not bundled package
@@ -24,6 +25,10 @@ import Foundation
 
 /// Where the active backend library was resolved from.
 public enum DicomCodecBackendSource: String, Codable, Sendable {
+    /// Implemented by code linked into DicomCore or another package target.
+    case packageLinked = "package-linked"
+    /// Implemented by an Apple system framework such as ImageIO.
+    case systemFramework = "system-framework"
     /// Loaded from the path in DICOM_DECODER_<RUNTIME>_LIBRARY_PATH.
     case environmentOverride = "environment-override"
     /// Loaded from the default Homebrew//usr/local candidate list.
@@ -34,6 +39,7 @@ public enum DicomCodecBackendSource: String, Codable, Sendable {
 
 /// Capability report for one codec backend.
 public struct DicomCodecCapability: Equatable, Sendable {
+    /// Optional dynamic runtime represented by this report.
     public let runtime: DicomCodecRuntime
     /// Transfer syntax UIDs this backend decodes.
     public let transferSyntaxUIDs: [String]
@@ -44,12 +50,37 @@ public struct DicomCodecCapability: Equatable, Sendable {
     public let version: String?
     /// Resolved library path, nil when unavailable.
     public let libraryPath: String?
+    /// How the codec runtime was resolved for this process.
     public let source: DicomCodecBackendSource
     /// Grayscale stored-bit depths the decode pipeline accepts.
     public let supportedGrayscaleBitDepths: ClosedRange<Int>
     /// Color (3-sample) stored-bit depths the decode pipeline accepts.
     public let supportedColorBitDepths: ClosedRange<Int>
     /// Deterministic reason when `isAvailable` is false.
+    public let unsupportedReason: String?
+}
+
+/// Public diagnostic projection of one compressed-frame backend.
+public struct DicomCodecBackendStatus: Equatable, Sendable {
+    /// Stable backend identifier used in rollout diagnostics.
+    public let identifier: String
+    /// Linked or runtime-reported backend version.
+    public let version: String?
+    /// How the backend implementation enters the process.
+    public let source: DicomCodecBackendSource
+    /// Whether calls can select the backend in this process.
+    public let isAvailable: Bool
+    /// Transfer syntaxes qualified for decode.
+    public let decodeTransferSyntaxUIDs: [String]
+    /// Transfer syntaxes qualified for encode.
+    public let encodeTransferSyntaxUIDs: [String]
+    /// Qualified operation names (`decode` and/or `encode`).
+    public let operations: [String]
+    /// Qualified grayscale stored-bit depths.
+    public let supportedGrayscaleBitDepths: ClosedRange<Int>
+    /// Qualified multi-component stored-bit depths.
+    public let supportedColorBitDepths: ClosedRange<Int>
+    /// Deterministic reason when the backend is unavailable.
     public let unsupportedReason: String?
 }
 
@@ -65,6 +96,35 @@ public enum DicomCodecCapabilities {
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> [DicomCodecCapability] {
         DicomCodecRuntime.allCases.map { capability(for: $0, environment: environment) }
+    }
+
+    /// Reports package-linked, system-framework, and dynamic codec backends
+    /// through a stable diagnostic surface suitable for preflight tooling.
+    public static func backendStatuses(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> [DicomCodecBackendStatus] {
+        frameBackends(environment: environment).map { capability in
+            DicomCodecBackendStatus(
+                identifier: capability.identifier.rawValue,
+                version: capability.version,
+                source: capability.source,
+                isAvailable: capability.isAvailable,
+                decodeTransferSyntaxUIDs: capability.transferSyntaxUIDs.sorted(),
+                encodeTransferSyntaxUIDs: capability.encodeTransferSyntaxUIDs.sorted(),
+                operations: capability.operations.map(\.rawValue).sorted(),
+                supportedGrayscaleBitDepths: capability.supportedGrayscaleBitDepths,
+                supportedColorBitDepths: capability.supportedColorBitDepths,
+                unsupportedReason: capability.unsupportedReason
+            )
+        }
+    }
+
+    /// Capability reports for every compressed-frame backend currently linked
+    /// or discoverable at runtime, including native Swift and ImageIO paths.
+    static func frameBackends(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> [DicomFrameCodecCapabilities] {
+        DicomCompressedPixelBackendRegistry.capabilities(environment: environment)
     }
 
     /// Capability report for one codec runtime.

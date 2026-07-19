@@ -1,29 +1,34 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.2
 import PackageDescription
 
 let package = Package(
     name: "DICOMSwift",
     defaultLocalization: "en",
     platforms: [
-        .iOS(.v13),
-        .macOS(.v12)
+        .iOS(.v18),
+        .macOS(.v15)
     ],
     products: [
         .library(name: "DicomCore", targets: ["DicomCore"]),
-        .executable(name: "dicomtool", targets: ["dicomtool"]),
-        .library(name: "DicomSwiftUI", targets: ["DicomSwiftUI"]),
-        .executable(name: "DicomSwiftUIExample", targets: ["DicomSwiftUIExample"])
+        .executable(name: "dicomtool", targets: ["dicomtool"])
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.2.0"),
-        .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.19")
+        .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.19"),
+        .package(url: "https://github.com/Raster-Lab/J2KSwift.git", exact: "11.0.2"),
+        .package(url: "https://github.com/Raster-Lab/JLSwift.git", exact: "0.9.0"),
+        .package(url: "https://github.com/Raster-Lab/JXLSwift.git", exact: "1.4.0")
     ],
     targets: [
         .target(
             name: "DicomCore",
             dependencies: [
-                .product(name: "ZIPFoundation", package: "ZIPFoundation")
+                .product(name: "ZIPFoundation", package: "ZIPFoundation"),
+                .product(name: "J2KCore", package: "J2KSwift"),
+                .product(name: "J2KCodec", package: "J2KSwift"),
+                .product(name: "JPEGLS", package: "JLSwift"),
+                .product(name: "JXLSwift", package: "JXLSwift")
             ],
             path: "Sources/DicomCore",
             exclude: [
@@ -45,24 +50,6 @@ let package = Package(
             ],
             path: "Sources/dicomtool"
         ),
-        .target(
-            name: "DicomSwiftUI",
-            dependencies: ["DicomCore"],
-            path: "Sources/DicomSwiftUI"
-        ),
-        .executableTarget(
-            name: "DicomSwiftUIExample",
-            dependencies: ["DicomSwiftUI", "DicomCore"],
-            path: "Examples/DicomSwiftUIExample",
-            exclude: [
-                "Info.plist",
-                "README.md"
-            ],
-            resources: [
-                .process("Assets.xcassets"),
-                .process("Resources")
-            ]
-        ),
         .testTarget(
             name: "DicomTestSupport",
             dependencies: ["DicomCore"],
@@ -74,7 +61,11 @@ let package = Package(
             dependencies: [
                 "DicomCore",
                 "DicomTestSupport",
-                .product(name: "ZIPFoundation", package: "ZIPFoundation")
+                .product(name: "ZIPFoundation", package: "ZIPFoundation"),
+                .product(name: "J2KCore", package: "J2KSwift"),
+                .product(name: "J2KCodec", package: "J2KSwift"),
+                .product(name: "JPEGLS", package: "JLSwift"),
+                .product(name: "JXLSwift", package: "JXLSwift")
             ],
             path: "Tests/DicomCoreTests",
             exclude: [
@@ -87,11 +78,6 @@ let package = Package(
             swiftSettings: [
                 .define("DEBUG", .when(configuration: .debug))
             ]
-        ),
-        .testTarget(
-            name: "DicomSwiftUITests",
-            dependencies: ["DicomSwiftUI", "DicomCore", "DicomTestSupport"],
-            path: "Tests/DicomSwiftUITests"
         ),
         .testTarget(
             name: "dicomtoolTests",
@@ -112,5 +98,6 @@ let package = Package(
             ],
             path: "Tests/dicomtoolIntegrationTests"
         )
-    ]
+    ],
+    swiftLanguageModes: [.v5]
 )

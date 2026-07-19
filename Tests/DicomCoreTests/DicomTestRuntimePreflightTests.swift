@@ -17,6 +17,7 @@ final class DicomTestRuntimePreflightTests: XCTestCase {
 
         let manifestIDs = Set(manifest.capabilities.map(\.id))
         let expectedIDs = Set(DicomRuntimeCapability.allCases.map(\.manifestID))
+            .union(["j2kswift-backend", "jlswift-backend", "jxlswift-backend", "dicomkit-interop"])
         XCTAssertEqual(manifestIDs, expectedIDs)
 
         for capability in manifest.capabilities {

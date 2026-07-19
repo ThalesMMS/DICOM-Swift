@@ -5,7 +5,7 @@ before they become part of the package contract. The local gate checks Swift
 source files for public declarations that do not have a preceding `///`
 documentation comment.
 
-Demo workflows covered by the documentation manifest:
+Core workflows covered by the documentation manifest:
 
 - Decode local DICOM file
 - Browse decoded series
@@ -13,4 +13,4 @@ Demo workflows covered by the documentation manifest:
 - Inspect DICOM metadata
 
 Documented limitations cover codecs, network behavior, clinical objects,
-rendering, fixtures, and device-specific performance.
+export, fixtures, and device-specific performance.

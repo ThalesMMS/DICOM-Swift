@@ -179,6 +179,25 @@ final class DicomDIMSENetworkTests: XCTestCase {
         ])
     }
 
+    func test_pDataDecode_retainsPayloadAsSliceOfInputBuffer() throws {
+        let payload = Data(repeating: 0x5A, count: 64 * 1_024)
+        let encoded = try DicomPDUCodec.encode(.pData([
+            DicomPDV(
+                presentationContextID: 1,
+                isCommand: false,
+                isLastFragment: true,
+                data: payload
+            )
+        ]))
+
+        guard case .pData(let pdvs) = try DicomPDUCodec.decode(encoded),
+              let decodedPayload = pdvs.first?.data else {
+            return XCTFail("Expected one P-DATA payload.")
+        }
+
+        XCTAssertEqual(decodedPayload, payload)
+    }
+
     func testStateMachineCoversReleaseAbortAndPDataErrors() throws {
         var stateMachine = DicomAssociationStateMachine()
         XCTAssertThrowsError(try stateMachine.validatePDataAllowed())

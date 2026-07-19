@@ -43,6 +43,11 @@ internal enum DicomJPEGLSCodec {
 
         var nearLossless: Int32 = 0
         try library.check(library.decoderGetNearLossless(decoder, 0, &nearLossless), operation: "read JPEG-LS NEAR parameter")
+        var interleaveMode: Int32 = 0
+        try library.check(
+            library.decoderGetInterleaveMode(decoder, &interleaveMode),
+            operation: "read JPEG-LS interleave mode"
+        )
 
         var destinationSize = 0
         try library.check(
@@ -65,13 +70,60 @@ internal enum DicomJPEGLSCodec {
         }
 
         return DecodedFrame(
-            bytes: decoded,
+            bytes: try normalizedColorBytes(
+                decoded,
+                frameInfo: frameInfo,
+                interleaveMode: interleaveMode
+            ),
             width: Int(frameInfo.width),
             height: Int(frameInfo.height),
             bitsPerSample: Int(frameInfo.bitsPerSample),
             componentCount: Int(frameInfo.componentCount),
             nearLossless: Int(nearLossless)
         )
+    }
+
+    private static func normalizedColorBytes(
+        _ decoded: Data,
+        frameInfo: CharLSFrameInfo,
+        interleaveMode: Int32
+    ) throws -> Data {
+        let componentCount = Int(frameInfo.componentCount)
+        guard componentCount > 1 else { return decoded }
+        guard componentCount == 3, (0...2).contains(interleaveMode) else {
+            throw DICOMError.invalidPixelData(
+                reason: "JPEG-LS color output has unsupported interleave mode \(interleaveMode)"
+            )
+        }
+        // CharLS materializes line- and sample-interleaved scans as RGBRGB.
+        // Only non-interleaved scans retain three contiguous component planes.
+        guard interleaveMode == 0 else { return decoded }
+        let width = Int(frameInfo.width)
+        let height = Int(frameInfo.height)
+        let pixelCountResult = width.multipliedReportingOverflow(by: height)
+        let bytesPerSample = Int(frameInfo.bitsPerSample) <= 8 ? 1 : 2
+        let sampleCountResult = pixelCountResult.partialValue.multipliedReportingOverflow(by: componentCount)
+        let byteCountResult = sampleCountResult.partialValue.multipliedReportingOverflow(by: bytesPerSample)
+        guard !pixelCountResult.overflow,
+              !sampleCountResult.overflow,
+              !byteCountResult.overflow,
+              decoded.count == byteCountResult.partialValue else {
+            throw DICOMError.invalidPixelData(reason: "JPEG-LS color output size does not match its frame header")
+        }
+
+        let source = [UInt8](decoded)
+        var destination = [UInt8](repeating: 0, count: source.count)
+        let pixelCount = pixelCountResult.partialValue
+        for pixel in 0..<pixelCount {
+            for component in 0..<componentCount {
+                let sourceSample = component * pixelCount + pixel
+                let destinationSample = pixel * componentCount + component
+                for byte in 0..<bytesPerSample {
+                    destination[destinationSample * bytesPerSample + byte] = source[sourceSample * bytesPerSample + byte]
+                }
+            }
+        }
+        return Data(destination)
     }
 
     static func encodeForTesting(
@@ -176,6 +228,7 @@ private final class CharLSLibrary {
     typealias DecoderReadHeader = @convention(c) (OpaquePointer) -> Int32
     typealias DecoderGetFrameInfo = @convention(c) (OpaquePointer, UnsafeMutableRawPointer?) -> Int32
     typealias DecoderGetNearLossless = @convention(c) (OpaquePointer, Int32, UnsafeMutablePointer<Int32>) -> Int32
+    typealias DecoderGetInterleaveMode = @convention(c) (OpaquePointer, UnsafeMutablePointer<Int32>) -> Int32
     typealias DecoderGetDestinationSize = @convention(c) (OpaquePointer, UInt32, UnsafeMutablePointer<Int>) -> Int32
     typealias DecoderDecodeToBuffer = @convention(c) (OpaquePointer, UnsafeMutableRawPointer?, Int, UInt32) -> Int32
 
@@ -201,6 +254,7 @@ private final class CharLSLibrary {
     let decoderReadHeader: DecoderReadHeader
     let decoderGetFrameInfo: DecoderGetFrameInfo
     let decoderGetNearLossless: DecoderGetNearLossless
+    let decoderGetInterleaveMode: DecoderGetInterleaveMode
     let decoderGetDestinationSize: DecoderGetDestinationSize
     let decoderDecodeToBuffer: DecoderDecodeToBuffer
 
@@ -266,6 +320,13 @@ private final class CharLSLibrary {
             as: DecoderGetNearLossless.self,
             missingSymbols: &unresolvedSymbols,
             fallback: Self.unavailableDecoderGetNearLossless
+        )
+        decoderGetInterleaveMode = Self.load(
+            "charls_jpegls_decoder_get_interleave_mode",
+            from: handle,
+            as: DecoderGetInterleaveMode.self,
+            missingSymbols: &unresolvedSymbols,
+            fallback: Self.unavailableDecoderGetInterleaveMode
         )
         decoderGetDestinationSize = Self.load(
             "charls_jpegls_decoder_get_destination_size",
@@ -412,6 +473,7 @@ private final class CharLSLibrary {
     private static let unavailableDecoderReadHeader: DecoderReadHeader = { _ in -1 }
     private static let unavailableDecoderGetFrameInfo: DecoderGetFrameInfo = { _, _ in -1 }
     private static let unavailableDecoderGetNearLossless: DecoderGetNearLossless = { _, _, _ in -1 }
+    private static let unavailableDecoderGetInterleaveMode: DecoderGetInterleaveMode = { _, _ in -1 }
     private static let unavailableDecoderGetDestinationSize: DecoderGetDestinationSize = { _, _, _ in -1 }
     private static let unavailableDecoderDecodeToBuffer: DecoderDecodeToBuffer = { _, _, _, _ in -1 }
     private static let unavailableEncoderCreate: EncoderCreate = { nil }

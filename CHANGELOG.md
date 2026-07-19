@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Added release-prep guidance, including a first-stable-release gate checklist in `RELEASING.md`.
+- Reduced DIMSE receive overhead by waiting for complete requested chunks and retaining decoded P-DATA payloads as zero-copy buffer slices.
 
 ### Added
 

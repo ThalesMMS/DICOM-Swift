@@ -15,7 +15,7 @@ DICOM (Digital Imaging and Communications in Medicine) is the standard for medic
 - PNG, JPEG, TIFF, 16-bit TIFF, and multiframe image export
 - UI-independent print/export preprocessing with resize and explicit annotation burn-in
 - Export, Secondary Capture, print, waveform, and video support matrix with typed unsupported-path diagnostics
-- Transfer syntax registry and conservative transcode planning
+- Transfer syntax registry, conservative transcode planning, explicit-intent CPU JPEG 2000/HTJ2K encoding, and experimental JPEG XL routes
 - Encapsulated Pixel Data frame indexing before codec decode
 - Deflated Explicit VR Little Endian dataset read/write support through zlib
 - JPIP referenced pixel data and progressive volume update streams with injected transport

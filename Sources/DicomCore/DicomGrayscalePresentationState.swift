@@ -739,7 +739,8 @@ private enum DicomGrayscalePresentationStateParser {
             valueOffset: metadata.offset,
             valueLength: metadata.elementLength,
             littleEndian: decoder.littleEndian,
-            explicitVR: syntax.isExplicitVR
+            explicitVR: syntax.isExplicitVR,
+            characterSet: decoder.activeCharacterSet
         )) ?? []
     }
 }

@@ -51,35 +51,52 @@ public enum DicomDecodedFramePixelBuffer: Equatable, Sendable {
 /// come from the DICOM header; optional fields are nil when the dataset
 /// does not carry the attribute.
 public struct DicomDecodedFrameMetadata: Equatable, Sendable {
+    /// Decoded frame width in pixels.
     public let width: Int
+    /// Decoded frame height in pixels.
     public let height: Int
     /// Addressable frame count (mapped frames for encapsulated objects).
     public let frameCount: Int
+    /// Storage allocation width of each sample.
     public let bitsAllocated: Int
+    /// Significant precision of each stored sample.
     public let bitsStored: Int
+    /// Index of the most significant stored bit.
     public let highBit: Int
+    /// DICOM signedness flag, where one denotes signed samples.
     public let pixelRepresentation: Int
+    /// Number of samples stored per pixel.
     public let samplesPerPixel: Int
+    /// DICOM photometric interpretation of the frame.
     public let photometricInterpretation: String
+    /// Planar layout flag for multi-sample frames, when present.
     public let planarConfiguration: Int?
+    /// Transfer syntax used by the source object.
     public let transferSyntaxUID: String
     /// Stored VOI window, nil when the dataset has no usable window.
     public let windowSettings: WindowSettings?
+    /// Modality rescale slope and intercept.
     public let rescaleParameters: RescaleParameters
+    /// Smallest stored image pixel value declared by the object.
     public let smallestImagePixelValue: Int?
+    /// Largest stored image pixel value declared by the object.
     public let largestImagePixelValue: Int?
 }
 
 /// One decoded frame: typed pixels plus renderer-facing metadata.
 public struct DicomDecodedFrame: Equatable, Sendable {
+    /// Zero-based source frame index.
     public let index: Int
+    /// Typed grayscale or RGB pixel storage.
     public let pixels: DicomDecodedFramePixelBuffer
+    /// Renderer-facing metadata for the decoded output.
     public let metadata: DicomDecodedFrameMetadata
 }
 
 /// Production frame reader over one DICOM object. Thread-safe (the wrapped
 /// decoder synchronizes its state) and cheap to copy.
 public struct DicomDecodedFrameReader: Sendable {
+    /// Typed failures while locating, extracting, or decoding a frame.
     public enum ReadError: Error, Equatable, LocalizedError, Sendable {
         /// The object carries no decodable Pixel Data element.
         case noPixelData
@@ -93,6 +110,7 @@ public struct DicomDecodedFrameReader: Sendable {
         /// The selected backend failed to produce a typed pixel buffer.
         case decodeFailed(transferSyntaxUID: String, reason: String)
 
+        /// Human-readable diagnostic suitable for logs or presentation.
         public var errorDescription: String? {
             switch self {
             case .noPixelData:
@@ -171,18 +189,229 @@ public struct DicomDecodedFrameReader: Sendable {
     /// Cancellation-aware variant: the decode runs off the caller's thread
     /// and honors `Task` cancellation before extraction starts.
     @available(macOS 10.15, iOS 13.0, *)
+    /// Decodes one frame asynchronously while honoring task cancellation.
     public func frame(at index: Int) async throws -> DicomDecodedFrame {
+        try await frameExecution(at: index).frame
+    }
+
+    @available(macOS 10.15, iOS 13.0, *)
+    /// Decodes one frame and reports the backend/fallback decision that produced it.
+    public func frameExecution(
+        at index: Int,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) async throws -> DicomDecodedFrameExecution {
+        guard decoder.fileReadSucceeded else {
+            throw ReadError.noPixelData
+        }
+        let count = frameCount
+        guard index >= 0, index < count else {
+            throw ReadError.frameIndexOutOfRange(index: index, frameCount: count)
+        }
+        if decoder.compressedImage,
+           let syntax = DicomTransferSyntax(uid: decoder.transferSyntaxUID),
+           let family = DicomCodecFamily.family(for: syntax),
+           family == .jpeg2000 || family == .htj2k {
+            return try await decodeJ2KFrame(at: index, frameCount: count, environment: environment)
+        }
+        if decoder.compressedImage,
+           let syntax = DicomTransferSyntax(uid: decoder.transferSyntaxUID),
+           DicomCodecFamily.family(for: syntax) == .jpegLS {
+            return try await decodeJPEGLSFrame(at: index, frameCount: count, environment: environment)
+        }
+        if decoder.compressedImage,
+           let syntax = DicomTransferSyntax(uid: decoder.transferSyntaxUID),
+           DicomCodecFamily.family(for: syntax) == .jpegXL,
+           DicomJXLSwiftRolloutMode(environment: environment) != .disabled {
+            return try await decodeJPEGXLFrame(at: index, frameCount: count, environment: environment)
+        }
+
         let reader = self
         return try await Task.detached(priority: .userInitiated) {
             try Task.checkCancellation()
-            return try reader.frame(at: index)
+            let frame = try reader.frame(at: index)
+            return reader.execution(
+                frame: frame,
+                environment: environment,
+                rolloutMode: nil,
+                fallbackReason: nil,
+                shadowBackendIdentifier: nil
+            )
         }.value
+    }
+
+    /// Reports codestream-qualified partial-decode capabilities for one frame.
+    /// Unsupported transfer syntaxes return `.unavailable`; malformed frame
+    /// mappings or codestream headers remain typed errors.
+    @available(macOS 10.15, iOS 13.0, *)
+    /// Reports direct partial-decode support and codestream limits for a frame.
+    public func partialDecodeCapabilities(at index: Int = 0) async throws
+        -> DicomPartialFrameDecodeCapabilities {
+        guard decoder.fileReadSucceeded else {
+            throw ReadError.noPixelData
+        }
+        let count = frameCount
+        guard index >= 0, index < count else {
+            throw ReadError.frameIndexOutOfRange(index: index, frameCount: count)
+        }
+        guard DicomJ2KSwiftBackend.qualifiedTransferSyntaxes.contains(decoder.transferSyntaxUID),
+              DicomJ2KSwiftRolloutMode() != .disabled else {
+            return .unavailable
+        }
+
+        let frameData = try compressedFrameData(at: index)
+        let info = try DicomJ2KCodestreamInfo.parse(frameData)
+        return DicomPartialFrameDecodeCapabilities(
+            supportsRegion: true,
+            supportsResolutionReduction: true,
+            supportsQualityLayers: true,
+            supportsCombinedRegionAndResolution: true,
+            supportsQualityWithSpatialReduction: false,
+            maximumResolutionReductionLevel: info.decompositionLevels,
+            qualityLayerCount: info.qualityLayerCount
+        )
+    }
+
+    /// Executes a qualified JPEG 2000 partial decode without materializing a
+    /// full frame. Callers choose any non-JPEG-2000 fallback explicitly.
+    @available(macOS 10.15, iOS 13.0, *)
+    /// Decodes a spatial, resolution, or quality subset of one qualified frame.
+    public func frame(
+        at index: Int,
+        partial request: DicomPartialFrameDecodeRequest
+    ) async throws -> DicomPartialFrameDecodeResult {
+        guard decoder.fileReadSucceeded else {
+            throw ReadError.noPixelData
+        }
+        let count = frameCount
+        guard index >= 0, index < count else {
+            throw ReadError.frameIndexOutOfRange(index: index, frameCount: count)
+        }
+        guard DicomJ2KSwiftBackend.qualifiedTransferSyntaxes.contains(decoder.transferSyntaxUID) else {
+            throw DicomPartialFrameDecodeError.unsupportedTransferSyntax(decoder.transferSyntaxUID)
+        }
+        guard DicomJ2KSwiftRolloutMode() != .disabled else {
+            throw DicomPartialFrameDecodeError.backendDisabled
+        }
+
+        try Task.checkCancellation()
+        let frameData = try compressedFrameData(at: index)
+        let info = try DicomJ2KCodestreamInfo.parse(frameData)
+        guard request.resolutionReductionLevel <= info.decompositionLevels else {
+            throw DicomPartialFrameDecodeError.invalidResolutionReductionLevel(
+                requested: request.resolutionReductionLevel,
+                maximum: info.decompositionLevels
+            )
+        }
+        if let layer = request.maximumQualityLayer {
+            guard layer < info.qualityLayerCount else {
+                throw DicomPartialFrameDecodeError.invalidQualityLayer(
+                    requested: layer,
+                    count: info.qualityLayerCount
+                )
+            }
+            let finalLayer = info.qualityLayerCount - 1
+            if request.requiresFinalQuality, layer < finalLayer {
+                throw DicomPartialFrameDecodeError.finalQualityUnavailable(
+                    requestedLayer: layer,
+                    finalLayer: finalLayer
+                )
+            }
+        }
+
+        let sourceRegion = try clippedRegion(request.sourceRegion)
+        let hasSpatialReduction = request.sourceRegion != nil || request.resolutionReductionLevel > 0
+        if request.maximumQualityLayer != nil, hasSpatialReduction {
+            throw DicomPartialFrameDecodeError.unsupportedCombination
+        }
+
+        let descriptor = compressedFrameDescriptor()
+        let partialRequest = DicomPartialDecodeRequest(
+            region: request.sourceRegion == nil ? nil : DicomPartialDecodeRequest.Region(
+                x: sourceRegion.x,
+                y: sourceRegion.y,
+                width: sourceRegion.width,
+                height: sourceRegion.height
+            ),
+            resolutionLevel: request.resolutionReductionLevel > 0
+                ? info.decompositionLevels - request.resolutionReductionLevel
+                : nil,
+            maximumQualityLayer: request.maximumQualityLayer
+        )
+        let decodeRequest = DicomFrameDecodeRequest(
+            frameData: frameData,
+            descriptor: descriptor,
+            frameIndex: index,
+            partialRequest: partialRequest
+        )
+
+        let decoded: DicomCodecDecodedFrame
+        do {
+            guard let result = try await DicomJ2KSwiftFrameDecoder.decode(
+                decodeRequest,
+                report: { telemetry in
+                    decoder.logger.info(Self.telemetryMessage(telemetry))
+                }
+            ) else {
+                throw DicomPartialFrameDecodeError.backendDisabled
+            }
+            decoded = result
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as DicomPartialFrameDecodeError {
+            throw error
+        } catch {
+            throw DicomPartialFrameDecodeError.decodeFailed(error.localizedDescription)
+        }
+        try Task.checkCancellation()
+
+        guard let result = DCMPixelReader.makeCompressedResult(
+            from: decoded,
+            pixelRepresentation: decoder.pixelRepresentationTagValue,
+            photometricInterpretation: decoder.photometricInterpretation
+        ), let pixels = Self.typedPixels(from: result) else {
+            throw DicomPartialFrameDecodeError.decodeFailed(
+                "the backend did not produce a typed pixel buffer"
+            )
+        }
+        let frame = DicomDecodedFrame(
+            index: index,
+            pixels: pixels,
+            metadata: makeMetadata(width: result.width, height: result.height, frameCount: count)
+        )
+        let execution: DicomPartialFrameDecodeResult.Execution
+        switch (request.sourceRegion != nil, request.resolutionReductionLevel > 0, request.maximumQualityLayer != nil) {
+        case (false, false, false): execution = .fullFrame
+        case (true, false, false): execution = .directRegion
+        case (false, true, false): execution = .directResolution
+        case (true, true, false): execution = .directRegionAndResolution
+        case (false, false, true): execution = .directQualityLayer
+        case (_, _, true): throw DicomPartialFrameDecodeError.unsupportedCombination
+        }
+        let qualityState: DicomPartialFrameDecodeResult.QualityState
+        if let layer = request.maximumQualityLayer, layer < info.qualityLayerCount - 1 {
+            qualityState = layer == 0 ? .preview : .refinement(layer: layer)
+        } else {
+            qualityState = .final
+        }
+        return DicomPartialFrameDecodeResult(
+            frame: frame,
+            decodedSourceRegion: sourceRegion,
+            coordinateTransform: DicomPartialFrameDecodeResult.CoordinateTransform(
+                sourceRegion: sourceRegion,
+                outputWidth: result.width,
+                outputHeight: result.height
+            ),
+            deliveredQualityLayer: request.maximumQualityLayer,
+            qualityState: qualityState,
+            execution: execution
+        )
     }
 
     /// Streams decoded frames one at a time (memory-bounded: only the
     /// in-flight frame is materialized). Cancelling the consuming task
     /// stops decoding before the next frame.
     @available(macOS 10.15, iOS 13.0, *)
+    /// Streams decoded frames and stops producing values when the task is cancelled.
     public func frames(in range: Range<Int>? = nil) -> AsyncThrowingStream<DicomDecodedFrame, Error> {
         let reader = self
         return AsyncThrowingStream { continuation in
@@ -191,7 +420,7 @@ public struct DicomDecodedFrameReader: Sendable {
                     let resolvedRange = range ?? 0..<reader.frameCount
                     for index in resolvedRange {
                         try Task.checkCancellation()
-                        continuation.yield(try reader.frame(at: index))
+                        continuation.yield(try await reader.frame(at: index))
                     }
                     continuation.finish()
                 } catch {
@@ -237,6 +466,191 @@ public struct DicomDecodedFrameReader: Sendable {
     }
 
     // MARK: - Compressed path
+
+    @available(macOS 10.15, iOS 13.0, *)
+    private func decodeJ2KFrame(
+        at index: Int,
+        frameCount: Int,
+        environment: [String: String]
+    ) async throws -> DicomDecodedFrameExecution {
+        let frameData = try compressedFrameData(at: index)
+        let descriptor = compressedFrameDescriptor()
+        let request = DicomFrameDecodeRequest(
+            frameData: frameData,
+            descriptor: descriptor,
+            frameIndex: index
+        )
+
+        let telemetry = DicomJ2KTelemetryProbe()
+        let decoded: DicomCodecDecodedFrame?
+        do {
+            decoded = try await DicomJ2KSwiftFrameDecoder.decode(request, environment: environment) { event in
+                telemetry.append(event)
+                decoder.logger.info(Self.telemetryMessage(event))
+            }
+        } catch {
+            throw ReadError.decodeFailed(
+                transferSyntaxUID: decoder.transferSyntaxUID,
+                reason: error.localizedDescription
+            )
+        }
+
+        guard let decoded else {
+            let reader = self
+            return try await Task.detached(priority: .userInitiated) {
+                let frame = try reader.decodeCompressedFrame(at: index, frameCount: frameCount)
+                return reader.execution(
+                    frame: frame,
+                    environment: environment,
+                    rolloutMode: DicomJ2KSwiftRolloutMode(environment: environment).rawValue,
+                    fallbackReason: "The J2KSwift rollout backend is disabled or ineligible.",
+                    shadowBackendIdentifier: nil
+                )
+            }.value
+        }
+        guard let result = DCMPixelReader.makeCompressedResult(
+            from: decoded,
+            pixelRepresentation: decoder.pixelRepresentationTagValue,
+            photometricInterpretation: decoder.photometricInterpretation
+        ), let pixels = Self.typedPixels(from: result) else {
+            throw ReadError.decodeFailed(
+                transferSyntaxUID: decoder.transferSyntaxUID,
+                reason: "the selected async codec backend did not produce a typed pixel buffer"
+            )
+        }
+        let frame = DicomDecodedFrame(
+            index: index,
+            pixels: pixels,
+            metadata: makeMetadata(width: result.width, height: result.height, frameCount: frameCount)
+        )
+        let snapshot = telemetry.snapshot()
+        return execution(
+            frame: frame,
+            selectedBackendIdentifier: snapshot.selectedBackendIdentifier,
+            environment: environment,
+            rolloutMode: snapshot.mode,
+            fallbackReason: snapshot.fallbackReason,
+            shadowBackendIdentifier: snapshot.shadowBackendIdentifier
+        )
+    }
+
+    @available(macOS 10.15, iOS 13.0, *)
+    private func decodeJPEGLSFrame(
+        at index: Int,
+        frameCount: Int,
+        environment: [String: String]
+    ) async throws -> DicomDecodedFrameExecution {
+        let request = DicomFrameDecodeRequest(
+            frameData: try compressedFrameData(at: index),
+            descriptor: compressedFrameDescriptor(),
+            frameIndex: index
+        )
+
+        let telemetry = DicomJLSTelemetryProbe()
+        let decoded: DicomCodecDecodedFrame?
+        do {
+            decoded = try await DicomJLSwiftFrameDecoder.decode(request, environment: environment) { event in
+                telemetry.append(event)
+                decoder.logger.info(Self.telemetryMessage(event))
+            }
+        } catch {
+            throw ReadError.decodeFailed(
+                transferSyntaxUID: decoder.transferSyntaxUID,
+                reason: error.localizedDescription
+            )
+        }
+        guard let decoded else {
+            let reader = self
+            return try await Task.detached(priority: .userInitiated) {
+                let frame = try reader.decodeCompressedFrame(at: index, frameCount: frameCount)
+                return reader.execution(
+                    frame: frame,
+                    environment: environment,
+                    rolloutMode: DicomJLSwiftRolloutMode(environment: environment).rawValue,
+                    fallbackReason: "The JLSwift rollout backend is disabled or ineligible.",
+                    shadowBackendIdentifier: nil
+                )
+            }.value
+        }
+        guard let result = DCMPixelReader.makeCompressedResult(
+            from: decoded,
+            pixelRepresentation: decoder.pixelRepresentationTagValue,
+            photometricInterpretation: decoder.photometricInterpretation
+        ), let pixels = Self.typedPixels(from: result) else {
+            throw ReadError.decodeFailed(
+                transferSyntaxUID: decoder.transferSyntaxUID,
+                reason: "the selected JPEG-LS backend did not produce a typed pixel buffer"
+            )
+        }
+        let frame = DicomDecodedFrame(
+            index: index,
+            pixels: pixels,
+            metadata: makeMetadata(width: result.width, height: result.height, frameCount: frameCount)
+        )
+        let snapshot = telemetry.snapshot()
+        return execution(
+            frame: frame,
+            selectedBackendIdentifier: snapshot.selectedBackendIdentifier,
+            environment: environment,
+            rolloutMode: snapshot.mode,
+            fallbackReason: snapshot.fallbackReason,
+            shadowBackendIdentifier: snapshot.shadowBackendIdentifier
+        )
+    }
+
+    @available(macOS 10.15, iOS 13.0, *)
+    private func decodeJPEGXLFrame(
+        at index: Int,
+        frameCount: Int,
+        environment: [String: String]
+    ) async throws -> DicomDecodedFrameExecution {
+        let request = DicomFrameDecodeRequest(
+            frameData: try compressedFrameData(at: index),
+            descriptor: compressedFrameDescriptor(),
+            frameIndex: index
+        )
+        let decoded: DicomCodecDecodedFrame?
+        do {
+            decoded = try await DicomJXLSwiftFrameDecoder.decode(request, environment: environment) { telemetry in
+                decoder.logger.info(
+                    "JXLSwift frame=\(telemetry.frameIndex) compressed=\(telemetry.compressedBytes) "
+                        + "decoded=\(telemetry.decodedBytes) duration=\(telemetry.duration) "
+                        + "ratio=\(telemetry.compressionRatio) "
+                        + "jpegBridge=\(telemetry.reconstructedJPEG) success=\(telemetry.succeeded)"
+                )
+            }
+        } catch {
+            throw ReadError.decodeFailed(
+                transferSyntaxUID: decoder.transferSyntaxUID,
+                reason: error.localizedDescription
+            )
+        }
+        guard let decoded,
+              let result = DCMPixelReader.makeCompressedResult(
+                from: decoded,
+                pixelRepresentation: decoder.pixelRepresentationTagValue,
+                photometricInterpretation: decoder.photometricInterpretation
+              ),
+              let pixels = Self.typedPixels(from: result) else {
+            throw ReadError.decodeFailed(
+                transferSyntaxUID: decoder.transferSyntaxUID,
+                reason: "the experimental JXLSwift backend did not produce a typed pixel buffer"
+            )
+        }
+        let frame = DicomDecodedFrame(
+            index: index,
+            pixels: pixels,
+            metadata: makeMetadata(width: result.width, height: result.height, frameCount: frameCount)
+        )
+        return execution(
+            frame: frame,
+            selectedBackendIdentifier: DicomCodecBackendIdentifier.jxlSwift.rawValue,
+            environment: environment,
+            rolloutMode: DicomJXLSwiftRolloutMode(environment: environment).rawValue,
+            fallbackReason: nil,
+            shadowBackendIdentifier: nil
+        )
+    }
 
     private func decodeCompressedFrame(at index: Int, frameCount: Int) throws -> DicomDecodedFrame {
         let transferSyntax = DicomTransferSyntax(uid: decoder.transferSyntaxUID)
@@ -312,6 +726,74 @@ public struct DicomDecodedFrameReader: Sendable {
 
     // MARK: - Shared helpers
 
+    private func compressedFrameData(at index: Int) throws -> Data {
+        do {
+            let encapsulated = try decoder.makeEncapsulatedPixelFrameReader()
+            return try encapsulated.frameData(at: index)
+        } catch let error as DicomEncapsulatedPixelFrameReader.ReaderError {
+            switch error {
+            case .notEncapsulated:
+                let data = decoder.dicomDataSnapshot()
+                guard decoder.offset > 0, decoder.offset <= data.count else {
+                    throw ReadError.decodeFailed(
+                        transferSyntaxUID: decoder.transferSyntaxUID,
+                        reason: "the defined-length compressed Pixel Data offset is invalid"
+                    )
+                }
+                return data.subdata(in: decoder.offset..<data.count)
+            case .unusableFrameMap(let diagnostics):
+                throw ReadError.unusableEncapsulation(diagnostics: diagnostics.map(\.message))
+            case .frameIndexOutOfRange(let index, let frameCount):
+                throw ReadError.frameIndexOutOfRange(index: index, frameCount: frameCount)
+            case .declaredFrameCountMismatch(let declared, let mapped):
+                throw ReadError.unusableEncapsulation(
+                    diagnostics: ["NumberOfFrames declares \(declared) frame(s) but \(mapped) were mapped."]
+                )
+            }
+        }
+    }
+
+    private func compressedFrameDescriptor() -> DicomCompressedFrameDescriptor {
+        let bitsStored = decoder.intValue(for: Int(DicomTag.bitsStored.rawValue)) ?? decoder.bitDepth
+        return DicomCompressedFrameDescriptor(
+            transferSyntaxUID: decoder.transferSyntaxUID,
+            rows: decoder.height,
+            columns: decoder.width,
+            bitsAllocated: decoder.bitDepth,
+            bitsStored: bitsStored,
+            highBit: decoder.intValue(for: Int(DicomTag.highBit.rawValue)) ?? max(0, bitsStored - 1),
+            pixelRepresentation: decoder.pixelRepresentationTagValue,
+            samplesPerPixel: decoder.samplesPerPixel,
+            photometricInterpretation: decoder.photometricInterpretation,
+            planarConfiguration: decoder.intValue(for: Int(DicomTag.planarConfiguration.rawValue))
+        )
+    }
+
+    private func clippedRegion(_ requested: DicomFrameRegion?) throws -> DicomFrameRegion {
+        let full = DicomFrameRegion(x: 0, y: 0, width: decoder.width, height: decoder.height)
+        guard let requested else { return full }
+        guard requested.width > 0, requested.height > 0 else {
+            throw DicomPartialFrameDecodeError.invalidRegion
+        }
+        let maximumXResult = requested.x.addingReportingOverflow(requested.width)
+        let maximumYResult = requested.y.addingReportingOverflow(requested.height)
+        let maximumX = maximumXResult.overflow ? Int.max : maximumXResult.partialValue
+        let maximumY = maximumYResult.overflow ? Int.max : maximumYResult.partialValue
+        let clippedX = max(0, requested.x)
+        let clippedY = max(0, requested.y)
+        let clippedMaximumX = min(decoder.width, maximumX)
+        let clippedMaximumY = min(decoder.height, maximumY)
+        guard clippedMaximumX > clippedX, clippedMaximumY > clippedY else {
+            throw DicomPartialFrameDecodeError.invalidRegion
+        }
+        return DicomFrameRegion(
+            x: clippedX,
+            y: clippedY,
+            width: clippedMaximumX - clippedX,
+            height: clippedMaximumY - clippedY
+        )
+    }
+
     private func makeMetadata(width: Int, height: Int, frameCount: Int? = nil) -> DicomDecodedFrameMetadata {
         let bitsAllocated = decoder.bitDepth
         let bitsStored = decoder.intValue(for: Int(DicomTag.bitsStored.rawValue)) ?? bitsAllocated
@@ -346,5 +828,187 @@ public struct DicomDecodedFrameReader: Sendable {
             return .gray8(pixels)
         }
         return nil
+    }
+
+    private func execution(
+        frame: DicomDecodedFrame,
+        selectedBackendIdentifier: String? = nil,
+        environment: [String: String],
+        rolloutMode: String?,
+        fallbackReason: String?,
+        shadowBackendIdentifier: String?
+    ) -> DicomDecodedFrameExecution {
+        if !decoder.compressedImage {
+            return DicomDecodedFrameExecution(
+                frame: frame,
+                backendIdentifier: "native-uncompressed",
+                backendSource: .packageLinked,
+                rolloutMode: rolloutMode,
+                fallbackReason: fallbackReason,
+                shadowBackendIdentifier: shadowBackendIdentifier
+            )
+        }
+
+        let identifier = selectedBackendIdentifier ?? legacyBackendIdentifier()
+        let status = DicomCodecCapabilities.backendStatuses(environment: environment)
+            .first { $0.identifier == identifier }
+        let directCapability = directCapability(identifier: identifier, environment: environment)
+        return DicomDecodedFrameExecution(
+            frame: frame,
+            backendIdentifier: identifier,
+            backendVersion: status?.version ?? directCapability?.version,
+            backendSource: status?.source ?? directCapability?.source ?? legacyBackendSource(identifier: identifier),
+            rolloutMode: rolloutMode,
+            fallbackReason: fallbackReason,
+            shadowBackendIdentifier: shadowBackendIdentifier
+        )
+    }
+
+    private func directCapability(
+        identifier: String,
+        environment: [String: String]
+    ) -> DicomFrameCodecCapabilities? {
+        switch identifier {
+        case DicomCodecBackendIdentifier.j2kSwiftCPU.rawValue:
+            return DicomJ2KSwiftBackend().capabilities
+        case DicomCodecBackendIdentifier.openJPEGCPU.rawValue:
+            return DicomOpenJPEGFrameBackend().capabilities
+        case DicomCodecBackendIdentifier.jlSwift.rawValue:
+            return DicomJLSwiftBackend().capabilities
+        case DicomCodecBackendIdentifier.charLSCPU.rawValue:
+            return DicomCharLSFrameBackend(environment: environment).capabilities
+        case DicomCodecBackendIdentifier.jxlSwift.rawValue:
+            return DicomJXLSwiftBackend().capabilities
+        default:
+            return nil
+        }
+    }
+
+    private func legacyBackendIdentifier() -> String {
+        let decision = DicomCompressedPixelBackendResolver.resolve(
+            transferSyntax: DicomTransferSyntax(uid: decoder.transferSyntaxUID),
+            requestedBitDepth: decoder.bitDepth,
+            samplesPerPixel: decoder.samplesPerPixel,
+            photometricInterpretation: decoder.photometricInterpretation,
+            bitsStored: decoder.intValue(for: Int(DicomTag.bitsStored.rawValue))
+        )
+        switch decision.backend {
+        case .nativeJPEGLossless: return "native-jpeg-lossless"
+        case .nativeRLELossless: return "native-rle-lossless"
+        case .nativeJPEGLS: return DicomCodecBackendIdentifier.charLSCPU.rawValue
+        case .nativeJPEGExtended: return "native-jpeg-extended"
+        case .imageIOJPEGBaseline: return "imageio-jpeg-baseline"
+        case .imageIOJPEGExtended: return "imageio-jpeg-extended"
+        case .imageIOJPEG2000: return "imageio-jpeg-2000"
+        case .openJPEG2000: return "openjpeg-jpeg-2000"
+        case .openJPEGHTJ2K: return "openjpeg-htj2k"
+        case .legacyImageIO: return "imageio-legacy"
+        case .unsupported: return "unsupported"
+        }
+    }
+
+    private func legacyBackendSource(identifier: String) -> DicomCodecBackendSource {
+        if identifier.hasPrefix("imageio-") {
+            return .systemFramework
+        }
+        if identifier == DicomCodecBackendIdentifier.openJPEGCPU.rawValue
+            || identifier.hasPrefix("openjpeg-") {
+            return DicomOpenJPEGFrameBackend().capabilities.source
+        }
+        if identifier == DicomCodecBackendIdentifier.charLSCPU.rawValue {
+            return DicomCharLSFrameBackend().capabilities.source
+        }
+        return identifier == "unsupported" ? .unavailable : .packageLinked
+    }
+
+    private static func telemetryMessage(_ telemetry: DicomJ2KSwiftDecodeTelemetry) -> String {
+        let dimensions = telemetry.width.flatMap { width in
+            telemetry.height.map { "\(width)x\($0)" }
+        } ?? "unknown"
+        let durationMilliseconds = Double(telemetry.durationNanoseconds) / 1_000_000
+        return "J2K rollout mode=\(telemetry.mode.rawValue) backend=\(telemetry.backend.rawValue)"
+            + " duration_ms=\(String(format: "%.3f", durationMilliseconds)) dimensions=\(dimensions)"
+            + " outcome=\(telemetry.outcome)"
+    }
+
+    private static func telemetryMessage(_ telemetry: DicomJLSwiftDecodeTelemetry) -> String {
+        let dimensions = telemetry.width.flatMap { width in
+            telemetry.height.map { "\(width)x\($0)" }
+        } ?? "unknown"
+        let durationMilliseconds = Double(telemetry.durationNanoseconds) / 1_000_000
+        return "JPEG-LS rollout mode=\(telemetry.mode.rawValue) backend=\(telemetry.backend.rawValue)"
+            + " duration_ms=\(String(format: "%.3f", durationMilliseconds)) dimensions=\(dimensions)"
+            + " outcome=\(telemetry.outcome)"
+    }
+}
+
+private struct DicomCodecTelemetrySnapshot {
+    let selectedBackendIdentifier: String?
+    let mode: String?
+    let fallbackReason: String?
+    let shadowBackendIdentifier: String?
+}
+
+private final class DicomJ2KTelemetryProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private var events: [DicomJ2KSwiftDecodeTelemetry] = []
+
+    func append(_ event: DicomJ2KSwiftDecodeTelemetry) {
+        lock.lock()
+        events.append(event)
+        lock.unlock()
+    }
+
+    func snapshot() -> DicomCodecTelemetrySnapshot {
+        lock.lock()
+        let captured = events
+        lock.unlock()
+        let selected = captured.last { event in
+            if case .succeeded = event.outcome { return true }
+            return false
+        }
+        let fallback = captured.compactMap { event -> String? in
+            if case .fellBack(let reason) = event.outcome { return reason }
+            return nil
+        }.last
+        let mode = captured.first?.mode
+        return DicomCodecTelemetrySnapshot(
+            selectedBackendIdentifier: selected?.backend.rawValue,
+            mode: mode?.rawValue,
+            fallbackReason: fallback,
+            shadowBackendIdentifier: mode == .shadow ? DicomCodecBackendIdentifier.j2kSwiftCPU.rawValue : nil
+        )
+    }
+}
+
+private final class DicomJLSTelemetryProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private var events: [DicomJLSwiftDecodeTelemetry] = []
+
+    func append(_ event: DicomJLSwiftDecodeTelemetry) {
+        lock.lock()
+        events.append(event)
+        lock.unlock()
+    }
+
+    func snapshot() -> DicomCodecTelemetrySnapshot {
+        lock.lock()
+        let captured = events
+        lock.unlock()
+        let selected = captured.last { event in
+            if case .succeeded = event.outcome { return true }
+            return false
+        }
+        let fallback = captured.compactMap { event -> String? in
+            if case .fellBack(let reason) = event.outcome { return reason }
+            return nil
+        }.last
+        let mode = captured.first?.mode
+        return DicomCodecTelemetrySnapshot(
+            selectedBackendIdentifier: selected?.backend.rawValue,
+            mode: mode?.rawValue,
+            fallbackReason: fallback,
+            shadowBackendIdentifier: mode == .shadow ? DicomCodecBackendIdentifier.jlSwift.rawValue : nil
+        )
     }
 }

@@ -266,22 +266,30 @@ private extension DicomEncapsulatedPixelDataParser {
     static let undefinedLength = 0xFFFFFFFF
 
     static func readTag(_ data: Data, at offset: Int) throws -> Int {
-        guard offset + 4 <= data.count else {
+        guard let group = data.dicomIntegerIfPresent(
+                  at: offset,
+                  as: UInt16.self,
+                  littleEndian: true
+              ),
+              let element = data.dicomIntegerIfPresent(
+                  at: offset + 2,
+                  as: UInt16.self,
+                  littleEndian: true
+              ) else {
             throw DicomEncapsulatedPixelDataError.truncatedItemHeader(offset: offset)
         }
-        let group = Int(data[offset]) | (Int(data[offset + 1]) << 8)
-        let element = Int(data[offset + 2]) | (Int(data[offset + 3]) << 8)
-        return (group << 16) | element
+        return (Int(group) << 16) | Int(element)
     }
 
     static func readUInt32(_ data: Data, at offset: Int) throws -> UInt32 {
-        guard offset + 4 <= data.count else {
+        guard let value = data.dicomIntegerIfPresent(
+            at: offset,
+            as: UInt32.self,
+            littleEndian: true
+        ) else {
             throw DicomEncapsulatedPixelDataError.truncatedItemHeader(offset: offset)
         }
-        return UInt32(data[offset])
-            | (UInt32(data[offset + 1]) << 8)
-            | (UInt32(data[offset + 2]) << 16)
-            | (UInt32(data[offset + 3]) << 24)
+        return value
     }
 
     static func readUInt32Values(
@@ -319,17 +327,11 @@ private extension DicomEncapsulatedPixelDataParser {
     }
 
     static func readUInt32Value(_ data: Data, at offset: Int) -> UInt32 {
-        let b0 = UInt32(data[offset])
-        let b1 = UInt32(data[offset + 1]) << 8
-        let b2 = UInt32(data[offset + 2]) << 16
-        let b3 = UInt32(data[offset + 3]) << 24
-        return b0 | b1 | b2 | b3
+        data.dicomIntegerIfPresent(at: offset, as: UInt32.self, littleEndian: true) ?? 0
     }
 
     static func readUInt64Value(_ data: Data, at offset: Int) -> UInt64 {
-        let low = UInt64(readUInt32Value(data, at: offset))
-        let high = UInt64(readUInt32Value(data, at: offset + 4)) << 32
-        return low | high
+        data.dicomIntegerIfPresent(at: offset, as: UInt64.self, littleEndian: true) ?? 0
     }
 
     static func extendedOffsetTable(

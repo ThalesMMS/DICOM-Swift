@@ -31,7 +31,8 @@ extension DCMDecoder {
             valueOffset: metadata.offset,
             valueLength: metadata.elementLength,
             littleEndian: littleEndian,
-            explicitVR: syntax.isExplicitVR
+            explicitVR: syntax.isExplicitVR,
+            characterSet: activeCharacterSet
         )) ?? []
     }
 }

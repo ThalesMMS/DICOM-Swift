@@ -7,15 +7,14 @@
   "ownerDocumentation": [
     {
       "owner": "DicomCore",
-      "apiDocumentation": [
-        "README.md",
-        "DICOM_GLOSSARY.md"
-      ],
-      "usageDocumentation": [
-        "README.md",
-        "BENCHMARKS.md",
-        "Examples/DicomSwiftUIExample/README.md"
-      ],
+        "apiDocumentation": [
+          "README.md",
+          "DICOM_GLOSSARY.md"
+        ],
+        "usageDocumentation": [
+          "README.md",
+          "BENCHMARKS.md"
+        ],
       "limitations": [
         {
           "category": "codecs",
@@ -30,8 +29,8 @@
           "path": "README.md"
         },
         {
-          "category": "rendering",
-          "path": "Examples/DicomSwiftUIExample/README.md"
+          "category": "export",
+          "path": "README.md"
         },
         {
           "category": "fixtures",
@@ -44,7 +43,7 @@
       ]
     }
   ],
-  "demoWorkflows": [
+  "coreWorkflows": [
     {
       "id": "decode-local-dicom",
       "path": "Tests/DicomCoreTests/Resources/ReleaseGates/PublicAPIDocumentationPolicy.md",

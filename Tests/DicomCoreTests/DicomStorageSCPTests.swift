@@ -4,6 +4,79 @@ import DicomTestSupport
 import XCTest
 
 final class DicomStorageSCPTests: XCTestCase {
+    func testStorageSCPContinuesAfterOneStoreFailure() throws {
+        let storage = FailFirstStorage()
+        let service = DicomStorageSCPService(
+            configuration: DicomStorageSCPConfiguration(
+                aeTitle: "MTKDEMO",
+                supportedStorageSOPClassUIDs: [storageSOPClassUID],
+                transferSyntaxes: [.explicitVRLittleEndian]
+            ),
+            storage: storage
+        )
+        let secondSOPInstanceUID = "2.25.1001"
+        let transport = try StorageSCUTransport(inboundPDUs: [
+            associationRequestPDU(contexts: [
+                DicomPresentationContextRequest(
+                    id: 1,
+                    abstractSyntaxUID: storageSOPClassUID,
+                    transferSyntaxes: [.explicitVRLittleEndian]
+                )
+            ]),
+            commandPDU(cStoreRequest(messageID: 1, sopInstanceUID: sopInstanceUID), contextID: 1),
+            dataSetPDU(storageDataSet(sopInstanceUID: sopInstanceUID), contextID: 1),
+            commandPDU(cStoreRequest(messageID: 2, sopInstanceUID: secondSOPInstanceUID), contextID: 1),
+            dataSetPDU(
+                storageDataSet(
+                    sopInstanceUID: secondSOPInstanceUID,
+                    patientName: "Иванов^Иван",
+                    characterSet: "ISO_IR 144"
+                ),
+                contextID: 1
+            ),
+            try DicomPDUCodec.encode(.releaseRequest)
+        ])
+        let progressRecorder = DicomStorageSCPProgressRecorder()
+
+        let result = try service.handleAssociation(using: transport) { progressRecorder.append($0) }
+
+        XCTAssertEqual(result.storedInstances.map(\.sopInstanceUID), [secondSOPInstanceUID])
+        XCTAssertEqual(storage.receivedInstances.last?.dataSet.string(for: .patientName), "Иванов^Иван")
+        XCTAssertEqual(transport.writtenCommands.map(\.status), [0xC000, 0])
+        XCTAssertTrue(progressRecorder.snapshot().contains {
+            guard case .storeFailed(let failedUID, _) = $0 else { return false }
+            return failedUID == sopInstanceUID
+        })
+        XCTAssertTrue(progressRecorder.snapshot().contains(.released))
+    }
+
+    func test_fileStorageCache_whenDataSetIsMutated_doesNotReuseStaleRawBytes() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storage = try DicomFileStorageCache(directoryURL: directory)
+        var dataSet = storageDataSet()
+        let rawData = try DicomDataSetWriter.dataSetData(from: dataSet)
+        var received = DicomStorageReceivedInstance(
+            sopClassUID: storageSOPClassUID,
+            sopInstanceUID: sopInstanceUID,
+            transferSyntax: .explicitVRLittleEndian,
+            dataSet: dataSet,
+            rawDataSetData: rawData
+        )
+        dataSet.set(DicomDataElement(
+            tag: DicomTag.patientName.rawValue,
+            vr: .PN,
+            value: .strings(["Updated^Patient"])
+        ))
+        received.dataSet = dataSet
+
+        let stored = try storage.store(received)
+        let decoded = try DCMDecoder(contentsOf: stored.fileURL)
+
+        XCTAssertNil(received.rawDataSetData)
+        XCTAssertEqual(decoded.dataSet.string(for: .patientName), "Updated^Patient")
+    }
+
     func testStorageSCPReceivesStoreWritesCacheAndReportsCommitment() throws {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -48,6 +121,12 @@ final class DicomStorageSCPTests: XCTestCase {
         XCTAssertEqual(result.storedInstances.count, 1)
         XCTAssertEqual(result.storedInstances[0].sopInstanceUID, sopInstanceUID)
         XCTAssertTrue(FileManager.default.fileExists(atPath: result.storedInstances[0].fileURL.path))
+        let expectedDataSetData = try DicomDataSetWriter.dataSetData(from: storageDataSet())
+        let storedData = try Data(contentsOf: result.storedInstances[0].fileURL)
+        XCTAssertTrue(storedData.suffix(expectedDataSetData.count).elementsEqual(expectedDataSetData))
+        let storedDecoder = try DCMDecoder(contentsOf: result.storedInstances[0].fileURL)
+        XCTAssertNotNil(storedDecoder.pixelDataDescriptor)
+        XCTAssertEqual(storedDecoder.getFrame(0)?.data, Data([0x7F]))
         XCTAssertEqual(result.commitmentReports.count, 1)
         XCTAssertEqual(result.commitmentReports[0].status, .partial)
         XCTAssertEqual(result.commitmentReports[0].references.filter { $0.status == .committed }.count, 1)
@@ -312,11 +391,14 @@ private func dataSetPDU(_ dataSet: DicomDataSet, contextID: UInt8) throws -> Dat
     ]))
 }
 
-private func cStoreRequest() -> DicomDIMSECommandSet {
+private func cStoreRequest(
+    messageID: UInt16 = 1,
+    sopInstanceUID: String = sopInstanceUID
+) -> DicomDIMSECommandSet {
     DicomDIMSECommandSet(
         affectedSOPClassUID: storageSOPClassUID,
         commandField: DicomDIMSECommandField.cStoreRQ,
-        messageID: 1,
+        messageID: messageID,
         commandDataSetType: DicomDIMSECommandDataSetType.hasDataSet,
         priority: 0,
         affectedSOPInstanceUID: sopInstanceUID
@@ -334,11 +416,15 @@ private func storageCommitmentAction() -> DicomDIMSECommandSet {
     )
 }
 
-private func storageDataSet() -> DicomDataSet {
-    DicomDataSet(elements: [
+private func storageDataSet(
+    sopInstanceUID: String = sopInstanceUID,
+    patientName: String = "DOE^JANE",
+    characterSet: String? = nil
+) -> DicomDataSet {
+    var elements = [
         element(DicomTag.sopClassUID.rawValue, .UI, storageSOPClassUID),
         element(DicomTag.sopInstanceUID.rawValue, .UI, sopInstanceUID),
-        element(DicomTag.patientName.rawValue, .PN, "DOE^JANE"),
+        element(DicomTag.patientName.rawValue, .PN, patientName),
         element(DicomTag.studyInstanceUID.rawValue, .UI, "2.25.2000"),
         element(DicomTag.seriesInstanceUID.rawValue, .UI, "2.25.3000"),
         DicomDataElement(tag: DicomTag.samplesPerPixel.rawValue, vr: .US, value: .unsignedIntegers([1])),
@@ -350,7 +436,11 @@ private func storageDataSet() -> DicomDataSet {
         DicomDataElement(tag: DicomTag.highBit.rawValue, vr: .US, value: .unsignedIntegers([7])),
         DicomDataElement(tag: DicomTag.pixelRepresentation.rawValue, vr: .US, value: .unsignedIntegers([0])),
         DicomDataElement(tag: DicomTag.pixelData.rawValue, vr: .OB, value: .bytes(Data([0x7F])))
-    ])
+    ]
+    if let characterSet {
+        elements.append(element(DicomTag.specificCharacterSet.rawValue, .CS, characterSet))
+    }
+    return DicomDataSet(elements: elements)
 }
 
 private func element(_ tag: Int, _ vr: DicomVR, _ value: String) -> DicomDataElement {
@@ -361,4 +451,21 @@ private func temporaryDirectory() -> URL {
     FileManager.default.temporaryDirectory
         .appendingPathComponent("DicomStorageSCPTests-\(UUID().uuidString)",
                                 isDirectory: true)
+}
+
+private final class FailFirstStorage: DicomStorageInstanceStoring {
+    private(set) var receivedInstances: [DicomStorageReceivedInstance] = []
+
+    func store(_ instance: DicomStorageReceivedInstance) throws -> DicomStoredInstance {
+        receivedInstances.append(instance)
+        if receivedInstances.count == 1 {
+            throw QueueFailure.offline
+        }
+        return DicomStoredInstance(
+            sopClassUID: instance.sopClassUID,
+            sopInstanceUID: instance.sopInstanceUID,
+            transferSyntax: instance.transferSyntax,
+            fileURL: FileManager.default.temporaryDirectory.appendingPathComponent(instance.sopInstanceUID)
+        )
+    }
 }

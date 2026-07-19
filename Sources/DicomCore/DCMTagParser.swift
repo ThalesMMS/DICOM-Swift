@@ -57,9 +57,6 @@ internal final class DCMTagParser {
     /// Flag indicating whether we are currently inside a sequence
     private var inSequence: Bool = false
 
-    /// Flag to track odd byte offsets (quirk in some DICOM files)
-    private var oddLocations: Bool = false
-
     private static func isSequenceControlTag(_ tag: Int) -> Bool {
         tag == 0xFFFEE000 || tag == 0xFFFEE00D || tag == 0xFFFEE0DD
     }
@@ -244,16 +241,6 @@ internal final class DCMTagParser {
         let remainingBytes = data.count - location
         if elementLength > remainingBytes {
             elementLength = min(elementLength, remainingBytes)
-        }
-
-        // Correct for odd location hack
-        if elementLength == 13 && !oddLocations {
-            elementLength = 10
-        }
-
-        // Track odd byte offsets
-        if (location & 1) != 0 {
-            oddLocations = true
         }
 
         return tag
@@ -455,7 +442,6 @@ internal final class DCMTagParser {
         elementLength = 0
         elementLengthIsUndefined = false
         inSequence = false
-        oddLocations = false
     }
 
     /// Clears sequence-tracking state after callers skip a complete sequence value.

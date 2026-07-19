@@ -25,6 +25,7 @@ final class DicomDataSetWriterTests: XCTestCase {
         let decodedDataSet = decoder.dataSet
 
         XCTAssertTrue(DicomTransferSyntax.explicitVRLittleEndian.matches(decoder.info(for: .transferSyntaxUID)))
+        XCTAssertTrue(decoder.isExplicitVRTransferSyntax)
         XCTAssertEqual(decodedDataSet.personName(for: .patientName)?.familyName, "Roe")
         XCTAssertEqual(decodedDataSet.personName(for: .patientName)?.givenName, "Richard")
         XCTAssertEqual(decodedDataSet.string(for: .modality), "CT")
@@ -52,11 +53,47 @@ final class DicomDataSetWriterTests: XCTestCase {
         let decoder = try DCMDecoder(contentsOf: url)
 
         XCTAssertTrue(DicomTransferSyntax.implicitVRLittleEndian.matches(decoder.info(for: .transferSyntaxUID)))
+        XCTAssertFalse(decoder.isExplicitVRTransferSyntax)
         XCTAssertEqual(decoder.dataSet.personName(for: .patientName)?.familyName, "Doe")
         XCTAssertEqual(decoder.dataSet.string(for: .modality), "CT")
         XCTAssertEqual(decoder.width, 1)
         XCTAssertEqual(decoder.height, 1)
         XCTAssertEqual(try XCTUnwrap(decoder.getPixels16()), [43])
+    }
+
+    func test_part10Wrapping_preservesEncodedDataSet() throws {
+        let dataSet = makeBaseDataSet(pixelBytes: Data([0x2B, 0x00]))
+        let encodedDataSet = try DicomDataSetWriter.dataSetData(
+            from: dataSet,
+            transferSyntax: .implicitVRLittleEndian
+        )
+
+        let part10Data = try DicomDataSetWriter.part10Data(
+            fromEncodedDataSet: encodedDataSet,
+            transferSyntax: .implicitVRLittleEndian,
+            mediaStorageSOPClassUID: try XCTUnwrap(dataSet.string(for: sopClassUIDTag)),
+            mediaStorageSOPInstanceUID: try XCTUnwrap(dataSet.string(for: .sopInstanceUID))
+        )
+        let decoder = try DCMDecoder(data: part10Data)
+
+        XCTAssertEqual(Data(part10Data[128..<132]), Data("DICM".utf8))
+        XCTAssertEqual(Data(part10Data.suffix(encodedDataSet.count)), encodedDataSet)
+        XCTAssertTrue(DicomTransferSyntax.implicitVRLittleEndian.matches(decoder.info(for: .transferSyntaxUID)))
+        XCTAssertEqual(decoder.dataSet.string(for: .sopInstanceUID), "2.25.123456789")
+        XCTAssertEqual(try XCTUnwrap(decoder.getPixels16()), [43])
+    }
+
+    func test_part10Wrapping_rejectsDeflatedTransferSyntaxForRawBytes() throws {
+        XCTAssertThrowsError(try DicomDataSetWriter.part10Data(
+            fromEncodedDataSet: Data([0x01, 0x02]),
+            transferSyntax: .deflatedExplicitVRLittleEndian,
+            mediaStorageSOPClassUID: "1.2.840.10008.5.1.4.1.1.7",
+            mediaStorageSOPInstanceUID: "2.25.1"
+        )) { error in
+            guard case .transferSyntaxWriteUnsupported = error as? DicomDataSetWriterError else {
+                return XCTFail("Expected unsupported transfer syntax, got \(error)")
+            }
+        }
     }
 
     func testWriterRoundTripsLegacyExplicitVRBigEndian() throws {
@@ -73,6 +110,7 @@ final class DicomDataSetWriterTests: XCTestCase {
         let decoder = try DCMDecoder(contentsOf: url)
 
         XCTAssertTrue(DicomTransferSyntax.explicitVRBigEndian.matches(decoder.info(for: .transferSyntaxUID)))
+        XCTAssertTrue(decoder.isExplicitVRTransferSyntax)
         XCTAssertFalse(decoder.currentLittleEndian())
         XCTAssertEqual(decoder.dataSet.string(for: .modality), "CT")
         XCTAssertEqual(decoder.width, 1)

@@ -339,7 +339,7 @@ public enum DicomPDUCodec {
         case .associationReject(let reject):
             body = encodeAssociationReject(reject)
         case .pData(let pdvs):
-            body = encodePData(pdvs)
+            return encodePData(pdvs)
         case .releaseRequest, .releaseResponse:
             body = Data(repeating: 0, count: 4)
         case .abort(let abort):
@@ -494,8 +494,13 @@ public struct DicomAssociationStateMachine: Equatable, Sendable {
 }
 
 public protocol DicomAssociationTransport: AnyObject {
+    var isOpen: Bool { get }
     func writePDU(_ data: Data) throws
     func readPDU() throws -> Data
+}
+
+public extension DicomAssociationTransport {
+    var isOpen: Bool { true }
 }
 
 public protocol DicomCancellableAssociationTransport: DicomAssociationTransport {
@@ -596,7 +601,8 @@ public struct DicomAssociation: Equatable, Sendable {
     }
 
     public func dataSetPData(_ data: Data,
-                             presentationContextID: UInt8) throws -> DicomPDU {
+                             presentationContextID: UInt8,
+                             isLastFragment: Bool = true) throws -> DicomPDU {
         try stateMachine.validatePDataAllowed()
         guard acceptedPresentationContexts.contains(where: { $0.id == presentationContextID }) else {
             throw DicomNetworkError.invalidPresentationContextID(presentationContextID)
@@ -604,7 +610,7 @@ public struct DicomAssociation: Equatable, Sendable {
         return .pData([
             DicomPDV(presentationContextID: presentationContextID,
                     isCommand: false,
-                    isLastFragment: true,
+                    isLastFragment: isLastFragment,
                     data: data)
         ])
     }
@@ -949,7 +955,14 @@ private extension DicomPDUCodec {
     }
 
     static func encodePData(_ pdvs: [DicomPDV]) -> Data {
+        let bodyLength = pdvs.reduce(into: 0) { length, pdv in
+            length += 6 + pdv.data.count
+        }
         var data = Data()
+        data.reserveCapacity(6 + bodyLength)
+        data.append(DicomPDUType.pData.rawValue)
+        data.append(0x00)
+        appendUInt32BE(UInt32(bodyLength), to: &data)
         for pdv in pdvs {
             appendUInt32BE(UInt32(pdv.data.count + 2), to: &data)
             data.append(pdv.presentationContextID)
@@ -1245,10 +1258,15 @@ private struct DicomNetworkItem {
 
 private struct DicomNetworkCursor {
     var data: Data
-    var offset = 0
+    var offset: Data.Index
+
+    init(data: Data) {
+        self.data = data
+        self.offset = data.startIndex
+    }
 
     var remaining: Int {
-        data.count - offset
+        data.distance(from: offset, to: data.endIndex)
     }
 
     mutating func readUInt8() throws -> UInt8 {
@@ -1259,44 +1277,55 @@ private struct DicomNetworkCursor {
 
     mutating func readUInt16BE() throws -> UInt16 {
         try require(2)
-        let value = UInt16(data[offset]) << 8 | UInt16(data[offset + 1])
+        let byteOffset = data.distance(from: data.startIndex, to: offset)
+        guard let value = data.dicomIntegerIfPresent(at: byteOffset, as: UInt16.self, littleEndian: false) else {
+            throw DicomNetworkError.invalidPDULength(expected: 2, actual: remaining)
+        }
         offset += 2
         return value
     }
 
     mutating func readUInt32BE() throws -> UInt32 {
         try require(4)
-        let value = UInt32(data[offset]) << 24 |
-            UInt32(data[offset + 1]) << 16 |
-            UInt32(data[offset + 2]) << 8 |
-            UInt32(data[offset + 3])
+        let byteOffset = data.distance(from: data.startIndex, to: offset)
+        guard let value = data.dicomIntegerIfPresent(at: byteOffset, as: UInt32.self, littleEndian: false) else {
+            throw DicomNetworkError.invalidPDULength(expected: 4, actual: remaining)
+        }
         offset += 4
         return value
     }
 
     mutating func readUInt32LE() throws -> UInt32 {
         try require(4)
-        let value = UInt32(data[offset]) |
-            UInt32(data[offset + 1]) << 8 |
-            UInt32(data[offset + 2]) << 16 |
-            UInt32(data[offset + 3]) << 24
+        let byteOffset = data.distance(from: data.startIndex, to: offset)
+        guard let value = data.dicomIntegerIfPresent(at: byteOffset, as: UInt32.self, littleEndian: true) else {
+            throw DicomNetworkError.invalidPDULength(expected: 4, actual: remaining)
+        }
         offset += 4
         return value
     }
 
     mutating func readTagLE() throws -> Int {
-        try require(4)
-        let group = UInt16(data[offset]) | UInt16(data[offset + 1]) << 8
-        let element = UInt16(data[offset + 2]) | UInt16(data[offset + 3]) << 8
-        offset += 4
+        let group = try readUInt16LE()
+        let element = try readUInt16LE()
         return Int(UInt32(group) << 16 | UInt32(element))
+    }
+
+    private mutating func readUInt16LE() throws -> UInt16 {
+        try require(2)
+        let byteOffset = data.distance(from: data.startIndex, to: offset)
+        guard let value = data.dicomIntegerIfPresent(at: byteOffset, as: UInt16.self, littleEndian: true) else {
+            throw DicomNetworkError.invalidPDULength(expected: 2, actual: remaining)
+        }
+        offset += 2
+        return value
     }
 
     mutating func readData(count: Int) throws -> Data {
         try require(count)
         let range = offset..<(offset + count)
         offset += count
-        return Data(data[range])
+        return data[range]
     }
 
     mutating func readASCII(count: Int) throws -> String {

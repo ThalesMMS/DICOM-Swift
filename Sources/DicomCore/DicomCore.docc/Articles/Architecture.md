@@ -13,7 +13,68 @@ DicomCore is built on a protocol-based architecture that prioritizes testability
 - **Lazy loading**: Pixel data loaded on first access, not at file open
 - **Performance**: Tag caching and optional Metal GPU acceleration
 - **Type safety**: Swift-idiomatic throwing initializers and type-safe value types
-- **Async/await**: All blocking operations have async variants (iOS 13+)
+- **Async/await**: All blocking operations have async variants
+
+---
+
+## Compressed Frame Codec Boundary
+
+`DicomFrameCodecBackend` is DicomCore's internal adapter contract for
+compressed frames. It keeps codec-package types behind the adapter and models
+the DICOM details a generic image-compression protocol omits: exact transfer
+syntax UID, stored/allocated depth, signedness, component count, photometric
+interpretation, planar configuration, partial decode, execution class, and
+output ownership.
+
+`DicomFrameCodecRegistry` evaluates registered async backends in deterministic
+order. An automatic request chooses the first eligible backend; an explicit
+preference either selects that backend, records why it fell back, or throws
+`DicomCodecSelectionError.unsupported`. `DicomCodecSelectionDiagnostics`
+captures the selected identifier, runtime source/version, fallback reason, and
+optional shadow identifier for telemetry and bug reports.
+
+`DicomFrameCodecExecutor` can run a family-specific shadow candidate and report
+matched pixels, mismatched pixels, or a candidate error. It always returns the
+production frame. There is no semaphore or synchronous wrapper around the
+async codec boundary.
+
+The legacy synchronous pixel surface remains compatible while it migrates:
+`DicomCompressedPixelBackendResolver` delegates its current native, ImageIO,
+CharLS, OpenJPEG, and HTJ2K decision matrix to
+`DicomCompressedPixelBackendRegistry`. `DicomCodecCapabilities.frameBackends()`
+adds package-linked and system-framework paths to the existing dynamically
+loaded runtime reports.
+
+JLSwift 0.9.0 is the package-linked JPEG-LS CPU candidate. Async .80/.81 frame
+reads default to `DICOM_JLSWIFT_MODE=shadow`: CharLS pixels are returned while
+JLSwift reports duration, dimensions, and parity. Qualified shapes are aligned
+8–16-bit grayscale and RGB8. `preferred` enables those shapes with CharLS
+fallback; `disabled` is the immediate rollback. Async encoding supports .80
+with reversible intent and .81 with an explicit NEAR value.
+
+JXLSwift 1.4.0 is package-linked for JPEG XL .110/.111/.112, but defaults to
+`DICOM_JXLSWIFT_MODE=disabled`. `experimental` enables qualified
+developer/export reads and explicit-intent transcodes; `.111` verifies JPEG
+Baseline reconstruction byte-for-byte. The adapter excludes 10/12-bit, custom
+ICC, and implicit DIMSE negotiation and never replaces the GDCM viewer path.
+
+The JPEG 2000 package adapter is J2KSwift 11.0.2 CPU. Async frame reads
+default to `DICOM_J2KSWIFT_MODE=shadow`: OpenJPEG pixels are returned while
+J2KSwift receives the same encapsulated `Data` and reports duration,
+dimensions, and comparison outcome. `preferred` enables only qualified
+JPEG 2000 UIDs; `disabled` rolls back without rebuilding. HTJ2K remains
+shadow-only because the pinned OpenJPH fixture is not bit-exact in this
+J2KSwift release.
+
+Encoding uses the same neutral backend boundary but has an independent UID
+set. `DicomTranscoder` exposes async, explicit-intent CPU routes for JPEG 2000
+.90/.91 and HTJ2K .201-.203. It converts native grayscale/RGB frames into
+J2KSwift components, then owns DICOM encapsulation and metadata updates. This
+does not qualify HTJ2K for production J2KSwift decode, does not add Part 2
+.92/.93 encoding, and cannot select Metal for reversible output.
+
+Concrete codec imports are allowed only in DicomCore adapter files. Toolkit-
+neutral app modules and MTKCore exchange neutral DICOM descriptors and buffers.
 
 ---
 
@@ -206,6 +267,7 @@ DicomCore uses protocol-based abstractions for all major components, enabling de
 | `DicomDictionaryProtocol` | `DCMDictionary` | Abstracts DICOM tag lookups |
 | `DicomSeriesLoaderProtocol` | `DicomSeriesLoader` | Abstracts series volume loading |
 | `FileImportServiceProtocol` | App-provided implementations | Abstracts file import and ZIP extraction (no implementation ships in this package) |
+| `DicomFrameCodecBackend` | Native/ImageIO/runtime adapters | Async compressed-frame decode/encode boundary without concrete codec types |
 
 ### Dependency Injection Pattern
 
@@ -328,7 +390,7 @@ Older API using boolean success checks (maintained for backward compatibility):
 
 ### 5. Async/Await Support
 
-**Decision:** All blocking operations have async variants (iOS 13+).
+**Decision:** All blocking operations have async variants.
 
 **Rationale:**
 - Prevents UI blocking during file loading
@@ -419,8 +481,8 @@ if !rescale.isIdentity {
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                     Application Layer                   │
-│           (SwiftUI Views, ViewModels, etc.)             │
+│                  Downstream Integration                 │
+│             (CLI, server, or application)               │
 └─────────────────────────────────────────────────────────┘
                             │
                             ▼
@@ -501,7 +563,7 @@ User Request
          │
          ▼
 ┌─────────────────┐
-│ Display Image   │ CGImage / SwiftUI Image
+│ Core Output     │ pixels / metadata / CGImage export
 └─────────────────┘
 ```
 

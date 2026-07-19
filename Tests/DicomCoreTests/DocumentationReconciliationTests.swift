@@ -18,11 +18,9 @@ final class DocumentationReconciliationTests: XCTestCase {
             "DicomPrintManagementSupport",
             "DicomWaveformStorageKind",
             "DicomVideoCodec",
-            "Backlog Alignment",
-            "issue #1064",
-            "issue #1077",
-            "#1078 through",
-            "#1090"
+            "Current Scope",
+            "Presentation and interaction policy is caller-owned",
+            "decoded values, frames, series, and explicit exports"
         ])
 
         assert(readme, contains: [
@@ -30,7 +28,6 @@ final class DocumentationReconciliationTests: XCTestCase {
             "DicomTransferSyntaxRegistry.standard.writeSupportMatrix",
             "DicomWebConformanceMatrix.packageDefault",
             "DIMSE scope",
-            "MockDicomDecoderForPreviews",
             "DicomCodecRuntimePreflight.status(for: .charLS)",
             "DicomCodecRuntimePreflight.status(for: .openJPEG)"
         ])
@@ -103,9 +100,9 @@ final class DocumentationReconciliationTests: XCTestCase {
         let gaps = try Self.packageText("IMPLEMENTATION_GAPS.md")
 
         XCTAssertTrue(gaps.contains("Documentation Drift and Migration Checklist Reconciled"))
-        XCTAssertTrue(gaps.contains("Status: reconciled and guarded by #1077."))
+        XCTAssertTrue(gaps.contains("Status: reconciled and guarded by documentation tests."))
         XCTAssertTrue(gaps.contains("DocumentationReconciliationTests.swift"))
-        XCTAssertTrue(gaps.contains("None currently tracked in the package audit after #1074."))
+        XCTAssertTrue(gaps.contains("No application-facing module is tracked by this package audit."))
     }
 
     private func assert(

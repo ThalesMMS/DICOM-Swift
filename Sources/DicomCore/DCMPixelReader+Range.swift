@@ -232,15 +232,13 @@ extension DCMPixelReader {
         data.withUnsafeBytes { dataBytes in
             let basePtr = dataBytes.baseAddress!.advanced(by: rangeByteOffset)
             let uint8Ptr = basePtr.assumingMemoryBound(to: UInt8.self)
-            if photometricInterpretation == "MONOCHROME1" {
-                for i in 0..<rangeCount {
-                    pixels[i] = 255 - uint8Ptr[i]
-                }
-            } else {
-                pixels.withUnsafeMutableBufferPointer { pixelBuffer in
-                    _ = memcpy(pixelBuffer.baseAddress!, uint8Ptr, rangeBytes)
-                }
+            pixels.withUnsafeMutableBufferPointer { pixelBuffer in
+                guard let destination = pixelBuffer.baseAddress else { return }
+                _ = memcpy(destination, uint8Ptr, rangeBytes)
             }
+        }
+        if photometricInterpretation == "MONOCHROME1" {
+            invertMonochrome1Vectorized(buffer: &pixels, count: rangeCount)
         }
 
         result.pixels8 = pooledBuffer == nil ? pixels : Array(pixels[0..<min(rangeCount, pixels.count)])

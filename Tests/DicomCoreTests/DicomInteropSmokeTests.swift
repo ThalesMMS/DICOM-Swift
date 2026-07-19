@@ -99,12 +99,14 @@ final class DicomInteropSmokeTests: XCTestCase {
             }
 
             if archive.capabilities.contains(.dimseGet) {
+                var retrievedInstances: [DicomRetrievedInstance] = []
                 let result = try service.get(
                     identifier: retrieveQuery(studyInstanceUID: fixture.studyInstanceUID),
-                    storageSOPClassUIDs: [fixture.sopClassUID]
+                    storageSOPClassUIDs: [fixture.sopClassUID],
+                    onInstance: { retrievedInstances.append($0) }
                 )
-                XCTAssertEqual(result.operation.status, 0, archive.id)
-                XCTAssertTrue(result.retrievedInstances.contains { $0.sopInstanceUID == fixture.sopInstanceUID }, archive.id)
+                XCTAssertEqual(result.status, 0, archive.id)
+                XCTAssertTrue(retrievedInstances.contains { $0.sopInstanceUID == fixture.sopInstanceUID }, archive.id)
             }
 
             if archive.capabilities.contains(.dimseMove) {
@@ -208,7 +210,7 @@ final class DicomInteropSmokeTests: XCTestCase {
             dimseHost: env["\(prefix)_DIMSE_HOST"],
             dimsePort: env["\(prefix)_DIMSE_PORT"].flatMap(UInt16.init),
             calledAETitle: env["\(prefix)_CALLED_AE"] ?? "ARCHIVE",
-            callingAETitle: env["\(prefix)_CALLING_AE"] ?? "MTKSMOKE",
+            callingAETitle: env["\(prefix)_CALLING_AE"] ?? "DICOMSWIFT",
             dicomWebURL: env["\(prefix)_DICOMWEB_URL"].flatMap(URL.init(string:)),
             dicomWebHeaders: bearerHeaders(token: env["\(prefix)_DICOMWEB_BEARER_TOKEN"]),
             capabilities: capabilities,
@@ -706,7 +708,7 @@ extension DicomInteropSmokeTests {
                     host: host,
                     port: port,
                     calledAETitle: env["\(prefix)_CALLED_AE"] ?? "ARCHIVE",
-                    callingAETitle: env["\(prefix)_CALLING_AE"] ?? "MTKSMOKE",
+                    callingAETitle: env["\(prefix)_CALLING_AE"] ?? "DICOMSWIFT",
                     timeout: env["DICOM_INTEROP_TIMEOUT"].flatMap(TimeInterval.init) ?? 30
                 ),
                 capabilities: capabilities,

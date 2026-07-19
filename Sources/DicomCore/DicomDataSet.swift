@@ -617,9 +617,11 @@ public struct DicomDataSet: Equatable, Sendable {
 
 public extension DCMDecoder {
     var dataSet: DicomDataSet {
-        let tags = allTagKeys()
-        let elements = tags.compactMap { dataElement(for: $0) }
-        return DicomDataSet(elements: elements)
+        synchronized {
+            let tags = Set(dicomInfoDict.keys).union(tagMetadataCache.keys)
+            let elements = tags.compactMap(dataElementUnsafe(for:))
+            return DicomDataSet(elements: elements)
+        }
     }
 
     func dataElement(for tag: DicomTag) -> DicomDataElement? {
@@ -628,16 +630,20 @@ public extension DCMDecoder {
 
     func dataElement(for tag: Int) -> DicomDataElement? {
         synchronized {
-            guard dicomInfoDict[tag] != nil || tagMetadataCache[tag] != nil else {
-                return nil
-            }
-
-            let metadata = tagMetadataCache[tag]
-            let vr = effectiveVR(for: tag, metadata: metadata)
-            let name = dict.description(forKey: tag.hexKey)
-            let value = dataValue(for: tag, vr: vr, metadata: metadata)
-            return DicomDataElement(tag: tag, vr: vr, value: value, name: name)
+            dataElementUnsafe(for: tag)
         }
+    }
+
+    private func dataElementUnsafe(for tag: Int) -> DicomDataElement? {
+        guard dicomInfoDict[tag] != nil || tagMetadataCache[tag] != nil else {
+            return nil
+        }
+
+        let metadata = tagMetadataCache[tag]
+        let vr = effectiveVR(for: tag, metadata: metadata)
+        let name = dict.description(forTag: tag)
+        let value = dataValue(for: tag, vr: vr, metadata: metadata)
+        return DicomDataElement(tag: tag, vr: vr, value: value, name: name)
     }
 
     private func effectiveVR(for tag: Int, metadata: TagMetadata?) -> DicomVR {
@@ -648,7 +654,7 @@ public extension DCMDecoder {
     }
 
     private func dictionaryVR(for tag: Int) -> DicomVR? {
-        guard let code = dict.vrCode(forKey: tag.hexKey) else {
+        guard let code = dict.vrCode(forTag: tag) else {
             return nil
         }
         return DicomVR(code: code)
@@ -662,44 +668,28 @@ public extension DCMDecoder {
                   metadata.offset + metadata.elementLength <= dicomData.count else {
                 return .sequence([])
             }
-            let syntax = DicomTransferSyntax(uid: transferSyntaxUID) ?? .explicitVRLittleEndian
             let items = (try? DicomSequenceValueParser.parseItems(
                 in: dicomData,
                 valueOffset: metadata.offset,
                 valueLength: metadata.elementLength,
                 littleEndian: littleEndian,
-                explicitVR: syntax.isExplicitVR
+                explicitVR: isExplicitVRTransferSyntax,
+                characterSet: activeCharacterSet
             )) ?? []
             return .sequence(items)
         }
 
         if let metadata,
-           let raw = rawValueData(for: metadata) {
-            switch vr {
-            case .FD:
-                return .floats(raw.readFloat64Values(littleEndian: littleEndian))
-            case .FL:
-                return .floats(raw.readFloat32Values(littleEndian: littleEndian).map(Double.init))
-            case .SL:
-                return .signedIntegers(raw.readInt32Values(littleEndian: littleEndian).map(Int.init))
-            case .SS:
-                return .signedIntegers(raw.readInt16Values(littleEndian: littleEndian).map(Int.init))
-            case .UL:
-                return .unsignedIntegers(raw.readUInt32Values(littleEndian: littleEndian).map(UInt.init))
-            case .US:
-                return .unsignedIntegers(raw.readUInt16Values(littleEndian: littleEndian).map(UInt.init))
-            case .OF:
-                return .floats(raw.readFloat32Values(littleEndian: littleEndian).map(Double.init))
-            case .OD:
-                return .floats(raw.readFloat64Values(littleEndian: littleEndian))
-            case .OB, .OW, .OV, .UN:
-                return .bytes(raw)
-            default:
-                break
-            }
+           let raw = rawValueData(for: metadata),
+           let value = DicomDataValueDecoder.binaryValue(
+               for: vr,
+               data: raw,
+               littleEndian: littleEndian
+           ) {
+            return value
         }
 
-        let rawString = info(for: tag)
+        let rawString = infoUnsafe(for: tag)
         let values = rawString.dicomMultiValues
         return values.isEmpty ? .empty : .strings(values)
     }
@@ -711,7 +701,7 @@ public extension DCMDecoder {
               metadata.offset + metadata.elementLength <= dicomData.count else {
             return nil
         }
-        return dicomData.subdata(in: metadata.offset..<(metadata.offset + metadata.elementLength))
+        return dicomData[metadata.offset..<(metadata.offset + metadata.elementLength)]
     }
 }
 
@@ -728,12 +718,6 @@ public extension DicomVR {
         let high = UInt8((rawValue >> 8) & 0xFF)
         let low = UInt8(rawValue & 0xFF)
         return String(bytes: [high, low], encoding: .ascii) ?? "UN"
-    }
-}
-
-private extension Int {
-    var hexKey: String {
-        String(format: "%08X", self)
     }
 }
 
@@ -758,60 +742,5 @@ private extension String {
 private extension Array {
     subscript(safe index: Int) -> Element? {
         indices.contains(index) ? self[index] : nil
-    }
-}
-
-private extension Data {
-    func readUInt16Values(littleEndian: Bool) -> [UInt16] {
-        stride(from: 0, to: count - count % 2, by: 2).map { readUInt16(at: $0, littleEndian: littleEndian) }
-    }
-
-    func readInt16Values(littleEndian: Bool) -> [Int16] {
-        readUInt16Values(littleEndian: littleEndian).map { Int16(bitPattern: $0) }
-    }
-
-    func readUInt32Values(littleEndian: Bool) -> [UInt32] {
-        stride(from: 0, to: count - count % 4, by: 4).map { readUInt32(at: $0, littleEndian: littleEndian) }
-    }
-
-    func readInt32Values(littleEndian: Bool) -> [Int32] {
-        readUInt32Values(littleEndian: littleEndian).map { Int32(bitPattern: $0) }
-    }
-
-    func readFloat32Values(littleEndian: Bool) -> [Float] {
-        readUInt32Values(littleEndian: littleEndian).map { Float(bitPattern: $0) }
-    }
-
-    func readFloat64Values(littleEndian: Bool) -> [Double] {
-        stride(from: 0, to: count - count % 8, by: 8).map {
-            Double(bitPattern: readUInt64(at: $0, littleEndian: littleEndian))
-        }
-    }
-
-    func readUInt16(at offset: Int, littleEndian: Bool) -> UInt16 {
-        let b0 = UInt16(self[offset])
-        let b1 = UInt16(self[offset + 1])
-        return littleEndian ? (b1 << 8 | b0) : (b0 << 8 | b1)
-    }
-
-    func readUInt32(at offset: Int, littleEndian: Bool) -> UInt32 {
-        let b0 = UInt32(self[offset])
-        let b1 = UInt32(self[offset + 1])
-        let b2 = UInt32(self[offset + 2])
-        let b3 = UInt32(self[offset + 3])
-        if littleEndian {
-            return b3 << 24 | b2 << 16 | b1 << 8 | b0
-        }
-        return b0 << 24 | b1 << 16 | b2 << 8 | b3
-    }
-
-    func readUInt64(at offset: Int, littleEndian: Bool) -> UInt64 {
-        let values = (0..<8).map { UInt64(self[offset + $0]) }
-        if littleEndian {
-            return values[7] << 56 | values[6] << 48 | values[5] << 40 | values[4] << 32 |
-                values[3] << 24 | values[2] << 16 | values[1] << 8 | values[0]
-        }
-        return values[0] << 56 | values[1] << 48 | values[2] << 40 | values[3] << 32 |
-            values[4] << 24 | values[5] << 16 | values[6] << 8 | values[7]
     }
 }

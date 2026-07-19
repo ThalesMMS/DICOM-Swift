@@ -330,7 +330,7 @@ import Foundation
 /// comprehensive patient demographics, study metadata, and series information extracted from
 /// DICOM files.
 ///
-/// The class conforms to `Codable` for JSON persistence, `Identifiable` for SwiftUI integration,
+/// The class conforms to `Codable` for JSON persistence, `Identifiable` for stable identity,
 /// and includes Objective-C compatibility for bridge applications. All DICOM groups are properly
 /// organized and documented with their corresponding tag numbers.
 ///

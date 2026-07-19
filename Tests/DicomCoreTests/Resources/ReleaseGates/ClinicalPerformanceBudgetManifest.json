@@ -1,14 +1,65 @@
 {
-  "version": 1,
-  "issue": 282,
+  "version": 2,
+  "issue": 1436,
+  "conformanceManifest": "ClinicalCodecConformanceManifest.json",
+  "privacyPolicy": "Reports contain fixture identifiers, aggregate timings, counters, and environment data only; never patient metadata or pixel payloads.",
   "requiredStages": [
     "decode",
-    "volumeAssembly",
     "gpuUpload",
-    "mprRender",
-    "volumeRender",
+    "progressiveFrame",
     "snapshot",
     "peakMemory"
+  ],
+  "requiredWorkflowMetrics": [
+    "thumbnailLatency",
+    "firstVisibleFrame",
+    "finalFrame",
+    "cineFrameP50P95P99",
+    "zoomROILatency",
+    "panCancellationLatency",
+    "workAvoided",
+    "cacheTransitions",
+    "jpipLayerProgress",
+    "jpipByteAccounting",
+    "cpuAndMemory",
+    "metalResources",
+    "copiesAndTemporaryIO",
+    "commandBuffers"
+  ],
+  "benchmarkModes": [
+    "cold-sdk-first-call",
+    "prewarmed-first-clinical-call",
+    "warm-isolated",
+    "warm-sustained",
+    "concurrent-clinical-workload",
+    "fallback-path"
+  ],
+  "tiers": [
+    {
+      "id": "pr-smoke",
+      "purpose": "Small deterministic correctness-first signal on every pull request.",
+      "hostPolicy": "CI host class; compare only within the same environment fingerprint."
+    },
+    {
+      "id": "nightly",
+      "purpose": "Sustained, concurrent, cache, partial-decode, and progressive workload coverage.",
+      "hostPolicy": "Pinned nightly host where available."
+    },
+    {
+      "id": "release",
+      "purpose": "Full clinical corpus and release-configuration absolute plus relative gates.",
+      "hostPolicy": "Pinned release host and device class."
+    },
+    {
+      "id": "manual-device",
+      "purpose": "Device-only Metal, energy, and thermal observations kept separate from host baselines.",
+      "hostPolicy": "Named physical device; never mixed with simulator or CLI baselines."
+    }
+  ],
+  "reportFormats": [
+    "json",
+    "csv",
+    "markdown"
   ],
   "buildConfigurations": [
     "debug",
@@ -16,8 +67,10 @@
   ],
   "warningRatio": 0.9,
   "comparisonProfile": {
-    "referenceDeviceClass": "Apple Silicon local developer machine",
-    "comparisonRule": "Treat values at or above warningRatio as visible warnings and values above the configured limit as failures.",
+    "referenceDeviceClass": "Apple Silicon local developer or pinned CI host",
+    "comparisonRule": "Correctness must pass first. Apply absolute warning/failure budgets, then relative warning/failure deltas only when every comparison key matches.",
+    "relativeWarningPercent": 10.0,
+    "relativeFailurePercent": 20.0,
     "requiredResultEnvironmentFields": [
       "deviceName",
       "osVersion",
@@ -25,23 +78,64 @@
       "modelIdentifier",
       "buildConfiguration",
       "benchmarkMode",
-      "fixtureID"
+      "fixtureID",
+      "tier",
+      "commandLineStartupIncluded"
     ]
   },
   "scenarios": [
     {
-      "id": "dicom-ct-import-small",
-      "component": "DicomCore local clinical import path",
-      "fixtureID": "local-ct-small-non-phi",
-      "fixturePolicy": "Use only local non-PHI representative fixtures committed with the package or generated during tests.",
-      "benchmarkMode": "swift-test-local",
+      "id": "dicom-j2k-codec-clinical",
+      "component": "DicomCore J2KSwift and OpenJPEG",
+      "fixtureID": "ct-explicit-vr-le-rescale",
+      "fixtureIDs": [
+        "ct-explicit-vr-le-rescale",
+        "secondary-capture-rgb",
+        "htj2k-openjph-known-mismatch"
+      ],
+      "conformanceCaseIDs": [
+        "j2k-lossless-matrix",
+        "j2k-rgb-cross-oracle",
+        "htj2k-known-mismatch",
+        "j2k-encode-openjpeg"
+      ],
+      "fixturePolicy": "Use local synthetic non-PHI fixtures from the #1435 conformance manifest.",
+      "benchmarkMode": "cold-sdk-first-call",
+      "benchmarkModes": [
+        "cold-sdk-first-call",
+        "prewarmed-first-clinical-call",
+        "warm-isolated",
+        "warm-sustained",
+        "concurrent-clinical-workload",
+        "fallback-path"
+      ],
+      "tiers": [
+        "pr-smoke",
+        "nightly",
+        "release"
+      ],
+      "backends": [
+        "j2kswift-cpu",
+        "openjpeg"
+      ],
       "datasetSize": {
         "rows": 512,
         "columns": 512,
         "frames": 32,
         "bytesPerVoxel": 2
       },
-      "benchmarkCommand": "swift test --package-path DICOM-Swift --filter PerformanceBudgetTests",
+      "warmupIterations": 3,
+      "benchmarkIterations": 20,
+      "benchmarkCommand": "swift test --package-path DICOM-Swift -c release --filter DicomJ2KSwiftBackendTests",
+      "correctnessGate": "ClinicalCodecConformanceManifest.json cases must pass before performance is evaluated.",
+      "workflowMetrics": [
+        "decodeLatency",
+        "throughput",
+        "cpuAndMemory",
+        "processCPUTime",
+        "peakRSS",
+        "fallbackLatency"
+      ],
       "budgets": [
         {
           "stage": "decode",
@@ -50,11 +144,132 @@
           "debugLimit": 500.0
         },
         {
-          "stage": "volumeAssembly",
+          "stage": "peakMemory",
+          "metric": "peakMemoryMegabytes",
+          "releaseLimit": 256.0,
+          "debugLimit": 384.0
+        }
+      ]
+    },
+    {
+      "id": "dicom-jpegls-codec-clinical",
+      "component": "DicomCore JLSwift and CharLS",
+      "fixtureID": "ct-explicit-vr-le-rescale",
+      "fixtureIDs": [
+        "ct-explicit-vr-le-rescale",
+        "secondary-capture-rgb"
+      ],
+      "conformanceCaseIDs": [
+        "jpegls-cross-oracle",
+        "jpegls-near-lossless",
+        "jpegls-negative-shapes"
+      ],
+      "fixturePolicy": "Use local synthetic non-PHI fixtures from the #1435 conformance manifest.",
+      "benchmarkMode": "warm-isolated",
+      "benchmarkModes": [
+        "cold-sdk-first-call",
+        "prewarmed-first-clinical-call",
+        "warm-isolated",
+        "warm-sustained",
+        "concurrent-clinical-workload",
+        "fallback-path"
+      ],
+      "tiers": [
+        "pr-smoke",
+        "nightly",
+        "release"
+      ],
+      "backends": [
+        "jlswift-cpu",
+        "charls"
+      ],
+      "datasetSize": {
+        "rows": 512,
+        "columns": 512,
+        "frames": 32,
+        "bytesPerVoxel": 2
+      },
+      "warmupIterations": 3,
+      "benchmarkIterations": 20,
+      "benchmarkCommand": "swift test --package-path DICOM-Swift -c release --filter DicomJLSwiftBackendTests",
+      "correctnessGate": "Exact or tolerance-qualified JLSwift/CharLS conformance must pass first.",
+      "workflowMetrics": [
+        "decodeLatency",
+        "throughput",
+        "processCPUTime",
+        "peakRSS",
+        "bufferFootprint"
+      ],
+      "budgets": [
+        {
+          "stage": "decode",
           "metric": "meanTimeMilliseconds",
           "releaseLimit": 180.0,
           "debugLimit": 360.0
-        },
+        }
+      ]
+    },
+    {
+      "id": "dicom-partial-decode-display",
+      "component": "DicomCore partial decode and CPU/Metal display",
+      "fixtureID": "ct-explicit-vr-le-rescale",
+      "fixtureIDs": [
+        "ct-explicit-vr-le-rescale"
+      ],
+      "conformanceCaseIDs": [
+        "j2k-lossless-matrix"
+      ],
+      "fixturePolicy": "Use local synthetic non-PHI fixtures and generated J2K codestreams derived from them.",
+      "benchmarkMode": "warm-sustained",
+      "benchmarkModes": [
+        "prewarmed-first-clinical-call",
+        "warm-isolated",
+        "warm-sustained",
+        "concurrent-clinical-workload",
+        "fallback-path"
+      ],
+      "tiers": [
+        "pr-smoke",
+        "nightly",
+        "release",
+        "manual-device"
+      ],
+      "backends": [
+        "j2kswift-partial",
+        "openjpeg-full-fallback",
+        "vdsp-cpu",
+        "metal"
+      ],
+      "datasetSize": {
+        "rows": 512,
+        "columns": 512,
+        "frames": 32,
+        "bytesPerVoxel": 2
+      },
+      "warmupIterations": 5,
+      "benchmarkIterations": 50,
+      "benchmarkCommand": "swift test --package-path DICOM-Swift -c release --filter DicomJ2KSwiftBackendTests",
+      "correctnessGate": "Partial output must equal the crop or resolution level from a qualified full decode.",
+      "workflowMetrics": [
+        "thumbnailLatency",
+        "firstVisibleFrame",
+        "finalFrame",
+        "cineFrameP50P95P99",
+        "zoomROILatency",
+        "panCancellationLatency",
+        "workAvoided",
+        "cacheTransitions",
+        "bytesAvoided",
+        "pixelsAvoided",
+        "cacheHits",
+        "cacheMisses",
+        "provisionalToFinalTransitions",
+        "cpuGpuCopies",
+        "metalResources",
+        "copiesAndTemporaryIO",
+        "commandBuffers"
+      ],
+      "budgets": [
         {
           "stage": "gpuUpload",
           "metric": "meanTimeMilliseconds",
@@ -62,28 +277,71 @@
           "debugLimit": 240.0
         },
         {
-          "stage": "mprRender",
-          "metric": "p95TimeMilliseconds",
-          "releaseLimit": 33.0,
-          "debugLimit": 66.0
-        },
-        {
-          "stage": "volumeRender",
-          "metric": "p95TimeMilliseconds",
-          "releaseLimit": 50.0,
-          "debugLimit": 100.0
-        },
-        {
           "stage": "snapshot",
           "metric": "meanTimeMilliseconds",
           "releaseLimit": 300.0,
           "debugLimit": 600.0
-        },
+        }
+      ]
+    },
+    {
+      "id": "dicom-jpip-progressive",
+      "component": "DicomCore JPIP progressive stream",
+      "fixtureID": "ct-explicit-vr-le-rescale",
+      "fixtureIDs": [
+        "ct-explicit-vr-le-rescale"
+      ],
+      "conformanceCaseIDs": [
+        "j2k-lossless-matrix"
+      ],
+      "fixturePolicy": "Use a local deterministic injected JPIP transport with synthetic non-PHI layer payloads.",
+      "benchmarkMode": "prewarmed-first-clinical-call",
+      "benchmarkModes": [
+        "prewarmed-first-clinical-call",
+        "warm-sustained",
+        "concurrent-clinical-workload",
+        "fallback-path"
+      ],
+      "tiers": [
+        "pr-smoke",
+        "nightly",
+        "release"
+      ],
+      "backends": [
+        "jpip-injected-transport",
+        "j2kswift-progressive"
+      ],
+      "datasetSize": {
+        "rows": 512,
+        "columns": 512,
+        "frames": 32,
+        "bytesPerVoxel": 2
+      },
+      "warmupIterations": 1,
+      "benchmarkIterations": 20,
+      "benchmarkCommand": "swift test --package-path DICOM-Swift -c release --filter DicomJPIPProgressiveStreamTests",
+      "correctnessGate": "Preview and final layer ordering, quality state, and cancellation must remain correct.",
+      "workflowMetrics": [
+        "jpipLayerProgress",
+        "jpipByteAccounting",
+        "layerReceiveLatency",
+        "layerDecodeLatency",
+        "layerConversionLatency",
+        "layerUploadLatency",
+        "firstVisibleFrame",
+        "finalFrame",
+        "usefulBytes",
+        "cachedBytes",
+        "duplicatedBytes",
+        "staleBytes",
+        "discardedBytes"
+      ],
+      "budgets": [
         {
-          "stage": "peakMemory",
-          "metric": "peakMemoryMegabytes",
-          "releaseLimit": 256.0,
-          "debugLimit": 384.0
+          "stage": "progressiveFrame",
+          "metric": "p95TimeMilliseconds",
+          "releaseLimit": 33.0,
+          "debugLimit": 66.0
         }
       ]
     }

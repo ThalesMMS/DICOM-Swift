@@ -302,6 +302,7 @@ public final class DCMDecoder: DicomDecoderProtocol, @unchecked Sendable {
     /// Flags controlling how the decoder behaves when encountering
     /// certain structures in the file.
     var bigEndianTransferSyntax: Bool = false
+    var isExplicitVRTransferSyntax: Bool = true
     var littleEndian: Bool = true
 
     /// Rescale intercept and slope.  These values are stored in

@@ -135,7 +135,7 @@ extension DCMDecoder {
     /// Must be called while holding the decoder's synchronization lock.
     /// - Parameter tag: The integer DICOM tag to retrieve (group/element packed as Int).
     /// - Returns: The tag's value string with any leading description and colon removed and trimmed; an empty string if the tag is missing or has no value.
-    private func infoUnsafe(for tag: Int) -> String {
+    func infoUnsafe(for tag: Int) -> String {
         // OPTIMIZATION: Check cache first for frequently accessed tags
         if DCMDecoder.frequentTags.contains(tag), let cached = cachedInfo[tag] {
             return cached

@@ -93,18 +93,24 @@ public struct DicomStorageReceivedInstance: Equatable, Sendable {
     public var sopClassUID: String
     public var sopInstanceUID: String
     public var transferSyntax: DicomTransferSyntax
-    public var dataSet: DicomDataSet
+    /// Metadata-only parsed dataset. Pixel Data remains available in `rawDataSetData`.
+    public var dataSet: DicomDataSet {
+        didSet { rawDataSetData = nil }
+    }
+    public var rawDataSetData: Data?
     public var receivedAt: Date
 
     public init(sopClassUID: String,
                 sopInstanceUID: String,
                 transferSyntax: DicomTransferSyntax,
                 dataSet: DicomDataSet,
+                rawDataSetData: Data? = nil,
                 receivedAt: Date = Date()) {
         self.sopClassUID = sopClassUID
         self.sopInstanceUID = sopInstanceUID
         self.transferSyntax = transferSyntax
         self.dataSet = dataSet
+        self.rawDataSetData = rawDataSetData
         self.receivedAt = receivedAt
     }
 }
@@ -144,15 +150,29 @@ public final class DicomFileStorageCache: DicomStorageInstanceStoring {
 
     public func store(_ instance: DicomStorageReceivedInstance) throws -> DicomStoredInstance {
         let fileURL = directoryURL.appendingPathComponent(Self.fileName(for: instance.sopInstanceUID))
-        try DicomDataSetWriter.write(
-            instance.dataSet,
-            to: fileURL,
-            options: DicomPart10WriterOptions(
+        if let rawDataSetData = instance.rawDataSetData {
+            try DicomDataSetWriter.validateWriteSupport(
+                for: instance.dataSet,
+                transferSyntax: instance.transferSyntax
+            )
+            let part10Data = try DicomDataSetWriter.part10Data(
+                fromEncodedDataSet: rawDataSetData,
                 transferSyntax: instance.transferSyntax,
                 mediaStorageSOPClassUID: instance.sopClassUID,
                 mediaStorageSOPInstanceUID: instance.sopInstanceUID
             )
-        )
+            try part10Data.write(to: fileURL, options: [.atomic])
+        } else {
+            try DicomDataSetWriter.write(
+                instance.dataSet,
+                to: fileURL,
+                options: DicomPart10WriterOptions(
+                    transferSyntax: instance.transferSyntax,
+                    mediaStorageSOPClassUID: instance.sopClassUID,
+                    mediaStorageSOPInstanceUID: instance.sopInstanceUID
+                )
+            )
+        }
         return DicomStoredInstance(sopClassUID: instance.sopClassUID,
                                    sopInstanceUID: instance.sopInstanceUID,
                                    transferSyntax: instance.transferSyntax,
@@ -413,13 +433,14 @@ public final class DicomStorageSCPService {
                 let command = try DicomDIMSECommandSet.decode(message.data)
                 switch command.commandField {
                 case DicomDIMSECommandField.cStoreRQ:
-                    let stored = try handleStore(command: command,
-                                                 commandContextID: message.presentationContextID,
-                                                 association: association,
-                                                 transport: transport,
-                                                 reader: reader,
-                                                 progress: progress)
-                    storedInstances.append(stored)
+                    if let stored = try handleStore(command: command,
+                                                    commandContextID: message.presentationContextID,
+                                                    association: association,
+                                                    transport: transport,
+                                                    reader: reader,
+                                                    progress: progress) {
+                        storedInstances.append(stored)
+                    }
                 case DicomDIMSECommandField.nActionRQ:
                     let report = try handleStorageCommitment(command: command,
                                                              commandContextID: message.presentationContextID,
@@ -461,7 +482,7 @@ public final class DicomStorageSCPService {
                              association: DicomAssociation,
                              transport: DicomAssociationTransport,
                              reader: DicomDIMSEMessageReader,
-                             progress: (@Sendable (DicomStorageSCPProgress) -> Void)?) throws -> DicomStoredInstance {
+                             progress: (@Sendable (DicomStorageSCPProgress) -> Void)?) throws -> DicomStoredInstance? {
         let payload = try reader.readMessage(from: transport)
         guard !payload.isCommand else {
             throw DicomStorageSCPError.missingCommandDataSet(command.commandField)
@@ -477,21 +498,14 @@ public final class DicomStorageSCPService {
             DicomDataSetWriter.makeUID()
         progress?(.instanceReceived(sopClassUID: sopClassUID, sopInstanceUID: sopInstanceUID))
 
+        let received = DicomStorageReceivedInstance(sopClassUID: sopClassUID,
+                                                    sopInstanceUID: sopInstanceUID,
+                                                    transferSyntax: transferSyntax,
+                                                    dataSet: dataSet,
+                                                    rawDataSetData: payload.data)
+        let stored: DicomStoredInstance
         do {
-            let received = DicomStorageReceivedInstance(sopClassUID: sopClassUID,
-                                                        sopInstanceUID: sopInstanceUID,
-                                                        transferSyntax: transferSyntax,
-                                                        dataSet: dataSet)
-            let stored = try storage.store(received)
-            commitmentTracker.recordStoredInstance(stored)
-            try sendStoreResponse(command: command,
-                                  status: 0,
-                                  errorComment: nil,
-                                  presentationContextID: commandContextID,
-                                  association: association,
-                                  transport: transport)
-            progress?(.instanceStored(stored))
-            return stored
+            stored = try storage.store(received)
         } catch {
             try sendStoreResponse(command: command,
                                   status: 0xC000,
@@ -501,8 +515,17 @@ public final class DicomStorageSCPService {
                                   transport: transport)
             progress?(.storeFailed(sopInstanceUID: sopInstanceUID,
                                    errorDescription: error.localizedDescription))
-            throw error
+            return nil
         }
+        commitmentTracker.recordStoredInstance(stored)
+        try sendStoreResponse(command: command,
+                              status: 0,
+                              errorComment: nil,
+                              presentationContextID: commandContextID,
+                              association: association,
+                              transport: transport)
+        progress?(.instanceStored(stored))
+        return stored
     }
 
     private func handleStorageCommitment(command: DicomDIMSECommandSet,
@@ -776,7 +799,8 @@ public final class DicomStorageSCPServer {
         var startupError: Error?
         listener.newConnectionHandler = { [service] connection in
             let transport = DicomTCPAssociationTransport(acceptedConnection: connection,
-                                                         timeout: service.configuration.timeout)
+                                                         timeout: service.configuration.timeout,
+                                                         maximumIncomingPDUSize: service.configuration.maximumPDULength)
             transport.startAcceptedConnection()
             DispatchQueue.global(qos: .userInitiated).async {
                 _ = try? service.handleAssociation(using: transport, progress: progress)

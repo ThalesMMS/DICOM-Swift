@@ -212,6 +212,54 @@ struct PreflightCommand: ParsableCommand {
                 message: status.message
             )
 
+        case "j2kswift-backend":
+            guard let status = DicomCodecCapabilities.backendStatuses(environment: environment)
+                .first(where: { $0.identifier == "j2kswift-cpu" }) else {
+                return PreflightCheck(kind: .regression, message: "The J2KSwift backend is not registered.")
+            }
+            guard status.isAvailable, status.version == "11.0.2" else {
+                return PreflightCheck(
+                    kind: .regression,
+                    message: status.unsupportedReason ?? "J2KSwift 11.0.2 is not active."
+                )
+            }
+            return PreflightCheck(
+                kind: .available,
+                message: "J2KSwift \(status.version ?? "unknown") is package-linked for JPEG 2000 decode and encode."
+            )
+
+        case "jlswift-backend":
+            guard let status = DicomCodecCapabilities.backendStatuses(environment: environment)
+                .first(where: { $0.identifier == "jlswift" }) else {
+                return PreflightCheck(kind: .regression, message: "The JLSwift backend is not registered.")
+            }
+            guard status.isAvailable, status.version == "0.9.0" else {
+                return PreflightCheck(
+                    kind: .regression,
+                    message: status.unsupportedReason ?? "JLSwift 0.9.0 is not active."
+                )
+            }
+            return PreflightCheck(
+                kind: .available,
+                message: "JLSwift \(status.version ?? "unknown") is package-linked for JPEG-LS decode and encode."
+            )
+
+        case "jxlswift-backend":
+            guard let status = DicomCodecCapabilities.backendStatuses(environment: environment)
+                .first(where: { $0.identifier == "jxlswift" }) else {
+                return PreflightCheck(kind: .regression, message: "The JXLSwift backend is not registered.")
+            }
+            guard status.isAvailable, status.version == "1.4.0" else {
+                return PreflightCheck(
+                    kind: .regression,
+                    message: status.unsupportedReason ?? "JXLSwift 1.4.0 is not active."
+                )
+            }
+            return PreflightCheck(
+                kind: .available,
+                message: "JXLSwift \(status.version ?? "unknown") is package-linked behind the disabled-by-default experimental flag."
+            )
+
         case "openjpeg-runtime":
             let status = DicomCodecRuntimePreflight.status(for: .openJPEG, environment: environment)
             return PreflightCheck(
@@ -226,6 +274,57 @@ struct PreflightCommand: ParsableCommand {
             return PreflightCheck(
                 kind: .missingOptionalRuntime,
                 message: "opj_compress was not found in PATH or common Homebrew locations."
+            )
+
+        case "libjxl-tools":
+            let cjxl = executablePath(named: "cjxl", environment: environment)
+            let djxl = executablePath(named: "djxl", environment: environment)
+            if let cjxl, let djxl {
+                return PreflightCheck(
+                    kind: .available,
+                    message: "Found cjxl at \(cjxl) and djxl at \(djxl)."
+                )
+            }
+            return PreflightCheck(
+                kind: .missingOptionalRuntime,
+                message: "cjxl and djxl were not both found in PATH or common Homebrew locations."
+            )
+
+        case "dicomkit-interop":
+            guard let checkoutPath = environment["DICOMKIT_CHECKOUT"], !checkoutPath.isEmpty else {
+                return PreflightCheck(
+                    kind: .missingOptionalRuntime,
+                    message: "DICOMKIT_CHECKOUT is not configured."
+                )
+            }
+            let checkout = URL(fileURLWithPath: checkoutPath, isDirectory: true)
+            guard FileManager.default.fileExists(atPath: checkout.appendingPathComponent(".git").path) else {
+                return PreflightCheck(
+                    kind: .missingOptionalRuntime,
+                    message: "DICOMKIT_CHECKOUT is not a Git checkout."
+                )
+            }
+            guard let expectedCommit = pinnedDICOMKitCommit(packageRoot: packageRoot) else {
+                return PreflightCheck(
+                    kind: .regression,
+                    message: "The clinical conformance manifest does not declare a pinned DICOMKit commit."
+                )
+            }
+            guard let actualCommit = gitCommit(at: checkout) else {
+                return PreflightCheck(
+                    kind: .missingOptionalRuntime,
+                    message: "Could not read the DICOMKit checkout commit."
+                )
+            }
+            guard actualCommit == expectedCommit else {
+                return PreflightCheck(
+                    kind: .missingOptionalRuntime,
+                    message: "DICOMKit commit mismatch: expected \(expectedCommit), found \(actualCommit)."
+                )
+            }
+            return PreflightCheck(
+                kind: .available,
+                message: "DICOMKit is pinned at \(actualCommit)."
             )
 
         case "metal-device":
@@ -271,6 +370,38 @@ struct PreflightCommand: ParsableCommand {
         let candidates = (pathDirectories + ["/opt/homebrew/bin", "/usr/local/bin"])
             .map { URL(fileURLWithPath: $0).appendingPathComponent(executableName).path }
         return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
+    }
+
+    static func gitCommit(at checkout: URL) -> String? {
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.arguments = ["-C", checkout.path, "rev-parse", "HEAD"]
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return nil }
+            return String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        } catch {
+            return nil
+        }
+    }
+
+    static func pinnedDICOMKitCommit(packageRoot: URL) -> String? {
+        let manifestURL = packageRoot.appendingPathComponent(
+            "Tests/DicomCoreTests/Resources/ReleaseGates/ClinicalCodecConformanceManifest.json"
+        )
+        guard let data = try? Data(contentsOf: manifestURL),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let dicomKit = object["dicomKit"] as? [String: Any],
+              let commit = dicomKit["commit"] as? String,
+              commit.range(of: #"^[0-9a-f]{40}$"#, options: .regularExpression) != nil else {
+            return nil
+        }
+        return commit
     }
 }
 

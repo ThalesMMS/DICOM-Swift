@@ -1,5 +1,42 @@
 {
+  "originHash" : "300d9069bd2cd7d410522a7978fbe2975a8818c7f2f02f2d2601176dc8404b8a",
   "pins" : [
+    {
+      "identity" : "compressionfamily",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Raster-Lab/CompressionFamily.git",
+      "state" : {
+        "revision" : "30fd74b6df841cf79b1a0247534a723f5e7ab4ba",
+        "version" : "1.0.0"
+      }
+    },
+    {
+      "identity" : "j2kswift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Raster-Lab/J2KSwift.git",
+      "state" : {
+        "revision" : "b1949084eeedaafb40bff8f1745bbab19e4bc36d",
+        "version" : "11.0.2"
+      }
+    },
+    {
+      "identity" : "jlswift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Raster-Lab/JLSwift.git",
+      "state" : {
+        "revision" : "53d902fec538e5c12f4ed9864c026be5da66b5dd",
+        "version" : "0.9.0"
+      }
+    },
+    {
+      "identity" : "jxlswift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Raster-Lab/JXLSwift.git",
+      "state" : {
+        "revision" : "760697a54dd253da8e8466c3fd09ecf2c2d89aec",
+        "version" : "1.4.0"
+      }
+    },
     {
       "identity" : "swift-argument-parser",
       "kind" : "remoteSourceControl",
@@ -37,5 +74,5 @@
       }
     }
   ],
-  "version" : 2
+  "version" : 3
 }

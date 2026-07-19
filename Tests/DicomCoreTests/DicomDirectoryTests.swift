@@ -2,6 +2,31 @@ import XCTest
 @testable import DicomCore
 
 final class DicomDirectoryTests: XCTestCase {
+    func testReaderDecodesRecordSpecificCharacterSet() throws {
+        let characterSet = DicomSpecificCharacterSet("ISO_IR 144")
+        let patientName = "Иванов^Иван"
+        let record = explicitStringElement(tag: 0x0004_1430, vr: "CS", value: Data("PATIENT".utf8))
+            + explicitStringElement(
+                tag: DicomTag.specificCharacterSet.rawValue,
+                vr: "CS",
+                value: Data("ISO_IR 144".utf8)
+            )
+            + explicitStringElement(
+                tag: DicomTag.patientName.rawValue,
+                vr: "PN",
+                value: characterSet.encode(patientName)
+            )
+        let item = tagData(0xFFFE_E000) + uint32Data(UInt32(record.count)) + record
+        let sequence = explicitLongElement(tag: 0x0004_1220, vr: "SQ", value: item)
+        var data = Data(count: 128)
+        data.append(contentsOf: "DICM".utf8)
+        data.append(sequence)
+
+        let parsed = try DicomDirectoryReader.read(data: data)
+
+        XCTAssertEqual(parsed.patients.first?.patientName, patientName)
+    }
+
     func testWriterAndReaderRoundTripHierarchy() throws {
         let directory = makeTwoPatientDirectory()
 
@@ -166,6 +191,35 @@ final class DicomDirectoryTests: XCTestCase {
             searchOffset = itemEnd
         }
         return items
+    }
+
+    private func explicitStringElement(tag: Int, vr: String, value: Data) -> Data {
+        var padded = value
+        if !padded.count.isMultiple(of: 2) {
+            padded.append(0x20)
+        }
+        return tagData(tag) + Data(vr.utf8) + uint16Data(UInt16(padded.count)) + padded
+    }
+
+    private func explicitLongElement(tag: Int, vr: String, value: Data) -> Data {
+        tagData(tag) + Data(vr.utf8) + Data([0, 0]) + uint32Data(UInt32(value.count)) + value
+    }
+
+    private func tagData(_ tag: Int) -> Data {
+        uint16Data(UInt16((tag >> 16) & 0xFFFF)) + uint16Data(UInt16(tag & 0xFFFF))
+    }
+
+    private func uint16Data(_ value: UInt16) -> Data {
+        Data([UInt8(value & 0xFF), UInt8(value >> 8)])
+    }
+
+    private func uint32Data(_ value: UInt32) -> Data {
+        Data([
+            UInt8(value & 0xFF),
+            UInt8((value >> 8) & 0xFF),
+            UInt8((value >> 16) & 0xFF),
+            UInt8(value >> 24)
+        ])
     }
 }
 

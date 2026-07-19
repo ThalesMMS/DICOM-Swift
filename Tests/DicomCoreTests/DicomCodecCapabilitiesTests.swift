@@ -15,6 +15,27 @@ import DicomTestSupport
 @testable import DicomCore
 
 final class DicomCodecCapabilitiesTests: XCTestCase {
+    func testBackendStatusesExposePackageLinkedJLSwiftQualification() throws {
+        let status = try XCTUnwrap(
+            DicomCodecCapabilities.backendStatuses(environment: [:])
+                .first(where: { $0.identifier == "jlswift" })
+        )
+
+        XCTAssertTrue(status.isAvailable)
+        XCTAssertEqual(status.version, "0.9.0")
+        XCTAssertEqual(status.source, .packageLinked)
+        XCTAssertEqual(status.operations, ["decode", "encode"])
+        XCTAssertEqual(status.supportedGrayscaleBitDepths, 8...16)
+        XCTAssertEqual(status.supportedColorBitDepths, 8...8)
+        XCTAssertEqual(
+            Set(status.decodeTransferSyntaxUIDs),
+            DicomJLSwiftBackend.transferSyntaxes
+        )
+        XCTAssertEqual(
+            Set(status.encodeTransferSyntaxUIDs),
+            DicomJLSwiftBackend.transferSyntaxes
+        )
+    }
     // MARK: - Available backends
 
     func testAvailableCharLSReportsVersionPathSourceAndBitDepths() throws {

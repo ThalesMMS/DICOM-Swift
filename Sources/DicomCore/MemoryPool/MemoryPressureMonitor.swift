@@ -8,7 +8,7 @@ import Dispatch
 /// This implementation uses `DispatchSource.makeMemoryPressureSource()` rather than
 /// `NotificationCenter` (UIApplication.didReceiveMemoryWarningNotification) because:
 ///
-/// 1. **Platform Independence**: Works on both iOS and macOS without UIKit dependency.
+/// 1. **Platform Independence**: Works on both iOS and macOS through Foundation.
 ///    The library targets iOS 13+ and macOS 12+, and DispatchSource is available on both.
 ///
 /// 2. **System-Level Integration**: DispatchSource provides direct access to kernel-level

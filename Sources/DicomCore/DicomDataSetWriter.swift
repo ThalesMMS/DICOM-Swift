@@ -95,6 +95,29 @@ public enum DicomDataSetWriter {
         return data
     }
 
+    /// Wraps an already encoded dataset in DICOM Part 10 file metadata without re-encoding it.
+    public static func part10Data(fromEncodedDataSet dataSetData: Data,
+                                  transferSyntax: DicomTransferSyntax,
+                                  mediaStorageSOPClassUID: String,
+                                  mediaStorageSOPInstanceUID: String) throws -> Data {
+        guard !transferSyntax.usesDataSetDeflate else {
+            throw DicomDataSetWriterError.transferSyntaxWriteUnsupported(
+                uid: transferSyntax.rawValue,
+                reason: "fromEncodedDataSet writing does not support deflate transfer syntaxes."
+            )
+        }
+        let options = DicomPart10WriterOptions(
+            transferSyntax: transferSyntax,
+            mediaStorageSOPClassUID: mediaStorageSOPClassUID,
+            mediaStorageSOPInstanceUID: mediaStorageSOPInstanceUID
+        )
+        var data = Data(count: 128)
+        data.append(contentsOf: "DICM".utf8)
+        data.append(try fileMetaData(for: DicomDataSet(), options: options))
+        data.append(dataSetData)
+        return data
+    }
+
     public static func dataSetData(from dataSet: DicomDataSet,
                                    transferSyntax: DicomTransferSyntax = .explicitVRLittleEndian) throws -> Data {
         try validateWriteSupport(for: dataSet, transferSyntax: transferSyntax)
@@ -214,8 +237,8 @@ public enum DicomDataSetWriter {
             hasEncapsulatedPixelData(element)
     }
 
-    private static func validateWriteSupport(for dataSet: DicomDataSet,
-                                             transferSyntax: DicomTransferSyntax) throws {
+    static func validateWriteSupport(for dataSet: DicomDataSet,
+                                     transferSyntax: DicomTransferSyntax) throws {
         let support = transferSyntax.writeSupport
         let pixelData = dataSet.element(for: .pixelData)
         let hasPixelData = pixelData != nil

@@ -12,6 +12,7 @@ public enum DicomRuntimeCapability: String, CaseIterable, Codable {
     case charLS
     case openJPEG
     case opjCompress
+    case libjxlTools
     case metalDevice
     case networkSecurityTLS
     case networkInteropSmoke
@@ -30,6 +31,8 @@ public enum DicomRuntimeCapability: String, CaseIterable, Codable {
             return "openjpeg-runtime"
         case .opjCompress:
             return "opj-compress-tool"
+        case .libjxlTools:
+            return "libjxl-tools"
         case .metalDevice:
             return "metal-device"
         case .networkSecurityTLS:
@@ -53,6 +56,8 @@ public enum DicomRuntimeCapability: String, CaseIterable, Codable {
             return "OpenJPEG runtime"
         case .opjCompress:
             return "opj_compress tool"
+        case .libjxlTools:
+            return "cjxl/djxl tools"
         case .metalDevice:
             return "Metal device"
         case .networkSecurityTLS:
@@ -76,6 +81,8 @@ public enum DicomRuntimeCapability: String, CaseIterable, Codable {
             return "DICOM_REQUIRE_OPENJPEG"
         case .opjCompress:
             return "DICOM_REQUIRE_OPJ_COMPRESS"
+        case .libjxlTools:
+            return "DICOM_REQUIRE_LIBJXL_TOOLS"
         case .metalDevice:
             return "DICOM_REQUIRE_METAL"
         case .networkSecurityTLS:
@@ -90,6 +97,7 @@ public enum DicomRuntimeCapability: String, CaseIterable, Codable {
         case .bundledSyntheticFixtures:
             return true
         case .largeDicomFixtures, .jpegLosslessConformanceFixtures, .charLS, .openJPEG, .opjCompress,
+             .libjxlTools,
              .metalDevice, .networkSecurityTLS, .networkInteropSmoke:
             return false
         }
@@ -208,6 +216,18 @@ public enum DicomTestRuntimePreflight {
                 return status(capability, .available, "Found opj_compress at \(path).")
             }
             return status(capability, .missingOptionalRuntime, "opj_compress was not found in PATH or common Homebrew locations.")
+
+        case .libjxlTools:
+            let cjxl = executablePath(named: "cjxl", environment: environment)
+            let djxl = executablePath(named: "djxl", environment: environment)
+            if let cjxl, let djxl {
+                return status(capability, .available, "Found cjxl at \(cjxl) and djxl at \(djxl).")
+            }
+            return status(
+                capability,
+                .missingOptionalRuntime,
+                "cjxl and djxl were not both found in PATH or common Homebrew locations."
+            )
 
         case .metalDevice:
             #if canImport(Metal)

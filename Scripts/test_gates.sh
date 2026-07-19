@@ -59,6 +59,22 @@ emit_coverage_summary() {
     --output-dir "$COVERAGE_DIR"
 }
 
+emit_clinical_conformance_report() {
+  echo "==> Clinical codec conformance report (JSON/CSV/Markdown)"
+  local args=(
+    --manifest Tests/DicomCoreTests/Resources/ReleaseGates/ClinicalCodecConformanceManifest.json
+    --preflight "$COVERAGE_DIR/preflight.json"
+    --test-log "$TEST_LOG"
+    --output-dir "$COVERAGE_DIR/clinical-conformance"
+    --gate "$GATE"
+    --enforce-required
+  )
+  if [ -f ".build/clinical-conformance/dicomkit-interop.jsonl" ]; then
+    args+=(--interop-results ".build/clinical-conformance/dicomkit-interop.jsonl")
+  fi
+  python3 Scripts/clinical_conformance_report.py "${args[@]}"
+}
+
 # Heavy suites excluded from the quick gate. Keep this list in sync with the
 # fixture/runtime gates below — everything skipped here must be owned by one
 # of the other gates (or by the release gate's full run).
@@ -87,10 +103,27 @@ QUICK_SKIPS=(
 # Fixture-focused suites: bundled synthetic fixtures plus curated non-PHI
 # conformance/parity material. Deterministic, network-free.
 FIXTURE_FILTERS=(
+  ClinicalCodecConformanceManifestTests
+  ClinicalCodecConformanceReportTests
+  ClinicalInteropFixtureExportTests.test_committedClinicalObjectFixturesMatchDeterministicBuildersAndParse
   ClinicalParityFixtureManifestTests
   DCMDecoderIntegrationTests
+  DCMPixelReaderInternalTests
   JPEGLosslessConformanceTests
+  JPEGExtendedDecoderTests
   DicomCompressedPixelCodecMatrixTests
+  DicomColorPixelDataTests
+  DicomEncapsulatedPixelFrameReaderTests
+  DicomEnhancedMultiframeVolumeTests
+  DicomJLSwiftBackendTests
+  DicomJXLSwiftBackendTests
+  DicomSegmentationTests
+  DicomRTObjectsTests
+  DicomAIInferenceTests
+  DicomQuantitativeValuesTests
+  DicomEncapsulatedDocumentTests
+  DicomWaveformTests
+  DicomVideoTests
   TestFixturesIntegrationTests
 )
 
@@ -116,6 +149,7 @@ case "$GATE" in
     done
     swift test "${FILTER_ARGS[@]}" 2>&1 | tee "$TEST_LOG"
     emit_coverage_summary
+    emit_clinical_conformance_report
     echo "[gate=fixture] PASSED"
     ;;
 
@@ -150,6 +184,9 @@ PY
     }
 
     add_if_active charls-runtime DicomLosslessCodecTests
+    add_if_active j2kswift-backend DicomJ2KSwiftBackendTests DicomJ2KSwiftEncoderTests
+    add_if_active jlswift-backend DicomJLSwiftBackendTests
+    add_if_active jxlswift-backend DicomJXLSwiftBackendTests
     add_if_active openjpeg-runtime DicomLossyCodecBackendTests DicomJP3DVolumeDocumentTests
     add_if_active metal-device MetalWindowingTests
     add_if_active network-interop-smoke DicomInteropSmokeTests DicomDIMSENetworkTests
@@ -158,6 +195,7 @@ PY
 
     swift test "${FILTER_ARGS[@]}" 2>&1 | tee "$TEST_LOG"
     emit_coverage_summary
+    emit_clinical_conformance_report
     echo "[gate=runtime] PASSED"
     ;;
 
@@ -168,10 +206,13 @@ PY
     # backends are active — the preflight below fails fast otherwise.
     export DICOM_REQUIRE_CHARLS=1
     export DICOM_REQUIRE_OPENJPEG=1
+    export DICOM_REQUIRE_OPJ_COMPRESS=1
+    export DICOM_REQUIRE_LIBJXL_TOOLS=1
     run_preflight_or_fail_fast
     swift build -c release
     swift test 2>&1 | tee "$TEST_LOG"
     emit_coverage_summary
+    emit_clinical_conformance_report
     echo "[gate=release] PASSED"
     ;;
 

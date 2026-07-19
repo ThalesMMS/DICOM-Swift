@@ -13,13 +13,12 @@ extension DCMDecoder {
 
         let previousEndianness = littleEndian
         let wasInSequence = parser.isInSequence
-        let syntax = DicomTransferSyntax(uid: transferSyntaxUID)
         let tag = parser.getNextTag(
             location: &location,
             data: dicomData,
             littleEndian: &littleEndian,
             bigEndianTransferSyntax: bigEndianTransferSyntax,
-            explicitVR: syntax?.isExplicitVR ?? true
+            explicitVR: isExplicitVRTransferSyntax
         )
 
         let endiannessChanged = littleEndian != previousEndianness
@@ -108,6 +107,7 @@ extension DCMDecoder {
         // Reset some state to sane defaults
         tagMetadataCache.removeAll()
         activeCharacterSet = .defaultCharacterSet
+        isExplicitVRTransferSyntax = true
         bitDepth = 16
         compressedImage = false
         imageOrientation = nil
@@ -202,6 +202,9 @@ extension DCMDecoder {
                     transferSyntaxUID = context.transferSyntaxUID
                     compressedImage = context.compressedImage
                     bigEndianTransferSyntax = context.bigEndianTransferSyntax
+                    isExplicitVRTransferSyntax = DicomTransferSyntax(
+                        uid: context.transferSyntaxUID
+                    )?.isExplicitVR ?? true
                 } else if tag == DicomTag.specificCharacterSet.rawValue {
                     activeCharacterSet = context.specificCharacterSet
                     cachedInfo.removeAll()
@@ -219,14 +222,13 @@ extension DCMDecoder {
                 let metadataVR: DicomVR = isSequenceTag(tag, parser: parser) ? .SQ : parser.currentVR
                 let metadataLength: Int
                 if metadataVR == .SQ, parser.currentElementLengthIsUndefined {
-                    let syntax = DicomTransferSyntax(uid: transferSyntaxUID) ?? .explicitVRLittleEndian
                     do {
                         let bounds = try DicomSequenceValueParser.undefinedLengthSequenceBounds(
                             in: dicomData,
                             valueOffset: location,
                             end: dicomData.count,
                             littleEndian: littleEndian,
-                            explicitVR: syntax.isExplicitVR
+                            explicitVR: isExplicitVRTransferSyntax
                         )
                         metadataLength = bounds.valueLength
                         let metadata = TagMetadata(
@@ -269,6 +271,9 @@ extension DCMDecoder {
         transferSyntaxUID = context.transferSyntaxUID
         compressedImage = context.compressedImage
         bigEndianTransferSyntax = context.bigEndianTransferSyntax
+        isExplicitVRTransferSyntax = DicomTransferSyntax(
+            uid: context.transferSyntaxUID
+        )?.isExplicitVR ?? true
         activeCharacterSet = context.specificCharacterSet
         samplesPerPixel = context.samplesPerPixel
         photometricInterpretation = context.photometricInterpretation
