@@ -1,4 +1,4 @@
-# DICOM-Swift Decoder
+# DICOM-Swift
 
 <p align="center">
   <img src="https://img.shields.io/badge/Swift-6.2+-orange.svg" />
