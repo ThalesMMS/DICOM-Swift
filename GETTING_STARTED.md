@@ -1,6 +1,6 @@
-# Quick Start Guide - DICOM Decoder
+# Quick Start Guide - DICOM-Swift
 
-Welcome to the Swift DICOM Decoder. This guide helps you start working with DICOM files in Swift.
+Welcome to DICOM-Swift. This guide helps you start working with DICOM files in Swift.
 
 ## Contents
 

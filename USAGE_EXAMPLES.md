@@ -1,6 +1,6 @@
-# DICOM Decoder - Usage Examples
+# DICOM-Swift - Usage Examples
 
-This document provides detailed examples of using the Swift DICOM Decoder in various scenarios.
+This document provides detailed examples of using DICOM-Swift in various scenarios.
 
 ## Table of Contents
 

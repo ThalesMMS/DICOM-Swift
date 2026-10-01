@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-Solutions for common issues when using the DICOM Decoder.
+Solutions for common issues when using DICOM-Swift.
 
 ## Contents
 

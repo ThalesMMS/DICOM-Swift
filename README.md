@@ -1,4 +1,4 @@
-# Swift DICOM Decoder
+# DICOM-Swift
 
 <p align="center">
   <img src="https://img.shields.io/badge/Swift-6.2+-orange.svg" />
@@ -8,7 +8,7 @@
   <br/>
 </p>
 
-Pure Swift DICOM decoder toolkit for iOS, visionOS, and macOS. Parse DICOM
+DICOM-Swift is a pure Swift DICOM decoder toolkit for iOS, visionOS, and macOS. Parse DICOM
 metadata, extract pixel buffers, apply medical windowing, embed SwiftUI viewer
 components, script inspection/export workflows with the bundled CLI, and
 optionally remux encoded DICOM video for Apple playback.

@@ -1,6 +1,6 @@
 # Performance Benchmarks
 
-Comprehensive benchmark results and methodology for the Swift DICOM Decoder library. These benchmarks measure real-world performance across file loading, metadata extraction, and image processing operations.
+Comprehensive benchmark results and methodology for the DICOM-Swift library. These benchmarks measure real-world performance across file loading, metadata extraction, and image processing operations.
 
 ---
 

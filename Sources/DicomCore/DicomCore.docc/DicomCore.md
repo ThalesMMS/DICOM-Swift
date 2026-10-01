@@ -1,6 +1,6 @@
 # ``DicomCore``
 
-Pure Swift DICOM decoder for iOS and macOS. Read DICOM files, extract medical metadata, and process pixel data without UIKit or Objective-C dependencies.
+DICOM-Swift decoder for iOS and macOS, written in pure Swift. Read DICOM files, extract medical metadata, and process pixel data without UIKit or Objective-C dependencies.
 
 ## Overview
 
