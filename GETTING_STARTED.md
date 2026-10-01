@@ -68,7 +68,7 @@ Add to `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/ThalesMMS/DICOM-Swift.git", exact: "2.0.0-rc.1")
+    .package(url: "https://github.com/ThalesMMS/DICOM-Swift.git", exact: "2.0.0-rc.2")
 ]
 ```
 

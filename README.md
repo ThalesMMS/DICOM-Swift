@@ -609,7 +609,7 @@ Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/ThalesMMS/DICOM-Swift.git", exact: "2.0.0-rc.1")
+    .package(url: "https://github.com/ThalesMMS/DICOM-Swift.git", exact: "2.0.0-rc.2")
 ]
 ```
 
@@ -831,7 +831,7 @@ See [USAGE_EXAMPLES.md](USAGE_EXAMPLES.md#type-safe-value-types-v2-apis) for det
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/ThalesMMS/DICOM-Swift.git", exact: "2.0.0-rc.1")
+    .package(url: "https://github.com/ThalesMMS/DICOM-Swift.git", exact: "2.0.0-rc.2")
 ],
 targets: [
     .target(
@@ -1382,7 +1382,7 @@ Add DicomSwiftUI to your SwiftUI project:
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/ThalesMMS/DICOM-Swift.git", exact: "2.0.0-rc.1")
+    .package(url: "https://github.com/ThalesMMS/DICOM-Swift.git", exact: "2.0.0-rc.2")
 ],
 targets: [
     .target(
