@@ -76,7 +76,11 @@ internal enum DicomJPEG2000Codec {
     }
 
     static func decode(_ data: Data) throws -> DecodedFrame {
-        try decodeImage(data) { image in
+        try decode(data, environment: ProcessInfo.processInfo.environment)
+    }
+
+    static func decode(_ data: Data, environment: [String: String]) throws -> DecodedFrame {
+        try decodeImage(data, environment: environment) { image in
             try makeFrame(from: image)
         }
     }
@@ -87,8 +91,12 @@ internal enum DicomJPEG2000Codec {
         }
     }
 
-    private static func decodeImage<T>(_ data: Data, body: (OpenJPEGImage) throws -> T) throws -> T {
-        let library = try OpenJPEGLibrary.shared.require()
+    private static func decodeImage<T>(
+        _ data: Data,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        body: (OpenJPEGImage) throws -> T
+    ) throws -> T {
+        let library = try OpenJPEGLibrary.library(for: environment).require()
         let format = isJP2File(data) ? OpenJPEGLibrary.codecJP2 : OpenJPEGLibrary.codecJ2K
         guard let codec = library.createDecompress(format) else {
             throw DICOMError.imageProcessingFailed(operation: "JPEG 2000 decode", reason: "OpenJPEG decoder allocation failed")
@@ -315,8 +323,15 @@ private struct OpenJPEGImage {
     var iccProfileLength: UInt32
 }
 
-private final class OpenJPEGLibrary {
+/// The dynamic-library handle and resolved function pointers are immutable after initialization.
+private final class OpenJPEGLibrary: @unchecked Sendable {
     static let shared = OpenJPEGLibrary()
+
+    static func library(for environment: [String: String]) -> OpenJPEGLibrary {
+        environment == ProcessInfo.processInfo.environment
+            ? shared
+            : OpenJPEGLibrary(environment: environment)
+    }
 
     static let codecJ2K: Int32 = 0
     static let codecJP2: Int32 = 2
@@ -351,8 +366,12 @@ private final class OpenJPEGLibrary {
         runtimeStatus.isAvailable && missingSymbols.isEmpty
     }
 
-    private init() {
-        let resolution = DicomCodecRuntimePreflight.resolve(for: .openJPEG, retainHandle: true)
+    private init(environment: [String: String] = ProcessInfo.processInfo.environment) {
+        let resolution = DicomCodecRuntimePreflight.resolve(
+            for: .openJPEG,
+            environment: environment,
+            retainHandle: true
+        )
         handle = resolution.handle
         runtimeStatus = resolution.status
         var unresolvedSymbols: [String] = []

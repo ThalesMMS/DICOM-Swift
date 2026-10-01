@@ -322,11 +322,13 @@ public enum DicomSecondaryCaptureBuilder {
         let timeOfSecondaryCapture = options.timeOfSecondaryCapture ?? contentTime
 
         var elements: [DicomDataElement] = [
+            string(.specificCharacterSet, vr: .CS, "ISO_IR 192"),
             string(.sopClassUID, vr: .UI, DicomSecondaryCaptureImage.storageSOPClassUID),
             string(.sopInstanceUID, vr: .UI, sopInstanceUID),
             string(.studyInstanceUID, vr: .UI, studyInstanceUID),
             string(.seriesInstanceUID, vr: .UI, seriesInstanceUID),
             string(.modality, vr: .CS, "OT"),
+            DicomDataElement(tag: 0x00200020, vr: .CS, value: .strings([""])),
             DicomDataElement(tag: DicomTag.imageType.rawValue, vr: .CS, value: .strings(["DERIVED", "SECONDARY"])),
             string(.conversionType, vr: .CS, options.conversionType),
             string(.instanceCreationDate, vr: .DA, instanceCreationDate),
@@ -361,6 +363,17 @@ public enum DicomSecondaryCaptureBuilder {
         return DicomDataSet(elements: elements)
     }
 
+    /// Builds a Secondary Capture dataset and applies its required Type 2 attributes.
+    public static func dataSet(
+        pixelData: DicomSecondaryCapturePixelData,
+        options: DicomSecondaryCaptureBuildOptions = DicomSecondaryCaptureBuildOptions(),
+        requiredType2Attributes: DicomMediaAttachmentType2Attributes
+    ) -> DicomDataSet {
+        var dataSet = dataSet(pixelData: pixelData, options: options)
+        requiredType2Attributes.apply(to: &dataSet)
+        return dataSet
+    }
+
     public static func validatedDataSet(
         pixelData: DicomSecondaryCapturePixelData,
         options: DicomSecondaryCaptureBuildOptions = DicomSecondaryCaptureBuildOptions(),
@@ -387,6 +400,28 @@ public enum DicomSecondaryCaptureBuilder {
     ) throws -> Data {
         try validate(pixelData: pixelData, options: options, scope: validationScope)
         let dataSet = dataSet(pixelData: pixelData, options: options)
+        return try DicomDataSetWriter.part10Data(
+            from: dataSet,
+            options: DicomPart10WriterOptions(
+                mediaStorageSOPClassUID: DicomSecondaryCaptureImage.storageSOPClassUID,
+                mediaStorageSOPInstanceUID: dataSet.string(for: .sopInstanceUID)
+            )
+        )
+    }
+
+    /// Writes a Secondary Capture Part 10 object with required Type 2 attributes.
+    public static func part10Data(
+        pixelData: DicomSecondaryCapturePixelData,
+        options: DicomSecondaryCaptureBuildOptions = DicomSecondaryCaptureBuildOptions(),
+        requiredType2Attributes: DicomMediaAttachmentType2Attributes,
+        validationScope: DicomSecondaryCaptureValidationScope = .syntheticDefaultsAllowed
+    ) throws -> Data {
+        try validate(pixelData: pixelData, options: options, scope: validationScope)
+        let dataSet = dataSet(
+            pixelData: pixelData,
+            options: options,
+            requiredType2Attributes: requiredType2Attributes
+        )
         return try DicomDataSetWriter.part10Data(
             from: dataSet,
             options: DicomPart10WriterOptions(

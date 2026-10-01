@@ -5,11 +5,60 @@
 //  support for loading DICOM files and retrieving pixel data.
 //
 //  All async methods run on detached tasks with appropriate priority
-//  levels to avoid blocking the main thread while preserving thread
-//  safety guarantees of the underlying synchronous methods.
+//  levels to avoid blocking the main thread. Cancellation is propagated to
+//  those tasks and checked before and after the synchronous decoder work.
 //
 
 import Foundation
+
+enum DCMDecoderAsyncOperation {
+    static func perform<Value: Sendable>(
+        priority: TaskPriority,
+        operation: @escaping @Sendable () throws -> Value
+    ) async throws -> Value {
+        try Task.checkCancellation()
+        let task = Task.detached(priority: priority) { () throws -> Value in
+            try Task.checkCancellation()
+            let value = try operation()
+            try Task.checkCancellation()
+            return value
+        }
+
+        return try await withTaskCancellationHandler(operation: {
+            do {
+                let value = try await task.value
+                try Task.checkCancellation()
+                return value
+            } catch {
+                try Task.checkCancellation()
+                throw error
+            }
+        }, onCancel: {
+            task.cancel()
+        })
+    }
+
+    static func perform<Value: Sendable>(
+        priority: TaskPriority,
+        cancellationValue: Value,
+        operation: @escaping @Sendable () -> Value
+    ) async -> Value {
+        guard !Task.isCancelled else { return cancellationValue }
+        let task = Task.detached(priority: priority) { () -> Value in
+            guard !Task.isCancelled else { return cancellationValue }
+            let value = operation()
+            guard !Task.isCancelled else { return cancellationValue }
+            return value
+        }
+
+        return await withTaskCancellationHandler(operation: {
+            let value = await task.value
+            return Task.isCancelled ? cancellationValue : value
+        }, onCancel: {
+            task.cancel()
+        })
+    }
+}
 
 // MARK: - Async/Await Extensions
 
@@ -39,15 +88,15 @@ extension DCMDecoder {
     ///     }
     ///
     /// - Parameter url: File URL pointing to the DICOM file to load.
-    /// - Throws: ``DICOMError/fileNotFound(path:)`` if the file does not exist,
-    ///   or ``DICOMError/invalidDICOMFormat(reason:)`` if the file cannot be
-    ///   parsed as valid DICOM.
+    /// - Throws: `CancellationError` if the calling task is cancelled,
+    ///   ``DICOMError/fileNotFound(path:)`` if the file does not exist, or
+    ///   ``DICOMError/invalidDICOMFormat(reason:)`` if the file cannot be parsed
+    ///   as valid DICOM.
     public convenience init(contentsOf url: URL) async throws {
         // Initialize with default state
         self.init()
 
-        // Perform file loading on background thread
-        try await Task.detached(priority: .userInitiated) {
+        try await DCMDecoderAsyncOperation.perform(priority: .userInitiated) {
             // Verify file exists before attempting to load
             let path = url.path
             guard FileManager.default.fileExists(atPath: path) else {
@@ -55,7 +104,7 @@ extension DCMDecoder {
             }
 
             try self.loadDicomFile(at: path)
-        }.value
+        }
     }
 
     /// Asynchronously initializes a decoder by loading a DICOM file from
@@ -80,32 +129,32 @@ extension DCMDecoder {
     ///     }
     ///
     /// - Parameter path: Absolute file system path to the DICOM file to load.
-    /// - Throws: ``DICOMError/fileNotFound(path:)`` if the file does not exist,
-    ///   or ``DICOMError/invalidDICOMFormat(reason:)`` if the file cannot be
-    ///   parsed as valid DICOM.
+    /// - Throws: `CancellationError` if the calling task is cancelled,
+    ///   ``DICOMError/fileNotFound(path:)`` if the file does not exist, or
+    ///   ``DICOMError/invalidDICOMFormat(reason:)`` if the file cannot be parsed
+    ///   as valid DICOM.
     public convenience init(contentsOfFile path: String) async throws {
         // Initialize with default state
         self.init()
 
-        // Perform file loading on background thread
-        try await Task.detached(priority: .userInitiated) {
+        try await DCMDecoderAsyncOperation.perform(priority: .userInitiated) {
             // Verify file exists before attempting to load
             guard FileManager.default.fileExists(atPath: path) else {
                 throw DICOMError.fileNotFound(path: path)
             }
 
             try self.loadDicomFile(at: path)
-        }.value
+        }
     }
 
     // MARK: - Async Static Factory Methods
 
     /// Asynchronously loads a DICOM file from the specified URL using a
     /// static factory method pattern.  This async throwing factory method
-    /// provides the same functionality as ``load(from:)`` but can be called
+    /// provides the same functionality as `load(from:)` but can be called
     /// from async contexts.
     ///
-    /// This is a convenience wrapper around ``init(contentsOf:)`` that provides
+    /// This is a convenience wrapper around `init(contentsOf:)` that provides
     /// the same functionality with a factory method style.  The file loading is
     /// performed on a background thread using Task.detached to avoid blocking
     /// the calling thread.
@@ -124,19 +173,20 @@ extension DCMDecoder {
     ///
     /// - Parameter url: File URL pointing to the DICOM file to load.
     /// - Returns: Initialized DCMDecoder instance with the loaded DICOM file.
-    /// - Throws: ``DICOMError/fileNotFound(path:)`` if the file does not exist,
-    ///   or ``DICOMError/invalidDICOMFormat(reason:)`` if the file cannot be
-    ///   parsed as valid DICOM.
+    /// - Throws: `CancellationError` if the calling task is cancelled,
+    ///   ``DICOMError/fileNotFound(path:)`` if the file does not exist, or
+    ///   ``DICOMError/invalidDICOMFormat(reason:)`` if the file cannot be parsed
+    ///   as valid DICOM.
     public static func load(from url: URL) async throws -> Self {
         try await Self(contentsOf: url)
     }
 
     /// Asynchronously loads a DICOM file from the specified file path using a
     /// static factory method pattern.  This async throwing factory method
-    /// provides the same functionality as ``load(fromFile:)`` but can be called
+    /// provides the same functionality as `load(fromFile:)` but can be called
     /// from async contexts.
     ///
-    /// This is a convenience wrapper around ``init(contentsOfFile:)`` that provides
+    /// This is a convenience wrapper around `init(contentsOfFile:)` that provides
     /// the same functionality with a factory method style.  The file loading is
     /// performed on a background thread using Task.detached to avoid blocking
     /// the calling thread.
@@ -155,9 +205,10 @@ extension DCMDecoder {
     ///
     /// - Parameter path: Absolute file system path to the DICOM file to load.
     /// - Returns: Initialized DCMDecoder instance with the loaded DICOM file.
-    /// - Throws: ``DICOMError/fileNotFound(path:)`` if the file does not exist,
-    ///   or ``DICOMError/invalidDICOMFormat(reason:)`` if the file cannot be
-    ///   parsed as valid DICOM.
+    /// - Throws: `CancellationError` if the calling task is cancelled,
+    ///   ``DICOMError/fileNotFound(path:)`` if the file does not exist, or
+    ///   ``DICOMError/invalidDICOMFormat(reason:)`` if the file cannot be parsed
+    ///   as valid DICOM.
     public static func load(fromFile path: String) async throws -> Self {
         try await Self(contentsOfFile: path)
     }
@@ -166,70 +217,62 @@ extension DCMDecoder {
 
     /// Loads and decodes a DICOM file asynchronously
     /// - Parameter filename: Path to the DICOM file
-    /// - Returns: True if the file was successfully loaded and decoded
+    /// - Returns: True if the file was successfully loaded and decoded; false
+    ///   if loading fails or the calling task is cancelled.
     public func loadDICOMFileAsync(_ filename: String) async -> Bool {
-        return await withCheckedContinuation { continuation in
-            Task.detached(priority: .userInitiated) {
-                try? self.loadDicomFile(at: filename)
-                continuation.resume(returning: self.fileReadSucceeded)
-            }
+        await DCMDecoderAsyncOperation.perform(priority: .userInitiated, cancellationValue: false) {
+            try? self.loadDicomFile(at: filename)
+            return self.fileReadSucceeded
         }
     }
 
     // MARK: - Async Pixel Retrieval Methods
 
     /// Retrieves 16-bit pixels asynchronously
-    /// - Returns: Array of 16-bit pixel values or nil
+    /// - Returns: Array of 16-bit pixel values, or nil when unavailable or
+    ///   cancelled.
     public func getPixels16Async() async -> [UInt16]? {
-        return await withCheckedContinuation { continuation in
-            Task.detached(priority: .userInitiated) {
-                continuation.resume(returning: self.getPixels16())
-            }
+        await DCMDecoderAsyncOperation.perform(priority: .userInitiated, cancellationValue: nil) {
+            self.getPixels16()
         }
     }
 
     /// Retrieves 8-bit pixels asynchronously
-    /// - Returns: Array of 8-bit pixel values or nil
+    /// - Returns: Array of 8-bit pixel values, or nil when unavailable or
+    ///   cancelled.
     public func getPixels8Async() async -> [UInt8]? {
-        return await withCheckedContinuation { continuation in
-            Task.detached(priority: .userInitiated) {
-                continuation.resume(returning: self.getPixels8())
-            }
+        await DCMDecoderAsyncOperation.perform(priority: .userInitiated, cancellationValue: nil) {
+            self.getPixels8()
         }
     }
 
     /// Retrieves 24-bit RGB pixels asynchronously
-    /// - Returns: Array of 24-bit pixel values or nil
+    /// - Returns: Array of 24-bit pixel values, or nil when unavailable or
+    ///   cancelled.
     public func getPixels24Async() async -> [UInt8]? {
-        return await withCheckedContinuation { continuation in
-            Task.detached(priority: .userInitiated) {
-                continuation.resume(returning: self.getPixels24())
-            }
+        await DCMDecoderAsyncOperation.perform(priority: .userInitiated, cancellationValue: nil) {
+            self.getPixels24()
         }
     }
 
     /// Retrieves downsampled thumbnail pixels asynchronously
     /// - Parameter maxDimension: Maximum dimension for the thumbnail
-    /// - Returns: Tuple with downsampled pixels and dimensions, or nil
+    /// - Returns: Tuple with downsampled pixels and dimensions, or nil when
+    ///   unavailable or cancelled.
     public func getDownsampledPixels16Async(maxDimension: Int = 150) async -> (pixels: [UInt16], width: Int, height: Int)? {
-        return await withCheckedContinuation { continuation in
-            Task.detached(priority: .utility) {
-                continuation.resume(returning: self.getDownsampledPixels16(maxDimension: maxDimension))
-            }
+        await DCMDecoderAsyncOperation.perform(priority: .utility, cancellationValue: nil) {
+            self.getDownsampledPixels16(maxDimension: maxDimension)
         }
     }
 
-    /// Retrieves downsampled 8-bit thumbnail pixels asynchronously
-    /// - Parameter maxDimension: Maximum dimension for the thumbnail
     /// Retrieves an 8-bit downsampled pixel buffer and its dimensions, scaling the image so its longer side does not exceed the given maximum while preserving aspect ratio.
-    /// - Parameters:
-    ///   - maxDimension: Maximum length (in pixels) of the longer image side after downsampling; aspect ratio is preserved. Default is 150.
-    /// - Returns: A tuple `(pixels: [UInt8], width: Int, height: Int)` containing the downsampled pixel data and its width and height, or `nil` if pixel data is not available.
+    /// - Parameter maxDimension: Maximum length (in pixels) of the longer image side after downsampling; aspect ratio is preserved. Default is 150.
+    /// - Returns: A tuple `(pixels: [UInt8], width: Int, height: Int)` containing
+    ///   the downsampled pixel data and its dimensions, or `nil` when unavailable
+    ///   or cancelled.
     public func getDownsampledPixels8Async(maxDimension: Int = 150) async -> (pixels: [UInt8], width: Int, height: Int)? {
-        return await withCheckedContinuation { continuation in
-            Task.detached(priority: .utility) {
-                continuation.resume(returning: self.getDownsampledPixels8(maxDimension: maxDimension))
-            }
+        await DCMDecoderAsyncOperation.perform(priority: .utility, cancellationValue: nil) {
+            self.getDownsampledPixels8(maxDimension: maxDimension)
         }
     }
 
@@ -261,12 +304,6 @@ extension DCMDecoder {
     ///         }
     ///     }
     ///
-    /// - Parameters:
-    ///   - urls: Array of file URLs pointing to DICOM files to load.
-    ///   - maxConcurrency: Maximum number of files to load concurrently.
-    ///     Defaults to 4. Higher values may improve throughput but increase
-    ///     memory usage.
-    /// - Returns: Array of ``DicomBatchResult`` in the same order as input URLs.
     /// Concurrently loads the provided DICOM file URLs and returns per-file results in the original input order.
     /// - Parameters:
     ///   - urls: The file URLs to load.

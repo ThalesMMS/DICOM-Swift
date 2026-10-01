@@ -1,0 +1,114 @@
+{
+  "generator": "jpeg_sequential_scans_corpus.py",
+  "cjpeg": "libjpeg-turbo version 3.2.0 (build 20260630)",
+  "cases": [
+    {
+      "name": "sequential_1x1_interleaved",
+      "reference": "sequential_1x1_interleaved",
+      "width": 17,
+      "height": 19,
+      "scans": "0 1 2: 0-63 0 0;",
+      "jpegSHA256": "5bda0ff40c3c08c678cd9fbecaf59dd97a6357390eee0d6f8218943e8a12f496",
+      "djpegPPMSHA256": "e954df2b3ca70c4ca7cf95cdd2ac5621959b66280b4887c68d403d32757881c5"
+    },
+    {
+      "name": "sequential_1x1_separate",
+      "reference": "sequential_1x1_interleaved",
+      "width": 17,
+      "height": 19,
+      "scans": "0: 0-63 0 0; 1: 0-63 0 0; 2: 0-63 0 0;",
+      "jpegSHA256": "d072b77a44f28aed0fc4a76780b8a975ad65911cbf1d799114709205dded63c2",
+      "djpegPPMSHA256": "e954df2b3ca70c4ca7cf95cdd2ac5621959b66280b4887c68d403d32757881c5"
+    },
+    {
+      "name": "sequential_2x2_interleaved",
+      "reference": "sequential_2x2_interleaved",
+      "width": 17,
+      "height": 19,
+      "scans": "0 1 2: 0-63 0 0;",
+      "jpegSHA256": "91d3e3737110af8d3561e8cc407f0cce5887610b12a8c50cc6b0761dd698c3ac",
+      "djpegPPMSHA256": "790404c5a4580990a3a6386d01bf7858c89d79ee7526bcf741cf050bc5dd57a6"
+    },
+    {
+      "name": "sequential_2x2_separate",
+      "reference": "sequential_2x2_interleaved",
+      "width": 17,
+      "height": 19,
+      "scans": "0: 0-63 0 0; 1: 0-63 0 0; 2: 0-63 0 0;",
+      "jpegSHA256": "05f12f62ea372d8b971b2b15f2709c7c68a530cd96c89476eb9c7c807b38b44c",
+      "djpegPPMSHA256": "790404c5a4580990a3a6386d01bf7858c89d79ee7526bcf741cf050bc5dd57a6"
+    },
+    {
+      "name": "sequential_2x2_mixed_y",
+      "reference": "sequential_2x2_interleaved",
+      "width": 17,
+      "height": 19,
+      "scans": "0: 0-63 0 0; 1 2: 0-63 0 0;",
+      "jpegSHA256": "2a837f18ed3fd7a3a1e2196511a99e6b51fc3f4235c9545839e0a5269bd9004c",
+      "djpegPPMSHA256": "790404c5a4580990a3a6386d01bf7858c89d79ee7526bcf741cf050bc5dd57a6"
+    },
+    {
+      "name": "sequential_2x2_mixed_ycb",
+      "reference": "sequential_2x2_interleaved",
+      "width": 17,
+      "height": 19,
+      "scans": "0 1: 0-63 0 0; 2: 0-63 0 0;",
+      "jpegSHA256": "f28e981f4cd7d8ebe79d5d0ee0a468c3b8fd73b9df77b68fb833bd9896232146",
+      "djpegPPMSHA256": "790404c5a4580990a3a6386d01bf7858c89d79ee7526bcf741cf050bc5dd57a6"
+    },
+    {
+      "name": "sequential_2x1_interleaved",
+      "reference": "sequential_2x1_interleaved",
+      "width": 33,
+      "height": 9,
+      "scans": "0 1 2: 0-63 0 0;",
+      "jpegSHA256": "a9660a6d5fdc6c8ba7cc8ad091d9a4a9d9da9160f58f77cddadb0f19896e4cf0",
+      "djpegPPMSHA256": "66c3dcd7170d971e216baaf85de4d5571f7b6e12cbea69227b7834f1da6921a7"
+    },
+    {
+      "name": "sequential_2x1_separate",
+      "reference": "sequential_2x1_interleaved",
+      "width": 33,
+      "height": 9,
+      "scans": "0: 0-63 0 0; 1: 0-63 0 0; 2: 0-63 0 0;",
+      "jpegSHA256": "1897ed78b640faab5b851e8c9c561bad9278e915c184ffc019e94d04a65299c5",
+      "djpegPPMSHA256": "66c3dcd7170d971e216baaf85de4d5571f7b6e12cbea69227b7834f1da6921a7"
+    },
+    {
+      "name": "sequential_1x2_interleaved",
+      "reference": "sequential_1x2_interleaved",
+      "width": 9,
+      "height": 33,
+      "scans": "0 1 2: 0-63 0 0;",
+      "jpegSHA256": "d8e3f7baa3e70289a36e3c2c28dc264e53d620201dbd3061e15f73581b22aa64",
+      "djpegPPMSHA256": "6ac07b82281a2f1736faadd0e11a829272469a052d847c6af2725583f72241b4"
+    },
+    {
+      "name": "sequential_1x2_separate",
+      "reference": "sequential_1x2_interleaved",
+      "width": 9,
+      "height": 33,
+      "scans": "0: 0-63 0 0; 1: 0-63 0 0; 2: 0-63 0 0;",
+      "jpegSHA256": "3e64b43d616d0372523b9266074762af91071220edb8ccd5bf179b863a075762",
+      "djpegPPMSHA256": "6ac07b82281a2f1736faadd0e11a829272469a052d847c6af2725583f72241b4"
+    },
+    {
+      "name": "sequential_4x1_interleaved",
+      "reference": "sequential_4x1_interleaved",
+      "width": 33,
+      "height": 17,
+      "scans": "0 1 2: 0-63 0 0;",
+      "jpegSHA256": "4149cd010bed688385bb1e2a4b873b8387dd70e794dbb27169581f288848281e",
+      "djpegPPMSHA256": "305ae06a0373a34c44584c4e8c43e0492faa8e2a5c67ed3f3d6851cd52bbde27"
+    },
+    {
+      "name": "sequential_4x1_separate",
+      "reference": "sequential_4x1_interleaved",
+      "width": 33,
+      "height": 17,
+      "scans": "0: 0-63 0 0; 1: 0-63 0 0; 2: 0-63 0 0;",
+      "jpegSHA256": "e4ab09f95e9b41e853f90a77c433bb397c23bc07f8367bf9e541db0cb40ff8db",
+      "djpegPPMSHA256": "305ae06a0373a34c44584c4e8c43e0492faa8e2a5c67ed3f3d6851cd52bbde27"
+    }
+  ]
+}

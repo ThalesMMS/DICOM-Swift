@@ -160,7 +160,7 @@ public struct DicomCodecStructuredReport: Codable, Equatable, Sendable {
     public let schemaVersion: Int
     /// Operation represented by this report.
     public let operation: Operation
-    /// Whether the operation and requested validation succeeded.
+    /// Whether the codec operation and its pixel/encapsulation checks succeeded; conformance is separate evidence.
     public let success: Bool
     /// Non-identifying source object attributes, when an object was supplied.
     public let sourceObject: Object?
@@ -178,6 +178,11 @@ public struct DicomCodecStructuredReport: Codable, Equatable, Sendable {
     public let artifact: Artifact?
     /// Stable informational, warning, and error diagnostics.
     public let diagnostics: [Diagnostic]
+    /// Operation decisions for an explicit pixel profile. Optional for compatibility with earlier reports.
+    public let decisions: [DicomCodecDecision]?
+
+    /// Composed evidence for the validated source or transcoded output; operation success is not IOD conformance.
+    public let conformance: DicomValidationReport?
 
     /// Creates a canonical codec workflow report.
     public init(
@@ -191,7 +196,9 @@ public struct DicomCodecStructuredReport: Codable, Equatable, Sendable {
         frames: [Frame] = [],
         encapsulation: Encapsulation? = nil,
         artifact: Artifact? = nil,
-        diagnostics: [Diagnostic] = []
+        diagnostics: [Diagnostic] = [],
+        decisions: [DicomCodecDecision]? = nil,
+        conformance: DicomValidationReport? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.operation = operation
@@ -204,5 +211,7 @@ public struct DicomCodecStructuredReport: Codable, Equatable, Sendable {
         self.encapsulation = encapsulation
         self.artifact = artifact
         self.diagnostics = diagnostics
+        self.decisions = decisions
+        self.conformance = conformance
     }
 }

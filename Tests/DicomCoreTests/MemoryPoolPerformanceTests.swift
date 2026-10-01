@@ -278,6 +278,7 @@ final class MemoryPoolPerformanceTests: XCTestCase {
 
     /// Measures pool performance under concurrent access.
     /// Verifies thread safety and acceptable contention.
+    @MainActor
     func testConcurrentAccess() {
         let pool = BufferPool.shared
         pool.clear()

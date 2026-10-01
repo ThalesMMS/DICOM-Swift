@@ -5,7 +5,7 @@ import Metal
 #endif
 @testable import DicomCore
 
-public enum DicomRuntimeCapability: String, CaseIterable, Codable {
+public enum DicomRuntimeCapability: String, CaseIterable, Codable, Sendable {
     case bundledSyntheticFixtures
     case largeDicomFixtures
     case jpegLosslessConformanceFixtures
@@ -16,6 +16,7 @@ public enum DicomRuntimeCapability: String, CaseIterable, Codable {
     case metalDevice
     case networkSecurityTLS
     case networkInteropSmoke
+    case pynetdicomPeer
 
     public var manifestID: String {
         switch self {
@@ -37,6 +38,8 @@ public enum DicomRuntimeCapability: String, CaseIterable, Codable {
             return "metal-device"
         case .networkSecurityTLS:
             return "network-security-tls"
+        case .pynetdicomPeer:
+            return "pynetdicom-peer"
         case .networkInteropSmoke:
             return "network-interop-smoke"
         }
@@ -62,6 +65,8 @@ public enum DicomRuntimeCapability: String, CaseIterable, Codable {
             return "Metal device"
         case .networkSecurityTLS:
             return "Network/Security TLS runtime"
+        case .pynetdicomPeer:
+            return "Independent pynetdicom peer"
         case .networkInteropSmoke:
             return "DICOM interop smoke endpoints"
         }
@@ -87,6 +92,8 @@ public enum DicomRuntimeCapability: String, CaseIterable, Codable {
             return "DICOM_REQUIRE_METAL"
         case .networkSecurityTLS:
             return "DICOM_REQUIRE_NETWORK_SECURITY_TLS"
+        case .pynetdicomPeer:
+            return "DICOM_REQUIRE_PYNETDICOM"
         case .networkInteropSmoke:
             return "DICOM_REQUIRE_NETWORK_INTEROP_SMOKE"
         }
@@ -98,20 +105,20 @@ public enum DicomRuntimeCapability: String, CaseIterable, Codable {
             return true
         case .largeDicomFixtures, .jpegLosslessConformanceFixtures, .charLS, .openJPEG, .opjCompress,
              .libjxlTools,
-             .metalDevice, .networkSecurityTLS, .networkInteropSmoke:
+             .metalDevice, .networkSecurityTLS, .networkInteropSmoke, .pynetdicomPeer:
             return false
         }
     }
 }
 
-public enum DicomRuntimeStatusKind: String, Codable {
+public enum DicomRuntimeStatusKind: String, Codable, Sendable {
     case available
     case missingOptionalRuntime = "missing-optional-runtime"
     case regression
     case unsupportedFeature = "unsupported-feature"
 }
 
-public struct DicomRuntimeStatus: Equatable {
+public struct DicomRuntimeStatus: Equatable, Sendable {
     public let capability: DicomRuntimeCapability
     public let kind: DicomRuntimeStatusKind
     public let message: String
@@ -245,6 +252,15 @@ public enum DicomTestRuntimePreflight {
             return status(capability, .unsupportedFeature, "Network/Security TLS frameworks are unavailable on this platform.")
             #endif
 
+        case .pynetdicomPeer:
+            #if os(macOS)
+            let path = environment["DICOM_SWIFT_PYNETDICOM_PYTHON"] ?? "/tmp/isis-2321-iod-oracle/bin/python"
+            return FileManager.default.isExecutableFile(atPath: path)
+                ? status(capability, .available, "Python found; peer startup verifies pynetdicom availability.")
+                : status(capability, .missingOptionalRuntime, "Set DICOM_SWIFT_PYNETDICOM_PYTHON.")
+            #else
+            return status(capability, .unsupportedFeature, "Process launcher requires macOS.")
+            #endif
         case .networkInteropSmoke:
             #if canImport(Network)
             return environment["DICOM_INTEROP_SMOKE"] == "1"

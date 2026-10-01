@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Preserve upstream bytes verified by Scripts/Dictionary/manifest.json.
+ThirdPartyLicenses/pydicom/LICENSE -text whitespace=cr-at-eol

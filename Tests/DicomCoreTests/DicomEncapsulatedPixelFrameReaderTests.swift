@@ -135,6 +135,105 @@ final class DicomEncapsulatedPixelFrameReaderTests: XCTestCase {
         XCTAssertEqual(try reader.frameData(at: 1), Data([0x20, 0x21]))
     }
 
+    // MARK: - Frames delimited by codestream markers (issue #2814)
+
+    func testFragmentsWithoutOffsetTable_groupIntoFramesByJPEGMarkers() throws {
+        let file = try EncapsulatedFixtureFactory.makeFile(
+            transferSyntax: .jpegBaseline,
+            fragments: [Data([0xFF, 0xD8, 0x01, 0x02]), Data([0x03, 0x04]), Data([0x05, 0xFF, 0xD9]),
+                        Data([0xFF, 0xD8, 0x06]), Data([0x07, 0xFF, 0xD9, 0x00])],
+            declaredFrames: 2,
+            includeBasicOffsetTable: false
+        )
+        let reader = try Self.decoder(for: file).makeEncapsulatedPixelFrameReader()
+        try reader.validateDeclaredFrameCount()
+        XCTAssertEqual(try reader.frameData(at: 0), Data([0xFF, 0xD8, 0x01, 0x02, 0x03, 0x04, 0x05, 0xFF, 0xD9]))
+        XCTAssertEqual(try reader.frameData(at: 1), Data([0xFF, 0xD8, 0x06, 0x07, 0xFF, 0xD9, 0x00]))
+    }
+
+    func testJPEG2000FragmentOpeningWithSOCMidFrame_staysInItsFrame() throws {
+        // The second fragment of frame 0 happens to open with FF4F, but the fragment before it does not close
+        // with EOC, so it is not a new frame.
+        let file = try EncapsulatedFixtureFactory.makeFile(
+            transferSyntax: .jpeg2000Lossless,
+            fragments: [Data([0xFF, 0x4F, 0xFF, 0x51]), Data([0xFF, 0x4F, 0x10]), Data([0x11, 0xFF, 0xD9]),
+                        Data([0xFF, 0x4F, 0xFF, 0x51, 0xFF, 0xD9]),
+                        Data([0xFF, 0x4F, 0x20]), Data([0xFF, 0xD9])],
+            declaredFrames: 3,
+            includeBasicOffsetTable: false
+        )
+        let reader = try Self.decoder(for: file).makeEncapsulatedPixelFrameReader()
+        XCTAssertEqual(reader.frameCount, 3)
+        XCTAssertEqual(try reader.frameData(at: 0), Data([0xFF, 0x4F, 0xFF, 0x51, 0xFF, 0x4F, 0x10, 0x11, 0xFF, 0xD9]))
+        XCTAssertEqual(try reader.frameData(at: 1), Data([0xFF, 0x4F, 0xFF, 0x51, 0xFF, 0xD9]))
+        XCTAssertEqual(try reader.frameData(at: 2), Data([0xFF, 0x4F, 0x20, 0xFF, 0xD9]))
+    }
+
+    func testMarkersDelimitingAnotherFrameCount_areRefusedTyped() throws {
+        let file = try EncapsulatedFixtureFactory.makeFile(
+            transferSyntax: .jpegBaseline,
+            fragments: [Data([0xFF, 0xD8, 0x01]), Data([0xFF, 0xD9]), Data([0xFF, 0xD8, 0x02]), Data([0xFF, 0xD9])],
+            declaredFrames: 3,
+            includeBasicOffsetTable: false
+        )
+        XCTAssertThrowsError(try Self.decoder(for: file).makeEncapsulatedPixelFrameReader()) { error in
+            guard case DicomEncapsulatedPixelFrameReader.ReaderError.unusableFrameMap(let diagnostics) = error else {
+                return XCTFail("expected unusableFrameMap, got \(error)")
+            }
+            XCTAssertTrue(diagnostics.contains { $0.message.contains("Codestream markers delimit 2 frame(s)") })
+        }
+    }
+
+    func testRLEFragmentsWithoutOffsetTable_areNotGrouped() throws {
+        let header = Data([0x01, 0x00, 0x00, 0x00, 0x40]) + Data(count: 59)
+        let file = try EncapsulatedFixtureFactory.makeFile(
+            transferSyntax: .rleLossless,
+            fragments: [header, Data([0x00, 0x05]), header],
+            declaredFrames: 2,
+            includeBasicOffsetTable: false
+        )
+        XCTAssertThrowsError(try Self.decoder(for: file).makeEncapsulatedPixelFrameReader()) { error in
+            guard case DicomEncapsulatedPixelFrameReader.ReaderError.unusableFrameMap(let diagnostics) = error else {
+                return XCTFail("expected unusableFrameMap, got \(error)")
+            }
+            XCTAssertTrue(diagnostics.contains { $0.message.contains("Cannot safely map") })
+        }
+    }
+
+    /// Real codestreams from gdcmData whose single frame spans several fragments, repeated as a three-frame
+    /// object with neither offset table: every frame decodes like the original (opt-in, `ISIS_GDCM_DATA_DIR`).
+    func testGDCMCorpusCodestreamsSplitAcrossFragments_decodeFrameByFrameWithoutOffsetTable() throws {
+        guard let root = ProcessInfo.processInfo.environment["ISIS_GDCM_DATA_DIR"], !root.isEmpty else {
+            throw XCTSkip("ISIS_GDCM_DATA_DIR is not set")
+        }
+        let names = ["GE_RHAPSODE-16-MONO2-JPEG-Fragments.dcm", "D_CLUNIE_CT1_JPLL.dcm", "D_CLUNIE_CT1_JLSL.dcm",
+                     "D_CLUNIE_CT1_J2KR.dcm"]
+        for name in names {
+            let url = URL(fileURLWithPath: root).appendingPathComponent(name)
+            let source = try DCMDecoder(contentsOf: url)
+            let fileData = try Data(contentsOf: url)
+            let fragments = try source.makeEncapsulatedPixelFrameReader().descriptor.fragments.map {
+                Data(fileData[(fileData.startIndex + $0.valueRange.lowerBound)..<(fileData.startIndex + $0.valueRange.upperBound)])
+            }
+            XCTAssertGreaterThan(fragments.count, 1, name)
+            let syntax = try XCTUnwrap(DicomTransferSyntax(uid: source.transferSyntaxUID), name)
+            let bitsStored = source.intValue(for: .bitsStored) ?? source.bitDepth
+            let file = try EncapsulatedFixtureFactory.makeFile(
+                transferSyntax: syntax, fragments: fragments + fragments + fragments, declaredFrames: 3,
+                includeBasicOffsetTable: false, rows: source.height, columns: source.width,
+                bitsAllocated: source.bitDepth, bitsStored: bitsStored, highBit: bitsStored - 1,
+                pixelRepresentation: source.pixelRepresentationTagValue
+            )
+            let decoder = try Self.decoder(for: file)
+            XCTAssertEqual(try decoder.makeEncapsulatedPixelFrameReader().frameCount, 3, name)
+            let reference = try DicomDecodedFrameReader(decoder: source).frame(at: 0).pixels
+            for index in 0 ..< 3 {
+                XCTAssertEqual(try DicomDecodedFrameReader(decoder: decoder).frame(at: index).pixels, reference,
+                               "\(name) frame \(index)")
+            }
+        }
+    }
+
     // MARK: - NumberOfFrames validation and deterministic errors
 
     func testDeclaredFrameCountLargerThanFragmentsIsUnusable() throws {

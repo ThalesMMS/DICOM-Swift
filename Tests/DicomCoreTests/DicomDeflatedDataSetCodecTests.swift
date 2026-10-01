@@ -2,6 +2,35 @@ import XCTest
 @testable import DicomCore
 
 final class DicomDeflatedDataSetCodecTests: XCTestCase {
+    func test_groupLength_stopsBeforeDeflateBytesThatResembleFileMeta() throws {
+        let dataSet = makeBaseDataSet(pixelBytes: Data([0x34, 0x12]))
+        let encoded = try DicomDataSetWriter.dataSetData(from: dataSet)
+        let deflated = try DicomDeflatedDataSetCodec.deflate(encoded)
+        let part10 = try DicomDataSetWriter.part10Data(
+            from: dataSet, options: .init(transferSyntax: .deflatedExplicitVRLittleEndian)
+        )
+        let meta = part10.prefix(part10.count - deflated.count)
+        // Empty fixed and stored non-final blocks; the prefix also looks like group 0002.
+        let payload = Data([0x02, 0x00, 0x00, 0x00, 0xFF, 0xFF]) + deflated
+        XCTAssertEqual(try DicomDeflatedDataSetCodec.inflate(payload), encoded)
+        XCTAssertEqual(try DicomDeflatedDataSetCodec.inflatedPart10DataIfNeeded(meta + payload), meta + encoded)
+    }
+
+    func test_groupLength_rejectsTruncatedOrOutOfBoundsFileMeta() throws {
+        let original = try DicomDataSetWriter.part10Data(
+            from: makeBaseDataSet(pixelBytes: Data([0x34, 0x12])),
+            options: .init(transferSyntax: .deflatedExplicitVRLittleEndian)
+        )
+        for length: UInt32 in [1, .max] {
+            var data = original
+            var encodedLength = length.littleEndian
+            data.replaceSubrange(140..<144, with: withUnsafeBytes(of: &encodedLength) { Data($0) })
+            XCTAssertThrowsError(try DicomDeflatedDataSetCodec.inflatedPart10DataIfNeeded(data)) {
+                XCTAssertEqual($0 as? DicomDeflatedDataSetError, .malformedFileMetaInformation)
+            }
+        }
+    }
+
     private let sopClassUIDTag = 0x00080016
     private let procedureCodeSequenceTag = 0x00081032
     private let codeValueTag = 0x00080100

@@ -5,6 +5,7 @@ import simd
 public struct DicomEnhancedMultiframeFunctionalGroups: Equatable, Sendable {
     public let shared: DicomFrameFunctionalGroups?
     public let perFrame: [DicomFrameFunctionalGroups]
+    public let declaredFrameCount: Int
     public let frames: [DicomEnhancedFrame]
     public let dimensionOrganization: DicomEnhancedDimensionOrganization?
 
@@ -17,6 +18,7 @@ public struct DicomEnhancedMultiframeFunctionalGroups: Equatable, Sendable {
         let frameCount = max(declaredFrameCount, perFrame.count)
         self.shared = shared
         self.perFrame = perFrame
+        self.declaredFrameCount = declaredFrameCount
         self.dimensionOrganization = dimensionOrganization
         self.frames = (0..<frameCount).map { index in
             let resolved = perFrame[safe: index]?.resolving(shared: shared) ?? DicomFrameFunctionalGroups().resolving(shared: shared)
@@ -85,15 +87,28 @@ public struct DicomEnhancedDimensionOrganization: Equatable, Sendable {
 /// One top-level Dimension Index Sequence item. Optional fields are preserved
 /// so the volume validator can reject malformed definitions instead of
 /// silently dropping them during parsing.
-public struct DicomEnhancedDimensionIndex: Equatable, Sendable {
+public struct DicomEnhancedDimensionIndex: Hashable, Sendable {
     public let organizationUID: String?
     public let dimensionIndexPointer: Int?
     public let functionalGroupPointer: Int?
+    public let dimensionIndexPrivateCreator: String?
+    public let functionalGroupPrivateCreator: String?
+    public let descriptionLabel: String?
 
-    public init(organizationUID: String?, dimensionIndexPointer: Int?, functionalGroupPointer: Int?) {
+    public init(
+        organizationUID: String?,
+        dimensionIndexPointer: Int?,
+        functionalGroupPointer: Int?,
+        dimensionIndexPrivateCreator: String? = nil,
+        functionalGroupPrivateCreator: String? = nil,
+        descriptionLabel: String? = nil
+    ) {
         self.organizationUID = organizationUID
         self.dimensionIndexPointer = dimensionIndexPointer
         self.functionalGroupPointer = functionalGroupPointer
+        self.dimensionIndexPrivateCreator = dimensionIndexPrivateCreator
+        self.functionalGroupPrivateCreator = functionalGroupPrivateCreator
+        self.descriptionLabel = descriptionLabel
     }
 }
 
@@ -240,15 +255,27 @@ public struct DicomSourceImageReference: Equatable, Sendable {
     public let referencedSOPClassUID: String?
     public let referencedSOPInstanceUID: String?
     public let referencedFrameNumbers: [Int]
+    public let referencedSegmentNumbers: [Int]
+    public let referencedWaveformChannels: [Int]
+    public let derivationCode: DicomCodedConcept?
+    public let purposeOfReferenceCode: DicomCodedConcept?
 
     public init(
         referencedSOPClassUID: String?,
         referencedSOPInstanceUID: String?,
-        referencedFrameNumbers: [Int]
+        referencedFrameNumbers: [Int] = [],
+        referencedSegmentNumbers: [Int] = [],
+        referencedWaveformChannels: [Int] = [],
+        derivationCode: DicomCodedConcept? = nil,
+        purposeOfReferenceCode: DicomCodedConcept? = nil
     ) {
         self.referencedSOPClassUID = referencedSOPClassUID
         self.referencedSOPInstanceUID = referencedSOPInstanceUID
         self.referencedFrameNumbers = referencedFrameNumbers
+        self.referencedSegmentNumbers = referencedSegmentNumbers
+        self.referencedWaveformChannels = referencedWaveformChannels
+        self.derivationCode = derivationCode
+        self.purposeOfReferenceCode = purposeOfReferenceCode
     }
 }
 
@@ -278,6 +305,22 @@ public struct DicomFrameGeometry: Equatable, Sendable {
         self.sourceImageReferences = functionalGroups.derivationImage?.sourceImages ?? []
     }
 
+    public init(
+        frameIndex: Int,
+        imagePositionPatient: SIMD3<Double>? = nil,
+        imageOrientationPatient: DicomPlaneOrientation? = nil,
+        pixelMeasures: DicomPixelMeasures? = nil,
+        frameContent: DicomFrameContent? = nil,
+        sourceImageReferences: [DicomSourceImageReference] = []
+    ) {
+        self.frameIndex = frameIndex
+        self.imagePositionPatient = imagePositionPatient
+        self.imageOrientationPatient = imageOrientationPatient
+        self.pixelMeasures = pixelMeasures
+        self.frameContent = frameContent
+        self.sourceImageReferences = sourceImageReferences
+    }
+
     public var positionAlongNormal: Double? {
         guard let position = imagePositionPatient,
               let normal = imageOrientationPatient?.normal else {
@@ -293,12 +336,13 @@ enum DicomEnhancedMultiframeParser {
         perFrameItems: [DicomSequenceItem],
         declaredFrameCount: Int,
         dimensionOrganizationItems: [DicomSequenceItem] = [],
-        dimensionIndexItems: [DicomSequenceItem] = []
+        dimensionIndexItems: [DicomSequenceItem] = [],
+        littleEndian: Bool = true
     ) -> DicomEnhancedMultiframeFunctionalGroups? {
         guard !sharedItems.isEmpty || !perFrameItems.isEmpty else { return nil }
         return DicomEnhancedMultiframeFunctionalGroups(
-            shared: sharedItems.first.map { functionalGroups(from: $0.dataSet) },
-            perFrame: perFrameItems.map { functionalGroups(from: $0.dataSet) },
+            shared: sharedItems.first.map { functionalGroups(from: $0.dataSet, littleEndian: littleEndian) },
+            perFrame: perFrameItems.map { functionalGroups(from: $0.dataSet, littleEndian: littleEndian) },
             declaredFrameCount: declaredFrameCount,
             dimensionOrganization: dimensionOrganization(
                 organizationItems: dimensionOrganizationItems,
@@ -320,13 +364,19 @@ enum DicomEnhancedMultiframeParser {
                 DicomEnhancedDimensionIndex(
                     organizationUID: item.dataSet.string(for: .dimensionOrganizationUID),
                     dimensionIndexPointer: item.dataSet.int(for: .dimensionIndexPointer),
-                    functionalGroupPointer: item.dataSet.int(for: .functionalGroupPointer)
+                    functionalGroupPointer: item.dataSet.int(for: .functionalGroupPointer),
+                    dimensionIndexPrivateCreator: item.dataSet.string(for: 0x0020_9213),
+                    functionalGroupPrivateCreator: item.dataSet.string(for: 0x0020_9238),
+                    descriptionLabel: item.dataSet.string(for: 0x0020_9421)
                 )
             }
         )
     }
 
-    private static func functionalGroups(from dataSet: DicomDataSet) -> DicomFrameFunctionalGroups {
+    private static func functionalGroups(
+        from dataSet: DicomDataSet,
+        littleEndian: Bool
+    ) -> DicomFrameFunctionalGroups {
         DicomFrameFunctionalGroups(
             frameContent: dataSet.firstNestedDataSet(for: .frameContentSequence).flatMap(frameContent),
             pixelMeasures: dataSet.firstNestedDataSet(for: .pixelMeasuresSequence).flatMap(pixelMeasures),
@@ -335,11 +385,16 @@ enum DicomEnhancedMultiframeParser {
             derivationImage: derivationImage(from: dataSet.sequenceItems(for: .derivationImageSequence)),
             pixelValueTransformation: dataSet.firstNestedDataSet(for: .pixelValueTransformationSequence)
                 .flatMap(pixelValueTransformation),
-            frameVOI: dataSet.firstNestedDataSet(for: .frameVOILUTSequence).flatMap(frameVOI)
+            frameVOI: dataSet.firstNestedDataSet(for: .frameVOILUTSequence).flatMap {
+                frameVOI(from: $0, littleEndian: littleEndian)
+            }
         )
     }
 
-    private static func frameVOI(from dataSet: DicomDataSet) -> DicomFrameVOI? {
+    private static func frameVOI(
+        from dataSet: DicomDataSet,
+        littleEndian: Bool
+    ) -> DicomFrameVOI? {
         let centers = dataSet.decimalStrings(for: .windowCenter)
         let widths = dataSet.decimalStrings(for: .windowWidth)
         let explanations = dataSet.strings(for: .windowCenterWidthExplanation)
@@ -350,12 +405,16 @@ enum DicomEnhancedMultiframeParser {
                 explanation: explanations[safe: index]
             )
         }
-        guard !windows.isEmpty else { return nil }
+        let voiLUTs = DicomVOILUTValidator.validate(
+            items: dataSet.sequenceItems(for: .voiLUTSequence),
+            littleEndian: littleEndian
+        ).accepted
+        guard !windows.isEmpty || !voiLUTs.isEmpty else { return nil }
         let normalizedFunction = dataSet.string(for: .voiLUTFunction)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .uppercased()
         let lutFunction = normalizedFunction?.isEmpty == false ? normalizedFunction : nil
-        return DicomFrameVOI(windows: windows, lutFunction: lutFunction)
+        return DicomFrameVOI(windows: windows, voiLUTs: voiLUTs, lutFunction: lutFunction)
     }
 
     private static func pixelValueTransformation(from dataSet: DicomDataSet) -> DicomPixelValueTransformation? {
@@ -423,16 +482,24 @@ enum DicomEnhancedMultiframeParser {
 
     private static func derivationImage(from items: [DicomSequenceItem]) -> DicomDerivationImage? {
         let sources = items.flatMap { item in
-            item.dataSet.sequenceItems(for: .sourceImageSequence).map(sourceImageReference)
+            item.dataSet.sequenceItems(for: .sourceImageSequence).map { source in
+                sourceImageReference(from: source, derivationCode: item.dataSet[0x00089215]?.sequenceItems.first
+                    .flatMap { DicomCodedConcept(dataSet: $0.dataSet) })
+            }
         }
         return sources.isEmpty ? nil : DicomDerivationImage(sourceImages: sources)
     }
 
-    private static func sourceImageReference(from item: DicomSequenceItem) -> DicomSourceImageReference {
+    private static func sourceImageReference(from item: DicomSequenceItem, derivationCode: DicomCodedConcept?) -> DicomSourceImageReference {
         DicomSourceImageReference(
             referencedSOPClassUID: item.dataSet.string(for: .referencedSOPClassUID),
             referencedSOPInstanceUID: item.dataSet.string(for: .referencedSOPInstanceUID),
-            referencedFrameNumbers: item.dataSet.ints(for: .referencedFrameNumber)
+            referencedFrameNumbers: item.dataSet.ints(for: .referencedFrameNumber),
+            referencedSegmentNumbers: item.dataSet.ints(for: 0x0062000B),
+            referencedWaveformChannels: item.dataSet.ints(for: 0x0040A0B0),
+            derivationCode: derivationCode,
+            purposeOfReferenceCode: item.dataSet[0x0040A170]?.sequenceItems.first
+                .flatMap { DicomCodedConcept(dataSet: $0.dataSet) }
         )
     }
 

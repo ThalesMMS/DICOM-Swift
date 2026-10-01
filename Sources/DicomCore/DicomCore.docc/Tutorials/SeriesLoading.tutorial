@@ -4,7 +4,6 @@
 
         Learn how to load DICOM series from directories, automatically order slices by anatomical position, validate geometric consistency, and access 3D volume data. You'll explore synchronous and asynchronous loading, progress tracking, and volume geometry extraction.
 
-        @Image(source: "series-loading-intro.png", alt: "DICOM series volume assembly")
     }
 
     @Section(title: "Understanding DICOM Series") {
@@ -13,7 +12,6 @@
 
             The ``DicomSeriesLoader`` automatically orders slices by their Image Position (Patient) coordinates, validates consistency across the series, and assembles supported single-frame uncompressed grayscale inputs into a contiguous `Int16` 3D volume buffer with complete geometric metadata.
 
-            @Image(source: "series-concept.png", alt: "DICOM series concept")
         }
 
         @Steps {
@@ -23,7 +21,6 @@
                 The loader uses dependency injection to create decoders for each DICOM file, ensuring clean state and thread-safe processing.
 
                 @Code(name: "SeriesExample.swift", file: SeriesExample.swift) {
-                    @Image(source: "create-loader.png", alt: "Create series loader")
                 }
             }
 
@@ -33,7 +30,6 @@
                 The loader scans the directory, loads each slice, validates consistency, orders by position, and assembles the volume.
 
                 @Code(name: "SeriesExample.swift", file: SeriesExample.swift) {
-                    @Image(source: "load-series.png", alt: "Load series")
                 }
             }
 
@@ -43,7 +39,6 @@
                 The ``DicomSeriesVolume`` structure provides width, height, depth, and complete geometric information.
 
                 @Code(name: "SeriesExample.swift", file: SeriesExample.swift) {
-                    @Image(source: "volume-info.png", alt: "Volume information")
                 }
             }
 
@@ -53,7 +48,6 @@
                 Common errors include no DICOM files found, inconsistent dimensions, and unsupported formats.
 
                 @Code(name: "SeriesExample.swift", file: SeriesExample.swift) {
-                    @Image(source: "handle-errors.png", alt: "Handle loading errors")
                 }
             }
         }
@@ -65,7 +59,6 @@
 
             The loader supports progress callbacks that report completion fraction, slice count, and current file being processed.
 
-            @Image(source: "progress-tracking.png", alt: "Progress tracking")
         }
 
         @Steps {
@@ -75,7 +68,6 @@
                 The progress callback receives fraction complete (0.0 to 1.0), total slice count, current slice index, and file URL.
 
                 @Code(name: "SeriesExample.swift", file: SeriesExample.swift) {
-                    @Image(source: "progress-handler.png", alt: "Progress handler")
                 }
             }
 
@@ -85,7 +77,6 @@
                 Use the progress fraction to update progress bars, labels, and status indicators in your app's interface.
 
                 @Code(name: "SeriesExample.swift", file: SeriesExample.swift) {
-                    @Image(source: "update-ui.png", alt: "Update UI")
                 }
             }
         }
@@ -97,7 +88,6 @@
 
             The async API integrates with Swift Concurrency, providing non-blocking loading with progress streams.
 
-            @Image(source: "async-loading.png", alt: "Asynchronous loading")
         }
 
         @Steps {
@@ -107,7 +97,6 @@
                 The async method works identically to the synchronous version but doesn't block the calling thread.
 
                 @Code(name: "SeriesExample.swift", file: SeriesExample.swift) {
-                    @Image(source: "async-load.png", alt: "Async load")
                 }
             }
 
@@ -117,7 +106,6 @@
                 This method returns an AsyncThrowingStream that yields progress updates during loading.
 
                 @Code(name: "SeriesExample.swift", file: SeriesExample.swift) {
-                    @Image(source: "progress-stream.png", alt: "Progress stream")
                 }
             }
         }
@@ -129,7 +117,6 @@
 
             The volume includes pixel spacing, orientation matrices, origin position, and rescale parameters needed for accurate spatial representation.
 
-            @Image(source: "volume-geometry.png", alt: "Volume geometry")
         }
 
         @Steps {
@@ -139,7 +126,6 @@
                 The spacing SIMD3 vector provides physical distance between voxels in X, Y, and Z dimensions.
 
                 @Code(name: "SeriesExample.swift", file: SeriesExample.swift) {
-                    @Image(source: "pixel-spacing.png", alt: "Pixel spacing")
                 }
             }
 
@@ -149,7 +135,6 @@
                 The 3×3 orientation matrix defines anatomical axes, while origin specifies the volume's position in patient space.
 
                 @Code(name: "SeriesExample.swift", file: SeriesExample.swift) {
-                    @Image(source: "orientation.png", alt: "Orientation")
                 }
             }
 
@@ -159,7 +144,6 @@
                 Multiply pixel dimensions by spacing to get physical size in millimeters.
 
                 @Code(name: "SeriesExample.swift", file: SeriesExample.swift) {
-                    @Image(source: "physical-dims.png", alt: "Physical dimensions")
                 }
             }
         }
@@ -171,7 +155,6 @@
 
             The voxel buffer is a contiguous Data object containing 16-bit signed integers in row-major order (X varies fastest).
 
-            @Image(source: "voxel-data.png", alt: "Voxel data access")
         }
 
         @Steps {
@@ -181,7 +164,6 @@
                 The voxels property provides direct access to the contiguous 16-bit data buffer.
 
                 @Code(name: "SeriesExample.swift", file: SeriesExample.swift) {
-                    @Image(source: "raw-voxels.png", alt: "Raw voxels")
                 }
             }
 
@@ -191,7 +173,6 @@
                 Use withUnsafeBytes to access the buffer as typed Int16 values.
 
                 @Code(name: "SeriesExample.swift", file: SeriesExample.swift) {
-                    @Image(source: "typed-access.png", alt: "Typed access")
                 }
             }
 
@@ -201,7 +182,6 @@
                 Use the rescale slope and intercept to convert stored values to modality units (e.g., HU for CT).
 
                 @Code(name: "SeriesExample.swift", file: SeriesExample.swift) {
-                    @Image(source: "apply-rescale.png", alt: "Apply rescale")
                 }
             }
         }
@@ -213,7 +193,6 @@
 
             Each slice can be windowed independently for visualization or analysis.
 
-            @Image(source: "slice-processing.png", alt: "Slice processing")
         }
 
         @Steps {
@@ -223,7 +202,6 @@
                 Calculate the offset into the voxel buffer based on slice index and dimensions.
 
                 @Code(name: "SeriesExample.swift", file: SeriesExample.swift) {
-                    @Image(source: "extract-slice.png", alt: "Extract slice")
                 }
             }
 
@@ -233,7 +211,6 @@
                 Use ``DCMWindowingProcessor`` to convert 16-bit slice data to displayable 8-bit values.
 
                 @Code(name: "SeriesExample.swift", file: SeriesExample.swift) {
-                    @Image(source: "window-slice.png", alt: "Window slice")
                 }
             }
         }
@@ -245,7 +222,6 @@
 
             The loader accepts a decoder factory closure, enabling dependency injection for testability.
 
-            @Image(source: "dependency-injection.png", alt: "Dependency injection")
         }
 
         @Steps {
@@ -255,7 +231,6 @@
                 This is particularly useful for unit testing with MockDicomDecoder.
 
                 @Code(name: "SeriesExample.swift", file: SeriesExample.swift) {
-                    @Image(source: "custom-factory.png", alt: "Custom factory")
                 }
             }
 
@@ -265,7 +240,6 @@
                 The loading API remains identical regardless of decoder implementation.
 
                 @Code(name: "SeriesExample.swift", file: SeriesExample.swift) {
-                    @Image(source: "use-injected.png", alt: "Use injected decoder")
                 }
             }
         }
@@ -277,7 +251,6 @@
 
             This example demonstrates async loading, progress tracking, geometry extraction, slice processing, and windowing.
 
-            @Image(source: "complete-series-workflow.png", alt: "Complete workflow")
         }
 
         @Steps {
@@ -287,7 +260,6 @@
                 This workflow loads a series asynchronously, tracks progress, extracts geometry, processes individual slices, and applies medical presets.
 
                 @Code(name: "SeriesExample.swift", file: SeriesExample.swift) {
-                    @Image(source: "full-series-pipeline.png", alt: "Full pipeline")
                 }
             }
         }

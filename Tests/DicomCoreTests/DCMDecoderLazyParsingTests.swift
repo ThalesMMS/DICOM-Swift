@@ -21,6 +21,45 @@ final class DCMDecoderLazyParsingTests: XCTestCase {
         try getAnyFixtureDICOMURL()
     }
 
+    private func makeDeferredMetadataDICOMFile() throws -> URL {
+        let sopClassUID = DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID
+        let sopInstanceUID = "2.25.987654321"
+        var elements = [
+            DicomDataElement(tag: DicomTag.sopClassUID.rawValue, vr: .UI, value: .strings([sopClassUID])),
+            DicomDataElement(tag: DicomTag.sopInstanceUID.rawValue, vr: .UI, value: .strings([sopInstanceUID])),
+            DicomDataElement(tag: 0x0009_0010, vr: .LO, value: .strings(["LAZY TEST"])),
+            DicomDataElement(tag: DicomTag.samplesPerPixel.rawValue, vr: .US, value: .unsignedIntegers([1])),
+            DicomDataElement(tag: DicomTag.photometricInterpretation.rawValue, vr: .CS,
+                             value: .strings(["MONOCHROME2"])),
+            DicomDataElement(tag: DicomTag.rows.rawValue, vr: .US, value: .unsignedIntegers([2])),
+            DicomDataElement(tag: DicomTag.columns.rawValue, vr: .US, value: .unsignedIntegers([2])),
+            DicomDataElement(tag: DicomTag.bitsAllocated.rawValue, vr: .US, value: .unsignedIntegers([16])),
+            DicomDataElement(tag: DicomTag.bitsStored.rawValue, vr: .US, value: .unsignedIntegers([16])),
+            DicomDataElement(tag: DicomTag.highBit.rawValue, vr: .US, value: .unsignedIntegers([15])),
+            DicomDataElement(tag: DicomTag.pixelRepresentation.rawValue, vr: .US, value: .unsignedIntegers([0])),
+            DicomDataElement(tag: DicomTag.pixelData.rawValue, vr: .OW,
+                             value: .bytes(Data([1, 0, 2, 0, 3, 0, 4, 0])))
+        ]
+        elements.append(contentsOf: (0..<64).map { index in
+            DicomDataElement(
+                tag: 0x0009_1000 + index,
+                vr: .LO,
+                value: .strings(["deferred-\(index)"])
+            )
+        })
+        let data = try DicomDataSetWriter.part10Data(
+            from: DicomDataSet(elements: elements),
+            options: DicomPart10WriterOptions(
+                mediaStorageSOPClassUID: sopClassUID,
+                mediaStorageSOPInstanceUID: sopInstanceUID
+            )
+        )
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("lazy-metadata-\(UUID().uuidString).dcm")
+        try data.write(to: url)
+        return url
+    }
+
     // MARK: - Memory Allocation Benchmarks
 
     /// Benchmarks memory allocation improvement from lazy metadata parsing.
@@ -40,7 +79,8 @@ final class DCMDecoderLazyParsingTests: XCTestCase {
     /// - Only accessed + critical tags should be in dicomInfoDict
     /// - Memory savings: ~68 bytes per unused tag
     func testLazyParsingMemoryImprovement() throws {
-        let file = try getAnyDICOMFile()
+        let file = try makeDeferredMetadataDICOMFile()
+        defer { try? FileManager.default.removeItem(at: file) }
 
         let decoder = try DCMDecoder(contentsOfFile: file.path)
 
@@ -49,17 +89,8 @@ final class DCMDecoderLazyParsingTests: XCTestCase {
         XCTAssertTrue(decoder.isValid(),
                       "Decoder should be valid after loading")
 
-        // Get internal state using mirror reflection (tagMetadataCache is private)
-        let mirror = Mirror(reflecting: decoder)
-        guard let tagMetadataCache = mirror.children.first(where: { $0.label == "tagMetadataCache" })?.value as? [Int: TagMetadata] else {
-            XCTFail("Could not access tagMetadataCache via reflection")
-            return
-        }
-
-        guard let dicomInfoDict = mirror.children.first(where: { $0.label == "dicomInfoDict" })?.value as? [Int: String] else {
-            XCTFail("Could not access dicomInfoDict via reflection")
-            return
-        }
+        let tagMetadataCache = decoder.tagMetadataCache
+        let dicomInfoDict = decoder.dicomInfoDict
 
         let lazyTagCount = tagMetadataCache.count
         let parsedTagCount = dicomInfoDict.count
@@ -75,31 +106,16 @@ final class DCMDecoderLazyParsingTests: XCTestCase {
 
         """)
 
-        // Now access only a small subset of tags (simulating typical viewer usage)
-        let accessedTags: [Int] = [
-            0x00100010,  // Patient Name
-            0x00100020,  // Patient ID
-            0x00080060,  // Modality
-            0x00200013,  // Instance Number
-            0x00080020,  // Study Date
-            0x00080030,  // Study Time
-            0x00080050,  // Accession Number
-            0x00080090,  // Referring Physician Name
-            0x00081030,  // Study Description
-            0x0008103E   // Series Description
-        ]
+        let deferredTag = 0x0009_1000
+        XCTAssertNotNil(tagMetadataCache[deferredTag])
+        XCTAssertNil(dicomInfoDict[deferredTag])
 
-        // Access the tags
-        for tag in accessedTags {
-            _ = decoder.info(for: tag)
-        }
+        XCTAssertEqual(decoder.info(for: deferredTag), "deferred-0")
 
-        // Get updated dicomInfoDict after access
-        let mirrorAfter = Mirror(reflecting: decoder)
-        guard let dicomInfoDictAfter = mirrorAfter.children.first(where: { $0.label == "dicomInfoDict" })?.value as? [Int: String] else {
-            XCTFail("Could not access dicomInfoDict via reflection")
-            return
-        }
+        let dicomInfoDictAfter = decoder.dicomInfoDict
+        XCTAssertNotNil(dicomInfoDictAfter[deferredTag])
+        XCTAssertEqual(dicomInfoDictAfter.count, parsedTagCount + 1)
+        XCTAssertNotNil(decoder.tagMetadataCache[deferredTag])
 
         let parsedTagCountAfter = dicomInfoDictAfter.count
 
@@ -111,9 +127,10 @@ final class DCMDecoderLazyParsingTests: XCTestCase {
 
         print("""
 
-        ========== After Accessing \(accessedTags.count) Tags ==========
+        ========== After Accessing 1 Tag ==========
         Tags parsed to strings (after access): \(parsedTagCountAfter)
-        Tags remaining as metadata: \(lazyTagCount - (parsedTagCountAfter - parsedTagCount))
+        Deferred tags materialized: \(parsedTagCountAfter - parsedTagCount)
+        Metadata cache entries retained: \(decoder.tagMetadataCache.count)
 
         Memory Savings Estimate:
         - Bytes per TagMetadata: ~\(bytesPerTagMetadata) bytes
@@ -154,9 +171,11 @@ final class DCMDecoderLazyParsingTests: XCTestCase {
             """)
         }
 
-        // Always pass - this is a documentation/measurement test
-        // The existence of lazy parsing infrastructure is verified by the code compiling
-        XCTAssertTrue(true, "Lazy parsing memory improvement documented")
+        XCTAssertGreaterThan(
+            lazyTagCount,
+            0,
+            "The fixture must exercise deferred metadata instead of only eager tags"
+        )
     }
 
     // MARK: - Lazy Parsing Behavior Tests
@@ -251,57 +270,4 @@ final class DCMDecoderLazyParsingTests: XCTestCase {
                          "First access should be <10ms")
     }
 
-    // MARK: - Documentation Tests
-
-    /// Documents the lazy parsing optimization strategy.
-    ///
-    /// This test always passes and exists to document the performance characteristics
-    /// and memory improvements from lazy metadata parsing.
-    func testLazyParsingDocumentation() {
-        XCTAssertTrue(true, "Lazy parsing optimization documented")
-
-        print("""
-
-        ========== Lazy Metadata Parsing Optimization ==========
-
-        **Problem:**
-        DICOM files can contain 100+ tags, but typical viewers access only 10-15 tags.
-        Eager parsing allocates strings for ALL tags, wasting memory.
-
-        **Solution:**
-        Store TagMetadata (32 bytes) instead of parsed strings (100+ bytes) for non-critical tags.
-        Parse tags on first access via info(for:) and cache the result.
-
-        **Memory Savings:**
-        - TagMetadata: ~32 bytes (tag + offset + VR + length)
-        - Parsed string: ~100+ bytes (depends on tag value)
-        - Memory saved: ~68 bytes per unused tag (~68% reduction)
-
-        **Critical Tags (Always Eager):**
-        - Image dimensions (rows, columns, bitsAllocated)
-        - Pixel interpretation (samplesPerPixel, photometricInterpretation)
-        - Transfer syntax (affects parsing)
-        - Windowing (windowCenter, windowWidth - frequently accessed)
-        - Geometry (imagePosition, imageOrientation - for 3D reconstruction)
-
-        **Lazy Tags (Parsed On Demand):**
-        - Patient demographics (name, ID, age, sex)
-        - Study/Series metadata (descriptions, dates, times)
-        - Equipment information (manufacturer, model)
-        - Private tags (vendor-specific, rarely accessed)
-
-        **Performance:**
-        - First access: <1ms (includes parsing overhead)
-        - Cached access: <0.1ms (direct dictionary lookup)
-        - File loading: Faster (skips string formatting for unused tags)
-
-        **Backward Compatibility:**
-        - Public API unchanged
-        - All existing tests pass without modification
-        - No functional regression
-
-        =========================================================
-
-        """)
-    }
 }

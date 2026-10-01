@@ -112,9 +112,19 @@ final class DicomLossyCodecBackendTests: XCTestCase {
             DicomCompressedPixelBackendResolver.resolve(
                 transferSyntax: .jpegBaseline,
                 requestedBitDepth: 8,
+                samplesPerPixel: 1,
+                environment: ["DICOM_JPEGSWIFT_MODE": "disabled"]
+            ).backend,
+            .imageIOJPEGBaseline,
+            "the established ImageIO path stays reachable when the own JPEG backend is disabled"
+        )
+        XCTAssertEqual(
+            DicomCompressedPixelBackendResolver.resolve(
+                transferSyntax: .jpegBaseline,
+                requestedBitDepth: 8,
                 samplesPerPixel: 1
             ).backend,
-            .imageIOJPEGBaseline
+            .nativeJPEG
         )
         XCTAssertEqual(
             DicomCompressedPixelBackendResolver.resolve(

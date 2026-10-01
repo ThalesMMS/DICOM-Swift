@@ -4,12 +4,15 @@ import XCTest
 @testable import DicomCore
 
 final class DicomJ2KSwiftEncoderTests: XCTestCase {
-    func test_capabilitiesAdvertiseExactEncodeUIDsWithoutQualifyingHTDecode() {
+    func test_capabilitiesAdvertiseTheSameFiveUIDsForEncodeAndDecode() {
         let capabilities = DicomJ2KSwiftBackend().capabilities
         XCTAssertEqual(capabilities.operations, [.decode, .encode])
-        XCTAssertEqual(capabilities.transferSyntaxUIDs, DicomJ2KSwiftBackend.qualifiedTransferSyntaxes)
-        XCTAssertEqual(capabilities.encodeTransferSyntaxUIDs, DicomJ2KSwiftBackend.allFrameTransferSyntaxes)
-        XCTAssertFalse(capabilities.transferSyntaxUIDs.contains(DicomTransferSyntax.htj2kLossless.rawValue))
+        XCTAssertEqual(capabilities.transferSyntaxUIDs,
+                       DicomJ2KSwiftBackend.qualifiedTransferSyntaxes.union(DicomJ2KSwiftBackend.part2TransferSyntaxes))
+        XCTAssertEqual(capabilities.encodeTransferSyntaxUIDs,
+                       DicomJ2KSwiftBackend.allFrameTransferSyntaxes.union(DicomJ2KSwiftBackend.part2TransferSyntaxes))
+        // #2330 qualified the own HT decoder; before that only encode covered the HTJ2K UIDs.
+        XCTAssertTrue(capabilities.transferSyntaxUIDs.contains(DicomTransferSyntax.htj2kLossless.rawValue))
         XCTAssertTrue(capabilities.encodeTransferSyntaxUIDs.contains(DicomTransferSyntax.htj2kLossless.rawValue))
     }
 
@@ -64,7 +67,8 @@ final class DicomJ2KSwiftEncoderTests: XCTestCase {
                 signed: true,
                 destination: destination,
                 intent: .reversible,
-                tileSize: (19, 17)
+                // PS3.5 10.18.1: the .202 syntax is written as a single tile; the others take real tiles (#2330).
+                tileSize: destination == .htj2kLosslessRPCL ? nil : (19, 17)
             )
             let encoded = try await DicomJ2KSwiftBackend().encode(request)
             XCTAssertEqual(
@@ -261,8 +265,9 @@ final class DicomJ2KSwiftEncoderTests: XCTestCase {
 
         XCTAssertEqual(descriptor.basicOffsetTable.offsets, [])
         XCTAssertEqual(descriptor.extendedOffsetTable?.offsets, [0, 10])
-        XCTAssertEqual(descriptor.extendedOffsetTable?.lengths, [2, 4])
+        XCTAssertEqual(descriptor.extendedOffsetTable?.lengths, [1, 3]) // PS3.5 A.4: lengths exclude the pad byte.
         XCTAssertEqual(descriptor.fragments.map(\.length), [2, 4])
+        XCTAssertTrue(descriptor.diagnostics.isEmpty)
         XCTAssertEqual(descriptor.frameFragmentIndexes.map(\.count), [1, 1])
     }
 
@@ -432,7 +437,7 @@ final class DicomJ2KSwiftEncoderTests: XCTestCase {
             guard case .unsupportedShape(_, let reason) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
-            XCTAssertTrue(reason.contains("positive"))
+            XCTAssertTrue(reason.contains("dimensions"), reason)
         }
 
         let highBitSource = try Self.makeNativeFile(

@@ -14,7 +14,7 @@
       "usageDocumentation": [
         "README.md",
         "BENCHMARKS.md",
-        "README.md"
+        "Examples/DicomSwiftUIExample/README.md"
       ],
       "limitations": [
         {
@@ -31,7 +31,7 @@
         },
         {
           "category": "rendering",
-          "path": "README.md"
+          "path": "Examples/DicomSwiftUIExample/README.md"
         },
         {
           "category": "fixtures",

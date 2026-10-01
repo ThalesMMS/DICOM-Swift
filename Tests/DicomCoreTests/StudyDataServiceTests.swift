@@ -5,11 +5,22 @@ import DicomTestSupport
 final class StudyDataServiceTests: XCTestCase {
 
     private final class MockBatchFileLoader: DicomBatchFileLoading {
-        private(set) var loadedURLs: [URL] = []
-        var resultsByLastPathComponent: [String: DicomFileResult] = [:]
+        private let loadedURLsStorage = DicomTestLockedValue<[URL]>([])
+        private let resultsStorage = DicomTestLockedValue<[String: DicomFileResult]>([:])
+
+        private(set) var loadedURLs: [URL] {
+            get { loadedURLsStorage.value }
+            set { loadedURLsStorage.replace(with: newValue) }
+        }
+
+        var resultsByLastPathComponent: [String: DicomFileResult] {
+            get { resultsStorage.value }
+            set { resultsStorage.replace(with: newValue) }
+        }
 
         func batchLoadFiles(urls: [URL], maxConcurrency: Int) async -> [DicomFileResult] {
             loadedURLs = urls
+            let resultsByLastPathComponent = resultsStorage.value
             return urls.map { url in
                 guard let result = resultsByLastPathComponent[url.lastPathComponent] else {
                     return DicomFileResult(
@@ -32,12 +43,14 @@ final class StudyDataServiceTests: XCTestCase {
     // MARK: - Helpers
 
     /// Creates a decoder factory for testing
-    private func makeDecoderFactory() -> (String) throws -> DicomDecoderProtocol {
+    private func makeDecoderFactory() -> @Sendable (String) throws -> DicomDecoderProtocol {
         return { path in try DCMDecoder(contentsOfFile: path) }
     }
 
     /// Creates a mock decoder factory for testing dependency injection
-    private func makeMockDecoderFactory(mock: MockDicomDecoder) -> (String) throws -> DicomDecoderProtocol {
+    private func makeMockDecoderFactory(
+        mock: MockDicomDecoder
+    ) -> @Sendable (String) throws -> DicomDecoderProtocol {
         return { _ in mock }
     }
 

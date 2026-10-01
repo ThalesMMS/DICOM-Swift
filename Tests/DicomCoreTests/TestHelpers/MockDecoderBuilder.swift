@@ -123,9 +123,9 @@ enum MockDecoderBuilder {
         orientation: (row: SIMD3<Double>, column: SIMD3<Double>) = axialOrientation,
         seriesDescription: String = "Test Series",
         modality: String = "CT",
-        positionProvider: ((String) -> SIMD3<Double>)? = nil,
-        sizeProvider: ((String) -> (width: Int, height: Int))? = nil
-    ) -> (String) throws -> DicomDecoderProtocol {
+        positionProvider: (@Sendable (String) -> SIMD3<Double>)? = nil,
+        sizeProvider: (@Sendable (String) -> (width: Int, height: Int))? = nil
+    ) -> @Sendable (String) throws -> DicomDecoderProtocol {
         { path in
             let size = sizeProvider?(path) ?? (width: width, height: height)
             return makeDecoder(
@@ -160,8 +160,8 @@ enum MockDecoderBuilder {
         seriesDescription: String = "Test Series",
         modality: String = "CT",
         loadSucceeded: Bool = true,
-        positionProvider: (() -> SIMD3<Double>)? = nil
-    ) -> () -> DicomDecoderProtocol {
+        positionProvider: (@Sendable () -> SIMD3<Double>)? = nil
+    ) -> @Sendable () -> DicomDecoderProtocol {
         {
             makeDecoder(
                 width: width,
@@ -206,12 +206,11 @@ enum MockDecoderBuilder {
         orientation: (row: SIMD3<Double>, column: SIMD3<Double>) = axialOrientation,
         seriesDescription: String = "Test Series",
         modality: String = "CT"
-    ) -> () -> DicomDecoderProtocol {
-        let queue = DispatchQueue(label: "MockDecoderBuilder.sequence")
-        var index = 0
+    ) -> @Sendable () -> DicomDecoderProtocol {
+        let index = DicomTestLockedValue(0)
 
         return {
-            let loadSucceeded = queue.sync {
+            let loadSucceeded = index.withValue { index in
                 guard !successPattern.isEmpty else { return true }
                 let result = successPattern[index % successPattern.count]
                 index += 1

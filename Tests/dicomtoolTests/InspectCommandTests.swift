@@ -20,15 +20,13 @@ final class InspectCommandTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        InspectCommand.makeDecoder = { (_: String) async throws -> any DicomDecoderProtocol in
+        InspectCommand.replaceDecoderFactory { (_: String) async throws -> any DicomDecoderProtocol in
             Self.makeDefaultMockDecoder()
         }
     }
 
     override func tearDown() {
-        InspectCommand.makeDecoder = { path in
-            try await DCMDecoder(contentsOfFile: path)
-        }
+        InspectCommand.resetDecoderFactory()
         super.tearDown()
     }
 
@@ -83,6 +81,84 @@ final class InspectCommandTests: XCTestCase {
     }
 
     // MARK: - Initialization Tests
+
+    func test_boundedInspect_readsActualFileAndReportsBytesWithoutPatientID() async throws {
+        let dataset = DicomDataSet(elements: [
+            .init(tag: DicomTag.patientName.rawValue, vr: .PN, value: .strings(["SYNTHETIC^RANGE"])),
+            .init(tag: DicomTag.patientID.rawValue, vr: .LO, value: .strings(["SYNTHETIC2318"])),
+            .init(tag: DicomTag.rows.rawValue, vr: .US, value: .unsignedIntegers([256])),
+            .init(tag: DicomTag.columns.rawValue, vr: .US, value: .unsignedIntegers([256])),
+            .init(tag: DicomTag.pixelData.rawValue, vr: .OB, value: .bytes(Data(repeating: 7, count: 65536)))
+        ])
+        let url = try createTemporaryFile(contents: DicomDataSetWriter.part10Data(from: dataset))
+        for mode in [[], ["--mapped-ranges"]] {
+            var command = try InspectCommand.parse([url.path, "--bounded", "--read-metrics", "--format", "json",
+                                                     "--tags", "PatientName,PatientID,Rows"] + mode)
+            let output = try await captureStandardOutput { try await command.run() }
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(output.utf8)) as? [String: String])
+            XCTAssertEqual(json["PatientName"], "SYNTHETIC^RANGE")
+            XCTAssertEqual(json["Rows"], "256")
+            XCTAssertEqual(json["PatientID"], "(redacted)")
+            XCTAssertFalse(output.contains("SYNTHETIC2318"))
+            XCTAssertLessThan(try XCTUnwrap(Int(json["ReadReceivedBytes"] ?? "")), 1024)
+        }
+    }
+
+    func test_boundedInspect_strictRejectsAndRecoveryReportsOpaqueBytes() async throws {
+        // Hand-encoded wrong VR: Patient Name requires PN, not LO.
+        let dataset = Data([0x10, 0, 0x10, 0, 0x4C, 0x4F, 2, 0, 0x58, 0x20])
+        let bytes = try DicomDataSetWriter.part10Data(fromEncodedDataSet: dataset,
+            transferSyntax: .explicitVRLittleEndian,
+            mediaStorageSOPClassUID: DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID,
+            mediaStorageSOPInstanceUID: "2.25.2320003")
+        let url = try createTemporaryFile(contents: bytes)
+        var strict = try InspectCommand.parse([url.path, "--bounded", "--read-mode", "strict"])
+        do {
+            try await strict.run()
+            XCTFail("Strict inspect accepted an incompatible VR")
+        } catch {
+            XCTAssertEqual((error as? DicomDataSetReadResult.Diagnostic)?.reason, .incompatibleVR)
+        }
+        var recover = try InspectCommand.parse([url.path, "--bounded", "--read-mode", "recover", "--format", "json", "--all"])
+        let output = try await captureStandardOutput { try await recover.run() }
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(output.utf8)) as? [String: String])
+        XCTAssertEqual(json["ReadMode"], "recover")
+        XCTAssertEqual(json["ReadDataSetDiagnosticsCount"], "1")
+        XCTAssertEqual(json["ReadFileMetaDiagnosticsCount"], "0")
+        XCTAssertEqual(json["ReadDataSetDiagnostic0"], "tag=00100010 offset=8 reason=incompatibleVR")
+        XCTAssertEqual(json["ReadDataSetDiagnostic0Path"], "tag:00100010")
+        XCTAssertEqual(json["PatientName"], "(2 bytes)")
+    }
+
+    func test_boundedInspect_nestedRecoveryReportsItemPathWithoutTheInvalidValue() async throws {
+        let item = DicomDataSet(elements: [.init(tag: 0x0040A040, vr: .CS, value: .strings(["bad!"]))])
+        let wire = try DicomDataSetWriter.dataSetData(from: .init(elements: [
+            .init(tag: 0x0040A730, vr: .SQ, value: .sequence([.init(dataSet: item)]))
+        ]))
+        let bytes = try DicomDataSetWriter.part10Data(fromEncodedDataSet: wire,
+            transferSyntax: .explicitVRLittleEndian,
+            mediaStorageSOPClassUID: "1.2.840.10008.5.1.4.1.1.88.22",
+            mediaStorageSOPInstanceUID: "2.25.2321001")
+        let url = try createTemporaryFile(contents: bytes)
+        var command = try InspectCommand.parse([url.path, "--bounded", "--read-mode", "recover", "--format", "json"])
+        let output = try await captureStandardOutput { try await command.run() }
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(output.utf8)) as? [String: String])
+        XCTAssertEqual(json["ReadDataSetDiagnosticsCount"], "1")
+        XCTAssertEqual(json["ReadDataSetDiagnostic0Path"], "tag:0040A730/item:0/tag:0040A040")
+        XCTAssertFalse(output.contains("bad!"))
+    }
+
+    func test_validatedInspect_requiresBoundedModeAndRejectsUnknownReadMode() async throws {
+        let url = try createTemporaryFile(contents: Data())
+        var command = try InspectCommand.parse([url.path, "--read-mode", "strict"])
+        do {
+            try await command.run()
+            XCTFail("Validated read mode silently used the legacy decoder")
+        } catch {
+            XCTAssertTrue(error is ValidationError)
+        }
+        XCTAssertThrowsError(try InspectCommand.parse([url.path, "--bounded", "--read-mode", "guess"]))
+    }
 
     func testInspectCommandInitialization() throws {
         // Test that InspectCommand can be parsed from arguments
@@ -273,7 +349,7 @@ final class InspectCommandTests: XCTestCase {
 
     func testInspectCommandWithEmptyFilePath() async throws {
         var command = try InspectCommand.parse([""])
-        InspectCommand.makeDecoder = { _ in
+        InspectCommand.replaceDecoderFactory { _ in
             throw DICOMError.invalidDICOMFormat(reason: "Mock invalid file")
         }
 
@@ -291,7 +367,7 @@ final class InspectCommandTests: XCTestCase {
             .appendingPathComponent("inspect_directory_\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directoryURL) }
-        InspectCommand.makeDecoder = { _ in
+        InspectCommand.replaceDecoderFactory { _ in
             throw DICOMError.invalidDICOMFormat(reason: "Directory input is not a DICOM file")
         }
         var command = try InspectCommand.parse([directoryURL.path])
@@ -333,9 +409,9 @@ final class InspectCommandTests: XCTestCase {
         mockDecoder.width = 128
         mockDecoder.height = 96
         mockDecoder.setTag(DicomTag.patientName.rawValue, value: "Mock^Patient")
-        var requestedPath: String?
-        InspectCommand.makeDecoder = { path in
-            requestedPath = path
+        let requestedPath = LockedValue<String?>(nil)
+        InspectCommand.replaceDecoderFactory { path in
+            requestedPath.replace(with: path)
             return mockDecoder
         }
 
@@ -348,7 +424,7 @@ final class InspectCommandTests: XCTestCase {
             XCTFail("Command should execute successfully: \(error)")
         }
 
-        XCTAssertEqual(requestedPath, fileURL.path, "Command should request decoding for the selected path")
+        XCTAssertEqual(requestedPath.value, fileURL.path, "Command should request decoding for the selected path")
         XCTAssertEqual(mockDecoder.width, 128)
         XCTAssertEqual(mockDecoder.height, 96)
     }

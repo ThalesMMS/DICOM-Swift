@@ -121,31 +121,51 @@ internal struct BitStreamReader {
     /// - Throws: `DICOMError.invalidDICOMFormat` when the next marker is not
     ///   a restart marker or the entropy-coded data ends first.
     internal mutating func consumeRestartMarker() throws -> Int {
-        // Padding bits before a restart marker are discarded along with any
-        // partially consumed byte.
+        guard bitsAvailable <= 7 else {
+            throw DICOMError.invalidDICOMFormat(
+                reason: "Expected JPEG restart marker (RSTn) at the restart boundary but found additional entropy data"
+            )
+        }
+        if bitsAvailable > 0 {
+            let paddingMask = UInt32((1 << bitsAvailable) - 1)
+            guard bitBuffer & paddingMask == paddingMask else {
+                throw DICOMError.invalidDICOMFormat(
+                    reason: "Expected JPEG restart marker (RSTn) after all-ones entropy padding"
+                )
+            }
+        }
         bitBuffer = 0
         bitsAvailable = 0
 
-        while byteIndex + 1 < endIndex {
-            guard data[byteIndex] == JPEGMarker.prefix else {
-                byteIndex += 1
-                continue
-            }
-            let marker = data[byteIndex + 1]
-            if marker == JPEGMarker.prefix { // fill byte
-                byteIndex += 1
-                continue
-            }
-            if JPEGMarker.isRestart(marker) {
-                byteIndex += 2
-                return Int(marker - 0xD0)
-            }
+        guard byteIndex + 1 < endIndex else {
             throw DICOMError.invalidDICOMFormat(
-                reason: "Expected JPEG restart marker (RSTn) in entropy-coded data but found marker 0xFF\(String(marker, radix: 16, uppercase: true))"
+                reason: "Entropy-coded data ended while expecting a JPEG restart marker (RSTn)"
             )
         }
-        throw DICOMError.invalidDICOMFormat(
-            reason: "Entropy-coded data ended while expecting a JPEG restart marker (RSTn)"
-        )
+        guard data[byteIndex] == JPEGMarker.prefix else {
+            throw DICOMError.invalidDICOMFormat(
+                reason: "Expected JPEG restart marker (RSTn) at the restart boundary but found entropy byte "
+                    + "0x\(String(data[byteIndex], radix: 16, uppercase: true))"
+            )
+        }
+
+        while byteIndex + 1 < endIndex, data[byteIndex + 1] == JPEGMarker.prefix {
+            byteIndex += 1
+        }
+        guard byteIndex + 1 < endIndex else {
+            throw DICOMError.invalidDICOMFormat(
+                reason: "Entropy-coded data ended while expecting a JPEG restart marker (RSTn)"
+            )
+        }
+
+        let marker = data[byteIndex + 1]
+        guard JPEGMarker.isRestart(marker) else {
+            throw DICOMError.invalidDICOMFormat(
+                reason: "Expected JPEG restart marker (RSTn) in entropy-coded data but found marker "
+                    + "0xFF\(String(marker, radix: 16, uppercase: true))"
+            )
+        }
+        byteIndex += 2
+        return Int(marker - 0xD0)
     }
 }

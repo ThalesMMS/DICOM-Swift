@@ -1,0 +1,16 @@
+[
+  {
+    "id": {"root": "2.25.2362.9001"},
+    "name": "Cycle A",
+    "kind": "document",
+    "inherits": [{"root": "2.25.2362.9002"}],
+    "constraints": []
+  },
+  {
+    "id": {"root": "2.25.2362.9002"},
+    "name": "Cycle B",
+    "kind": "document",
+    "inherits": [{"root": "2.25.2362.9001"}],
+    "constraints": []
+  }
+]

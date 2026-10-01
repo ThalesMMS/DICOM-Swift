@@ -134,6 +134,24 @@ final class DCMDecoderTransferSyntaxTests: XCTestCase {
 
     // MARK: - Compressed Transfer Syntax Tests
 
+    func test_oversizedFileMetaGroupLength_preservesLegacyBigEndianFallback() throws {
+        var data = makeExplicitVRBigEndianDICOM()
+        var groupLength = Data()
+        appendExplicitVRTag(to: &groupLength, group: 0x0002, element: 0x0000, vr: "UL",
+                            value: Data(repeating: 0xFF, count: 4), littleEndian: true)
+        // Legacy headers may place Group Length after the Transfer Syntax element.
+        let transferSyntaxEnd = 140 + Int(data.dicomInteger(at: 138, as: UInt16.self, littleEndian: true))
+        data.insert(contentsOf: groupLength, at: transferSyntaxEnd)
+
+        let decoder = try DCMDecoder(data: data)
+
+        XCTAssertFalse(decoder.currentLittleEndian())
+        XCTAssertEqual(decoder.width, 2)
+        XCTAssertEqual(decoder.height, 2)
+        XCTAssertEqual(decoder.info(for: .modality), "CT")
+        XCTAssertEqual(decoder.getPixels16(), [1, 2, 3, 4])
+    }
+
     func testJPEGBaselineProperties() {
         let syntax = DicomTransferSyntax.jpegBaseline
 

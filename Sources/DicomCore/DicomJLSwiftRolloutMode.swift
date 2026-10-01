@@ -17,6 +17,8 @@ enum DicomJLSwiftRolloutMode: String, CaseIterable, Sendable {
         let configured = environment[Self.environmentKey]?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
-        self = configured.flatMap(Self.init(rawValue:)) ?? .shadow
+        // Since #2328 the JPEG-LS codec is the own DicomJPEGLS target; it is preferred by default and CharLS
+        // (when present) remains the fallback and the independent oracle.
+        self = configured.flatMap(Self.init(rawValue:)) ?? .preferred
     }
 }

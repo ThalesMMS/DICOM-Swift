@@ -114,7 +114,7 @@ internal final class DCMTagParser {
         var retValue: Int = 0
 
         switch vr {
-        case .OB, .OD, .OF, .OW, .OV, .SQ, .UN, .UR, .UT:
+        case .OB, .OD, .OF, .OL, .OW, .OV, .SQ, .UN, .UR, .UT, .UC, .SV, .UV:
             // Explicit VRs with 32‑bit lengths have two reserved
             // bytes (b2 and b3).  If those bytes are zero we
             // interpret the following 4 bytes as the length.
@@ -211,14 +211,14 @@ internal final class DCMTagParser {
 
         let group = Int(binaryReader.readShort(location: &location))
 
-        // Endianness detection: if the group appears as 0x0800 in a
-        // big endian transfer syntax we flip endianness.  This
-        // mirrors the hack in the original implementation.
+        // Compatibility fallback for files without File Meta Group Length.
+        // A dataset can start in any group; valid Part 10 boundaries are handled
+        // by the decoder before this call, without relying on a group-0008 heuristic.
         var actualGroup = group
         let element: Int
-        if group == 0x0800 && bigEndianTransferSyntax {
+        if littleEndian && bigEndianTransferSyntax && group != 0x0002 {
             littleEndian = false
-            actualGroup = 0x0008
+            actualGroup = Int(UInt16(group).byteSwapped)
             guard location + 2 <= data.count else {
                 return -1
             }
@@ -310,7 +310,7 @@ internal final class DCMTagParser {
             location += elementLength
 
         case .AE, .AS, .AT, .CS, .DA, .DS, .DT, .IS, .LO, .LT, .PN, .SH, .ST, .TM, .UI:
-            value = binaryReader.readString(length: elementLength, location: &location)
+            value = binaryReader.readString(length: elementLength, location: &location, vr: vr)
 
         case .US:
             if elementLength == 2 {
@@ -328,7 +328,7 @@ internal final class DCMTagParser {
 
         case .implicitRaw:
             // Interpret as a string unless extremely long
-            let s = binaryReader.readString(length: elementLength, location: &location)
+            let s = binaryReader.readString(length: elementLength, location: &location, vr: vr)
             if elementLength <= 44 {
                 value = s
             } else {

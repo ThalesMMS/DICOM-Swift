@@ -10,6 +10,7 @@ public struct DicomSRSupportMatrix: Equatable, Sendable {
 
     /// SR value types accepted by the semantic validator.
     public let supportedValueTypes: Set<String>
+    public var supportedValueTypesBySOPClassUID: [String: Set<String>] = [:]
 
     /// SR relationship types accepted for by-value content items.
     public let supportedRelationshipTypes: Set<String>
@@ -37,12 +38,14 @@ public struct DicomSRSupportMatrix: Equatable, Sendable {
         supportedSOPClassUIDs: [
             DicomSRDocument.enhancedSRStorageSOPClassUID,
             DicomSRDocument.comprehensiveSRStorageSOPClassUID,
+            DicomSRDocument.comprehensive3DSRStorageSOPClassUID,
             DicomSRDocument.keyObjectSelectionDocumentStorageSOPClassUID
         ],
         supportedTemplateIdentifiersBySOPClassUID: [
             DicomSRDocument.enhancedSRStorageSOPClassUID: ["1500"],
             DicomSRDocument.comprehensiveSRStorageSOPClassUID: ["1500"],
-            DicomSRDocument.keyObjectSelectionDocumentStorageSOPClassUID: []
+            DicomSRDocument.comprehensive3DSRStorageSOPClassUID: ["1500"],
+            DicomSRDocument.keyObjectSelectionDocumentStorageSOPClassUID: ["2010"]
         ],
         supportedValueTypes: [
             "CONTAINER",
@@ -51,16 +54,20 @@ public struct DicomSRSupportMatrix: Equatable, Sendable {
             "NUM",
             "IMAGE",
             "SCOORD",
+            "COMPOSITE", "WAVEFORM", "TCOORD",
             "UIDREF",
             "DATETIME",
             "DATE",
             "TIME",
             "PNAME"
         ],
+        supportedValueTypesBySOPClassUID: Dictionary(uniqueKeysWithValues:
+            DicomSRProfileConstraints.allCases.map { ($0.sopClassUID, $0.valueTypes) }),
         supportedRelationshipTypes: [
             "CONTAINS",
             "HAS OBS CONTEXT",
             "HAS CONCEPT MOD",
+            "HAS ACQ CONTEXT", "HAS PROPERTIES",
             "INFERRED FROM",
             "SELECTED FROM"
         ],
@@ -70,6 +77,11 @@ public struct DicomSRSupportMatrix: Equatable, Sendable {
             "SCT",
             "SRT",
             "UCUM",
+            "RFC5646",
+            "ISO639_2",
+            "UMLS",
+            "NCIt",
+            "LN",
             "99LOCAL"
         ],
         supportedMeasurementUnitSchemes: ["UCUM"],
@@ -79,6 +91,7 @@ public struct DicomSRSupportMatrix: Equatable, Sendable {
             "CAD finding container"
         ],
         supportedObservationContextValueTypes: [
+            "COMPOSITE",
             "TEXT",
             "CODE",
             "UIDREF",
@@ -99,7 +112,10 @@ public struct DicomSRSupportMatrix: Equatable, Sendable {
         guard !supportedTemplates.isEmpty else {
             return templateIdentifier == nil || templateIdentifier?.isEmpty == true
         }
-        guard let templateIdentifier else { return false }
+        guard let templateIdentifier else {
+            // A document without an identifier uses the root template its IOD mandates, when supported.
+            return supportedTemplates.contains { DicomSRProfileConstraints(sopClassUID: sopClassUID)?.rootTemplateIdentifier == $0 }
+        }
         return supportedTemplates.contains(templateIdentifier)
     }
 }
@@ -157,6 +173,14 @@ public enum DicomSRSemanticValidationError: Error, Equatable, LocalizedError, Se
     /// A KOS document has no evidence or IMAGE references.
     case missingEvidenceReference
 
+    case byReferenceNotPermitted(path: String)
+    case byReferenceTargetMissing(path: String, identifier: [Int])
+    case byReferenceTargetIsByReference(path: String)
+    case byReferenceToSelfOrAncestor(path: String)
+    case byReferenceCycle(path: String)
+    case missingFrameOfReferenceUID(path: String)
+    case invalidTemporalCoordinates(path: String)
+
     public var errorDescription: String? {
         switch self {
         case .unsupportedSOPClassUID(let sopClassUID):
@@ -191,6 +215,20 @@ public enum DicomSRSemanticValidationError: Error, Equatable, LocalizedError, Se
             return "Missing SR referenced SOP at \(path)"
         case .invalidGraphicData(let path, let graphicType, let pointCount):
             return "Invalid SR graphic data at \(path): \(graphicType ?? "nil") with \(pointCount) values"
+        case .byReferenceNotPermitted(let path):
+            return "byReferenceNotPermitted at \(path)"
+        case .byReferenceTargetMissing(let path, _):
+            return "byReferenceTargetMissing at \(path)"
+        case .byReferenceTargetIsByReference(let path):
+            return "byReferenceTargetIsByReference at \(path)"
+        case .byReferenceToSelfOrAncestor(let path):
+            return "byReferenceToSelfOrAncestor at \(path)"
+        case .byReferenceCycle(let path):
+            return "byReferenceCycle at \(path)"
+        case .missingFrameOfReferenceUID(let path):
+            return "missingFrameOfReferenceUID at \(path)"
+        case .invalidTemporalCoordinates(let path):
+            return "invalidTemporalCoordinates at \(path)"
         case .missingEvidenceReference:
             return "Missing SR evidence reference"
         }
@@ -230,6 +268,12 @@ public struct DicomSRSemanticValidationFailure: Error, Equatable, LocalizedError
 
 /// Validates a parsed or builder-created Structured Report against the declared semantic scope.
 public enum DicomSRSemanticValidator {
+    public static func validateWithTemplate(_ document: DicomSRDocument) -> (
+        semantic: DicomSRSemanticValidationResult, template: DicomSRTemplateValidationResult
+    ) {
+        (validate(document), DicomSRTemplateValidator.validate(document))
+    }
+
     /// Validates a document and returns every semantic error found.
     public static func validate(
         _ document: DicomSRDocument,
@@ -237,7 +281,7 @@ public enum DicomSRSemanticValidator {
     ) -> DicomSRSemanticValidationResult {
         var errors: [DicomSRSemanticValidationError] = []
         validateDocumentIdentity(document, supportMatrix: supportMatrix, errors: &errors)
-        validateItem(document.root, path: "root", isRoot: true, supportMatrix: supportMatrix, errors: &errors)
+        validateItems(document.root, sopClassUID: document.sopClassUID, supportMatrix: supportMatrix, errors: &errors)
         validateEvidenceReferences(document.evidenceReferences, errors: &errors)
 
         if document.sopClassUID == DicomSRDocument.keyObjectSelectionDocumentStorageSOPClassUID,
@@ -259,7 +303,7 @@ public enum DicomSRSemanticValidator {
         }
     }
 
-    private static func validateDocumentIdentity(
+    static func validateDocumentIdentity(
         _ document: DicomSRDocument,
         supportMatrix: DicomSRSupportMatrix,
         errors: inout [DicomSRSemanticValidationError]
@@ -279,7 +323,8 @@ public enum DicomSRSemanticValidator {
         }
 
         if sopClassUID == DicomSRDocument.comprehensiveSRStorageSOPClassUID ||
-            sopClassUID == DicomSRDocument.enhancedSRStorageSOPClassUID {
+            sopClassUID == DicomSRDocument.enhancedSRStorageSOPClassUID ||
+            sopClassUID == DicomSRDocument.comprehensive3DSRStorageSOPClassUID {
             validateExpectedRootConcept(
                 document.root.conceptName,
                 path: "root",
@@ -312,14 +357,149 @@ public enum DicomSRSemanticValidator {
         }
     }
 
-    private static func validateItem(
-        _ item: DicomSRContentItem,
-        path: String,
-        isRoot: Bool,
+    private struct ValidationChildrenFrame {
+        let children: [DicomSRContentItem]
+        let sourceValueType: String
+        var nextChildIndex: Int
+    }
+
+    /// Validates the tree in the same preorder as the former recursive walk while
+    /// keeping only one child cursor per level. The mutable index path avoids
+    /// retaining a complete path string in every frame of a deep report.
+    private static func validateItems(
+        _ root: DicomSRContentItem,
+        sopClassUID: String?,
         supportMatrix: DicomSRSupportMatrix,
         errors: inout [DicomSRSemanticValidationError]
     ) {
-        if !supportMatrix.supportedValueTypes.contains(item.valueType) {
+        validateItemContents(
+            root,
+            path: "root",
+            isRoot: true,
+            sopClassUID: sopClassUID,
+            supportMatrix: supportMatrix,
+            errors: &errors
+        )
+
+        var pathIndices: [Int] = []
+        var frames = [ValidationChildrenFrame(children: root.children, sourceValueType: root.valueType, nextChildIndex: 0)]
+        while !frames.isEmpty {
+            let frameIndex = frames.index(before: frames.endIndex)
+            guard frames[frameIndex].nextChildIndex < frames[frameIndex].children.count else {
+                frames.removeLast()
+                if !pathIndices.isEmpty {
+                    pathIndices.removeLast()
+                }
+                continue
+            }
+
+            let childIndex = frames[frameIndex].nextChildIndex
+            let child = frames[frameIndex].children[childIndex]
+            frames[frameIndex].nextChildIndex += 1
+            pathIndices.append(childIndex)
+
+            if child.isByReference {
+                validateByReference(child, root: root, indices: pathIndices,
+                    source: frames[frameIndex].sourceValueType, sopClassUID: sopClassUID, errors: &errors)
+                pathIndices.removeLast()
+                continue
+            }
+            if let relationship = child.relationshipType, !relationship.hasPrefix("R-"),
+               let constraints = sopClassUID.flatMap(DicomSRRelationshipConstraints.init(rawValue:)),
+               !constraints.permits(source: frames[frameIndex].sourceValueType, relationship: relationship,
+                    target: child.valueType, byReference: false) {
+                errors.append(.unsupportedRelationshipType(path: itemPath(indices: pathIndices), relationshipType: relationship))
+            }
+            validateItemContents(
+                child,
+                path: itemPath(indices: pathIndices),
+                isRoot: false,
+                sopClassUID: sopClassUID,
+                supportMatrix: supportMatrix,
+                errors: &errors
+            )
+            frames.append(ValidationChildrenFrame(children: child.children, sourceValueType: child.valueType, nextChildIndex: 0))
+        }
+    }
+
+    static func referencedItem(in root: DicomSRContentItem, identifier: [Int]) -> DicomSRContentItem? {
+        guard identifier.first == 1 else { return nil }
+        var item = root
+        for component in identifier.dropFirst() {
+            guard component > 0, component <= item.children.count else { return nil }
+            item = item.children[component - 1]
+        }
+        return item
+    }
+
+    static func validateByReference(
+        _ item: DicomSRContentItem,
+        root: DicomSRContentItem,
+        indices: [Int],
+        source: String,
+        sopClassUID: String?,
+        errors: inout [DicomSRSemanticValidationError]
+    ) {
+        let path = itemPath(indices: indices)
+        let identifier = item.referencedContentItemIdentifier ?? []
+        let ownIdentifier = [1] + indices.map { $0 + 1 }
+        let constraints = sopClassUID.flatMap(DicomSRRelationshipConstraints.init(rawValue:))
+        if constraints != .comprehensive && constraints != .comprehensive3D {
+            errors.append(.byReferenceNotPermitted(path: path))
+        }
+        if item.relationshipType == nil { errors.append(.missingRelationshipType(path: path)) }
+        guard let target = referencedItem(in: root, identifier: identifier) else {
+            errors.append(.byReferenceTargetMissing(path: path, identifier: identifier))
+            return
+        }
+        if target.isByReference { errors.append(.byReferenceTargetIsByReference(path: path)) }
+        if ownIdentifier.starts(with: identifier) {
+            errors.append(.byReferenceToSelfOrAncestor(path: path))
+        }
+        if let constraints, !constraints.permits(source: source, relationship: item.relationshipType ?? "",
+            target: target.valueType, byReference: true) {
+            errors.append(.byReferenceNotPermitted(path: path))
+        }
+        // Include by-value edges: two sibling source items may reference each other through their children.
+        var pending = [identifier]
+        var visited = Set<[Int]>()
+        let parentIdentifier = Array(ownIdentifier.dropLast())
+        while let current = pending.popLast() {
+            if current == ownIdentifier || current == parentIdentifier {
+                errors.append(.byReferenceCycle(path: path))
+                break
+            }
+            guard visited.insert(current).inserted,
+                  let node = referencedItem(in: root, identifier: current) else { continue }
+            if let reference = node.referencedContentItemIdentifier {
+                pending.append(reference)
+            } else {
+                for index in node.children.indices { pending.append(current + [index + 1]) }
+            }
+        }
+    }
+
+    private static func itemPath(indices: [Int]) -> String {
+        var path = "root"
+        for index in indices {
+            path.append("/")
+            path.append(String(index))
+        }
+        return path
+    }
+
+    static func validateItemContents(
+        _ item: DicomSRContentItem,
+        path: String,
+        isRoot: Bool,
+        sopClassUID: String? = nil,
+        supportMatrix: DicomSRSupportMatrix,
+        errors: inout [DicomSRSemanticValidationError]
+    ) {
+        if item.isByReference { return }
+        let valueTypes = sopClassUID.flatMap { supportMatrix.supportedValueTypesBySOPClassUID[$0] }
+            ?? supportMatrix.supportedValueTypes
+        if !valueTypes.contains(item.valueType) {
             errors.append(.unsupportedValueType(path: path, valueType: item.valueType))
         }
 
@@ -334,9 +514,23 @@ public enum DicomSRSemanticValidator {
         case "CODE":
             validateCodeValue(item, path: path, supportMatrix: supportMatrix, errors: &errors)
         case "NUM":
-            validateNumericMeasurement(item, path: path, supportMatrix: supportMatrix, errors: &errors)
-        case "IMAGE":
+            validateNumericMeasurement(item, path: path, supportsQualifiedValue: sopClassUID != nil,
+                supportMatrix: supportMatrix, errors: &errors)
+        case "IMAGE", "COMPOSITE", "WAVEFORM":
             validateReferencedSOPs(item.referencedSOPs, path: path, errors: &errors)
+        case "SCOORD3D":
+            if item.frameOfReferenceUID?.dicomSRNonEmptyValue == nil {
+                errors.append(.missingFrameOfReferenceUID(path: path))
+            }
+            validateGraphicData(item, path: path, errors: &errors)
+        case "TCOORD":
+            let forms = [!item.referencedSamplePositions.isEmpty, !item.referencedTimeOffsets.isEmpty,
+                !item.referencedDateTimes.isEmpty].filter { $0 }.count
+            if forms != 1 || !["POINT", "MULTIPOINT", "SEGMENT", "MULTISEGMENT", "BEGIN", "END"]
+                .contains(item.temporalRangeType ?? "") || !item.referencedSamplePositions.allSatisfy({ $0 > 0 }) ||
+                !item.referencedTimeOffsets.allSatisfy(\.isFinite) {
+                errors.append(.invalidTemporalCoordinates(path: path))
+            }
         case "SCOORD":
             validateGraphicData(item, path: path, errors: &errors)
         case "UIDREF":
@@ -351,16 +545,6 @@ public enum DicomSRSemanticValidator {
             validateRequired(item.personNameValue?.rawValue, path: path, valueType: item.valueType, errors: &errors)
         default:
             break
-        }
-
-        for (index, child) in item.children.enumerated() {
-            validateItem(
-                child,
-                path: "\(path)/\(index)",
-                isRoot: false,
-                supportMatrix: supportMatrix,
-                errors: &errors
-            )
         }
     }
 
@@ -429,10 +613,16 @@ public enum DicomSRSemanticValidator {
     private static func validateNumericMeasurement(
         _ item: DicomSRContentItem,
         path: String,
+        supportsQualifiedValue: Bool,
         supportMatrix: DicomSRSupportMatrix,
         errors: inout [DicomSRSemanticValidationError]
     ) {
-        if item.numericValue == nil {
+        if let qualifier = item.numericValueQualifier {
+            validateConcept(qualifier, path: "\(path).numericValueQualifier", supportMatrix: supportMatrix, errors: &errors)
+        }
+        if item.numericValue == nil && item.floatingPointValue == nil &&
+            (item.rationalNumeratorValue == nil || item.rationalDenominatorValue == nil) {
+            if supportsQualifiedValue && item.numericValueQualifier != nil { return }
             errors.append(.missingNumericValue(path: path))
         }
         guard let units = item.measurementUnits else {
@@ -485,6 +675,23 @@ public enum DicomSRSemanticValidator {
             return
         }
         let count = item.graphicData.count
+        if item.valueType == "SCOORD3D" {
+            let points = count / 3
+            let valid: Bool
+            switch graphicType {
+            case "POINT": valid = points == 1
+            case "MULTIPOINT": valid = points >= 1
+            case "POLYLINE": valid = points >= 2
+            case "POLYGON": valid = points >= 3 && item.graphicData.prefix(3).elementsEqual(item.graphicData.suffix(3))
+            case "ELLIPSE": valid = points == 4
+            case "ELLIPSOID": valid = points == 6
+            default: valid = false
+            }
+            if !valid || count % 3 != 0 || !item.graphicData.allSatisfy(\.isFinite) {
+                errors.append(.invalidGraphicData(path: path, graphicType: graphicType, pointCount: count))
+            }
+            return
+        }
         let valid: Bool
         switch graphicType {
         case "POINT":
@@ -498,7 +705,7 @@ public enum DicomSRSemanticValidator {
         default:
             valid = false
         }
-        if !valid {
+        if !valid || !item.graphicData.allSatisfy({ $0.isFinite && $0 >= 0 }) {
             errors.append(.invalidGraphicData(path: path, graphicType: graphicType, pointCount: count))
         }
     }

@@ -1,0 +1,1908 @@
+{
+ "schemaVersion": 1,
+ "generator": "Tools/Scripts/dcmtk_vr_vectors.py",
+ "dcmtkCommit": "8d68392db66cd69e13dc878dc9889681062ad479",
+ "attribution": "Test vectors derived from DCMTK dcmdata/tests (tchval.cc, tvrui.cc), OFFIS e.V., BSD 3-Clause License:\nCopyright (C) 1994-2026, OFFIS e.V.\n *  All rights reserved.\n *\n *  This software and supporting documentation were developed by\n *\n *    OFFIS e.V.\n *    R&D Division Health\n *    Escherweg 2\n *    26121 Oldenburg, Germany\n *\n *  Redistribution and use in source and binary forms, with or without\n *  modification, are permitted provided that the following conditions\n *  are met:\n *\n *  - Redistributions of source code must retain the above copyright\n *    notice, this list of conditions and the following disclaimer.\n *\n *  - Redistributions in binary form must reproduce the above copyright\n *    notice, this list of conditions and the following disclaimer in the\n *    documentation and/or other materials provided with the distribution.\n *\n *  - Neither the name of OFFIS nor the names of its contributors may be\n *    used to endorse or promote products derived from this software\n *    without specific prior written permission.\n *\n *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS\n *  \"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT\n *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR\n *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT\n *  HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,\n *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT\n *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,\n *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY\n *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT\n *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE\n *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n *\n */\n\nPlease note that some DCMTK modules, especially those that are not part\nof the free toolkit, are covered by a separate license which can be found\nin the COPYRIGHT file in the corresponding module directory.",
+ "notes": "tvrdatim.cc, tvrds.cc and tvrpn.cc test conversion and component APIs, not value validation.",
+ "cases": [
+  {
+   "id": "AE-01",
+   "vr": "AE",
+   "valueHex": "20",
+   "valueText": " ",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:44"
+  },
+  {
+   "id": "AE-02",
+   "vr": "AE",
+   "valueHex": "415c",
+   "valueText": "A\\\\",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:45"
+  },
+  {
+   "id": "AE-03",
+   "vr": "AE",
+   "valueHex": "2041455449544c45",
+   "valueText": " AETITLE",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:46"
+  },
+  {
+   "id": "AE-04",
+   "vr": "AE",
+   "valueHex": "41452d5469746c652020",
+   "valueText": "AE-Title  ",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:47"
+  },
+  {
+   "id": "AE-05",
+   "vr": "AE",
+   "valueHex": "204145205469746c6520",
+   "valueText": " AE Title ",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:48"
+  },
+  {
+   "id": "AE-06",
+   "vr": "AE",
+   "valueHex": "41205c2042",
+   "valueText": "A \\\\ B",
+   "vm": "2",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:49"
+  },
+  {
+   "id": "AE-07",
+   "vr": "AE",
+   "valueHex": "4af67267",
+   "valueText": "J\\366rg",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:50"
+  },
+  {
+   "id": "AE-08",
+   "vr": "AE",
+   "valueHex": "313233343536373839302d414243444520",
+   "valueText": "1234567890-ABCDE ",
+   "vm": null,
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:51"
+  },
+  {
+   "id": "AE-09",
+   "vr": "AE",
+   "valueHex": "5c204145205c",
+   "valueText": "\\\\ AE \\\\",
+   "vm": "3-3n",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:52"
+  },
+  {
+   "id": "AS-01",
+   "vr": "AS",
+   "valueHex": "30303159",
+   "valueText": "001Y",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:55"
+  },
+  {
+   "id": "AS-02",
+   "vr": "AS",
+   "valueHex": "30393959",
+   "valueText": "099Y",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:56"
+  },
+  {
+   "id": "AS-03",
+   "vr": "AS",
+   "valueHex": "3039395a",
+   "valueText": "099Z",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:57"
+  },
+  {
+   "id": "AS-04",
+   "vr": "AS",
+   "valueHex": "313939445c303030575c3530304d",
+   "valueText": "199D\\\\000W\\\\500M",
+   "vm": "2-n",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:58"
+  },
+  {
+   "id": "AS-05",
+   "vr": "AS",
+   "valueHex": "59303130",
+   "valueText": "Y010",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:59"
+  },
+  {
+   "id": "AS-06",
+   "vr": "AS",
+   "valueHex": "313059",
+   "valueText": "10Y",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:60"
+  },
+  {
+   "id": "AS-07",
+   "vr": "AS",
+   "valueHex": "3031302059",
+   "valueText": "010 Y",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:61"
+  },
+  {
+   "id": "AS-08",
+   "vr": "AS",
+   "valueHex": "2030313059",
+   "valueText": " 010Y",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:62"
+  },
+  {
+   "id": "AS-09",
+   "vr": "AS",
+   "valueHex": "3031305920",
+   "valueText": "010Y ",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:63"
+  },
+  {
+   "id": "AS-10",
+   "vr": "AS",
+   "valueHex": "3031303959",
+   "valueText": "0109Y",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:64"
+  },
+  {
+   "id": "CS-01",
+   "vr": "CS",
+   "valueHex": "5445535420313233343536373839305c54455354",
+   "valueText": "TEST 1234567890\\\\TEST",
+   "vm": "2-2n",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:67"
+  },
+  {
+   "id": "CS-02",
+   "vr": "CS",
+   "valueHex": "5445535420313233343536373839305c544553545c",
+   "valueText": "TEST 1234567890\\\\TEST\\\\",
+   "vm": "2-2n",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:68"
+  },
+  {
+   "id": "CS-03",
+   "vr": "CS",
+   "valueHex": "",
+   "valueText": "",
+   "vm": "2-2n",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:69"
+  },
+  {
+   "id": "CS-04",
+   "vr": "CS",
+   "valueHex": "5c544553542031323334353637383930",
+   "valueText": "\\\\TEST 1234567890",
+   "vm": "2",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:70"
+  },
+  {
+   "id": "CS-05",
+   "vr": "CS",
+   "valueHex": "5c20",
+   "valueText": "\\\\ ",
+   "vm": "2",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:71"
+  },
+  {
+   "id": "CS-06",
+   "vr": "CS",
+   "valueHex": "5c5445535420313233343536373839302041",
+   "valueText": "\\\\TEST 1234567890 A",
+   "vm": "2",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:72"
+  },
+  {
+   "id": "CS-07",
+   "vr": "CS",
+   "valueHex": "4af67267",
+   "valueText": "J\\366rg",
+   "vm": "1-2",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:73"
+  },
+  {
+   "id": "CS-08",
+   "vr": "CS",
+   "valueHex": "4a6f657267",
+   "valueText": "Joerg",
+   "vm": "1-2",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:74"
+  },
+  {
+   "id": "CS-09",
+   "vr": "CS",
+   "valueHex": "4d4152434f205c204a4f455247",
+   "valueText": "MARCO \\\\ JOERG",
+   "vm": "1-2",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:75"
+  },
+  {
+   "id": "CS-10",
+   "vr": "CS",
+   "valueHex": "4d4152434f5c204d49434841454c205c4a4f4552475c",
+   "valueText": "MARCO\\\\ MICHAEL \\\\JOERG\\\\",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:76"
+  },
+  {
+   "id": "CS-11",
+   "vr": "CS",
+   "valueHex": "202020203132333435363738393020202020",
+   "valueText": "    1234567890    ",
+   "vm": null,
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:77"
+  },
+  {
+   "id": "CS-12",
+   "vr": "CS",
+   "valueHex": "313233343536373839302d4142434445",
+   "valueText": "1234567890-ABCDE",
+   "vm": null,
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:78"
+  },
+  {
+   "id": "CS-13",
+   "vr": "CS",
+   "valueHex": "20202020202020202020202020202020",
+   "valueText": "                ",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:79"
+  },
+  {
+   "id": "CS-14",
+   "vr": "CS",
+   "valueHex": "2020202020202020202020202020202020",
+   "valueText": "                 ",
+   "vm": null,
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:80"
+  },
+  {
+   "id": "DA-01",
+   "vr": "DA",
+   "valueHex": "3230303930373331",
+   "valueText": "20090731",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:83"
+  },
+  {
+   "id": "DA-02",
+   "vr": "DA",
+   "valueHex": "3138323030313031",
+   "valueText": "18200101",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:84"
+  },
+  {
+   "id": "DA-03",
+   "vr": "DA",
+   "valueHex": "3231303031323331",
+   "valueText": "21001231",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:85"
+  },
+  {
+   "id": "DA-04",
+   "vr": "DA",
+   "valueHex": "313832302e30312e3031",
+   "valueText": "1820.01.01",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:86",
+   "oldFormat": false
+  },
+  {
+   "id": "DA-05",
+   "vr": "DA",
+   "valueHex": "313832302e30312e3031",
+   "valueText": "1820.01.01",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:87",
+   "oldFormat": true,
+   "decision": {
+    "dicomSwift": "bad",
+    "reason": "The ACR-NEMA dotted date and colon time formats were retired from PS3.5; DICOM-Swift reads them only in recovery, as UN with the exact bytes, like any other invalid value."
+   }
+  },
+  {
+   "id": "DA-06",
+   "vr": "DA",
+   "valueHex": "32303039303733315c3138323030313031",
+   "valueText": "20090731\\\\18200101",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:88"
+  },
+  {
+   "id": "DA-07",
+   "vr": "DA",
+   "valueHex": "32303039303733315c3138323030313031",
+   "valueText": "20090731\\\\18200101",
+   "vm": "2-2n",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:89"
+  },
+  {
+   "id": "DA-08",
+   "vr": "DA",
+   "valueHex": "32303039303733315c31383230303130315c32303030303130315c3231303031323331",
+   "valueText": "20090731\\\\18200101\\\\20000101\\\\21001231",
+   "vm": "2-2n",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:90"
+  },
+  {
+   "id": "DA-09",
+   "vr": "DA",
+   "valueHex": "3230303930373331",
+   "valueText": "20090731",
+   "vm": "6",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:91"
+  },
+  {
+   "id": "DA-10",
+   "vr": "DA",
+   "valueHex": "3230303030303031",
+   "valueText": "20000001",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:92"
+  },
+  {
+   "id": "DA-11",
+   "vr": "DA",
+   "valueHex": "3030303031323332",
+   "valueText": "00001232",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:93"
+  },
+  {
+   "id": "DA-12",
+   "vr": "DA",
+   "valueHex": "3230303030303030",
+   "valueText": "20000000",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:94"
+  },
+  {
+   "id": "DT-01",
+   "vr": "DT",
+   "valueHex": "323030393037333131323330",
+   "valueText": "200907311230",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:97"
+  },
+  {
+   "id": "DT-02",
+   "vr": "DT",
+   "valueHex": "3138323030313031303030303030",
+   "valueText": "18200101000000",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:98"
+  },
+  {
+   "id": "DT-03",
+   "vr": "DT",
+   "valueHex": "32313030313233313233353935392e303030303031",
+   "valueText": "21001231235959.000001",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:99"
+  },
+  {
+   "id": "DT-04",
+   "vr": "DT",
+   "valueHex": "3230303930373331",
+   "valueText": "20090731",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:100"
+  },
+  {
+   "id": "DT-05",
+   "vr": "DT",
+   "valueHex": "323030393037333132343030",
+   "valueText": "200907312400",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:101"
+  },
+  {
+   "id": "DT-06",
+   "vr": "DT",
+   "valueHex": "32303039303733312031323030",
+   "valueText": "20090731 1200",
+   "vm": null,
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:102"
+  },
+  {
+   "id": "DT-07",
+   "vr": "DT",
+   "valueHex": "323030393037333130305c31383230303130313132",
+   "valueText": "2009073100\\\\1820010112",
+   "vm": "2-2n",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:103"
+  },
+  {
+   "id": "DT-08",
+   "vr": "DT",
+   "valueHex": "323030393037333130305c313832303031303131325c3230303030313031303033305c32313030313233313137313534302e313233",
+   "valueText": "2009073100\\\\1820010112\\\\200001010030\\\\21001231171540.123",
+   "vm": "2-2n",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:104"
+  },
+  {
+   "id": "DT-09",
+   "vr": "DT",
+   "valueHex": "3230303930373331313233302b30313030",
+   "valueText": "200907311230+0100",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:105"
+  },
+  {
+   "id": "DT-10",
+   "vr": "DT",
+   "valueHex": "32303039303733313132333030302b31303030",
+   "valueText": "20090731123000+1000",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:106"
+  },
+  {
+   "id": "DT-11",
+   "vr": "DT",
+   "valueHex": "3230303930373331313233302b31393030",
+   "valueText": "200907311230+1900",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:107"
+  },
+  {
+   "id": "DT-12",
+   "vr": "DT",
+   "valueHex": "32303039303733313132333030302e3132333435362b30313030",
+   "valueText": "20090731123000.123456+0100",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:108"
+  },
+  {
+   "id": "DT-13",
+   "vr": "DT",
+   "valueHex": "32303039303733313132333030302e3132333435362b3031303020",
+   "valueText": "20090731123000.123456+0100 ",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:109",
+   "decision": {
+    "dicomSwift": "good",
+    "reason": "DICOM-Swift treats every trailing space of DA, TM and DT as padding and checks the length without it, so over-padded values from old devices keep their date or time."
+   }
+  },
+  {
+   "id": "DT-14",
+   "vr": "DT",
+   "valueHex": "323030393037333131323330",
+   "valueText": "200907311230",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:110"
+  },
+  {
+   "id": "DT-15",
+   "vr": "DT",
+   "valueHex": "323030393037",
+   "valueText": "200907",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:111"
+  },
+  {
+   "id": "DT-16",
+   "vr": "DT",
+   "valueHex": "32303039",
+   "valueText": "2009",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:112"
+  },
+  {
+   "id": "DT-17",
+   "vr": "DT",
+   "valueHex": "3230303931",
+   "valueText": "20091",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:113"
+  },
+  {
+   "id": "DT-18",
+   "vr": "DT",
+   "valueHex": "3230323530313031313230302b30303030",
+   "valueText": "202501011200+0000",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:115"
+  },
+  {
+   "id": "DT-19",
+   "vr": "DT",
+   "valueHex": "3230323530313031313230302d30303030",
+   "valueText": "202501011200-0000",
+   "vm": null,
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:116"
+  },
+  {
+   "id": "DT-20",
+   "vr": "DT",
+   "valueHex": "3230323530313031313230302b30313030",
+   "valueText": "202501011200+0100",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:117"
+  },
+  {
+   "id": "DT-21",
+   "vr": "DT",
+   "valueHex": "3230323431323331313230302d31313330",
+   "valueText": "202412311200-1130",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:118"
+  },
+  {
+   "id": "DT-22",
+   "vr": "DT",
+   "valueHex": "3230323431323331313230302d31323030",
+   "valueText": "202412311200-1200",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:119"
+  },
+  {
+   "id": "DT-23",
+   "vr": "DT",
+   "valueHex": "3230323431323331313230302d31323330",
+   "valueText": "202412311200-1230",
+   "vm": null,
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:120"
+  },
+  {
+   "id": "DT-24",
+   "vr": "DT",
+   "valueHex": "3230323431323331313230302b31323030",
+   "valueText": "202412311200+1200",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:121"
+  },
+  {
+   "id": "DT-25",
+   "vr": "DT",
+   "valueHex": "3230323431323331313230302b31333330",
+   "valueText": "202412311200+1330",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:122"
+  },
+  {
+   "id": "DT-26",
+   "vr": "DT",
+   "valueHex": "3230323431323331313230302b31343030",
+   "valueText": "202412311200+1400",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:123"
+  },
+  {
+   "id": "DT-27",
+   "vr": "DT",
+   "valueHex": "3230323431323331313230302b31343330",
+   "valueText": "202412311200+1430",
+   "vm": null,
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:124"
+  },
+  {
+   "id": "DS-01",
+   "vr": "DS",
+   "valueHex": "2030",
+   "valueText": " 0",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:127"
+  },
+  {
+   "id": "DS-02",
+   "vr": "DS",
+   "valueHex": "302e3020",
+   "valueText": "0.0 ",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:128"
+  },
+  {
+   "id": "DS-03",
+   "vr": "DS",
+   "valueHex": "2d31",
+   "valueText": "-1",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:129"
+  },
+  {
+   "id": "DS-04",
+   "vr": "DS",
+   "valueHex": "2b31323334352e3637383930",
+   "valueText": "+12345.67890",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:130"
+  },
+  {
+   "id": "DS-05",
+   "vr": "DS",
+   "valueHex": "2020202d31323334352e36373839202020",
+   "valueText": "   -12345.6789   ",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:131"
+  },
+  {
+   "id": "DS-06",
+   "vr": "DS",
+   "valueHex": "30312e3031",
+   "valueText": "01.01",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:132"
+  },
+  {
+   "id": "DS-06",
+   "vr": "DS",
+   "valueHex": "302e312e3031",
+   "valueText": "0.1.01",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:133"
+  },
+  {
+   "id": "DS-07",
+   "vr": "DS",
+   "valueHex": "302031",
+   "valueText": "0 1",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:134"
+  },
+  {
+   "id": "DS-08",
+   "vr": "DS",
+   "valueHex": "302d31",
+   "valueText": "0-1",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:135"
+  },
+  {
+   "id": "DS-09",
+   "vr": "DS",
+   "valueHex": "312e30453939",
+   "valueText": "1.0E99",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:136"
+  },
+  {
+   "id": "DS-10",
+   "vr": "DS",
+   "valueHex": "312e30393945",
+   "valueText": "1.099E",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:137"
+  },
+  {
+   "id": "DS-11",
+   "vr": "DS",
+   "valueHex": "2d3130652b3939",
+   "valueText": "-10e+99",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:138"
+  },
+  {
+   "id": "DS-12",
+   "vr": "DS",
+   "valueHex": "2d3130652b39395c2b31452d31",
+   "valueText": "-10e+99\\\\+1E-1",
+   "vm": "2",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:139"
+  },
+  {
+   "id": "IS-01",
+   "vr": "IS",
+   "valueHex": "30",
+   "valueText": "0",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:142"
+  },
+  {
+   "id": "IS-02",
+   "vr": "IS",
+   "valueHex": "2b30",
+   "valueText": "+0",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:143"
+  },
+  {
+   "id": "IS-03",
+   "vr": "IS",
+   "valueHex": "2d30",
+   "valueText": "-0",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:144"
+  },
+  {
+   "id": "IS-04",
+   "vr": "IS",
+   "valueHex": "3030",
+   "valueText": "00",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:145"
+  },
+  {
+   "id": "IS-05",
+   "vr": "IS",
+   "valueHex": "303030303030303030303031",
+   "valueText": "000000000001",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:146"
+  },
+  {
+   "id": "IS-06",
+   "vr": "IS",
+   "valueHex": "31303030303030303030303031",
+   "valueText": "1000000000001",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:147"
+  },
+  {
+   "id": "IS-07",
+   "vr": "IS",
+   "valueHex": "2d303030303030303030303031",
+   "valueText": "-000000000001",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:148"
+  },
+  {
+   "id": "IS-08",
+   "vr": "IS",
+   "valueHex": "33303030303030303030",
+   "valueText": "3000000000",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:149"
+  },
+  {
+   "id": "IS-08",
+   "vr": "IS",
+   "valueHex": "2b32303030303030303030",
+   "valueText": "+2000000000",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:150"
+  },
+  {
+   "id": "IS-09",
+   "vr": "IS",
+   "valueHex": "2b32313437343833363437",
+   "valueText": "+2147483647",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:151"
+  },
+  {
+   "id": "IS-10",
+   "vr": "IS",
+   "valueHex": "32313437343833363438",
+   "valueText": "2147483648",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:152"
+  },
+  {
+   "id": "IS-11",
+   "vr": "IS",
+   "valueHex": "2d32313437343833363438",
+   "valueText": "-2147483648",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:153"
+  },
+  {
+   "id": "IS-12",
+   "vr": "IS",
+   "valueHex": "2d32313437343833363439",
+   "valueText": "-2147483649",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:154"
+  },
+  {
+   "id": "IS-13",
+   "vr": "IS",
+   "valueHex": "202d323134373438333634385c2b3231343734383336343720",
+   "valueText": " -2147483648\\\\+2147483647 ",
+   "vm": "2",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:155"
+  },
+  {
+   "id": "IS-14",
+   "vr": "IS",
+   "valueHex": "202d32313437343833363438205c2b32313437343833363437",
+   "valueText": " -2147483648 \\\\+2147483647",
+   "vm": "2",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:156"
+  },
+  {
+   "id": "LO-01",
+   "vr": "LO",
+   "valueHex": "20",
+   "valueText": " ",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:159"
+  },
+  {
+   "id": "LO-02",
+   "vr": "LO",
+   "valueHex": "202e20",
+   "valueText": " . ",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:160"
+  },
+  {
+   "id": "LO-03",
+   "vr": "LO",
+   "valueHex": "4142432031323320616263205f2b2d2f",
+   "valueText": "ABC 123 abc _+-/",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:161"
+  },
+  {
+   "id": "LO-04",
+   "vr": "LO",
+   "valueHex": "2020",
+   "valueText": "  ",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:162"
+  },
+  {
+   "id": "LO-05",
+   "vr": "LO",
+   "valueHex": "4142435c313233",
+   "valueText": "ABC\\\\123",
+   "vm": "2",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:163"
+  },
+  {
+   "id": "LO-06",
+   "vr": "LO",
+   "valueHex": "204af6726720526965736d6569657220",
+   "valueText": " J\\366rg Riesmeier ",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:164",
+   "specificCharacterSet": "ISO_IR 100"
+  },
+  {
+   "id": "LO-08",
+   "vr": "LO",
+   "valueHex": "5c205f325f205c205f335f205c205f345f205c205f355f205c",
+   "valueText": "\\\\ _2_ \\\\ _3_ \\\\ _4_ \\\\ _5_ \\\\",
+   "vm": "6",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:167"
+  },
+  {
+   "id": "LO-09",
+   "vr": "LO",
+   "valueHex": "455343206f6e6c7920616c6c6f77656420666f722049534f2032303232206368617261637465722073657420636f6e74726f6c2073657175656e6365733a201b",
+   "valueText": "ESC only allowed for ISO 2022 character set control sequences: \\033",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:169",
+   "decision": {
+    "dicomSwift": "bad",
+    "reason": "ESC starts an ISO 2022 code extension (PS3.5 6.1.2.5.3); DICOM-Swift decodes it only when (0008,0005) declares one, and refuses it as undecodable text otherwise."
+   }
+  },
+  {
+   "id": "LO-10",
+   "vr": "LO",
+   "valueHex": "616c736f206e6f7420616c6c6f7765643a200d0c",
+   "valueText": "also not allowed: \\r\\014",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:170"
+  },
+  {
+   "id": "LT-01",
+   "vr": "LT",
+   "valueHex": "2048656c6c6f205c203132333435205c20e4f6fcdf20",
+   "valueText": " Hello \\\\ 12345 \\\\ \\344\\366\\374\\337 ",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:173",
+   "specificCharacterSet": "ISO_IR 100"
+  },
+  {
+   "id": "LT-02",
+   "vr": "LT",
+   "valueHex": "207065726d697474656420636f6e74726f6c20636861726163746572733a2009200a200c200d20",
+   "valueText": " permitted control characters: \\011 \\012 \\014 \\015 ",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:174"
+  },
+  {
+   "id": "LT-03",
+   "vr": "LT",
+   "valueHex": "20",
+   "valueText": " ",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:175"
+  },
+  {
+   "id": "PN-01",
+   "vr": "PN",
+   "valueHex": "415e526965736d656965725e5e3d525e4af67267",
+   "valueText": "A^Riesmeier^^=R^J\\366rg",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:178",
+   "specificCharacterSet": "ISO_IR 100"
+  },
+  {
+   "id": "PN-02",
+   "vr": "PN",
+   "valueHex": "415e526965736d656965725e5e3d525e4af672675c",
+   "valueText": "A^Riesmeier^^=R^J\\366rg\\\\",
+   "vm": "1-n",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:179",
+   "specificCharacterSet": "ISO_IR 100"
+  },
+  {
+   "id": "PN-03",
+   "vr": "PN",
+   "valueHex": "415e526965736d656965725e5e3d525e4af672675c",
+   "valueText": "A^Riesmeier^^=R^J\\366rg\\\\",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:180"
+  },
+  {
+   "id": "PN-04",
+   "vr": "PN",
+   "valueHex": "45696368656c626572675e4d6172636f5e5e44722e3d4f6e6b656e5e4d69636861656c5e3d526965736d656965725e4af672675e5e44722e5e",
+   "valueText": "Eichelberg^Marco^^Dr.=Onken^Michael^=Riesmeier^J\\366rg^^Dr.^",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:181",
+   "specificCharacterSet": "ISO_IR 100"
+  },
+  {
+   "id": "PN-05",
+   "vr": "PN",
+   "valueHex": "45696368656c626572675c4f6e6b656e5c526965736d65696572",
+   "valueText": "Eichelberg\\\\Onken\\\\Riesmeier",
+   "vm": "3",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:182"
+  },
+  {
+   "id": "PN-06",
+   "vr": "PN",
+   "valueHex": "20",
+   "valueText": " ",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:183"
+  },
+  {
+   "id": "PN-07",
+   "vr": "PN",
+   "valueHex": "2041",
+   "valueText": " A",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:184"
+  },
+  {
+   "id": "PN-08",
+   "vr": "PN",
+   "valueHex": "5e5e5e5e",
+   "valueText": "^^^^",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:185"
+  },
+  {
+   "id": "PN-09",
+   "vr": "PN",
+   "valueHex": "5e204af67267205e",
+   "valueText": "^ J\\366rg ^",
+   "vm": null,
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:186"
+  },
+  {
+   "id": "PN-10",
+   "vr": "PN",
+   "valueHex": "5e5e5e5e4d4420",
+   "valueText": "^^^^MD ",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:187"
+  },
+  {
+   "id": "PN-11",
+   "vr": "PN",
+   "valueHex": "5e5e5e5e5e",
+   "valueText": "^^^^^",
+   "vm": null,
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:188"
+  },
+  {
+   "id": "PN-12",
+   "vr": "PN",
+   "valueHex": "415e425e435e445e453d465e475e485e495e4a3d4b5e4c5e4d5e4e5e4f",
+   "valueText": "A^B^C^D^E=F^G^H^I^J=K^L^M^N^O",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:189"
+  },
+  {
+   "id": "PN-13",
+   "vr": "PN",
+   "valueHex": "3d3d54657374",
+   "valueText": "==Test",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:194"
+  },
+  {
+   "id": "PN-14",
+   "vr": "PN",
+   "valueHex": "546573743d3d",
+   "valueText": "Test==",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:195"
+  },
+  {
+   "id": "PN-15",
+   "vr": "PN",
+   "valueHex": "3d3d",
+   "valueText": "==",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:196"
+  },
+  {
+   "id": "PN-16",
+   "vr": "PN",
+   "valueHex": "3d3d3d",
+   "valueText": "===",
+   "vm": null,
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:197"
+  },
+  {
+   "id": "PN-17",
+   "vr": "PN",
+   "valueHex": "5e3d5e3d5e3d5e",
+   "valueText": "^=^=^=^",
+   "vm": null,
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:198"
+  },
+  {
+   "id": "PN-18",
+   "vr": "PN",
+   "valueHex": "5e5e5e5e3d5e5e5e5e3d5e5e5e5e",
+   "valueText": "^^^^=^^^^=^^^^",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:199"
+  },
+  {
+   "id": "PN-19",
+   "vr": "PN",
+   "valueHex": "",
+   "valueText": "",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:200"
+  },
+  {
+   "id": "PN-20",
+   "vr": "PN",
+   "valueHex": "556e7370656369666965645e5e5e5e3d5e5e5e5e3d5e5e5e5e",
+   "valueText": "Unspecified^^^^=^^^^=^^^^",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:202"
+  },
+  {
+   "id": "PN-21",
+   "vr": "PN",
+   "valueHex": "5e5e5e5e3d5e5e556e7370656369666965645e5e3d5e5e5e5e",
+   "valueText": "^^^^=^^Unspecified^^=^^^^",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:203"
+  },
+  {
+   "id": "PN-22",
+   "vr": "PN",
+   "valueHex": "5e5e5e5e3d5e5e5e5e3d5e5e5e5e556e737065636966696564",
+   "valueText": "^^^^=^^^^=^^^^Unspecified",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:204"
+  },
+  {
+   "id": "SH-01",
+   "vr": "SH",
+   "valueHex": "20",
+   "valueText": " ",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:207"
+  },
+  {
+   "id": "SH-02",
+   "vr": "SH",
+   "valueHex": "202e20",
+   "valueText": " . ",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:208"
+  },
+  {
+   "id": "SH-03",
+   "vr": "SH",
+   "valueHex": "4142432031323320616263205f2b2d2f",
+   "valueText": "ABC 123 abc _+-/",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:209"
+  },
+  {
+   "id": "SH-04",
+   "vr": "SH",
+   "valueHex": "2020",
+   "valueText": "  ",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:210"
+  },
+  {
+   "id": "SH-05",
+   "vr": "SH",
+   "valueHex": "4142435c313233",
+   "valueText": "ABC\\\\123",
+   "vm": "2",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:211"
+  },
+  {
+   "id": "SH-06",
+   "vr": "SH",
+   "valueHex": "204af6726720526965736d6569657220",
+   "valueText": " J\\366rg Riesmeier ",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:212",
+   "specificCharacterSet": "ISO_IR 100"
+  },
+  {
+   "id": "SH-07",
+   "vr": "SH",
+   "valueHex": "4f4646495320652e562e2c204f6c64656e62757267",
+   "valueText": "OFFIS e.V., Oldenburg",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:214"
+  },
+  {
+   "id": "SH-08",
+   "vr": "SH",
+   "valueHex": "5c205f325f205c205f335f205c205f345f205c205f355f205c",
+   "valueText": "\\\\ _2_ \\\\ _3_ \\\\ _4_ \\\\ _5_ \\\\",
+   "vm": "6",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:215"
+  },
+  {
+   "id": "SH-09",
+   "vr": "SH",
+   "valueHex": "20",
+   "valueText": " ",
+   "vm": "2",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:216",
+   "decision": {
+    "dicomSwift": "good",
+    "reason": "A value of spaces only is an empty value (PS3.5 6.4): VM 0, which every VM accepts."
+   }
+  },
+  {
+   "id": "SH-10",
+   "vr": "SH",
+   "valueHex": "",
+   "valueText": "",
+   "vm": "2",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:217"
+  },
+  {
+   "id": "SH-11",
+   "vr": "SH",
+   "valueHex": "6e6f7420616c6c6f7765643a201b",
+   "valueText": "not allowed: \\033",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:219",
+   "decision": {
+    "dicomSwift": "bad",
+    "reason": "ESC starts an ISO 2022 code extension (PS3.5 6.1.2.5.3); DICOM-Swift decodes it only when (0008,0005) declares one, and refuses it as undecodable text otherwise."
+   }
+  },
+  {
+   "id": "SH-12",
+   "vr": "SH",
+   "valueHex": "6e6f7420616c6c6f7765643a200a0d",
+   "valueText": "not allowed: \\n\\r",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:220"
+  },
+  {
+   "id": "SH-13",
+   "vr": "SH",
+   "valueHex": "6e6f7420616c6c6f7765643a20080c",
+   "valueText": "not allowed: \\010\\014",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:221"
+  },
+  {
+   "id": "ST-01",
+   "vr": "ST",
+   "valueHex": "20756d6c61757420636861726163746572732061726520616c6c6f7765643a20c4d6dce4f6fc0a616363656e746564206368617261637465727320616c736f3a20e1e0e9e8edece2eaf40d616e6420636f6e74726f6c20636861726163746572732c206f6620636f757273652c20696e636c7564696e67201b3d45534320",
+   "valueText": " umlaut characters are allowed: \\304\\326\\334\\344\\366\\374\\naccented characters also: \\341\\340\\351\\350\\355\\354\\342\\352\\364\\rand control characters, of course, including \\033=ESC ",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:224",
+   "specificCharacterSet": "ISO_IR 100",
+   "decision": {
+    "dicomSwift": "bad",
+    "reason": "ESC starts an ISO 2022 code extension (PS3.5 6.1.2.5.3); DICOM-Swift decodes it only when (0008,0005) declares one, and refuses it as undecodable text otherwise."
+   }
+  },
+  {
+   "id": "ST-02",
+   "vr": "ST",
+   "valueHex": "206f7468657220636f6e74726f6c206368617261637465727320617265206e6f7420616c6c6f7765643a200b2008208020",
+   "valueText": " other control characters are not allowed: \\013 \\010 \\200 ",
+   "vm": null,
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:225"
+  },
+  {
+   "id": "ST-03",
+   "vr": "ST",
+   "valueHex": "20202e2020",
+   "valueText": "  .  ",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:226"
+  },
+  {
+   "id": "ST-04",
+   "vr": "ST",
+   "valueHex": "2020202020",
+   "valueText": "     ",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:227"
+  },
+  {
+   "id": "TM-01",
+   "vr": "TM",
+   "valueHex": "30303030",
+   "valueText": "0000",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:230"
+  },
+  {
+   "id": "TM-02",
+   "vr": "TM",
+   "valueHex": "32343030",
+   "valueText": "2400",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:231"
+  },
+  {
+   "id": "TM-03",
+   "vr": "TM",
+   "valueHex": "313233303435",
+   "valueText": "123045",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:232"
+  },
+  {
+   "id": "TM-04",
+   "vr": "TM",
+   "valueHex": "3233353935392e313233",
+   "valueText": "235959.123",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:233"
+  },
+  {
+   "id": "TM-05",
+   "vr": "TM",
+   "valueHex": "3233353935392e393837363534",
+   "valueText": "235959.987654",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:234"
+  },
+  {
+   "id": "TM-06",
+   "vr": "TM",
+   "valueHex": "3030303030302e30303030303030",
+   "valueText": "000000.0000000",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:235"
+  },
+  {
+   "id": "TM-07",
+   "vr": "TM",
+   "valueHex": "3132313520",
+   "valueText": "1215 ",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:236"
+  },
+  {
+   "id": "TM-08",
+   "vr": "TM",
+   "valueHex": "2031323135",
+   "valueText": " 1215",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:237"
+  },
+  {
+   "id": "TM-09",
+   "vr": "TM",
+   "valueHex": "3132203135",
+   "valueText": "12 15",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:238"
+  },
+  {
+   "id": "TM-10",
+   "vr": "TM",
+   "valueHex": "3233353935392e39383736353420202020",
+   "valueText": "235959.987654    ",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:239",
+   "decision": {
+    "dicomSwift": "good",
+    "reason": "DICOM-Swift treats every trailing space of DA, TM and DT as padding and checks the length without it, so over-padded values from old devices keep their date or time."
+   }
+  },
+  {
+   "id": "TM-11",
+   "vr": "TM",
+   "valueHex": "303030302020205c30313031303120205c3032303230322e3032205c3033303330332e30333033",
+   "valueText": "0000   \\\\010101  \\\\020202.02 \\\\030303.0303",
+   "vm": "4",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:240"
+  },
+  {
+   "id": "TM-12",
+   "vr": "TM",
+   "valueHex": "31323a33303a30302e313233343536",
+   "valueText": "12:30:00.123456",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:241",
+   "oldFormat": false
+  },
+  {
+   "id": "TM-13",
+   "vr": "TM",
+   "valueHex": "31323a33303a30302e313233343536",
+   "valueText": "12:30:00.123456",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:242",
+   "oldFormat": true,
+   "decision": {
+    "dicomSwift": "bad",
+    "reason": "The ACR-NEMA dotted date and colon time formats were retired from PS3.5; DICOM-Swift reads them only in recovery, as UN with the exact bytes, like any other invalid value."
+   }
+  },
+  {
+   "id": "TM-14",
+   "vr": "TM",
+   "valueHex": "31323a3330",
+   "valueText": "12:30",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:243",
+   "oldFormat": true
+  },
+  {
+   "id": "TM-15",
+   "vr": "TM",
+   "valueHex": "313220",
+   "valueText": "12 ",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:244"
+  },
+  {
+   "id": "TM-16",
+   "vr": "TM",
+   "valueHex": "20",
+   "valueText": " ",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:245"
+  },
+  {
+   "id": "UC-01",
+   "vr": "UC",
+   "valueHex": "414243",
+   "valueText": "ABC",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:248"
+  },
+  {
+   "id": "UC-02",
+   "vr": "UC",
+   "valueHex": "4142435c313233",
+   "valueText": "ABC\\\\123",
+   "vm": "2",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:249"
+  },
+  {
+   "id": "UC-03",
+   "vr": "UC",
+   "valueHex": "204af6726720526965736d6569657220",
+   "valueText": " J\\366rg Riesmeier ",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:250",
+   "specificCharacterSet": "ISO_IR 100"
+  },
+  {
+   "id": "UC-04",
+   "vr": "UC",
+   "valueHex": "4553431b6170696e67",
+   "valueText": "ESC\\033aping",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:251",
+   "decision": {
+    "dicomSwift": "bad",
+    "reason": "ESC starts an ISO 2022 code extension (PS3.5 6.1.2.5.3); DICOM-Swift decodes it only when (0008,0005) declares one, and refuses it as undecodable text otherwise."
+   }
+  },
+  {
+   "id": "UC-05",
+   "vr": "UC",
+   "valueHex": "6e6f7420616c6c6f7765643a200a080d0c",
+   "valueText": "not allowed: \\n\\010\\r\\014",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:252"
+  },
+  {
+   "id": "UC-06",
+   "vr": "UC",
+   "valueHex": "20",
+   "valueText": " ",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:253"
+  },
+  {
+   "id": "UC-07",
+   "vr": "UC",
+   "valueHex": "415c42",
+   "valueText": "A\\\\B",
+   "vm": "2",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:254"
+  },
+  {
+   "id": "UI-01",
+   "vr": "UI",
+   "valueHex": "30",
+   "valueText": "0",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:257"
+  },
+  {
+   "id": "UI-02",
+   "vr": "UI",
+   "valueHex": "302e31",
+   "valueText": "0.1",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:258"
+  },
+  {
+   "id": "UI-03",
+   "vr": "UI",
+   "valueHex": "312e322e332e342e352e362e372e382e392e302e3132332e34333231",
+   "valueText": "1.2.3.4.5.6.7.8.9.0.123.4321",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:259"
+  },
+  {
+   "id": "UI-04",
+   "vr": "UI",
+   "valueHex": "312e3032",
+   "valueText": "1.02",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:260"
+  },
+  {
+   "id": "UI-05",
+   "vr": "UI",
+   "valueHex": "2e32",
+   "valueText": ".2",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:261"
+  },
+  {
+   "id": "UI-06",
+   "vr": "UI",
+   "valueHex": "312e",
+   "valueText": "1.",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:262"
+  },
+  {
+   "id": "UI-07",
+   "vr": "UI",
+   "valueHex": "312e322e332e342e352e362e372e382e392e3020",
+   "valueText": "1.2.3.4.5.6.7.8.9.0 ",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:263"
+  },
+  {
+   "id": "UI-08",
+   "vr": "UI",
+   "valueHex": "20312e322e332e342e352e362e372e382e392e30",
+   "valueText": " 1.2.3.4.5.6.7.8.9.0",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:264"
+  },
+  {
+   "id": "UI-09",
+   "vr": "UI",
+   "valueHex": "312e322e332e342e352e20362e372e382e392e30",
+   "valueText": "1.2.3.4.5. 6.7.8.9.0",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:265"
+  },
+  {
+   "id": "UI-10",
+   "vr": "UI",
+   "valueHex": "312e322e332e342e352e362e372e382e392e305c3939",
+   "valueText": "1.2.3.4.5.6.7.8.9.0\\\\99",
+   "vm": "2",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:266"
+  },
+  {
+   "id": "UI-11",
+   "vr": "UI",
+   "valueHex": "312e322e332e342e352e362e372e382e392e302e3132332e3435362e3738392e302e313131323232333333343434353535363636373737383838393939303030",
+   "valueText": "1.2.3.4.5.6.7.8.9.0.123.456.789.0.111222333444555666777888999000",
+   "vm": "1",
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:267"
+  },
+  {
+   "id": "UI-12",
+   "vr": "UI",
+   "valueHex": "312e322e332e342e352e362e372e382e392e302e3132332e3435362e3738392e31302e313131323232333333343434353535363636373737383838393939303030",
+   "valueText": "1.2.3.4.5.6.7.8.9.0.123.456.789.10.111222333444555666777888999000",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:268"
+  },
+  {
+   "id": "UI-13",
+   "vr": "UI",
+   "valueHex": "303037",
+   "valueText": "007",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:269"
+  },
+  {
+   "id": "UR-01",
+   "vr": "UR",
+   "valueHex": "687474703a2f2f7777772e64636d746b2e6f72672f20",
+   "valueText": "http://www.dcmtk.org/ ",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:272"
+  },
+  {
+   "id": "UR-02",
+   "vr": "UR",
+   "valueHex": "20687474703a2f2f7777772e64636d746b2e6f72672f",
+   "valueText": " http://www.dcmtk.org/",
+   "vm": null,
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:273"
+  },
+  {
+   "id": "UR-03",
+   "vr": "UR",
+   "valueHex": "687474703a5c5c7777772e64636d746b2e6f7267",
+   "valueText": "http:\\\\\\\\www.dcmtk.org",
+   "vm": null,
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:274"
+  },
+  {
+   "id": "UR-04",
+   "vr": "UR",
+   "valueHex": "687474703a2f2f6c6f63616c686f73742f736f6d65207370616365",
+   "valueText": "http://localhost/some space",
+   "vm": null,
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc:275"
+  },
+  {
+   "id": "UR-05",
+   "vr": "UR",
+   "valueHex": "687474703a2f2f6c6f63616c686f73742f736f6d652532307370616365",
+   "valueText": "http://localhost/some%20space",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:276"
+  },
+  {
+   "id": "UR-06",
+   "vr": "UR",
+   "valueHex": "666f6f3a2f2f6578616d706c652e636f6d3a383034322f6f7665722f74686572653f6e616d653d666572726574236e6f7365",
+   "valueText": "foo://example.com:8042/over/there?name=ferret#nose",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:277"
+  },
+  {
+   "id": "UR-07",
+   "vr": "UR",
+   "valueHex": "75726e3a6578616d706c653a616e696d616c3a6665727265743a6e6f7365",
+   "valueText": "urn:example:animal:ferret:nose",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:278"
+  },
+  {
+   "id": "UR-08",
+   "vr": "UR",
+   "valueHex": "687474703a2f2f6a6f653a706173737764407777772e6578616d706c652e6e65743a383038302f696e6465782e68746d6c3f616374696f6e3d736f6d657468696e672673657373696f6e3d413534433646453223696e666f",
+   "valueText": "http://joe:passwd@www.example.net:8080/index.html?action=something&session=A54C6FE2#info",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:279"
+  },
+  {
+   "id": "UT-01",
+   "vr": "UT",
+   "valueHex": "205468697320746578742063616e20626520707265747479206c6f6e67202e2e2e20",
+   "valueText": " This text can be pretty long ... ",
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc:284"
+  },
+  {
+   "id": "UT-02",
+   "vr": "UT",
+   "fill": {
+    "byteHex": "6e",
+    "length": 524288,
+    "overrides": {}
+   },
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc (hugeString)"
+  },
+  {
+   "id": "UT-03",
+   "vr": "UT",
+   "fill": {
+    "byteHex": "6e",
+    "length": 524288,
+    "overrides": {
+     "262144": "09"
+    }
+   },
+   "vm": null,
+   "expected": "good",
+   "source": "dcmdata/tests/tchval.cc (hugeString)"
+  },
+  {
+   "id": "UT-04",
+   "vr": "UT",
+   "fill": {
+    "byteHex": "6e",
+    "length": 524288,
+    "overrides": {
+     "262144": "09",
+     "524287": "0b"
+    }
+   },
+   "vm": null,
+   "expected": "bad",
+   "source": "dcmdata/tests/tchval.cc (hugeString)"
+  },
+  {
+   "id": "UIX-01",
+   "vr": "UI",
+   "valueHex": "312e322e332e345c352e362e372e38",
+   "valueText": "1.2.3.4\\5.6.7.8",
+   "vm": "2",
+   "expected": "good",
+   "source": "dcmdata/tests/tvrui.cc"
+  },
+  {
+   "id": "UIX-02",
+   "vr": "UI",
+   "valueHex": "312e322e332e345c352e362e372e3800",
+   "valueText": "1.2.3.4\\5.6.7.8\u0000",
+   "vm": "2",
+   "expected": "good",
+   "source": "dcmdata/tests/tvrui.cc"
+  },
+  {
+   "id": "UIX-03",
+   "vr": "UI",
+   "valueHex": "372e382e392e31300000",
+   "valueText": "7.8.9.10\u0000\u0000",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tvrui.cc"
+  },
+  {
+   "id": "UIX-04",
+   "vr": "UI",
+   "valueHex": "312e322e332e3420",
+   "valueText": "1.2.3.4 ",
+   "vm": "1",
+   "expected": "bad",
+   "source": "dcmdata/tests/tvrui.cc"
+  },
+  {
+   "id": "UIX-05",
+   "vr": "UI",
+   "valueHex": "312e322e332e345c352e362e372e3820",
+   "valueText": "1.2.3.4\\5.6.7.8 ",
+   "vm": "2",
+   "expected": "bad",
+   "source": "dcmdata/tests/tvrui.cc"
+  }
+ ]
+}

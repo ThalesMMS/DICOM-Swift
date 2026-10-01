@@ -7,11 +7,18 @@ import Foundation
 
 struct DicomOpenJPEGFrameBackend: DicomFrameCodecBackend {
     let capabilities: DicomFrameCodecCapabilities
+    private let environment: [String: String]
 
-    init() {
-        let runtimeCapability = DicomCodecCapabilities.capability(for: .openJPEG)
+    init(environment: [String: String] = ProcessInfo.processInfo.environment) {
+        self.environment = environment
+        let runtimeCapability = DicomCodecCapabilities.capability(for: .openJPEG, environment: environment)
         let availableSyntaxes: Set<String>
-        if DicomJPEG2000Codec.supportsHTJ2K {
+        if runtimeCapability.isAvailable,
+           DicomJPEG2000Codec.htj2kUnsupportedReason(
+               runtimeAvailable: true,
+               runtimeMessage: runtimeCapability.unsupportedReason ?? "OpenJPEG is available.",
+               version: runtimeCapability.version
+           ) == nil {
             availableSyntaxes = DicomJ2KSwiftBackend.allFrameTransferSyntaxes
         } else {
             availableSyntaxes = [
@@ -29,18 +36,19 @@ struct DicomOpenJPEGFrameBackend: DicomFrameCodecBackend {
             supportsSignedSamples: true,
             executionClass: .cpu,
             source: runtimeCapability.source,
-            version: DicomJPEG2000Codec.version,
-            isAvailable: DicomJPEG2000Codec.isAvailable,
-            unsupportedReason: DicomJPEG2000Codec.isAvailable
+            version: runtimeCapability.version,
+            isAvailable: runtimeCapability.isAvailable,
+            unsupportedReason: runtimeCapability.isAvailable
                 ? nil
-                : "OpenJPEG runtime library is unavailable."
+                : runtimeCapability.unsupportedReason ?? "OpenJPEG runtime library is unavailable."
         )
     }
 
     func decode(_ request: DicomFrameDecodeRequest) async throws -> DicomCodecDecodedFrame {
-        let decoded = try await Task.detached(priority: .userInitiated) {
-            try DicomJPEG2000Codec.decode(request.frameData)
-        }.value
+        try Task.checkCancellation()
+        let decoded = try await DicomCancellableDetachedOperation.run {
+            try DicomJPEG2000Codec.decode(request.frameData, environment: environment)
+        }
         return DicomCodecDecodedFrame(
             buffer: .owned(decoded.bytes),
             width: decoded.width,

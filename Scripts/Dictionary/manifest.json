@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/pydicom/pydicom",
+  "commit": "f1eb627599020bcffd1eb171be9d1a71d10652f3",
+  "dicomEdition": "2024d",
+  "license": "MIT",
+  "inputs": [
+    {
+      "upstreamPath": "src/pydicom/_dicom_dict.py",
+      "path": "Scripts/Dictionary/Sources/dictionary.py",
+      "sha256": "37b0f0f6aeac1f2146166d5b2e0420c6f10d54f0d3382ba714f3caae2c2b8129"
+    },
+    {
+      "upstreamPath": "src/pydicom/_version.py",
+      "path": "Scripts/Dictionary/Sources/version.py",
+      "sha256": "549a431b11999b61bab675680a91498ae548fde78cfa9109d348f1776042e76a"
+    },
+    {
+      "upstreamPath": "LICENSE",
+      "path": "ThirdPartyLicenses/pydicom/LICENSE",
+      "sha256": "a567a2a78fead06a2f0d1dbb7d01bc6e44916fe91f4ba053e2e8b305013b687e"
+    }
+  ],
+  "ownInputs": [
+    {
+      "path": "Scripts/Dictionary/Sources/supplement.json",
+      "sha256": "e2d5aaa89f3b9d146dd20b5e9825a2b1bed09f533498591e3b9926550f3feb98",
+      "source": "PS3.6 2026c",
+      "mode": "own-transcription",
+      "materials": []
+    }
+  ]
+}

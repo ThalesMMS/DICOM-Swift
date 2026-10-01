@@ -1,0 +1,393 @@
+{
+  "schemaVersion": 1,
+  "requestCases": [
+    {
+      "id": "qido-studies",
+      "operation": "qidoStudies",
+      "baseURL": "https://archive.example:443/dicom-web",
+      "input": {
+        "patientName": "DOE*",
+        "limit": 25,
+        "offset": 50
+      },
+      "sharedExpectation": {
+        "method": "GET",
+        "scheme": "https",
+        "host": "archive.example",
+        "port": 443,
+        "path": "/dicom-web/studies",
+        "query": {
+          "PatientName": "DOE*",
+          "limit": "25",
+          "offset": "50"
+        },
+        "headers": {}
+      },
+      "dicomSwiftExpectation": {
+        "query": {
+          "includefield": "all"
+        },
+        "headers": {
+          "Accept": "application/dicom+json"
+        }
+      },
+      "isisExpectation": {
+        "query": {
+          "includefield": "StudyDescription,InstitutionName,PatientBirthDate,StudyTime,ModalitiesInStudy"
+        },
+        "headers": {
+          "Accept": "application/dicom+json"
+        }
+      },
+      "intentionalDifferences": [
+        {
+          "field": "query.includefield",
+          "reason": "The toolkit compatibility client requests all fields; Isis requests only fields consumed by its study mapper."
+        }
+      ]
+    },
+    {
+      "id": "wado-instance",
+      "operation": "wadoInstance",
+      "baseURL": "https://archive.example:443/dicom-web",
+      "input": {
+        "studyUID": "2.25.study",
+        "seriesUID": "2.25.series",
+        "instanceUID": "2.25.instance",
+        "isisAcceptHeader": "application/dicom; transfer-syntax=1.2.840.10008.1.2.1"
+      },
+      "sharedExpectation": {
+        "method": "GET",
+        "scheme": "https",
+        "host": "archive.example",
+        "port": 443,
+        "path": "/dicom-web/studies/2.25.study/series/2.25.series/instances/2.25.instance",
+        "query": {},
+        "headers": {}
+      },
+      "dicomSwiftExpectation": {
+        "query": {},
+        "headers": {
+          "Accept": "multipart/related; type=\"application/dicom\"; transfer-syntax=*"
+        }
+      },
+      "isisExpectation": {
+        "query": {},
+        "headers": {
+          "Accept": "application/dicom; transfer-syntax=1.2.840.10008.1.2.1"
+        }
+      },
+      "intentionalDifferences": [
+        {
+          "field": "headers.Accept",
+          "reason": "The toolkit accepts a multipart WADO response; Isis downloads one raw Part 10 instance per request."
+        }
+      ]
+    },
+    {
+      "id": "stow-study",
+      "operation": "stowStudy",
+      "baseURL": "https://archive.example:443/dicom-web",
+      "input": {
+        "studyUID": "2.25.study",
+        "boundary": "BOUNDARY",
+        "payloadBase64": "RElDTQ=="
+      },
+      "sharedExpectation": {
+        "method": "POST",
+        "scheme": "https",
+        "host": "archive.example",
+        "port": 443,
+        "path": "/dicom-web/studies/2.25.study",
+        "query": {},
+        "headers": {
+          "Content-Type": "multipart/related; type=\"application/dicom\"; boundary=BOUNDARY",
+          "Content-Length": "86"
+        },
+        "multipartBodyBase64": "LS1CT1VOREFSWQ0KQ29udGVudC1UeXBlOiBhcHBsaWNhdGlvbi9kaWNvbQ0KQ29udGVudC1MZW5ndGg6IDQNCg0KRElDTQ0KLS1CT1VOREFSWS0tDQo="
+      },
+      "dicomSwiftExpectation": {
+        "query": {},
+        "headers": {
+          "Accept": "application/dicom+json, multipart/related; type=\"application/dicom+xml\""
+        }
+      },
+      "isisExpectation": {
+        "query": {},
+        "headers": {
+          "Accept": "application/dicom+json"
+        }
+      },
+      "intentionalDifferences": [
+        {
+          "field": "headers.Accept",
+          "reason": "The toolkit can parse multipart STOW responses; Isis parses the DICOM JSON Store Instances Response Module."
+        }
+      ]
+    }
+  ],
+  "statusCases": [
+    {
+      "id": "ok-200",
+      "statusCode": 200,
+      "accepted": true,
+      "bodyBase64": "W10="
+    },
+    {
+      "id": "no-content-204",
+      "statusCode": 204,
+      "accepted": true,
+      "bodyBase64": ""
+    },
+    {
+      "id": "upper-success-299",
+      "statusCode": 299,
+      "accepted": true,
+      "bodyBase64": "W10="
+    },
+    {
+      "id": "redirect-300",
+      "statusCode": 300,
+      "accepted": false,
+      "bodyBase64": "cmVkaXJlY3Q="
+    },
+    {
+      "id": "missing-404",
+      "statusCode": 404,
+      "accepted": false,
+      "bodyBase64": "bWlzc2luZw=="
+    },
+    {
+      "id": "server-503",
+      "statusCode": 503,
+      "accepted": false,
+      "bodyBase64": "bWFpbnRlbmFuY2U="
+    },
+    {
+      "id": "http-206",
+      "statusCode": 206,
+      "accepted": true,
+      "bodyBase64": "W10="
+    },
+    {
+      "id": "http-406",
+      "statusCode": 406,
+      "accepted": false,
+      "bodyBase64": "W10="
+    },
+    {
+      "id": "http-409",
+      "statusCode": 409,
+      "accepted": false,
+      "bodyBase64": "W10="
+    },
+    {
+      "id": "http-415",
+      "statusCode": 415,
+      "accepted": false,
+      "bodyBase64": "W10="
+    }
+  ],
+  "dicomJSONCases": [
+    {
+      "id": "study-array",
+      "bodyBase64": "W3siMDAxMDAwMTAiOnsidnIiOiJQTiIsIlZhbHVlIjpbeyJBbHBoYWJldGljIjoiRE9FXkpBTkUifV19LCIwMDIwMDAwRCI6eyJ2ciI6IlVJIiwiVmFsdWUiOlsiMi4yNS5zdHVkeSJdfX1d",
+      "dicomSwiftExpectation": {
+        "accepted": true,
+        "studyUID": "2.25.study",
+        "patientName": "DOE^JANE"
+      },
+      "isisExpectation": {
+        "accepted": true,
+        "studyUID": "2.25.study",
+        "patientName": "DOE^JANE"
+      },
+      "intentionalDifferences": []
+    },
+    {
+      "id": "single-study-object",
+      "bodyBase64": "eyIwMDEwMDAxMCI6eyJ2ciI6IlBOIiwiVmFsdWUiOlt7IkFscGhhYmV0aWMiOiJET0VeSkFORSJ9XX0sIjAwMjAwMDBEIjp7InZyIjoiVUkiLCJWYWx1ZSI6WyIyLjI1LnN0dWR5Il19fQ==",
+      "dicomSwiftExpectation": {
+        "accepted": true,
+        "studyUID": "2.25.study",
+        "patientName": "DOE^JANE"
+      },
+      "isisExpectation": {
+        "accepted": false
+      },
+      "intentionalDifferences": [
+        {
+          "field": "accepted",
+          "reason": "The toolkit retains compatibility with a single dataset object; Isis requires the QIDO array mandated by DICOM PS3.18."
+        },
+        {
+          "field": "studyUID",
+          "reason": "Only the toolkit produces a dataset when the compatibility object form is accepted."
+        },
+        {
+          "field": "patientName",
+          "reason": "Only the toolkit produces a dataset when the compatibility object form is accepted."
+        }
+      ]
+    },
+    {
+      "id": "missing-vr",
+      "bodyBase64": "W3siMDAyMDAwMEQiOnsiVmFsdWUiOlsiMi4yNS5zdHVkeSJdfX1d",
+      "dicomSwiftExpectation": {
+        "accepted": false
+      },
+      "isisExpectation": {
+        "accepted": false
+      },
+      "intentionalDifferences": []
+    },
+    {
+      "id": "invalid-json",
+      "bodyBase64": "bm90LWpzb24=",
+      "dicomSwiftExpectation": {
+        "accepted": false
+      },
+      "isisExpectation": {
+        "accepted": false
+      },
+      "intentionalDifferences": []
+    }
+  ],
+  "clientOperationCases": [
+    {
+      "operation": "searchSeriesGlobal",
+      "method": "GET",
+      "path": "/series",
+      "accept": "application/dicom+json"
+    },
+    {
+      "operation": "searchSeriesScoped",
+      "method": "GET",
+      "path": "/studies/1/series",
+      "accept": "application/dicom+json"
+    },
+    {
+      "operation": "searchInstancesGlobal",
+      "method": "GET",
+      "path": "/instances",
+      "accept": "application/dicom+json"
+    },
+    {
+      "operation": "searchInstancesStudy",
+      "method": "GET",
+      "path": "/studies/1/instances",
+      "accept": "application/dicom+json"
+    },
+    {
+      "operation": "searchInstancesSeries",
+      "method": "GET",
+      "path": "/studies/1/series/2/instances",
+      "accept": "application/dicom+json"
+    },
+    {
+      "operation": "retrieveStudy",
+      "method": "GET",
+      "path": "/studies/1",
+      "accept": "multipart/related; type=\"application/dicom\"; transfer-syntax=*"
+    },
+    {
+      "operation": "retrieveSeries",
+      "method": "GET",
+      "path": "/studies/1/series/2",
+      "accept": "multipart/related; type=\"application/dicom\"; transfer-syntax=*"
+    },
+    {
+      "operation": "seriesMetadata",
+      "method": "GET",
+      "path": "/studies/1/series/2/metadata",
+      "accept": "application/dicom+json"
+    },
+    {
+      "operation": "instanceMetadata",
+      "method": "GET",
+      "path": "/studies/1/series/2/instances/3/metadata",
+      "accept": "application/dicom+json"
+    },
+    {
+      "operation": "studyThumbnail",
+      "method": "GET",
+      "path": "/studies/1/thumbnail",
+      "accept": "image/jpeg, image/png, image/gif"
+    },
+    {
+      "operation": "seriesThumbnail",
+      "method": "GET",
+      "path": "/studies/1/series/2/thumbnail",
+      "accept": "image/jpeg, image/png, image/gif"
+    },
+    {
+      "operation": "instanceThumbnail",
+      "method": "GET",
+      "path": "/studies/1/series/2/instances/3/thumbnail",
+      "accept": "image/jpeg, image/png, image/gif"
+    },
+    {
+      "operation": "renderedInstance",
+      "method": "GET",
+      "path": "/studies/1/series/2/instances/3/rendered",
+      "accept": "image/jpeg, image/png, image/gif"
+    },
+    {
+      "operation": "bulkdataStream",
+      "method": "GET",
+      "path": "/bulk/1",
+      "accept": "application/octet-stream, multipart/related; type=\"application/octet-stream\""
+    },
+    {
+      "operation": "instanceStream",
+      "method": "GET",
+      "path": "/studies/1/series/2/instances/3",
+      "accept": "multipart/related; type=\"application/dicom\"; transfer-syntax=*"
+    },
+    {
+      "operation": "framesStream",
+      "method": "GET",
+      "path": "/studies/1/series/2/instances/3/frames/1,2",
+      "accept": "multipart/related; type=\"application/octet-stream\"; transfer-syntax=*"
+    }
+  ],
+  "storeResponseCases": [
+    {
+      "statusCode": 200,
+      "contentType": "application/dicom+json",
+      "body": "[{\"00081199\":{\"vr\":\"SQ\",\"Value\":[{\"00081155\":{\"vr\":\"UI\",\"Value\":[\"1.2\"]}}]}}]",
+      "acceptedInstanceCount": 1,
+      "outcomes": [
+        "accepted"
+      ]
+    },
+    {
+      "statusCode": 202,
+      "contentType": "application/dicom+json",
+      "body": "[{\"00081199\":{\"vr\":\"SQ\",\"Value\":[{\"00081155\":{\"vr\":\"UI\",\"Value\":[\"1.2\"]},\"00081196\":{\"vr\":\"US\",\"Value\":[45056]}}]},\"00081198\":{\"vr\":\"SQ\",\"Value\":[{\"00081155\":{\"vr\":\"UI\",\"Value\":[\"1.3\"]},\"00081197\":{\"vr\":\"US\",\"Value\":[42752]}}]}}]",
+      "acceptedInstanceCount": 1,
+      "outcomes": [
+        "warning",
+        "failed"
+      ]
+    },
+    {
+      "statusCode": 409,
+      "contentType": "application/dicom+json",
+      "body": "[{\"00081198\":{\"vr\":\"SQ\",\"Value\":[{\"00081155\":{\"vr\":\"UI\",\"Value\":[\"1.3\"]},\"00081197\":{\"vr\":\"US\",\"Value\":[42752]}}]}}]",
+      "acceptedInstanceCount": 0,
+      "outcomes": [
+        "failed"
+      ]
+    },
+    {
+      "statusCode": 202,
+      "contentType": "application/dicom+xml",
+      "body": "<NativeDicomModel xmlns=\"http://dicom.nema.org/PS3.19/models/NativeDICOM\"><DicomAttribute tag=\"00081199\" vr=\"SQ\"><Item number=\"1\"><DicomAttribute tag=\"00081155\" vr=\"UI\"><Value number=\"1\">1.2</Value></DicomAttribute><DicomAttribute tag=\"00081196\" vr=\"US\"><Value number=\"1\">45056</Value></DicomAttribute></Item></DicomAttribute></NativeDicomModel>",
+      "acceptedInstanceCount": 1,
+      "outcomes": [
+        "warning"
+      ]
+    }
+  ]
+}

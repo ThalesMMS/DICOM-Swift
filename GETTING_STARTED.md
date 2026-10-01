@@ -34,7 +34,8 @@ A DICOM file (`.dcm`) contains:
 Before you start, ensure you have:
 
 - Xcode 26.0+
-- Swift 6.2+ toolchain
+- Swift 6.2+ toolchain. DICOM-Swift targets compile in Swift 6 language mode, which enables complete
+  strict-concurrency checking; consuming targets retain their own language-mode setting.
 - macOS 26+ or iOS 26+
 - Basic Swift knowledge
 - At least one DICOM file to test (`.dcm`)
@@ -67,7 +68,7 @@ Add to `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/ThalesMMS/DICOM-Swift.git", from: "1.0.0")
+    .package(url: "https://github.com/ThalesMMS/DICOM-Swift.git", exact: "2.0.0-rc.1")
 ]
 ```
 

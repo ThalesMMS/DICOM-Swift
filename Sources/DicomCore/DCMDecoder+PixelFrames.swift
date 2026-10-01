@@ -11,14 +11,14 @@ extension DCMDecoder {
         synchronized {
             guard let descriptor = makePixelDataDescriptorUnsafe(),
                   let byteRange = descriptor.byteRange(forFrame: index),
-                  byteRange.upperBound <= dicomData.count else {
+                  let data = descriptor.nativeFrameData(in: dicomData, frame: index) else {
                 return nil
             }
 
             return DicomPixelFrame(
                 index: index,
                 byteRange: byteRange,
-                data: Data(dicomData[byteRange]),
+                data: data,
                 descriptor: descriptor
             )
         }
@@ -45,7 +45,7 @@ extension DCMDecoder {
         }
     }
 
-    private func makePixelDataDescriptorUnsafe() -> DicomPixelDataDescriptor? {
+    func makePixelDataDescriptorUnsafe() -> DicomPixelDataDescriptor? {
         guard dicomFound,
               !compressedImage,
               offset >= 0 else {
@@ -72,7 +72,8 @@ extension DCMDecoder {
             samplesPerPixel: samplesPerPixel,
             planarConfiguration: planarConfiguration,
             photometricInterpretation: photometric,
-            pixelDataOffset: offset
+            pixelDataOffset: offset,
+            eightBitSamplesAreWordSwapped: bigEndianTransferSyntax && !littleEndian && bitDepth == 8 && pixelDataVR == .OW
         ) else {
             return nil
         }
@@ -94,13 +95,13 @@ extension DCMDecoder {
         frames.reserveCapacity(range.count)
         for index in range {
             guard let byteRange = descriptor.byteRange(forFrame: index),
-                  byteRange.upperBound <= dicomData.count else {
+                  let data = descriptor.nativeFrameData(in: dicomData, frame: index) else {
                 return nil
             }
             frames.append(DicomPixelFrame(
                 index: index,
                 byteRange: byteRange,
-                data: Data(dicomData[byteRange]),
+                data: data,
                 descriptor: descriptor
             ))
         }

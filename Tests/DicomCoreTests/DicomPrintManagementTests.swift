@@ -29,6 +29,32 @@ final class DicomPrintManagementTests: XCTestCase {
         XCTAssertEqual(imageDataSet?.element(for: .pixelData)?.bytesValue, Data([0, 255]))
     }
 
+    func testRenderedBitmapBuildsPlanarRGBColorImageBoxDataSet() throws {
+        let bitmap = try DicomRenderedBitmap(
+            width: 2,
+            height: 1,
+            rgbData: Data([10, 20, 30, 200, 150, 100])
+        )
+        let imageBox = try DicomImageBox(position: 1, bitmap: bitmap)
+
+        let dataSet = imageBox.dataSet(for: .color)
+        let imageDataSet = try XCTUnwrap(
+            dataSet.sequenceItems(for: DicomPrintTag.basicColorImageSequence).first?.dataSet
+        )
+
+        XCTAssertTrue(dataSet.sequenceItems(for: DicomPrintTag.basicGrayscaleImageSequence).isEmpty)
+        XCTAssertEqual(imageDataSet.int(for: .samplesPerPixel), 3)
+        XCTAssertEqual(imageDataSet.string(for: .photometricInterpretation), "RGB")
+        XCTAssertEqual(imageDataSet.int(for: .planarConfiguration), 1)
+        XCTAssertEqual(imageDataSet.int(for: .rows), 1)
+        XCTAssertEqual(imageDataSet.int(for: .columns), 2)
+        XCTAssertEqual(imageDataSet.int(for: .bitsAllocated), 8)
+        XCTAssertEqual(imageDataSet.int(for: .bitsStored), 8)
+        XCTAssertEqual(imageDataSet.int(for: .highBit), 7)
+        XCTAssertEqual(imageDataSet.int(for: .pixelRepresentation), 0)
+        XCTAssertEqual(imageDataSet.element(for: .pixelData)?.bytesValue, Data([10, 200, 20, 150, 30, 100]))
+    }
+
     func testPrintQueueTracksStatusAndFailureReason() throws {
         let bitmap = try DicomRenderedBitmap(width: 1,
                                              height: 1,
@@ -57,19 +83,27 @@ final class DicomPrintManagementTests: XCTestCase {
     func testPrintScopeListsSupportedSOPClassesAndRejectsUnsupportedServices() throws {
         XCTAssertEqual(DicomPrintManagementSupport.supportedSOPClassUIDs, Set([
             DicomNetworkUID.basicGrayscalePrintManagementMetaSOPClass,
+            DicomNetworkUID.basicColorPrintManagementMetaSOPClass,
             DicomNetworkUID.basicFilmSessionSOPClass,
             DicomNetworkUID.basicFilmBoxSOPClass,
-            DicomNetworkUID.basicGrayscaleImageBoxSOPClass
+            DicomNetworkUID.basicGrayscaleImageBoxSOPClass,
+            DicomNetworkUID.basicColorImageBoxSOPClass,
+            // Supported since issue #1908.
+            DicomNetworkUID.basicAnnotationBoxSOPClass,
+            // Optional monitoring since issue #1988.
+            DicomNetworkUID.printerSOPClass,
+            DicomNetworkUID.presentationLUTSOPClass,
+            DicomNetworkUID.printJobSOPClass,
+            DicomNetworkUID.printerConfigurationRetrievalSOPClass
         ]))
-        XCTAssertTrue(DicomPrintManagementSupport.unsupportedServices.contains(.presentationLUT))
-        XCTAssertTrue(DicomPrintManagementSupport.unsupportedServices.contains(.colorPrintManagement))
+        XCTAssertTrue(DicomPrintManagementSupport.unsupportedServices.contains(.storageCommitment))
 
         XCTAssertThrowsError(
-            try DicomPrintManagementSupport.rejectUnsupported(.presentationLUT)
+            try DicomPrintManagementSupport.rejectUnsupported(.storageCommitment)
         ) { error in
             XCTAssertEqual(
                 error as? DicomPrintManagementError,
-                .unsupportedService(DicomPrintManagementUnsupportedService.presentationLUT.rawValue)
+                .unsupportedService(DicomPrintManagementUnsupportedService.storageCommitment.rawValue)
             )
         }
     }

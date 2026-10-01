@@ -5,7 +5,7 @@ extension DicomSeriesLoader {
     ///
     /// This method processes multiple series directories in parallel using Swift's TaskGroup,
     /// enabling efficient concurrent loading for batch operations. Each series is loaded
-    /// using ``loadSeries(in:progress:)-6zq7v`` and assembled into a complete volume.
+    /// using the asynchronous `loadSeries(in:progress:)` overload and assembled into a complete volume.
     ///
     /// Progress is aggregated across all series and reported through the callback handler.
     /// The progress fraction represents the overall completion (number of series completed
@@ -36,17 +36,6 @@ extension DicomSeriesLoader {
     /// }
     /// ```
     ///
-    /// - Parameters:
-    ///   - seriesDirectories: Array of directory URLs containing DICOM series
-    ///   - maxConcurrency: Maximum number of concurrent series loading operations (default: 2)
-    ///   - progressHandler: Optional callback invoked with (fractionComplete, seriesCompleted)
-    /// - Returns: Array of ``DicomSeriesVolume`` in the same order as input directories
-    /// Concurrently loads DICOM series from the given directories and returns their volumes in the same order as the input.
-    /// - Parameters:
-    ///   - seriesDirectories: Array of directory URLs, each containing a DICOM series to load.
-    ///   - maxConcurrency: Maximum number of series to load in parallel (default is 2).
-    ///   - progressHandler: Optional callback that receives `(fractionComplete, completedCount)` as each series finishes.
-    /// - Returns: An array of `DicomSeriesVolume` objects ordered to match `seriesDirectories`.
     /// Concurrently loads multiple DICOM series from the given directory URLs and returns volumes ordered to match the input.
     /// - Parameters:
     ///   - seriesDirectories: Array of directory `URL`s containing DICOM series to load.
@@ -170,14 +159,6 @@ extension DicomSeriesLoader {
     /// print("Successfully loaded \(successes.count) of \(results.count) files")
     /// ```
     ///
-    /// - Parameters:
-    ///   - urls: Array of DICOM file URLs to load
-    ///   - maxConcurrency: Maximum number of concurrent loading operations (default: 4)
-    /// - Returns: Array of ``DicomFileResult`` in the same order as input URLs
-    /// Load multiple DICOM files concurrently and produce per-file results in the same order as the input URLs.
-    /// - Parameters:
-    ///   - urls: The file URLs to load.
-    ///   - maxConcurrency: Maximum number of concurrent file-loading tasks; values less than 1 behave as 1.
     /// Concurrently loads multiple DICOM files and returns per-file results in the same order as the input URLs.
     /// - Parameters:
     ///   - urls: File URLs of DICOM files to load.

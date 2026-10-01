@@ -4,10 +4,10 @@
 //  JPEG Lossless decompression for DICOM images.
 //  This module implements decoding for JPEG Lossless transfer syntaxes
 //  (1.2.840.10008.1.2.4.57 and 1.2.840.10008.1.2.4.70) using predictive
-//  coding with Huffman entropy coding. Supports Process 14 with Selection
-//  Value 1 (first-order prediction).
+//  coding with Huffman entropy coding. Supports Process 14 predictors,
+//  conformant DRI/RSTn intervals, and single interleaved scans.
 //
-//  The decoder parses JPEG markers (SOI, SOF3, DHT, SOS, EOI), constructs
+//  The decoder parses JPEG headers (SOI, SOF3, DHT, DRI, SOS), constructs
 //  Huffman decoding tables, and reconstructs pixels using spatial prediction.
 //
 //  Usage:
@@ -26,9 +26,10 @@ import Foundation
 /// as specified in ITU-T T.81 and DICOM PS3.5 Section 8.2.4.
 ///
 /// This decoder handles:
-/// - JPEG marker parsing (SOI, SOF3, DHT, SOS, EOI)
+/// - JPEG header parsing (SOI, SOF3, DHT, DRI, SOS)
 /// - Huffman table construction and symbol decoding
-/// - Predictive coding with Selection Value 1 (left neighbor predictor)
+/// - Predictive coding with Selection Values 1 through 7
+/// - Row-aligned restart intervals with RST0 through RST7 validation
 /// - Bit-level stream parsing with byte stuffing removal
 ///
 /// Supports DICOM Transfer Syntaxes:
@@ -69,7 +70,7 @@ internal final class JPEGLosslessDecoder {
     /// Decodes JPEG Lossless compressed pixel data
     /// - Parameter data: Raw JPEG Lossless bitstream starting with SOI marker
     /// - Returns: Decoded pixel buffer with metadata
-    /// Decode a JPEG Lossless (Process 14, first-order prediction / Selection Value 1) compressed scan from DICOM pixel data into reconstructed image pixels.
+    /// Decodes a JPEG Lossless Process 14 Huffman scan into reconstructed image pixels.
     /// - Parameters:
     ///   - data: The JPEG byte stream containing markers and entropy-coded scan data as stored in a DICOM PixelData element.
     /// - Returns: A `JPEGLosslessDecodeResult` containing the reconstructed pixel buffer, `width`, `height`, and `bitDepth`.

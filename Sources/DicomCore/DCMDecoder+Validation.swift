@@ -8,14 +8,11 @@ import Foundation
 
 extension DCMDecoder {
 
-    /// Validates DICOM file structure and required tags
-    /// - Parameter filename: Path to the DICOM file
     /// Performs basic filesystem and header-level validation of a DICOM file at the given path.
     /// 
     /// The check includes file existence, readable file attributes, file size (empty or too small),
     /// and — when the file is at least 132 bytes — an attempt to read the 4-byte `DICM` signature at offset 128.
-    /// - Parameters:
-    ///   - filename: Path to the DICOM file to validate.
+    /// - Parameter filename: Path to the DICOM file to validate.
     /// - Returns: A tuple where `isValid` is `true` if no hard issues were detected, and `issues` is an array of
     ///   human-readable issues and warnings found during validation.
     public func validateDICOMFile(_ filename: String) -> (isValid: Bool, issues: [String]) {

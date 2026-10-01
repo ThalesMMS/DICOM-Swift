@@ -15,18 +15,20 @@ DICOM (Digital Imaging and Communications in Medicine) is the standard for medic
 - PNG, JPEG, TIFF, 16-bit TIFF, and multiframe image export
 - UI-independent print/export preprocessing with resize and explicit annotation burn-in
 - Export, Secondary Capture, print, waveform, and video support matrix with typed unsupported-path diagnostics
-- Transfer syntax registry, conservative transcode planning, explicit-intent CPU JPEG 2000/HTJ2K encoding, and experimental JPEG XL routes
+- Transfer syntax registry, conservative transcode planning, own JPEG 2000/HTJ2K decoding and explicit-intent encoding, and experimental JPEG XL routes
 - Encapsulated Pixel Data frame indexing before codec decode
 - Deflated Explicit VR Little Endian dataset read/write support through zlib
-- JPIP referenced pixel data and progressive volume update streams with injected transport
-- DICOMweb client/server helpers with a tested conformance matrix for QIDO-RS, WADO-RS, WADO-URI, STOW-RS, BulkDataURI retrieval, pagination, auth hooks, multipart handling, and stable unsupported-route errors
+- JPIP referenced pixel data with a bounded HTTPS-first stateless transport, exact-origin authorization, pull backpressure, cancellation, and classic JPEG 2000/HTJ2K complete-entity MIME negotiation
+- DICOMweb client/server helpers with a tested conformance matrix for QIDO-RS, WADO-RS metadata/instance/frame/rendered-frame retrieval, WADO-URI, STOW-RS, BulkDataURI retrieval, pagination, auth hooks, bounded multipart handling, and stable typed errors
 - Package-only series volume assembly for single-frame 8/16/32-bit MONOCHROME1/2 grayscale inputs normalized to `Int16`; compressed slices decode through the production frame reader when the transfer syntax has an active backend
 - Single-stack Enhanced CT/MR multiframe volume assembly from one object via Shared/Per-Frame Functional Groups (geometry, position ordering, per-frame rescale, and per-frame Frame VOI), native or compressed; multi-stack Dimension Organization remains unsupported
 - DICOM Segmentation parsing, labelmap extraction, and synthetic SEG dataset building
 - RT Structure Set, RT Dose, and RT Plan parsing for contour, dose-volume, and beam inspection
 - Parametric Map scalar layer parsing with units, quantity definitions, RWV, geometry, and source references
 - Structured Report and Key Object Selection parsing with navigable content trees, measurements, ROI references, CAD findings, key image references, and scoped semantic validation for Enhanced/Comprehensive SR TID 1500 plus KOS references
-- Secondary Capture snapshot dataset building and parsing with patient/study/series context and source image references
+- Secondary Capture and Video Photographic media-attachment authoring with
+  required Type 2 patient, study, and manufacturer attributes, including
+  present-empty values
 - External inference builders for SR findings, SEG masks, GSPS graphic annotations, and derived images
 - Grayscale Softcopy Presentation State graphic annotation dataset building/parsing
 - Encapsulated PDF, CDA, and STL document dataset building/parsing with MIME, title, concept, payload, and source instance metadata
@@ -41,9 +43,15 @@ DICOM (Digital Imaging and Communications in Medicine) is the standard for medic
 
 ### Getting Started
 
-- <doc:GettingStarted>
-- <doc:Installation>
 - <doc:QuickStart>
+- <doc:DicomLoading>
+
+### Guides
+
+- <doc:Architecture>
+- <doc:PerformanceGuide>
+- <doc:MigrationGuide>
+- <doc:JPEG2000ProgressiveEncoding>
 
 ### Core Components
 
@@ -56,12 +64,17 @@ DICOM (Digital Imaging and Communications in Medicine) is the standard for medic
 - ``DicomJP3DVolumeDocument``
 - ``DicomJPIPClient``
 - ``DicomJPIPReferencedPixelData``
+- ``DicomJPIPHTTPTransport``
+- ``DicomJPIPTransportConfiguration``
+- ``DicomJPIPAuthorizationProviding``
 - ``DicomWebClient``
 - ``DicomWebServer``
 - ``DicomWebConformanceMatrix``
 - ``DicomWebConformanceStatement``
 - ``DicomDeflatedDataSetCodec``
 - ``DicomSegmentationBuilder``
+- ``DicomSegmentationPixelEncoding``
+- ``DicomLabelmapBinaryPlan``
 - ``DicomRTStructureSet``
 - ``DicomRTDoseVolume``
 - ``DicomRTPlan``
@@ -79,6 +92,7 @@ DICOM (Digital Imaging and Communications in Medicine) is the standard for medic
 - ``DicomSecondaryCapturePixelData``
 - ``DicomSecondaryCaptureBuildOptions``
 - ``DicomSecondaryCaptureValidationScope``
+- ``DicomMediaAttachmentType2Attributes``
 - ``DicomEncapsulatedDocument``
 - ``DicomEncapsulatedDocumentBuilder``
 - ``DicomEncapsulatedDocumentBuildOptions``
@@ -114,9 +128,6 @@ DICOM (Digital Imaging and Communications in Medicine) is the standard for medic
 ### Data Models
 
 - ``PatientModel``
-- ``StudyModel``
-- ``SeriesModel``
-- ``ImageModel``
 - ``DicomSeriesVolume``
 - ``DicomJP3DVolumeGeometry``
 - ``DicomProgressiveLayer``
@@ -156,6 +167,16 @@ DICOM (Digital Imaging and Communications in Medicine) is the standard for medic
 - ``StudyDataService``
 - ``DCMDictionary``
 
+### Safe Part 10 Rewriting
+
+- ``DicomPart10Rewriter``
+- ``DicomPart10RewriteResult``
+- ``DicomPart10PreservationFailure``
+- ``DicomPart10UIDInspection``
+- ``DicomPart10RewriteError``
+- ``DicomAnonymizer``
+- ``DicomRewritePolicy``
+
 ### Error Handling
 
 - ``DICOMError``
@@ -163,20 +184,23 @@ DICOM (Digital Imaging and Communications in Medicine) is the standard for medic
 
 ### Image Processing
 
-- <doc:WindowingAndLeveling>
-- <doc:GPUAcceleration>
-- <doc:MedicalPresets>
+- <doc:WindowLevel>
 
 ### Advanced Topics
 
 - <doc:SeriesLoading>
-- <doc:DicomLoading>
-- <doc:GeometryAndOrientation>
-- <doc:PerformanceOptimization>
+
+### Codec Workflows
+
+- <doc:CodecWorkflow>
+- ``DicomCodecWorkflowEngine``
+- ``DicomCodecArtifactResult``
+- ``DicomCodecStructuredReport``
+- ``DicomCodecWorkflowError``
+- ``DicomCodecCanonicalRenderer``
+- ``DicomCodecCapabilities``
+- ``DicomCodecRuntimePreflight``
 
 ### Reference
 
-- <doc:SupportedFormats>
 - <doc:ConformanceStatement>
-- <doc:DicomGlossary>
-- <doc:Troubleshooting>

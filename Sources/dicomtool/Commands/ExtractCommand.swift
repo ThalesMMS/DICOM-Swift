@@ -111,7 +111,7 @@ extension MedicalPreset: ExpressibleByArgument {
 /// 1. **Preset windowing**: Use `--preset` with a medical preset name
 /// 2. **Custom windowing**: Use `--window-center` and `--window-width` together
 /// 3. **Automatic windowing**: No windowing flags (calculates optimal values from image data)
-struct ExtractCommand: ParsableCommand {
+struct ExtractCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "extract",
         abstract: "Extract and export DICOM pixel data with windowing",
@@ -166,6 +166,12 @@ struct ExtractCommand: ParsableCommand {
         help: "JPEG compression quality from 0.0 to 1.0 (default: 1.0)"
     )
     var jpegQuality: Double = 1.0
+
+    @Flag(
+        name: .long,
+        help: "Write JPEG output as a progressive (SOF2) codestream with the own encoder"
+    )
+    var progressiveJpeg: Bool = false
 
     @Option(
         name: .long,
@@ -225,9 +231,12 @@ struct ExtractCommand: ParsableCommand {
     )
     var processingMode: ProcessingMode = .auto
 
+    @Flag(name: .long, help: "Use a bounded shared frame session; preserve original frame numbers in image sidecars")
+    var bounded = false
+
     // MARK: - Execution
 
-    mutating func run() throws {
+    mutating func run() async throws {
         // Validate file path
         let fileURL = URL(fileURLWithPath: file)
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
@@ -240,10 +249,15 @@ struct ExtractCommand: ParsableCommand {
         // Validate windowing options
         try validateWindowingOptions()
 
+        if bounded {
+            try await extractBounded(from: fileURL)
+            return
+        }
+
         // Load DICOM file
         let decoder: DCMDecoder
         do {
-            decoder = try DCMDecoder(contentsOf: fileURL)
+            decoder = try await DCMDecoder(contentsOf: fileURL)
         } catch {
             throw CLIError.invalidDICOMFile(
                 path: file,
@@ -257,7 +271,8 @@ struct ExtractCommand: ParsableCommand {
             quality: jpegQuality,
             overwrite: overwrite,
             pixelMode: try pixelMode(),
-            metadataPolicy: metadata ? .nonPHISidecar : .none
+            metadataPolicy: metadata ? .nonPHISidecar : .none,
+            progressiveJPEG: progressiveJpeg
         )
 
         if allFrames {
@@ -275,6 +290,46 @@ struct ExtractCommand: ParsableCommand {
 
         print("  Windowing: \(windowingDescription())")
         print("  Format: \(format.description)")
+    }
+
+    private func extractBounded(from fileURL: URL) async throws {
+        let source = try await DicomByteSource.openFile(fileURL, limits: .init(maximumTotalReadBytes: Int.max))
+        var openedSession: DicomSourceFrameSession?
+        do {
+            let session = try await DicomSourceFrameSession.open(source: source)
+            openedSession = session
+            let outputURL = URL(fileURLWithPath: output)
+            let options = DicomImageExportOptions(format: format, quality: jpegQuality, overwrite: overwrite,
+                                                   pixelMode: try pixelMode(), metadataPolicy: metadata ? .nonPHISidecar : .none,
+            progressiveJPEG: progressiveJpeg
+        )
+            let selected = frame ?? 0
+            guard allFrames || (selected >= 0 && selected < session.index.frameCount) else {
+                throw DicomImageExportError.invalidFrame(index: selected, frameCount: session.index.frameCount)
+            }
+            let frames = allFrames ? 0..<session.index.frameCount : selected..<(selected + 1)
+            if allFrames { try FileManager.default.createDirectory(at: outputURL, withIntermediateDirectories: true) }
+            for index in frames {
+                try Task.checkCancellation()
+                let target = allFrames ? outputURL.appendingPathComponent(DicomImageExporter.fileName(
+                    baseName: fileURL.deletingPathExtension().lastPathComponent, frameIndex: index,
+                    frameCount: session.index.frameCount, format: format)) : outputURL
+                _ = try await DicomImageExporter().export(session: session, frame: index, to: target, options: options)
+            }
+            let metrics = await session.metrics
+            print("✓ Extracted \(frames.count) frame(s) through bounded reads")
+            print("  Read bytes: \(metrics.source.receivedBytes); materialized bytes: \(metrics.materializedBytes)")
+            print("  Windowing: \(windowingDescription())")
+            print("  Format: \(format.description)")
+            await session.close()
+        } catch {
+            if let openedSession {
+                await openedSession.close()
+            } else {
+                await source.close()
+            }
+            throw error
+        }
     }
 
     // MARK: - Validation

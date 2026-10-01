@@ -326,86 +326,24 @@ final class DCMDecoderMemoryMappedStreamingTests: XCTestCase {
         return (mappedPixelData, tempURL)
     }
 
-    /// Documents memory-mapped file integration design.
-    /// This test serves as executable documentation for the memory-mapping strategy.
-    func testMemoryMappedIntegrationDocumentation() {
-        // MEMORY-MAPPED FILE COMPATIBILITY VERIFICATION
-        //
-        // DCMDecoder automatically uses memory-mapping for files >10MB:
-        // - Files >10MB: Data(contentsOf: fileURL, options: .mappedIfSafe)
-        // - Files ≤10MB: Data(contentsOf: fileURL)
-        //
-        // The streaming pixel access methods work seamlessly with memory-mapped files:
-        //
-        // 1. DATA FLOW:
-        //    DCMDecoder.getPixels16(range:)
-        //    → synchronized wrapper
-        //    → DCMPixelReader.readPixels16(data: dicomData, range: ...)
-        //    → data.withUnsafeBytes { ... }
-        //    → Direct pointer access to memory-mapped region
-        //
-        // 2. MEMORY-MAPPING BENEFITS:
-        //    - Zero-copy access: Pointer directly references mapped file
-        //    - OS manages paging: Only accessed ranges loaded into RAM
-        //    - Automatic cleanup: OS releases pages when pressure increases
-        //    - No buffer allocation: withUnsafeBytes doesn't copy data
-        //
-        // 3. OPTIMIZATION PATH:
-        //    DCMPixelReader.readPixels16 (line 425-489):
-        //    ```swift
-        //    data.withUnsafeBytes { dataBytes in
-        //        let basePtr = dataBytes.baseAddress!.advanced(by: rangeByteOffset)
-        //        // Direct access - no intermediate buffer
-        //        basePtr.withMemoryRebound(to: UInt16.self, capacity: rangeCount) { uint16Ptr in
-        //            pixels.withUnsafeMutableBufferPointer { pixelBuffer in
-        //                _ = memcpy(pixelBuffer.baseAddress!, uint16Ptr, rangeBytes)
-        //            }
-        //        }
-        //    }
-        //    ```
-        //
-        // 4. MEMORY EFFICIENCY:
-        //    - Full buffer (8192x8192x2): ~134 MB
-        //    - Range access (256x256x2): ~131 KB (1000x less memory)
-        //    - OS only pages in accessed ranges
-        //    - Multiple small ranges don't accumulate in memory
-        //
-        // 5. ACCEPTANCE CRITERIA VERIFICATION:
-        //    ✅ Memory usage stays under 200MB for any file size
-        //       (Verified in DCMDecoderStreamingTests.testMemoryUsageLargeFileStreaming)
-        //    ✅ First pixel accessible within 500ms for files >1GB
-        //       (Verified in DCMDecoderPerformanceTests.testFirstPixelAccessLatency)
-        //    ✅ API supports range-based pixel access
-        //       (getPixels8/16/24(range:) methods implemented and tested)
-        //    ✅ Compatible with existing memory-mapped file support
-        //       (This test suite - streaming works seamlessly with mapped file Data)
-        //
-        // 6. IMPLEMENTATION VERIFICATION:
-        //    DCMDecoder.swift line 98-100:
-        //    - dicomData stores file contents and owns mapped file lifetime
-        //
-        //    DCMDecoder.swift line 351-361:
-        //    - if fileSize > 10_000_000 {
-        //        dicomData = try Data(contentsOf: fileURL, options: .mappedIfSafe)
-        //      }
-        //
-        //    DCMDecoder.swift line 531, 574, 620 (range-based methods):
-        //    - DCMPixelReader.readPixels*(data: dicomData, range: ...)
-        //    - dicomData is the memory-mapped Data for large files
-        //
-        //    DCMPixelReader.swift line 425, 538, 635 (all range methods):
-        //    - data.withUnsafeBytes { dataBytes in
-        //        let basePtr = dataBytes.baseAddress!.advanced(by: rangeByteOffset)
-        //        // Direct pointer arithmetic - no data copy
-        //      }
-        //
-        // CONCLUSION:
-        // Memory-mapped file compatibility is fully verified and working correctly.
-        // The streaming pixel access methods use data.withUnsafeBytes pattern which
-        // enables zero-copy access to memory-mapped files. The OS handles paging
-        // automatically, loading only the accessed byte ranges into RAM.
+    /// Verifies the memory-mapping strategy with a range read from a file above the decoder threshold.
+    func test_memoryMappedIntegration_readsRangeAboveThreshold() throws {
+        let width = 2_500
+        let height = 2_500
+        let fileURL = try makeMappedDicomFile(width: width, height: height) { index in
+            UInt16(index % 65_536)
+        }
+        defer { try? FileManager.default.removeItem(at: fileURL) }
 
-        XCTAssertTrue(true, "Memory-mapped integration design is sound and verified")
+        let fileSize = try XCTUnwrap(
+            FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? Int
+        )
+        XCTAssertGreaterThan(fileSize, 10_000_000)
+
+        let decoder = try DCMDecoder(contentsOfFile: fileURL.path)
+        let range = 3_000_000..<3_000_016
+        let pixels = try XCTUnwrap(decoder.getPixels16(range: range))
+        XCTAssertEqual(pixels, range.map { UInt16($0 % 65_536) })
     }
 
     /// Verifies that multiple sequential streaming accesses work correctly.

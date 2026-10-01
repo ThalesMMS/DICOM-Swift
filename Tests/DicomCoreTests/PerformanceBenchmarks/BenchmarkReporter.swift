@@ -70,10 +70,15 @@ public struct PlatformInfo: Codable {
         sysctlbyname("hw.model", nil, &size, nil, 0)
         var machine = [CChar](repeating: 0, count: size)
         sysctlbyname("hw.model", &machine, &size, nil, 0)
-        self.modelIdentifier = String(cString: machine)
+        self.modelIdentifier = Self.decodeModelIdentifier(machine)
         #else
         self.modelIdentifier = "Unknown"
         #endif
+    }
+
+    static func decodeModelIdentifier(_ machine: [CChar]) -> String {
+        let bytes = machine.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+        return String(decoding: bytes, as: UTF8.self)
     }
 }
 

@@ -26,7 +26,7 @@ class MetalWindowingTests: XCTestCase {
     func testShaderResourceBundling() throws {
         // Verify Metal shader is bundled correctly in test target
         let shaderURL = try XCTUnwrap(
-            Bundle.module.url(forResource: "WindowingShaders", withExtension: "metal"),
+            Bundle.module.url(forResource: "WindowingShaders.metal", withExtension: "txt"),
             "Metal shader file should be bundled in test target resources"
         )
 
@@ -43,7 +43,7 @@ class MetalWindowingTests: XCTestCase {
 
         // Load shader source from Bundle.module (SPM pattern)
         let shaderURL = try XCTUnwrap(
-            Bundle.module.url(forResource: "WindowingShaders", withExtension: "metal"),
+            Bundle.module.url(forResource: "WindowingShaders.metal", withExtension: "txt"),
             "Metal shader file should be bundled"
         )
         let shaderSource = try String(contentsOf: shaderURL, encoding: .utf8)
@@ -64,7 +64,7 @@ class MetalWindowingTests: XCTestCase {
         let device = try XCTUnwrap(MTLCreateSystemDefaultDevice())
 
         // Create Metal pipeline
-        let shaderURL = try XCTUnwrap(Bundle.module.url(forResource: "WindowingShaders", withExtension: "metal"))
+        let shaderURL = try XCTUnwrap(Bundle.module.url(forResource: "WindowingShaders.metal", withExtension: "txt"))
         let shaderSource = try String(contentsOf: shaderURL, encoding: .utf8)
         let library = try device.makeLibrary(source: shaderSource, options: nil)
         let function = try XCTUnwrap(library.makeFunction(name: "applyWindowLevel"))
@@ -121,6 +121,27 @@ class MetalWindowingTests: XCTestCase {
         XCTAssertEqual(results[4], 255, "Pixel above window maximum should be 255")
     }
 
+    // MARK: - The GPU path actually runs (issue #1905)
+
+    /// The processor the production `.metal` mode delegates to must
+    /// initialize on a Metal host. This is the test that was silently
+    /// missing: the old resource lookup asked for "Shaders.metal", the
+    /// bundle carries "WindowingShaders.metal.txt", `init` threw, and every
+    /// `.metal`-mode assertion passed on the vDSP fallback instead.
+    func test_metalProcessorOnMetalHost_initializesAndExecutesKernel() throws {
+        try DicomTestRuntimePreflight.require(.metalDevice)
+
+        let processor = try MetalWindowingProcessor()
+        let result = try processor.applyWindowLevel(
+            pixels16: [0, 1000, 2000, 3000, 4000],
+            center: Float(2000),
+            width: Float(2000)
+        )
+        let bytes = [UInt8](try XCTUnwrap(result))
+        XCTAssertEqual(bytes.first, 0)
+        XCTAssertEqual(bytes.last, 255)
+    }
+
     func testMetalVsDSPConsistency() throws {
         // Verify Metal and vDSP produce equivalent results
         try DicomTestRuntimePreflight.require(.metalDevice)
@@ -134,16 +155,20 @@ class MetalWindowingTests: XCTestCase {
         let vdspResult = DCMWindowingProcessor.applyWindowLevel(pixels16: pixels16, center: center, width: width)
         XCTAssertNotNil(vdspResult, "vDSP windowing should succeed")
 
-        let metalResult = DCMWindowingProcessor.applyWindowLevel(
+        let metalOutcome = DCMWindowingProcessor.applyWindowLevelReportingBackend(
             pixels16: pixels16,
             center: center,
             width: width,
             processingMode: .metal
         )
-        XCTAssertNotNil(metalResult, "Metal windowing should succeed when the Metal capability preflight passes")
+        // Without this assertion the ±1 agreement below is vacuous: a silent
+        // vDSP fallback matches the vDSP baseline exactly (issue #1905).
+        XCTAssertEqual(metalOutcome.backend, .metal,
+                       "the Metal kernel must actually execute on a Metal host")
+        XCTAssertNotNil(metalOutcome.data, "Metal windowing should succeed when the Metal capability preflight passes")
 
         let vdspBytes = [UInt8](try XCTUnwrap(vdspResult))
-        let metalBytes = [UInt8](try XCTUnwrap(metalResult))
+        let metalBytes = [UInt8](try XCTUnwrap(metalOutcome.data))
         XCTAssertEqual(metalBytes.count, vdspBytes.count)
         for (index, pair) in zip(vdspBytes, metalBytes).enumerated() {
             XCTAssertLessThanOrEqual(
@@ -152,5 +177,18 @@ class MetalWindowingTests: XCTestCase {
                 "vDSP and Metal should match within +/-1 at index \(index)"
             )
         }
+    }
+
+    /// `.auto` under the size threshold stays on the CPU — the fallback
+    /// contract survives the GPU path being proven above.
+    func test_autoModeBelowThreshold_reportsVDSPBackend() {
+        let outcome = DCMWindowingProcessor.applyWindowLevelReportingBackend(
+            pixels16: [0, 1000, 2000],
+            center: 2000,
+            width: 2000,
+            processingMode: .auto
+        )
+        XCTAssertEqual(outcome.backend, .vdsp)
+        XCTAssertNotNil(outcome.data)
     }
 }

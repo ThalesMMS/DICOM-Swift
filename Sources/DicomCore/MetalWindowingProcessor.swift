@@ -31,13 +31,16 @@ public enum MetalProcessorError: Error {
 /// 16-bit grayscale medical images.  The GPU implementation
 /// typically achieves 3-5x speedup compared to vDSP on Apple
 /// Silicon and modern Intel Macs.
-public final class MetalWindowingProcessor {
+/// Metal devices, command queues, and pipeline states support concurrent command encoding;
+/// this wrapper stores them immutably and allocates per-operation buffers and encoders.
+public final class MetalWindowingProcessor: @unchecked Sendable {
 
     // MARK: - Properties
 
     private let device: MTLDevice
     private let commandQueue: MTLCommandQueue
     private let pipelineState: MTLComputePipelineState
+    private let displayLUTPipelineState: MTLComputePipelineState
 
     // MARK: - Initialization
 
@@ -60,11 +63,19 @@ public final class MetalWindowingProcessor {
         }
         self.commandQueue = commandQueue
 
-        // Load shader source from bundle and compile it
-        // SPM doesn't support makeDefaultLibrary() - we need to compile from source
-        guard let shaderURL = Bundle.module.url(forResource: "Shaders", withExtension: "metal"),
-              let shaderSource = try? String(contentsOf: shaderURL, encoding: .utf8),
-              let library = try? device.makeLibrary(source: shaderSource, options: nil) else {
+        // Load shader source from bundle and compile it at runtime — SPM does
+        // not support makeDefaultLibrary(). The source ships as an opaque
+        // `.metal.txt` resource (issue #1905): a `.metal` extension makes an
+        // Xcode consumer treat it as build input and demand the Metal
+        // Toolchain for a file that is only ever compiled here, at runtime.
+        guard let shaderURL = Bundle.module.url(forResource: "WindowingShaders.metal",
+                                                withExtension: "txt") else {
+            throw MetalProcessorError.libraryCreationFailed
+        }
+        guard let shaderSource = try? String(contentsOf: shaderURL, encoding: .utf8) else {
+            throw MetalProcessorError.libraryCreationFailed
+        }
+        guard let library = try? device.makeLibrary(source: shaderSource, options: nil) else {
             throw MetalProcessorError.libraryCreationFailed
         }
 
@@ -79,6 +90,91 @@ public final class MetalWindowingProcessor {
         } catch {
             throw MetalProcessorError.pipelineCreationFailed(error)
         }
+
+        // The presentation-LUT kernel (issue #1906).
+        guard let lutFunction = library.makeFunction(name: "applyDisplayLUT") else {
+            throw MetalProcessorError.functionNotFound("applyDisplayLUT")
+        }
+        do {
+            self.displayLUTPipelineState = try device.makeComputePipelineState(function: lutFunction)
+        } catch {
+            throw MetalProcessorError.pipelineCreationFailed(error)
+        }
+    }
+
+    // MARK: - Presentation LUT (issue #1906)
+
+    /// Applies a cached presentation table to stored pixel values on the GPU.
+    ///
+    /// The GPU indexes the exact table the CPU path indexes, so the output is
+    /// byte-identical — there is no arithmetic to disagree about. Returns
+    /// `nil` when the table cannot represent every input (an unmapped entry
+    /// or an out-of-range stored value): those are the cases the scalar path
+    /// reports as per-pixel failures, and the GPU must not turn them into
+    /// silent zeros.
+    public func applyDisplayLUT(storedValues: [Int],
+                                lut: DicomDisplayLUT) throws -> Data? {
+        guard !storedValues.isEmpty else { return nil }
+        guard lut.hasUnmappedEntries == false else { return nil }
+
+        let table = lut.tableBytes
+        var indices = [UInt32](repeating: 0, count: storedValues.count)
+        for (position, storedValue) in storedValues.enumerated() {
+            let index = storedValue - lut.minimumStoredValue
+            guard index >= 0, index < table.count else { return nil }
+            indices[position] = UInt32(index)
+        }
+
+        let pixelCount = storedValues.count
+        guard let indexBuffer = device.makeBuffer(
+            bytes: indices,
+            length: pixelCount * MemoryLayout<UInt32>.stride,
+            options: .storageModeShared
+        ), let tableBuffer = device.makeBuffer(
+            bytes: table,
+            length: table.count,
+            options: .storageModeShared
+        ), let outputBuffer = device.makeBuffer(
+            length: pixelCount,
+            options: .storageModeShared
+        ) else {
+            throw MetalProcessorError.bufferCreationFailed
+        }
+
+        guard let commandBuffer = commandQueue.makeCommandBuffer(),
+              let encoder = commandBuffer.makeComputeCommandEncoder() else {
+            throw MetalProcessorError.commandBufferCreationFailed
+        }
+
+        var lutCount = UInt32(table.count)
+        var count = UInt32(pixelCount)
+        encoder.setComputePipelineState(displayLUTPipelineState)
+        encoder.setBuffer(indexBuffer, offset: 0, index: 0)
+        encoder.setBuffer(tableBuffer, offset: 0, index: 1)
+        encoder.setBuffer(outputBuffer, offset: 0, index: 2)
+        encoder.setBytes(&lutCount, length: MemoryLayout<UInt32>.stride, index: 3)
+        encoder.setBytes(&count, length: MemoryLayout<UInt32>.stride, index: 4)
+
+        let threadGroupSize = MTLSize(
+            width: min(displayLUTPipelineState.maxTotalThreadsPerThreadgroup, pixelCount),
+            height: 1,
+            depth: 1
+        )
+        let threadGroups = MTLSize(
+            width: (pixelCount + threadGroupSize.width - 1) / threadGroupSize.width,
+            height: 1,
+            depth: 1
+        )
+        encoder.dispatchThreadgroups(threadGroups, threadsPerThreadgroup: threadGroupSize)
+        encoder.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        if let error = commandBuffer.error {
+            throw error
+        }
+
+        let outputPointer = outputBuffer.contents().assumingMemoryBound(to: UInt8.self)
+        return Data(UnsafeBufferPointer(start: outputPointer, count: pixelCount))
     }
 
     // MARK: - Window/Level Operations
@@ -86,7 +182,7 @@ public final class MetalWindowingProcessor {
     /// Applies a linear window/level transformation to a 16-bit
     /// grayscale pixel buffer using GPU compute shader.  The
     /// resulting pixels are scaled to the 0–255 range and returned
-    /// as ``Data``.  This function mirrors the CPU implementation
+    /// as `Data`.  This function mirrors the CPU implementation
     /// in DCMWindowingProcessor.applyWindowLevel but executes on
     /// the GPU for improved performance.  If the input is empty or
     /// the width is non-positive the function returns nil.
@@ -95,7 +191,7 @@ public final class MetalWindowingProcessor {
     ///   - pixels16: An array of unsigned 16-bit pixel intensities.
     ///   - center: The centre of the window.
     ///   - width: The width of the window.
-    /// - Returns: A ``Data`` object containing 8-bit pixel values or
+    /// - Returns: A `Data` object containing 8-bit pixel values or
     ///   `nil` if the input is invalid.
     /// - Throws: ``MetalProcessorError`` if GPU processing fails
     public func applyWindowLevel(pixels16: [UInt16],
@@ -186,7 +282,7 @@ public final class MetalWindowingProcessor {
     ///   - pixels16: An array of unsigned 16-bit pixel intensities.
     ///   - center: The centre of the window.
     ///   - width: The width of the window.
-    /// - Returns: A ``Data`` object containing 8-bit pixel values or
+    /// - Returns: A `Data` object containing 8-bit pixel values or
     ///   `nil` if the input is invalid.
     /// - Throws: ``MetalProcessorError`` if GPU processing fails
     public func applyWindowLevel(pixels16: [UInt16],

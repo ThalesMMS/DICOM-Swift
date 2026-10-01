@@ -31,14 +31,18 @@ extension DCMDecoder {
         var offset = metadata.offset
         let characterSet = activeCharacterSet
 
+        let effectiveVR = metadata.vr == .implicitRaw
+            ? DicomVR(code: dict.vrCode(forTag: tag) ?? "") ?? metadata.vr : metadata.vr
+
         // Read value based on VR type (mirroring headerInfo logic)
-        switch metadata.vr {
+        switch effectiveVR {
         case .FD, .FL:
             // Skip numeric values not needed in text form
             break
 
-        case .AE, .AS, .AT, .CS, .DA, .DS, .DT, .IS, .LO, .LT, .PN, .SH, .ST, .TM, .UI, .UR, .UT:
-            value = reader.readString(length: metadata.elementLength, location: &offset, characterSet: characterSet)
+        case .AE, .AS, .AT, .CS, .DA, .DS, .DT, .IS, .LO, .LT, .PN, .SH, .ST, .TM, .UI, .UR, .UT, .UC:
+            value = reader.readString(length: metadata.elementLength, location: &offset,
+                                      characterSet: characterSet, vr: effectiveVR)
 
         case .US:
             if metadata.elementLength == 2 {
@@ -56,7 +60,8 @@ extension DCMDecoder {
 
         case .implicitRaw:
             // Interpret as a string unless extremely long
-            let s = reader.readString(length: metadata.elementLength, location: &offset, characterSet: characterSet)
+            let s = reader.readString(length: metadata.elementLength, location: &offset,
+                                      characterSet: characterSet, vr: effectiveVR)
             if metadata.elementLength <= 44 {
                 value = s
             } else {
@@ -70,6 +75,20 @@ extension DCMDecoder {
         default:
             // Unknown VR: skip
             value = ""
+        }
+
+        // Typed contextual values and modern 64-bit numbers must not fall back
+        // to an unsigned dictionary hint or disappear from lazy text metadata.
+        if DicomContextualVRResolver.needsContext(tag) || effectiveVR == .SV || effectiveVR == .UV,
+           metadata.offset >= 0, metadata.offset <= dicomData.count,
+           metadata.elementLength >= 0, metadata.elementLength <= dicomData.count - metadata.offset {
+            let bytes = dicomData[metadata.offset..<(metadata.offset + metadata.elementLength)]
+            if let binary = DicomDataValueDecoder.binaryValue(for: effectiveVR, data: bytes, littleEndian: littleEndian) {
+                let element = DicomDataElement(tag: tag, vr: effectiveVR, value: binary)
+                let resolved = DicomContextualVRResolver.resolveLegacyElement(element, bytes: bytes,
+                    explicitVR: isExplicitVRTransferSyntax, littleEndian: littleEndian, context: contextualVRContextUnsafe())
+                value = resolved.stringValues.joined(separator: "\\")
+            }
         }
 
         // Build the formatted string

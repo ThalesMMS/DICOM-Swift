@@ -34,57 +34,53 @@ final class DCMDecoderMetadataTests: XCTestCase {
     func testCommonPatientTags() {
         let decoder = DCMDecoder()
 
-        // Test patient information tags
-        _ = decoder.info(for: DicomTag.patientName.rawValue)
-        _ = decoder.info(for: DicomTag.patientID.rawValue)
-        _ = decoder.info(for: DicomTag.patientSex.rawValue)
-        _ = decoder.info(for: DicomTag.patientAge.rawValue)
-        _ = decoder.info(for: DicomTag.patientPosition.rawValue)
-
-        // Should not crash and return empty strings for uninitialized decoder
-        XCTAssertTrue(true, "Tag access should not crash")
+        let tags = [
+            DicomTag.patientName,
+            DicomTag.patientID,
+            DicomTag.patientSex,
+            DicomTag.patientAge,
+            DicomTag.patientPosition
+        ]
+        XCTAssertTrue(tags.allSatisfy { decoder.info(for: $0.rawValue).isEmpty })
     }
 
     func testCommonStudyTags() {
         let decoder = DCMDecoder()
 
-        // Test study information tags
-        _ = decoder.info(for: DicomTag.studyInstanceUID.rawValue)
-        _ = decoder.info(for: DicomTag.studyDate.rawValue)
-        _ = decoder.info(for: DicomTag.studyTime.rawValue)
-        _ = decoder.info(for: DicomTag.studyDescription.rawValue)
-        _ = decoder.info(for: DicomTag.studyID.rawValue)
-
-        // Should not crash and return empty strings for uninitialized decoder
-        XCTAssertTrue(true, "Tag access should not crash")
+        let tags = [
+            DicomTag.studyInstanceUID,
+            DicomTag.studyDate,
+            DicomTag.studyTime,
+            DicomTag.studyDescription,
+            DicomTag.studyID
+        ]
+        XCTAssertTrue(tags.allSatisfy { decoder.info(for: $0.rawValue).isEmpty })
     }
 
     func testCommonSeriesTags() {
         let decoder = DCMDecoder()
 
-        // Test series information tags
-        _ = decoder.info(for: DicomTag.seriesInstanceUID.rawValue)
-        _ = decoder.info(for: DicomTag.seriesNumber.rawValue)
-        _ = decoder.info(for: DicomTag.seriesDescription.rawValue)
-        _ = decoder.info(for: DicomTag.modality.rawValue)
-
-        // Should not crash and return empty strings for uninitialized decoder
-        XCTAssertTrue(true, "Tag access should not crash")
+        let tags = [
+            DicomTag.seriesInstanceUID,
+            DicomTag.seriesNumber,
+            DicomTag.seriesDescription,
+            DicomTag.modality
+        ]
+        XCTAssertTrue(tags.allSatisfy { decoder.info(for: $0.rawValue).isEmpty })
     }
 
     func testCommonImageTags() {
         let decoder = DCMDecoder()
 
-        // Test image information tags
-        _ = decoder.info(for: DicomTag.rows.rawValue)
-        _ = decoder.info(for: DicomTag.columns.rawValue)
-        _ = decoder.info(for: DicomTag.bitsAllocated.rawValue)
-        _ = decoder.info(for: DicomTag.bitsStored.rawValue)
-        _ = decoder.info(for: DicomTag.highBit.rawValue)
-        _ = decoder.info(for: DicomTag.pixelRepresentation.rawValue)
-
-        // Should not crash and return empty strings for uninitialized decoder
-        XCTAssertTrue(true, "Tag access should not crash")
+        let tags = [
+            DicomTag.rows,
+            DicomTag.columns,
+            DicomTag.bitsAllocated,
+            DicomTag.bitsStored,
+            DicomTag.highBit,
+            DicomTag.pixelRepresentation
+        ]
+        XCTAssertTrue(tags.allSatisfy { decoder.info(for: $0.rawValue).isEmpty })
     }
 
     // MARK: - Type Conversion Tests

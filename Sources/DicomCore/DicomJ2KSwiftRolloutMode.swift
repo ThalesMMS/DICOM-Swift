@@ -17,6 +17,8 @@ enum DicomJ2KSwiftRolloutMode: String, CaseIterable, Sendable {
         let configured = environment[Self.environmentKey]?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
-        self = configured.flatMap(Self.init(rawValue:)) ?? .shadow
+        // Since #2329 the JPEG 2000 codec is the own DicomJPEG2000 target; it is preferred by default and OpenJPEG
+        // (when present) remains the fallback and the independent oracle.
+        self = configured.flatMap(Self.init(rawValue:)) ?? .preferred
     }
 }

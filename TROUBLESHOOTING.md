@@ -31,9 +31,9 @@ import DicomCore  // Correct
 import DICOM-Swift  // Incorrect
 ```
 
-### Error: Swift version mismatch
+### Error: Swift tools version mismatch
 
-Message: "Requires minimum Swift 6.2"
+Symptom: SwiftPM reports that the package manifest requires Swift tools 6.2 or later.
 
 Solution:
 
@@ -42,7 +42,8 @@ Solution:
    ```bash
    swift --version
    ```
-3. Set the minimum Swift version in Build Settings.
+3. Confirm the toolchain supports Swift tools 6.2. The package manifest compiles DICOM-Swift targets in Swift 6
+   language mode; it does not change the consuming target's language mode.
 
 ---
 

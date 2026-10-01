@@ -31,7 +31,10 @@ public struct DicomModalityWorklistQuery: Equatable, Sendable {
     public var accessionNumber: String?
     public var modality: String?
     public var scheduledStationAETitle: String?
+    /// A date, or a `YYYYMMDD-YYYYMMDD` range (PS3.4 C.2.2.2.5).
     public var scheduledProcedureStepStartDate: String?
+    /// A time, or an `HHMMSS-HHMMSS` range; empty returns every start time.
+    public var scheduledProcedureStepStartTime: String?
     public var scheduledProcedureStepID: String?
 
     public init(patientName: String? = nil,
@@ -40,6 +43,7 @@ public struct DicomModalityWorklistQuery: Equatable, Sendable {
                 modality: String? = nil,
                 scheduledStationAETitle: String? = nil,
                 scheduledProcedureStepStartDate: String? = nil,
+                scheduledProcedureStepStartTime: String? = nil,
                 scheduledProcedureStepID: String? = nil) {
         self.patientName = patientName
         self.patientID = patientID
@@ -47,6 +51,7 @@ public struct DicomModalityWorklistQuery: Equatable, Sendable {
         self.modality = modality
         self.scheduledStationAETitle = scheduledStationAETitle
         self.scheduledProcedureStepStartDate = scheduledProcedureStepStartDate
+        self.scheduledProcedureStepStartTime = scheduledProcedureStepStartTime
         self.scheduledProcedureStepID = scheduledProcedureStepID
     }
 
@@ -61,7 +66,7 @@ public struct DicomModalityWorklistQuery: Equatable, Sendable {
                 DicomDataSet(elements: [
                     workflowString(DicomWorkflowTag.scheduledStationAETitle, .AE, scheduledStationAETitle),
                     workflowString(DicomWorkflowTag.scheduledProcedureStepStartDate, .DA, scheduledProcedureStepStartDate),
-                    workflowString(DicomWorkflowTag.scheduledProcedureStepStartTime, .TM, nil),
+                    workflowString(DicomWorkflowTag.scheduledProcedureStepStartTime, .TM, scheduledProcedureStepStartTime),
                     workflowString(DicomWorkflowTag.modality, .CS, modality),
                     workflowString(DicomWorkflowTag.scheduledProcedureStepDescription, .LO, nil),
                     workflowString(DicomWorkflowTag.scheduledProcedureStepID, .SH, scheduledProcedureStepID)

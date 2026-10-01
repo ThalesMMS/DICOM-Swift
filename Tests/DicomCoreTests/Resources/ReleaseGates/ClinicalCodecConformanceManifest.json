@@ -18,65 +18,609 @@
     "fixtureRoot": "Sources/DICOMStudio/Resources/CLIParity/synthetic"
   },
   "coverage": [
-    {"id":"modality.ct","status":"covered","caseIDs":["fixture-metadata-parity","j2k-lossless-matrix"],"owner":"DICOM-Swift QA"},
-    {"id":"modality.enhanced-ct","status":"covered","caseIDs":["enhanced-multiframe"],"owner":"DICOM-Swift QA"},
-    {"id":"modality.mr","status":"covered","caseIDs":["fixture-metadata-parity"],"owner":"DICOM-Swift QA"},
-    {"id":"modality.enhanced-mr","status":"covered","caseIDs":["enhanced-multiframe"],"owner":"DICOM-Swift QA"},
-    {"id":"modality.mg","status":"gap","caseIDs":[],"owner":"DICOM-Swift QA","gap":"No small redistributable MG fixture with verified provenance is committed."},
-    {"id":"modality.dx","status":"gap","caseIDs":[],"owner":"DICOM-Swift QA","gap":"DX behavior has synthetic pixel tests but no committed Part 10 DX fixture."},
-    {"id":"modality.cr","status":"gap","caseIDs":[],"owner":"DICOM-Swift QA","gap":"CR behavior has synthetic pixel tests but no committed Part 10 CR fixture."},
-    {"id":"modality.us-color-doppler","status":"gap","caseIDs":[],"owner":"DICOM-Swift QA","gap":"The committed US fixture validates multiframe metadata only; a licensed color Doppler pixel fixture is still required."},
-    {"id":"modality.secondary-capture","status":"covered","caseIDs":["fixture-metadata-parity","dicomkit-synthetic-read"],"owner":"DICOM-Swift QA"},
-    {"id":"modality.multiframe","status":"covered","caseIDs":["fixture-metadata-parity","enhanced-multiframe","encapsulation-offsets"],"owner":"DICOM-Swift QA"},
-
-    {"id":"object.seg","status":"covered","caseIDs":["clinical-object-roundtrip","dicomswift-object-export"],"owner":"DICOM-Swift QA"},
-    {"id":"object.rtstruct","status":"covered","caseIDs":["clinical-object-roundtrip","dicomswift-object-export"],"owner":"DICOM-Swift QA"},
-    {"id":"object.rtdose","status":"covered","caseIDs":["clinical-object-roundtrip","dicomswift-object-export"],"owner":"DICOM-Swift QA"},
-    {"id":"object.sr-tid1500","status":"covered","caseIDs":["fixture-metadata-parity","dicomswift-object-export"],"owner":"DICOM-Swift QA"},
-    {"id":"object.kos","status":"covered","caseIDs":["fixture-metadata-parity","dicomswift-object-export"],"owner":"DICOM-Swift QA"},
-    {"id":"object.presentation-state","status":"covered","caseIDs":["clinical-object-roundtrip","dicomswift-object-export"],"owner":"DICOM-Swift QA"},
-    {"id":"object.parametric-map","status":"covered","caseIDs":["quantitative-object-roundtrip"],"owner":"DICOM-Swift QA"},
-    {"id":"object.real-world-value","status":"covered","caseIDs":["quantitative-object-roundtrip"],"owner":"DICOM-Swift QA"},
-    {"id":"object.encapsulated-document","status":"covered","caseIDs":["non-pixel-object-roundtrip"],"owner":"DICOM-Swift QA"},
-    {"id":"object.waveform","status":"covered","caseIDs":["non-pixel-object-roundtrip"],"owner":"DICOM-Swift QA"},
-    {"id":"object.video-metadata","status":"covered","caseIDs":["non-pixel-object-roundtrip"],"owner":"DICOM-Swift QA"},
-
-    {"id":"pixel.monochrome1","status":"covered","caseIDs":["native-pixel-shapes"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.monochrome2","status":"covered","caseIDs":["fixture-metadata-parity","j2k-lossless-matrix","jpegls-cross-oracle"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.rgb-full-range","status":"covered","caseIDs":["native-color-shapes","j2k-rgb-cross-oracle","jpegxl-libjxl-cross-oracle"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.ybr","status":"covered","caseIDs":["native-color-shapes","j2k-lossy-metadata"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.palette-color","status":"covered","caseIDs":["native-color-shapes"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.signed","status":"covered","caseIDs":["j2k-lossless-matrix","jpegls-cross-oracle","jpegxl-lossless"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.unsigned","status":"covered","caseIDs":["j2k-lossless-matrix","jpegls-cross-oracle","jpegxl-lossless"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.bits-8","status":"covered","caseIDs":["j2k-lossless-matrix","jpegls-cross-oracle","jpegxl-lossless"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.bits-10","status":"covered","caseIDs":["j2k-lossless-matrix","jpegls-cross-oracle"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.bits-12","status":"covered","caseIDs":["j2k-lossless-matrix","jpegls-cross-oracle","native-extended-negative"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.bits-14","status":"covered","caseIDs":["j2k-lossless-matrix","jpegls-cross-oracle"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.bits-16","status":"covered","caseIDs":["j2k-lossless-matrix","jpegls-cross-oracle","jpegxl-lossless"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.planar","status":"covered","caseIDs":["j2k-rgb-cross-oracle","jpegls-cross-oracle"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.interleaved","status":"covered","caseIDs":["j2k-rgb-cross-oracle","jpegls-cross-oracle","jpegxl-libjxl-cross-oracle"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.single-frame","status":"covered","caseIDs":["fixture-metadata-parity","j2k-lossless-matrix"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.multiframe","status":"covered","caseIDs":["fixture-metadata-parity","encapsulation-offsets"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.single-tile","status":"covered","caseIDs":["j2k-lossless-matrix"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.multitile","status":"covered","caseIDs":["j2k-lossless-matrix"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.odd-non-power-of-two","status":"covered","caseIDs":["j2k-lossless-matrix","jpegls-negative-shapes","jpegxl-lossless"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.basic-offset-table","status":"covered","caseIDs":["encapsulation-offsets"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.empty-basic-offset-table","status":"covered","caseIDs":["encapsulation-offsets"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.extended-offset-table","status":"covered","caseIDs":["encapsulation-offsets"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.multi-fragment-frame","status":"covered","caseIDs":["encapsulation-offsets"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.lossless","status":"covered","caseIDs":["j2k-lossless-matrix","jpegls-cross-oracle","jpegxl-libjxl-cross-oracle"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.near-lossless","status":"covered","caseIDs":["jpegls-near-lossless"],"owner":"DICOM-Swift QA"},
-    {"id":"pixel.lossy","status":"covered","caseIDs":["j2k-lossy-metadata","jpegxl-lossy-metric"],"owner":"DICOM-Swift QA"},
-
-    {"id":"negative.truncated-codestream-fragment","status":"covered","caseIDs":["codec-negative-security"],"owner":"DICOM-Swift QA"},
-    {"id":"negative.inconsistent-frame-offsets","status":"covered","caseIDs":["encapsulation-offsets"],"owner":"DICOM-Swift QA"},
-    {"id":"negative.malformed-marker-box-bin","status":"covered","caseIDs":["codec-negative-security"],"owner":"DICOM-Swift QA"},
-    {"id":"negative.decompression-bomb-dimensions","status":"covered","caseIDs":["codec-negative-security"],"owner":"DICOM-Swift QA"},
-    {"id":"negative.integer-overflow-boundary","status":"covered","caseIDs":["codec-negative-security"],"owner":"DICOM-Swift QA"},
-    {"id":"negative.unsupported-component-precision-color","status":"covered","caseIDs":["native-extended-negative","codec-negative-security"],"owner":"DICOM-Swift QA"},
-    {"id":"negative.corrupt-derived-artifact","status":"covered","caseIDs":["optimized-artifact-negative"],"owner":"Isis ViewerCore QA"}
+    {
+      "id": "modality.ct",
+      "status": "covered",
+      "caseIDs": [
+        "fixture-metadata-parity",
+        "j2k-lossless-matrix"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "modality.enhanced-ct",
+      "status": "covered",
+      "caseIDs": [
+        "enhanced-multiframe"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "modality.mr",
+      "status": "covered",
+      "caseIDs": [
+        "fixture-metadata-parity"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "modality.enhanced-mr",
+      "status": "covered",
+      "caseIDs": [
+        "enhanced-multiframe"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "modality.mg",
+      "status": "gap",
+      "caseIDs": [],
+      "owner": "DICOM-Swift QA",
+      "gap": "No small redistributable MG fixture with verified provenance is committed."
+    },
+    {
+      "id": "modality.dx",
+      "status": "gap",
+      "caseIDs": [],
+      "owner": "DICOM-Swift QA",
+      "gap": "DX behavior has synthetic pixel tests but no committed Part 10 DX fixture."
+    },
+    {
+      "id": "modality.cr",
+      "status": "gap",
+      "caseIDs": [],
+      "owner": "DICOM-Swift QA",
+      "gap": "CR behavior has synthetic pixel tests but no committed Part 10 CR fixture."
+    },
+    {
+      "id": "modality.us-color-doppler",
+      "status": "gap",
+      "caseIDs": [],
+      "owner": "DICOM-Swift QA",
+      "gap": "The committed US fixture validates multiframe metadata only; a licensed color Doppler pixel fixture is still required."
+    },
+    {
+      "id": "modality.secondary-capture",
+      "status": "covered",
+      "caseIDs": [
+        "fixture-metadata-parity",
+        "dicomkit-synthetic-read"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "modality.multiframe",
+      "status": "covered",
+      "caseIDs": [
+        "fixture-metadata-parity",
+        "enhanced-multiframe",
+        "encapsulation-offsets"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "object.seg",
+      "status": "covered",
+      "caseIDs": [
+        "clinical-object-roundtrip",
+        "dicomswift-object-export"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "object.rtstruct",
+      "status": "covered",
+      "caseIDs": [
+        "clinical-object-roundtrip",
+        "dicomswift-object-export"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "object.rtdose",
+      "status": "covered",
+      "caseIDs": [
+        "clinical-object-roundtrip",
+        "dicomswift-object-export"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "object.sr-tid1500",
+      "status": "covered",
+      "caseIDs": [
+        "fixture-metadata-parity",
+        "dicomswift-object-export"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "object.kos",
+      "status": "covered",
+      "caseIDs": [
+        "fixture-metadata-parity",
+        "dicomswift-object-export"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "object.presentation-state",
+      "status": "covered",
+      "caseIDs": [
+        "clinical-object-roundtrip",
+        "dicomswift-object-export"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "object.parametric-map",
+      "status": "covered",
+      "caseIDs": [
+        "quantitative-object-roundtrip"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "object.real-world-value",
+      "status": "covered",
+      "caseIDs": [
+        "quantitative-object-roundtrip"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "object.encapsulated-document",
+      "status": "covered",
+      "caseIDs": [
+        "non-pixel-object-roundtrip"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "object.waveform",
+      "status": "covered",
+      "caseIDs": [
+        "non-pixel-object-roundtrip"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "object.video-metadata",
+      "status": "covered",
+      "caseIDs": [
+        "non-pixel-object-roundtrip"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.monochrome1",
+      "status": "covered",
+      "caseIDs": [
+        "native-pixel-shapes"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.monochrome2",
+      "status": "covered",
+      "caseIDs": [
+        "fixture-metadata-parity",
+        "j2k-lossless-matrix",
+        "jpegls-cross-oracle"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.rgb-full-range",
+      "status": "covered",
+      "caseIDs": [
+        "native-color-shapes",
+        "j2k-rgb-cross-oracle",
+        "jpegxl-libjxl-cross-oracle"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.ybr",
+      "status": "covered",
+      "caseIDs": [
+        "native-color-shapes",
+        "j2k-lossy-metadata"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.palette-color",
+      "status": "covered",
+      "caseIDs": [
+        "native-color-shapes"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.signed",
+      "status": "covered",
+      "caseIDs": [
+        "j2k-lossless-matrix",
+        "jpegls-cross-oracle",
+        "jpegxl-lossless",
+        "jpeg-own-lossless-codec",
+        "jpeg-own-lossless-signed"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.unsigned",
+      "status": "covered",
+      "caseIDs": [
+        "j2k-lossless-matrix",
+        "jpegls-cross-oracle",
+        "jpegxl-lossless"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.bits-8",
+      "status": "covered",
+      "caseIDs": [
+        "j2k-lossless-matrix",
+        "jpegls-cross-oracle",
+        "jpegxl-lossless",
+        "jpeg-own-lossless-codec"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.bits-10",
+      "status": "covered",
+      "caseIDs": [
+        "j2k-lossless-matrix",
+        "jpegls-cross-oracle"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.bits-12",
+      "status": "covered",
+      "caseIDs": [
+        "j2k-lossless-matrix",
+        "jpegls-cross-oracle",
+        "native-extended-negative",
+        "jpeg-own-lossless-codec"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.bits-14",
+      "status": "covered",
+      "caseIDs": [
+        "j2k-lossless-matrix",
+        "jpegls-cross-oracle"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.bits-16",
+      "status": "covered",
+      "caseIDs": [
+        "j2k-lossless-matrix",
+        "jpegls-cross-oracle",
+        "jpegxl-lossless",
+        "jpeg-own-lossless-codec"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.planar",
+      "status": "covered",
+      "caseIDs": [
+        "j2k-rgb-cross-oracle",
+        "jpegls-cross-oracle",
+        "jpegls-own-interleave-cross-charls"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.interleaved",
+      "status": "covered",
+      "caseIDs": [
+        "j2k-rgb-cross-oracle",
+        "jpegls-cross-oracle",
+        "jpegxl-libjxl-cross-oracle",
+        "jpeg-own-lossless-codec",
+        "jpegls-own-interleave-cross-charls"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.single-frame",
+      "status": "covered",
+      "caseIDs": [
+        "fixture-metadata-parity",
+        "j2k-lossless-matrix"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.multiframe",
+      "status": "covered",
+      "caseIDs": [
+        "fixture-metadata-parity",
+        "encapsulation-offsets",
+        "jpeg-own-lossless-codec",
+        "jpeg-own-lossless-transcode-options",
+        "jpegls-own-interleave-cross-charls",
+        "jpegls-own-transcode-options"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.single-tile",
+      "status": "covered",
+      "caseIDs": [
+        "j2k-lossless-matrix"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.multitile",
+      "status": "covered",
+      "caseIDs": [
+        "j2k-lossless-matrix",
+        "j2k-own-openjpeg-independent-inputs"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.odd-non-power-of-two",
+      "status": "covered",
+      "caseIDs": [
+        "j2k-lossless-matrix",
+        "jpegls-negative-shapes",
+        "jpegxl-lossless",
+        "j2k-own-openjpeg-independent-inputs"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.basic-offset-table",
+      "status": "covered",
+      "caseIDs": [
+        "encapsulation-offsets"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.empty-basic-offset-table",
+      "status": "covered",
+      "caseIDs": [
+        "encapsulation-offsets"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.extended-offset-table",
+      "status": "covered",
+      "caseIDs": [
+        "encapsulation-offsets"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.multi-fragment-frame",
+      "status": "covered",
+      "caseIDs": [
+        "encapsulation-offsets"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.lossless",
+      "status": "covered",
+      "caseIDs": [
+        "j2k-lossless-matrix",
+        "jpegls-cross-oracle",
+        "jpegxl-libjxl-cross-oracle",
+        "jpeg-own-lossless-codec",
+        "j2k-own-openjpeg-independent-inputs"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.near-lossless",
+      "status": "covered",
+      "caseIDs": [
+        "jpegls-near-lossless",
+        "jpegls-own-interleave-cross-charls",
+        "jpegls-own-transcode-options"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "pixel.lossy",
+      "status": "covered",
+      "caseIDs": [
+        "j2k-lossy-metadata",
+        "jpegxl-lossy-metric",
+        "j2k-own-openjpeg-independent-inputs"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "negative.truncated-codestream-fragment",
+      "status": "covered",
+      "caseIDs": [
+        "codec-negative-security"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "negative.inconsistent-frame-offsets",
+      "status": "covered",
+      "caseIDs": [
+        "encapsulation-offsets"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "negative.malformed-marker-box-bin",
+      "status": "covered",
+      "caseIDs": [
+        "codec-negative-security"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "negative.decompression-bomb-dimensions",
+      "status": "covered",
+      "caseIDs": [
+        "codec-negative-security"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "negative.integer-overflow-boundary",
+      "status": "covered",
+      "caseIDs": [
+        "codec-negative-security"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "negative.unsupported-component-precision-color",
+      "status": "covered",
+      "caseIDs": [
+        "native-extended-negative",
+        "codec-negative-security"
+      ],
+      "owner": "DICOM-Swift QA"
+    },
+    {
+      "id": "negative.corrupt-derived-artifact",
+      "status": "covered",
+      "caseIDs": [
+        "optimized-artifact-negative"
+      ],
+      "owner": "Isis ViewerCore QA"
+    },
+    {
+      "id": "negative.nonzero-data-start",
+      "status": "covered",
+      "caseIDs": [
+        "rle-adversarial"
+      ],
+      "owner": "DICOM-Swift QA #2366"
+    },
+    {
+      "id": "negative.frame-order",
+      "status": "covered",
+      "caseIDs": [
+        "independent-native-corpus"
+      ],
+      "owner": "DICOM-Swift QA #2366"
+    },
+    {
+      "id": "negative.remote-origin",
+      "status": "covered",
+      "caseIDs": [
+        "network-adversarial"
+      ],
+      "owner": "DICOM-Swift QA #2366"
+    },
+    {
+      "id": "negative.cancelled-transport",
+      "status": "covered",
+      "caseIDs": [
+        "network-adversarial"
+      ],
+      "owner": "DICOM-Swift QA #2366"
+    },
+    {
+      "id": "negative.duplicate-evidence",
+      "status": "covered",
+      "caseIDs": [
+        "evidence-integrity"
+      ],
+      "owner": "DICOM-Swift QA #2366"
+    },
+    {
+      "id": "negative.partial-test-evidence",
+      "status": "covered",
+      "caseIDs": [
+        "evidence-integrity"
+      ],
+      "owner": "DICOM-Swift QA #2366"
+    },
+    {
+      "id": "negative.malformed-network-response",
+      "status": "covered",
+      "caseIDs": [
+        "network-adversarial"
+      ],
+      "owner": "DICOM-Swift QA #2366"
+    }
   ],
   "fixtures": [
+    {
+      "id": "seg-labelmap",
+      "path": "Tests/DicomCoreTests/Fixtures/ClinicalInterop/seg_labelmap.dcm",
+      "provenance": "Generated deterministically by ClinicalInteropFixtureExportTests and DicomGeometryCorpusTests using typed builders (issue #2346).",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; PARITY placeholders only.",
+      "sha256": "9ac9febb27bb0af9627c617bddd7ba3e05073c26e40bc3bbc00cc68ed85b5c19",
+      "modality": "SEG",
+      "objectFamily": "Label Map Segmentation Storage",
+      "transferSyntaxUID": "1.2.840.10008.1.2.1",
+      "photometricInterpretation": "MONOCHROME2",
+      "bitsStored": 8,
+      "signed": false,
+      "frames": 3
+    },
+    {
+      "id": "seg-fractional-sparse",
+      "path": "Tests/DicomCoreTests/Fixtures/ClinicalInterop/seg_fractional_sparse.dcm",
+      "provenance": "Generated deterministically by ClinicalInteropFixtureExportTests and DicomGeometryCorpusTests using typed builders (issue #2346).",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; PARITY placeholders only.",
+      "sha256": "ade9973877ad32e6952f1c5bc7419c0743c700e0a166f0adf9f0224b3cab0838",
+      "modality": "SEG",
+      "objectFamily": "Segmentation Storage",
+      "transferSyntaxUID": "1.2.840.10008.1.2.1",
+      "photometricInterpretation": "MONOCHROME2",
+      "bitsStored": 8,
+      "signed": false,
+      "frames": 2
+    },
+    {
+      "id": "rtstruct-multiloop-xor",
+      "path": "Tests/DicomCoreTests/Fixtures/ClinicalInterop/rtstruct_multiloop_xor.dcm",
+      "provenance": "Generated deterministically by ClinicalInteropFixtureExportTests and DicomGeometryCorpusTests using typed builders (issue #2346).",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; PARITY placeholders only.",
+      "sha256": "2750c84ab0f6f8146f4117ef805638090a70137e6582fe2a354982307b7ecd12",
+      "modality": "RTSTRUCT",
+      "objectFamily": "RT Structure Set Storage",
+      "transferSyntaxUID": "1.2.840.10008.1.2.1",
+      "photometricInterpretation": "N/A",
+      "bitsStored": 0,
+      "signed": false,
+      "frames": 0
+    },
+    {
+      "id": "surface-cube",
+      "path": "Tests/DicomCoreTests/Fixtures/ClinicalInterop/surface_cube.dcm",
+      "provenance": "Generated deterministically by ClinicalInteropFixtureExportTests and DicomGeometryCorpusTests using typed builders (issue #2346).",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; PARITY placeholders only.",
+      "sha256": "fd7b11fb071cab49881c57c490d80a702b5177a54e30a4d6d461897356ebd4e9",
+      "modality": "SEG",
+      "objectFamily": "Surface Segmentation Storage",
+      "transferSyntaxUID": "1.2.840.10008.1.2.1",
+      "photometricInterpretation": "N/A",
+      "bitsStored": 0,
+      "signed": false,
+      "frames": 0
+    },
     {
       "id": "ct-explicit-vr-le-rescale",
       "path": "Tests/DicomCoreTests/Fixtures/DecoderParity/ct_explicit_vr_le_rescale.dcm",
@@ -138,9 +682,9 @@
       "frames": 1
     },
     {
-      "id": "htj2k-openjph-known-mismatch",
+      "id": "htj2k-openjph-fixture",
       "path": "Tests/DicomCoreTests/Fixtures/DecoderParity/htj2k_lossless_parity.dcm",
-      "provenance": "Synthetic codestream generated with OpenJPH and wrapped as DICOM Part 10 by the repository fixture builder.",
+      "provenance": "Synthetic codestream generated with OpenJPH and wrapped as DICOM Part 10 by the repository fixture builder; decoded exactly by the own DicomJPEG2000 HT decoder since #2329/#2330.",
       "license": "Repository license",
       "deidentification": "Synthetic non-PHI; PARITY placeholders only.",
       "sha256": "de3168bcd547a2c3d5e655d7846623793cc8aacb6fd80b803c5fbf492cd47c7e",
@@ -158,7 +702,7 @@
       "provenance": "Generated deterministically by ClinicalInteropFixtureExportTests using DicomSegmentationBuilder.",
       "license": "Repository license",
       "deidentification": "Synthetic non-PHI; INTEROP placeholders only.",
-      "sha256": "12c65ecbfcde198806a09d4d22c598f86943ff88509e8a311caeafb30eeb3ac5",
+      "sha256": "f2cf02a341a74231df7715c00d3f2d5c7530283432bccb11ddb3a526484be0e6",
       "modality": "SEG",
       "objectFamily": "Segmentation Storage",
       "transferSyntaxUID": "1.2.840.10008.1.2.1",
@@ -198,12 +742,27 @@
       "frames": 1
     },
     {
+      "id": "gsps-source-ct",
+      "path": "Tests/DicomCoreTests/Fixtures/ClinicalInterop/gsps_source_ct.dcm",
+      "provenance": "Generated deterministically by ClinicalInteropFixtureExportTests as the referenced source for the GSPS interoperability fixture.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; INTEROP placeholders only.",
+      "sha256": "e640edd1bd230db592cdaf17116d837a16f95772d0b168fb67bb029076dd8e54",
+      "modality": "CT",
+      "objectFamily": "CT Image Storage",
+      "transferSyntaxUID": "1.2.840.10008.1.2.1",
+      "photometricInterpretation": "MONOCHROME2",
+      "bitsStored": 16,
+      "signed": false,
+      "frames": 1
+    },
+    {
       "id": "gsps-annotation",
       "path": "Tests/DicomCoreTests/Fixtures/ClinicalInterop/gsps_annotation.dcm",
       "provenance": "Generated deterministically by ClinicalInteropFixtureExportTests using DicomGrayscalePresentationStateBuilder.",
       "license": "Repository license",
       "deidentification": "Synthetic non-PHI; INTEROP placeholders only.",
-      "sha256": "01e92e1dcf72876c14afb699507b06a9c261e35839287c879b7f646dbc68053e",
+      "sha256": "a39d2d0a587f8bf28d557c79aa01cd931a7cd849120e13ddd0bbd701fce83c6a",
       "modality": "PR",
       "objectFamily": "Grayscale Softcopy Presentation State Storage",
       "transferSyntaxUID": "1.2.840.10008.1.2.1",
@@ -218,9 +777,279 @@
       "provenance": "Generated deterministically by ClinicalParityCuratedFixtureTests using DicomStructuredReportBuilder.",
       "license": "Repository license",
       "deidentification": "Synthetic non-PHI; PARITY placeholders only.",
-      "sha256": "e17cb1ba2a9b246498a6066d6e9236d258f7c3d183cf31b21d530c14c3e7a840",
+      "sha256": "2e85f73fd897e8d8f335be184da71508a2dea177696f0f367773046bc4460d7f",
       "modality": "SR",
       "objectFamily": "Comprehensive 3D SR / TID 1500",
+      "transferSyntaxUID": "1.2.840.10008.1.2.1",
+      "photometricInterpretation": "N/A",
+      "bitsStored": 0,
+      "signed": false,
+      "frames": 0
+    },
+    {
+      "id": "seg-dcmjs-rle-binary-as-fractional",
+      "path": "Tests/DicomCoreTests/Fixtures/Segmentation/dcmjs-rle-binary-as-fractional.dcm",
+      "provenance": "dcmjs 0.49.2 (81e7e11), OHIF RLE encoder; BINARY rewritten as FRACTIONAL 0/1 with maximum 255; synthetic 16 x 20, three slices. Reproduce with Scripts/conformance/seg_compressed_fixtures.py.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; SYNTHETIC^SEG placeholders only.",
+      "sha256": "79b47344f7db3dd8e44fd604fee1ebcfa2308b9c29cd734ef4409b9601f31d73",
+      "modality": "SEG",
+      "objectFamily": "Segmentation",
+      "transferSyntaxUID": "1.2.840.10008.1.2.5",
+      "photometricInterpretation": "MONOCHROME2",
+      "bitsStored": 8,
+      "signed": false,
+      "frames": 6
+    },
+    {
+      "id": "seg-gdcm-j2k-fractional",
+      "path": "Tests/DicomCoreTests/Fixtures/Segmentation/gdcm-j2k-fractional.dcm",
+      "provenance": "GDCM 3.2.7 gdcmconv; synthetic 16 x 20, three slices. Reproduce with Scripts/conformance/seg_compressed_fixtures.py.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; SYNTHETIC^SEG placeholders only.",
+      "sha256": "96878b2d573a91675f158fe368433ca4c95340c063a4f1d320a780774b4fc350",
+      "modality": "SEG",
+      "objectFamily": "Segmentation",
+      "transferSyntaxUID": "1.2.840.10008.1.2.4.90",
+      "photometricInterpretation": "MONOCHROME2",
+      "bitsStored": 8,
+      "signed": false,
+      "frames": 3
+    },
+    {
+      "id": "seg-gdcm-j2k-labelmap16",
+      "path": "Tests/DicomCoreTests/Fixtures/Segmentation/gdcm-j2k-labelmap16.dcm",
+      "provenance": "GDCM 3.2.7 gdcmconv; synthetic 16 x 20, three slices. Reproduce with Scripts/conformance/seg_compressed_fixtures.py.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; SYNTHETIC^SEG placeholders only.",
+      "sha256": "22755ebef6cbfd6a3063fe290c7437ed3cd166d5206f135f6c3dece4629d8b13",
+      "modality": "SEG",
+      "objectFamily": "Label Map Segmentation",
+      "transferSyntaxUID": "1.2.840.10008.1.2.4.90",
+      "photometricInterpretation": "MONOCHROME2",
+      "bitsStored": 16,
+      "signed": false,
+      "frames": 3
+    },
+    {
+      "id": "seg-gdcm-j2k-labelmap8",
+      "path": "Tests/DicomCoreTests/Fixtures/Segmentation/gdcm-j2k-labelmap8.dcm",
+      "provenance": "GDCM 3.2.7 gdcmconv; synthetic 16 x 20, three slices. Reproduce with Scripts/conformance/seg_compressed_fixtures.py.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; SYNTHETIC^SEG placeholders only.",
+      "sha256": "8b4080fb20cca431a7f252955caf615e4c3c038193e83f840a82d4cb1ebf3f1d",
+      "modality": "SEG",
+      "objectFamily": "Label Map Segmentation",
+      "transferSyntaxUID": "1.2.840.10008.1.2.4.90",
+      "photometricInterpretation": "MONOCHROME2",
+      "bitsStored": 8,
+      "signed": false,
+      "frames": 3
+    },
+    {
+      "id": "seg-gdcm-jpegls-fractional",
+      "path": "Tests/DicomCoreTests/Fixtures/Segmentation/gdcm-jpegls-fractional.dcm",
+      "provenance": "GDCM 3.2.7 gdcmconv; synthetic 16 x 20, three slices. Reproduce with Scripts/conformance/seg_compressed_fixtures.py.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; SYNTHETIC^SEG placeholders only.",
+      "sha256": "ab68ff2020959a0e5529dfe9c8cf8d512fed62776299ea2be6fd9f469a8cc7bd",
+      "modality": "SEG",
+      "objectFamily": "Segmentation",
+      "transferSyntaxUID": "1.2.840.10008.1.2.4.80",
+      "photometricInterpretation": "MONOCHROME2",
+      "bitsStored": 8,
+      "signed": false,
+      "frames": 3
+    },
+    {
+      "id": "seg-gdcm-jpegls-labelmap16",
+      "path": "Tests/DicomCoreTests/Fixtures/Segmentation/gdcm-jpegls-labelmap16.dcm",
+      "provenance": "GDCM 3.2.7 gdcmconv; synthetic 16 x 20, three slices. Reproduce with Scripts/conformance/seg_compressed_fixtures.py.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; SYNTHETIC^SEG placeholders only.",
+      "sha256": "4cc5c4fcea577002f84a820358f784d2fe0daaa7970b880c3504e9a83f6ac469",
+      "modality": "SEG",
+      "objectFamily": "Label Map Segmentation",
+      "transferSyntaxUID": "1.2.840.10008.1.2.4.80",
+      "photometricInterpretation": "MONOCHROME2",
+      "bitsStored": 16,
+      "signed": false,
+      "frames": 3
+    },
+    {
+      "id": "seg-gdcm-jpegls-labelmap8",
+      "path": "Tests/DicomCoreTests/Fixtures/Segmentation/gdcm-jpegls-labelmap8.dcm",
+      "provenance": "GDCM 3.2.7 gdcmconv; synthetic 16 x 20, three slices. Reproduce with Scripts/conformance/seg_compressed_fixtures.py.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; SYNTHETIC^SEG placeholders only.",
+      "sha256": "5c46a58c154f811d89f9790d0f5ead85f14095e2c14dbd9039faa1bb2d1c277a",
+      "modality": "SEG",
+      "objectFamily": "Label Map Segmentation",
+      "transferSyntaxUID": "1.2.840.10008.1.2.4.80",
+      "photometricInterpretation": "MONOCHROME2",
+      "bitsStored": 8,
+      "signed": false,
+      "frames": 3
+    },
+    {
+      "id": "seg-gdcm-rle-fractional",
+      "path": "Tests/DicomCoreTests/Fixtures/Segmentation/gdcm-rle-fractional.dcm",
+      "provenance": "GDCM 3.2.7 gdcmconv; synthetic 16 x 20, three slices. Reproduce with Scripts/conformance/seg_compressed_fixtures.py.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; SYNTHETIC^SEG placeholders only.",
+      "sha256": "96119213394295a0747db55498db5b0f77d9fb9fe9d3f82c481136e18a1e63fb",
+      "modality": "SEG",
+      "objectFamily": "Segmentation",
+      "transferSyntaxUID": "1.2.840.10008.1.2.5",
+      "photometricInterpretation": "MONOCHROME2",
+      "bitsStored": 8,
+      "signed": false,
+      "frames": 3
+    },
+    {
+      "id": "seg-native-binary",
+      "path": "Tests/DicomCoreTests/Fixtures/Segmentation/native-binary.dcm",
+      "provenance": "DicomSegmentationBuilder (native reference); synthetic 16 x 20, three slices. Reproduce with Scripts/conformance/seg_compressed_fixtures.py.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; SYNTHETIC^SEG placeholders only.",
+      "sha256": "b4177bcdfddfd037cb1c5ae10874d10dd84bb788288c1862bd3352b625ce4d29",
+      "modality": "SEG",
+      "objectFamily": "Segmentation",
+      "transferSyntaxUID": "1.2.840.10008.1.2.1",
+      "photometricInterpretation": "MONOCHROME2",
+      "bitsStored": 1,
+      "signed": false,
+      "frames": 6
+    },
+    {
+      "id": "seg-native-fractional",
+      "path": "Tests/DicomCoreTests/Fixtures/Segmentation/native-fractional.dcm",
+      "provenance": "DicomSegmentationBuilder (native reference); synthetic 16 x 20, three slices. Reproduce with Scripts/conformance/seg_compressed_fixtures.py.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; SYNTHETIC^SEG placeholders only.",
+      "sha256": "b6aff2d4fb565251668d103d3a44603405367d5bab2f4ebaffcb65a01eb3c50a",
+      "modality": "SEG",
+      "objectFamily": "Segmentation",
+      "transferSyntaxUID": "1.2.840.10008.1.2.1",
+      "photometricInterpretation": "MONOCHROME2",
+      "bitsStored": 8,
+      "signed": false,
+      "frames": 3
+    },
+    {
+      "id": "seg-native-labelmap16",
+      "path": "Tests/DicomCoreTests/Fixtures/Segmentation/native-labelmap16.dcm",
+      "provenance": "DicomSegmentationBuilder (native reference); synthetic 16 x 20, three slices. Reproduce with Scripts/conformance/seg_compressed_fixtures.py.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; SYNTHETIC^SEG placeholders only.",
+      "sha256": "fe0bffa04aafd3abe2a9f848d07fb6812b7a43a50147b915098a1f7faeadef66",
+      "modality": "SEG",
+      "objectFamily": "Label Map Segmentation",
+      "transferSyntaxUID": "1.2.840.10008.1.2.1",
+      "photometricInterpretation": "MONOCHROME2",
+      "bitsStored": 16,
+      "signed": false,
+      "frames": 3
+    },
+    {
+      "id": "seg-native-labelmap8",
+      "path": "Tests/DicomCoreTests/Fixtures/Segmentation/native-labelmap8.dcm",
+      "provenance": "DicomSegmentationBuilder (native reference); synthetic 16 x 20, three slices. Reproduce with Scripts/conformance/seg_compressed_fixtures.py.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; SYNTHETIC^SEG placeholders only.",
+      "sha256": "845e8a9b6d5d0877be09e5a5099e528e982c59b2e2596abcb78909eccc429afc",
+      "modality": "SEG",
+      "objectFamily": "Label Map Segmentation",
+      "transferSyntaxUID": "1.2.840.10008.1.2.1",
+      "photometricInterpretation": "MONOCHROME2",
+      "bitsStored": 8,
+      "signed": false,
+      "frames": 3
+    },
+    {
+      "id": "seg-openjph-htj2k-fractional",
+      "path": "Tests/DicomCoreTests/Fixtures/Segmentation/openjph-htj2k-fractional.dcm",
+      "provenance": "OpenJPH 0.32.0 ojph_compress, checked with ojph_expand; synthetic 16 x 20, three slices. Reproduce with Scripts/conformance/seg_compressed_fixtures.py.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; SYNTHETIC^SEG placeholders only.",
+      "sha256": "c281f61eade54ed77c7077406a29612e77b64c493e4dd998c37485afc4ada5c1",
+      "modality": "SEG",
+      "objectFamily": "Segmentation",
+      "transferSyntaxUID": "1.2.840.10008.1.2.4.201",
+      "photometricInterpretation": "MONOCHROME2",
+      "bitsStored": 8,
+      "signed": false,
+      "frames": 3
+    },
+    {
+      "id": "seg-openjph-htj2k-labelmap16",
+      "path": "Tests/DicomCoreTests/Fixtures/Segmentation/openjph-htj2k-labelmap16.dcm",
+      "provenance": "OpenJPH 0.32.0 ojph_compress, checked with ojph_expand; synthetic 16 x 20, three slices. Reproduce with Scripts/conformance/seg_compressed_fixtures.py.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; SYNTHETIC^SEG placeholders only.",
+      "sha256": "c173866cba6c1b5834145a1aaf28e4a04b9a9707fe5a781f73c1a1ef26623d4a",
+      "modality": "SEG",
+      "objectFamily": "Label Map Segmentation",
+      "transferSyntaxUID": "1.2.840.10008.1.2.4.201",
+      "photometricInterpretation": "MONOCHROME2",
+      "bitsStored": 16,
+      "signed": false,
+      "frames": 3
+    },
+    {
+      "id": "seg-openjph-htj2k-labelmap8",
+      "path": "Tests/DicomCoreTests/Fixtures/Segmentation/openjph-htj2k-labelmap8.dcm",
+      "provenance": "OpenJPH 0.32.0 ojph_compress, checked with ojph_expand; synthetic 16 x 20, three slices. Reproduce with Scripts/conformance/seg_compressed_fixtures.py.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; SYNTHETIC^SEG placeholders only.",
+      "sha256": "b288a7eaef98ef4f9c218c4f715af9bd82ab96ddd1fe9f19f47cc07f773904cf",
+      "modality": "SEG",
+      "objectFamily": "Label Map Segmentation",
+      "transferSyntaxUID": "1.2.840.10008.1.2.4.201",
+      "photometricInterpretation": "MONOCHROME2",
+      "bitsStored": 8,
+      "signed": false,
+      "frames": 3
+    },
+    {
+      "id": "seg-pydicom-rle-binary-bytes",
+      "path": "Tests/DicomCoreTests/Fixtures/Segmentation/pydicom-rle-binary-bytes.dcm",
+      "provenance": "pydicom 3.0.2 RLE encoder, one byte per pixel; synthetic 16 x 20, three slices. Reproduce with Scripts/conformance/seg_compressed_fixtures.py.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; SYNTHETIC^SEG placeholders only.",
+      "sha256": "3bd6aab27ecf6bfa742855ec73ae51ebef643c023f4e356de41281c034881dcc",
+      "modality": "SEG",
+      "objectFamily": "Segmentation",
+      "transferSyntaxUID": "1.2.840.10008.1.2.5",
+      "photometricInterpretation": "MONOCHROME2",
+      "bitsStored": 1,
+      "signed": false,
+      "frames": 6
+    },
+    {
+      "id": "seg-pydicom-rle-binary-packed",
+      "path": "Tests/DicomCoreTests/Fixtures/Segmentation/pydicom-rle-binary-packed.dcm",
+      "provenance": "pydicom 3.0.2 RLE encoder, packed bits per frame; synthetic 16 x 20, three slices. Reproduce with Scripts/conformance/seg_compressed_fixtures.py.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; SYNTHETIC^SEG placeholders only.",
+      "sha256": "1bc2256d053f0f14b09dfd6aa12b24998052fcdb4b2059a7462c26e39ff51eed",
+      "modality": "SEG",
+      "objectFamily": "Segmentation",
+      "transferSyntaxUID": "1.2.840.10008.1.2.5",
+      "photometricInterpretation": "MONOCHROME2",
+      "bitsStored": 1,
+      "signed": false,
+      "frames": 6
+    },
+    {
+      "id": "sr-tid1500-roi-measurement-report",
+      "path": "Tests/DicomCoreTests/Fixtures/StructuredReports/sr_tid1500_roi_measurement_report.dcm",
+      "provenance": "Generated deterministically by ClinicalInteropFixtureExportTests from DicomSRMeasurementReportBuilderTests.fullReport() using DicomSRMeasurementReportBuilder.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; PARITY placeholders only.",
+      "sha256": "5c12b74c0687284ca70a910328076b799a864e5330e8c89733aadd8a343eea10",
+      "modality": "SR",
+      "objectFamily": "Comprehensive 3D SR / TID 1500 ROI measurement report",
       "transferSyntaxUID": "1.2.840.10008.1.2.1",
       "photometricInterpretation": "N/A",
       "bitsStored": 0,
@@ -233,7 +1062,7 @@
       "provenance": "Generated deterministically by ClinicalParityCuratedFixtureTests using DicomStructuredReportBuilder.",
       "license": "Repository license",
       "deidentification": "Synthetic non-PHI; PARITY placeholders only.",
-      "sha256": "e1f83a1baf3e3a84ba674c1e027c82a00086921c0f6539ede7dd284d302abd4f",
+      "sha256": "b56527081dc48dcb05856a8e497d7f1920b966c0c2180d21ead63f121f07329f",
       "modality": "KO",
       "objectFamily": "Key Object Selection Document",
       "transferSyntaxUID": "1.2.840.10008.1.2.1",
@@ -241,64 +1070,1906 @@
       "bitsStored": 0,
       "signed": false,
       "frames": 0
+    },
+    {
+      "id": "independent-gray8",
+      "path": "Tests/DicomCoreTests/Fixtures/IndependentDifferential/gray8.dcm",
+      "sha256": "eba989cd7d4c6cd774538fb66bcdac0f356ffbe8c2381f029aedc7a581ba3483",
+      "provenance": "Generated independently with pydicom; arithmetic synthetic sample pattern.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; no patient source.",
+      "rows": 3,
+      "columns": 5,
+      "frames": 3,
+      "components": 1,
+      "bitsAllocated": 8,
+      "bitsStored": 8,
+      "signed": false,
+      "photometricInterpretation": "MONOCHROME2",
+      "planarConfiguration": null,
+      "transferSyntaxUID": "1.2.840.10008.1.2.1",
+      "geometry": {
+        "pixelSpacing": [
+          0.7,
+          1.3
+        ],
+        "position": [
+          -3.5,
+          4.25,
+          6.75
+        ],
+        "orientation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0
+        ]
+      },
+      "modality": "OT",
+      "objectFamily": "synthetic-multiframe-secondary-capture",
+      "highBit": 7,
+      "independentExpectedResults": {
+        "oracleID": "pydicom",
+        "artifactPath": "Tests/DicomCoreTests/Fixtures/IndependentDifferential/manifest.json",
+        "artifactSHA256": "19483d5dc2d3f92021d3f5d0754b3d14e359cad47558ea3d7159ed41135150dc",
+        "fixtureID": "gray8"
+      }
+    },
+    {
+      "id": "independent-gray12-signed",
+      "path": "Tests/DicomCoreTests/Fixtures/IndependentDifferential/gray12-signed.dcm",
+      "sha256": "f6e07d3bf7de9000080774ea1de93e2c73d5eda9e1383c602cc9b99f988deb12",
+      "provenance": "Generated independently with pydicom; arithmetic synthetic sample pattern.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; no patient source.",
+      "rows": 3,
+      "columns": 5,
+      "frames": 3,
+      "components": 1,
+      "bitsAllocated": 16,
+      "bitsStored": 12,
+      "signed": true,
+      "photometricInterpretation": "MONOCHROME2",
+      "planarConfiguration": null,
+      "transferSyntaxUID": "1.2.840.10008.1.2.1",
+      "geometry": {
+        "pixelSpacing": [
+          0.7,
+          1.3
+        ],
+        "position": [
+          -3.5,
+          4.25,
+          6.75
+        ],
+        "orientation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0
+        ]
+      },
+      "modality": "OT",
+      "objectFamily": "synthetic-multiframe-secondary-capture",
+      "highBit": 11,
+      "independentExpectedResults": {
+        "oracleID": "pydicom",
+        "artifactPath": "Tests/DicomCoreTests/Fixtures/IndependentDifferential/manifest.json",
+        "artifactSHA256": "19483d5dc2d3f92021d3f5d0754b3d14e359cad47558ea3d7159ed41135150dc",
+        "fixtureID": "gray12-signed"
+      }
+    },
+    {
+      "id": "independent-gray16",
+      "path": "Tests/DicomCoreTests/Fixtures/IndependentDifferential/gray16.dcm",
+      "sha256": "0a5542b2c86857a8f678ddf0d8a8cc4ce74205d5805a2fe041bae46f77361099",
+      "provenance": "Generated independently with pydicom; arithmetic synthetic sample pattern.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; no patient source.",
+      "rows": 3,
+      "columns": 5,
+      "frames": 3,
+      "components": 1,
+      "bitsAllocated": 16,
+      "bitsStored": 16,
+      "signed": false,
+      "photometricInterpretation": "MONOCHROME2",
+      "planarConfiguration": null,
+      "transferSyntaxUID": "1.2.840.10008.1.2.1",
+      "geometry": {
+        "pixelSpacing": [
+          0.7,
+          1.3
+        ],
+        "position": [
+          -3.5,
+          4.25,
+          6.75
+        ],
+        "orientation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0
+        ]
+      },
+      "modality": "OT",
+      "objectFamily": "synthetic-multiframe-secondary-capture",
+      "highBit": 15,
+      "independentExpectedResults": {
+        "oracleID": "pydicom",
+        "artifactPath": "Tests/DicomCoreTests/Fixtures/IndependentDifferential/manifest.json",
+        "artifactSHA256": "19483d5dc2d3f92021d3f5d0754b3d14e359cad47558ea3d7159ed41135150dc",
+        "fixtureID": "gray16"
+      }
+    },
+    {
+      "id": "independent-gray8-inverted",
+      "path": "Tests/DicomCoreTests/Fixtures/IndependentDifferential/gray8-inverted.dcm",
+      "sha256": "2e718ee547292774a0237f07b7dfdb567ea1862dc28eafa969978b9e525e0dd2",
+      "provenance": "Generated independently with pydicom; arithmetic synthetic sample pattern.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; no patient source.",
+      "rows": 3,
+      "columns": 5,
+      "frames": 3,
+      "components": 1,
+      "bitsAllocated": 8,
+      "bitsStored": 8,
+      "signed": false,
+      "photometricInterpretation": "MONOCHROME1",
+      "planarConfiguration": null,
+      "transferSyntaxUID": "1.2.840.10008.1.2.1",
+      "geometry": {
+        "pixelSpacing": [
+          0.7,
+          1.3
+        ],
+        "position": [
+          -3.5,
+          4.25,
+          6.75
+        ],
+        "orientation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0
+        ]
+      },
+      "modality": "OT",
+      "objectFamily": "synthetic-multiframe-secondary-capture",
+      "highBit": 7,
+      "independentExpectedResults": {
+        "oracleID": "pydicom",
+        "artifactPath": "Tests/DicomCoreTests/Fixtures/IndependentDifferential/manifest.json",
+        "artifactSHA256": "19483d5dc2d3f92021d3f5d0754b3d14e359cad47558ea3d7159ed41135150dc",
+        "fixtureID": "gray8-inverted"
+      }
+    },
+    {
+      "id": "independent-rgb-interleaved",
+      "path": "Tests/DicomCoreTests/Fixtures/IndependentDifferential/rgb-interleaved.dcm",
+      "sha256": "a8ef2f9adb3ad5f2305fc7bc416165a43d0eaca72b5211692fea06d3b4ee73c8",
+      "provenance": "Generated independently with pydicom; arithmetic synthetic sample pattern.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; no patient source.",
+      "rows": 3,
+      "columns": 5,
+      "frames": 3,
+      "components": 3,
+      "bitsAllocated": 8,
+      "bitsStored": 8,
+      "signed": false,
+      "photometricInterpretation": "RGB",
+      "planarConfiguration": 0,
+      "transferSyntaxUID": "1.2.840.10008.1.2.1",
+      "geometry": {
+        "pixelSpacing": [
+          0.7,
+          1.3
+        ],
+        "position": [
+          -3.5,
+          4.25,
+          6.75
+        ],
+        "orientation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0
+        ]
+      },
+      "modality": "OT",
+      "objectFamily": "synthetic-multiframe-secondary-capture",
+      "highBit": 7,
+      "independentExpectedResults": {
+        "oracleID": "pydicom",
+        "artifactPath": "Tests/DicomCoreTests/Fixtures/IndependentDifferential/manifest.json",
+        "artifactSHA256": "19483d5dc2d3f92021d3f5d0754b3d14e359cad47558ea3d7159ed41135150dc",
+        "fixtureID": "rgb-interleaved"
+      }
+    },
+    {
+      "id": "independent-rgb-planar",
+      "path": "Tests/DicomCoreTests/Fixtures/IndependentDifferential/rgb-planar.dcm",
+      "sha256": "0060eb3692f63844827a996d4668603f21fbba739059202fafd1c2b0cbc76a2a",
+      "provenance": "Generated independently with pydicom; arithmetic synthetic sample pattern.",
+      "license": "Repository license",
+      "deidentification": "Synthetic non-PHI; no patient source.",
+      "rows": 3,
+      "columns": 5,
+      "frames": 3,
+      "components": 3,
+      "bitsAllocated": 8,
+      "bitsStored": 8,
+      "signed": false,
+      "photometricInterpretation": "RGB",
+      "planarConfiguration": 1,
+      "transferSyntaxUID": "1.2.840.10008.1.2.1",
+      "geometry": {
+        "pixelSpacing": [
+          0.7,
+          1.3
+        ],
+        "position": [
+          -3.5,
+          4.25,
+          6.75
+        ],
+        "orientation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0
+        ]
+      },
+      "modality": "OT",
+      "objectFamily": "synthetic-multiframe-secondary-capture",
+      "highBit": 7,
+      "independentExpectedResults": {
+        "oracleID": "pydicom",
+        "artifactPath": "Tests/DicomCoreTests/Fixtures/IndependentDifferential/manifest.json",
+        "artifactSHA256": "19483d5dc2d3f92021d3f5d0754b3d14e359cad47558ea3d7159ed41135150dc",
+        "fixtureID": "rgb-planar"
+      }
     }
   ],
   "oracles": [
-    {"id":"dicomswift","implementation":"DICOM-Swift","version":"workspace HEAD","availability":"required","preflightCapabilityID":"bundled-synthetic-fixtures"},
-    {"id":"j2kswift","implementation":"Raster-Lab J2KSwift","version":"11.0.2","availability":"required","preflightCapabilityID":"j2kswift-backend"},
-    {"id":"openjpeg","implementation":"OpenJPEG","version":"runtime reported","availability":"release","preflightCapabilityID":"openjpeg-runtime"},
-    {"id":"openjph","implementation":"OpenJPH fixture producer","version":"fixture recorded","availability":"fixture","preflightCapabilityID":"bundled-synthetic-fixtures"},
-    {"id":"jlswift","implementation":"Raster-Lab JLSwift","version":"0.9.0","availability":"required","preflightCapabilityID":"jlswift-backend"},
-    {"id":"charls","implementation":"CharLS","version":"runtime reported","availability":"release","preflightCapabilityID":"charls-runtime"},
-    {"id":"jxlswift","implementation":"Raster-Lab JXLSwift","version":"1.4.0","availability":"required","preflightCapabilityID":"jxlswift-backend"},
-    {"id":"libjxl","implementation":"libjxl cjxl/djxl","version":"tool reported","availability":"release","preflightCapabilityID":"libjxl-tools"},
-    {"id":"dicomkit","implementation":"Raster-Lab DICOMKit CLI","version":"9348075fcd7500a1c15c2ff3e6a796f554c066b4","availability":"nightly","preflightCapabilityID":"dicomkit-interop"}
+    {
+      "id": "dicomswift",
+      "implementation": "DICOM-Swift",
+      "version": "workspace HEAD",
+      "availability": "required",
+      "preflightCapabilityID": "bundled-synthetic-fixtures"
+    },
+    {
+      "id": "j2kswift",
+      "implementation": "Own JPEG 2000 codec (vendored Raster-Lab J2KSwift 11.0.2 J2KCore/J2KCodec CPU core as DicomJPEG2000, #2329)",
+      "version": "11.0.2-vendored",
+      "availability": "required",
+      "preflightCapabilityID": "j2kswift-backend"
+    },
+    {
+      "id": "openjpeg",
+      "implementation": "OpenJPEG (libopenjp2 runtime in XCTest; opj_compress/opj_decompress 2.5 in jpeg2000_oracle.py)",
+      "version": "runtime reported",
+      "availability": "release",
+      "preflightCapabilityID": "openjpeg-runtime"
+    },
+    {
+      "id": "openjph",
+      "implementation": "OpenJPH fixture producer",
+      "version": "fixture recorded",
+      "availability": "fixture",
+      "preflightCapabilityID": "bundled-synthetic-fixtures"
+    },
+    {
+      "id": "jlswift",
+      "implementation": "Own JPEG-LS codec (vendored Raster-Lab JLSwift 0.9.1 core as DicomJPEGLS, #2328)",
+      "version": "0.9.1-vendored",
+      "availability": "required",
+      "preflightCapabilityID": "jlswift-backend"
+    },
+    {
+      "id": "charls",
+      "implementation": "CharLS (libcharls runtime in XCTest; pyjpegls 1.5.1 in jpegls_oracle.py)",
+      "version": "runtime reported",
+      "availability": "release",
+      "preflightCapabilityID": "charls-runtime"
+    },
+    {
+      "id": "jxlswift",
+      "implementation": "vendored DicomJPEGXL (Raster-Lab JXLSwift 1.4.0 core, own reference-exact Modular decoder)",
+      "version": "1.4.0-vendored",
+      "availability": "required",
+      "preflightCapabilityID": "jxlswift-backend"
+    },
+    {
+      "id": "libjxl",
+      "implementation": "libjxl cjxl/djxl",
+      "version": "tool reported",
+      "availability": "release",
+      "preflightCapabilityID": "libjxl-tools"
+    },
+    {
+      "id": "dicomkit",
+      "implementation": "Raster-Lab DICOMKit CLI",
+      "version": "9348075fcd7500a1c15c2ff3e6a796f554c066b4",
+      "availability": "nightly",
+      "preflightCapabilityID": "dicomkit-interop"
+    },
+    {
+      "id": "pydicom",
+      "implementation": "pydicom",
+      "version": "3.0.1",
+      "independence": "Independent Python DICOM reader/writer; no DICOM-Swift or Raster-Lab code.",
+      "preflightCapabilityID": "pydicom-differential",
+      "availability": "Explicit isolated Python environment for the differential gate; never an app dependency."
+    },
+    {
+      "id": "libjpeg-turbo",
+      "implementation": "libjpeg-turbo (Apple ImageIO in XCTest; cjpeg/djpeg 3.2 in jpeg_codec_oracle.py and jpeg_lossless_oracle.py)",
+      "version": "ImageIO system framework; libjpeg-turbo 3.2.0 CLI",
+      "availability": "release",
+      "independence": "Independent JPEG implementation; no DicomJPEG (vendored JLISwift) code.",
+      "preflightCapabilityID": "imageio-jpeg-baseline"
+    }
   ],
   "backends": [
-    {"capabilityID":"j2kswift-cpu","verdict":"experimental","independentOracleIDs":["openjpeg","openjph"],"caseIDs":["j2k-lossless-matrix","j2k-rgb-cross-oracle","htj2k-known-mismatch"]},
-    {"capabilityID":"jlswift","verdict":"experimental","independentOracleIDs":["charls"],"caseIDs":["jpegls-cross-oracle","jpegls-near-lossless"]},
-    {"capabilityID":"jxlswift","verdict":"experimental","independentOracleIDs":["libjxl"],"caseIDs":["jpegxl-libjxl-cross-oracle","jpegxl-lossy-metric"]},
-    {"capabilityID":"native-rle-lossless","verdict":"fallback","independentOracleIDs":["dicomkit"],"caseIDs":["dicomkit-synthetic-read"]},
-    {"capabilityID":"native-jpeg-lossless","verdict":"fallback","independentOracleIDs":["dicomkit"],"caseIDs":["dicomkit-cross-write"]},
-    {"capabilityID":"native-jpeg-extended","verdict":"fallback","independentOracleIDs":["dicomkit"],"caseIDs":["dicomkit-cross-write"]},
-    {"capabilityID":"charls-jpeg-ls","verdict":"qualified","independentOracleIDs":["jlswift"],"caseIDs":["jpegls-cross-oracle","jpegls-near-lossless"]},
-    {"capabilityID":"imageio-jpeg-baseline","verdict":"qualified","independentOracleIDs":["dicomkit"],"caseIDs":["dicomkit-synthetic-read"]},
-    {"capabilityID":"imageio-jpeg-extended","verdict":"fallback","independentOracleIDs":["dicomkit"],"caseIDs":["dicomkit-cross-write"]},
-    {"capabilityID":"imageio-jpeg-2000","verdict":"fallback","independentOracleIDs":["openjpeg"],"caseIDs":["j2k-lossless-matrix"]},
-    {"capabilityID":"openjpeg-jpeg-2000","verdict":"qualified","independentOracleIDs":["j2kswift"],"caseIDs":["j2k-lossless-matrix","j2k-rgb-cross-oracle"]},
-    {"capabilityID":"openjpeg-htj2k","verdict":"qualified","independentOracleIDs":["j2kswift","openjph"],"caseIDs":["htj2k-known-mismatch","j2k-encode-openjpeg"]}
+    {
+      "capabilityID": "j2kswift-cpu",
+      "verdict": "qualified",
+      "independentOracleIDs": [
+        "openjpeg",
+        "openjph"
+      ],
+      "caseIDs": [
+        "j2k-lossless-matrix",
+        "j2k-rgb-cross-oracle",
+        "htj2k-openjph-parity",
+        "j2k-own-openjpeg-independent-inputs",
+        "j2k-own-containers",
+        "j2k-own-deterministic-parallel",
+        "htj2k-own-per-uid-cross-decoded",
+        "htj2k-own-tiles",
+        "htj2k-own-intent-not-uid",
+        "htj2k-own-openjph-independent-inputs",
+        "htj2k-own-syntax-capabilities",
+        "htj2k-own-encapsulation",
+        "htj2k-own-partial-parallel-cancel",
+        "htj2k-own-malformed",
+        "j2k-part2-own-collections-openjpeg-components",
+        "j2k-part2-built-annex-j-streams",
+        "j2k-part2-collections-dicom-layer",
+        "j2k-part2-syntax-rules"
+      ]
+    },
+    {
+      "capabilityID": "jlswift",
+      "verdict": "qualified",
+      "independentOracleIDs": [
+        "charls"
+      ],
+      "caseIDs": [
+        "jpegls-cross-oracle",
+        "jpegls-near-lossless",
+        "jpegls-negative-shapes",
+        "jpegls-own-interleave-cross-charls",
+        "jpegls-own-restart-and-near-bound",
+        "jpegls-own-transcode-options"
+      ]
+    },
+    {
+      "capabilityID": "jxlswift",
+      "verdict": "experimental",
+      "independentOracleIDs": [
+        "libjxl"
+      ],
+      "caseIDs": [
+        "jpegxl-libjxl-cross-oracle",
+        "jpegxl-lossy-metric",
+        "jpegxl-lossless",
+        "jpegxl-modular-libjxl-decoded-by-own",
+        "jpegxl-modular-own-decoded-by-libjxl",
+        "jpegxl-modular-icc-passthrough",
+        "jpegxl-vardct-libjxl-decoded-by-own",
+        "jpegxl-vardct-own-accepted-by-libjxl",
+        "jpegxl-vardct-explicit-lossy-derivation",
+        "jpegxl-vardct-typed-refusals-and-cancellation",
+        "jpegxl-recompression-processes-byte-exact",
+        "jpegxl-recompression-dicom-identity",
+        "jpegxl-recompression-damaged-data-typed",
+        "jpegxl-modular-dicom-layer",
+        "jpegxl-modular-refusals"
+      ]
+    },
+    {
+      "capabilityID": "native-rle-lossless",
+      "verdict": "fallback",
+      "independentOracleIDs": [
+        "dicomkit",
+        "pydicom"
+      ],
+      "caseIDs": [
+        "dicomkit-synthetic-read",
+        "rle-deflate-rle-shape-contract",
+        "rle-deflate-compressed-sources"
+      ]
+    },
+    {
+      "capabilityID": "native-jpeg-lossless",
+      "verdict": "fallback",
+      "independentOracleIDs": [
+        "dicomkit"
+      ],
+      "caseIDs": [
+        "dicomkit-cross-write"
+      ]
+    },
+    {
+      "capabilityID": "native-jpeg-extended",
+      "verdict": "fallback",
+      "independentOracleIDs": [
+        "dicomkit"
+      ],
+      "caseIDs": [
+        "dicomkit-cross-write"
+      ]
+    },
+    {
+      "capabilityID": "charls-jpeg-ls",
+      "verdict": "qualified",
+      "independentOracleIDs": [
+        "jlswift"
+      ],
+      "caseIDs": [
+        "jpegls-cross-oracle",
+        "jpegls-near-lossless"
+      ]
+    },
+    {
+      "capabilityID": "imageio-jpeg-baseline",
+      "verdict": "qualified",
+      "independentOracleIDs": [
+        "dicomkit"
+      ],
+      "caseIDs": [
+        "dicomkit-synthetic-read"
+      ]
+    },
+    {
+      "capabilityID": "imageio-jpeg-extended",
+      "verdict": "fallback",
+      "independentOracleIDs": [
+        "dicomkit"
+      ],
+      "caseIDs": [
+        "dicomkit-cross-write"
+      ]
+    },
+    {
+      "capabilityID": "imageio-jpeg-2000",
+      "verdict": "fallback",
+      "independentOracleIDs": [
+        "openjpeg"
+      ],
+      "caseIDs": [
+        "j2k-lossless-matrix"
+      ]
+    },
+    {
+      "capabilityID": "openjpeg-jpeg-2000",
+      "verdict": "qualified",
+      "independentOracleIDs": [
+        "j2kswift"
+      ],
+      "caseIDs": [
+        "j2k-lossless-matrix",
+        "j2k-rgb-cross-oracle"
+      ]
+    },
+    {
+      "capabilityID": "openjpeg-htj2k",
+      "verdict": "qualified",
+      "independentOracleIDs": [
+        "j2kswift",
+        "openjph"
+      ],
+      "caseIDs": [
+        "htj2k-openjph-parity",
+        "j2k-encode-openjpeg"
+      ]
+    },
+    {
+      "capabilityID": "jpegswift",
+      "verdict": "qualified",
+      "independentOracleIDs": [
+        "libjpeg-turbo"
+      ],
+      "caseIDs": [
+        "jpeg-own-cross-imageio",
+        "jpeg-own-twelve-bit-and-lossless",
+        "jpeg-own-transcode-routes"
+      ]
+    },
+    {
+      "capabilityID": "native-deflated-frames",
+      "verdict": "qualified",
+      "independentOracleIDs": [
+        "pydicom"
+      ],
+      "caseIDs": [
+        "rle-deflate-frame-codec-bounded",
+        "rle-deflate-native-any-bits-allocated",
+        "rle-deflate-compressed-sources",
+        "rle-deflate-plans-and-streaming",
+        "rle-deflate-malformed-fragments",
+        "rle-deflate-cancellation",
+        "rle-deflate-registry-negotiation",
+        "rle-deflate-dataset-deflate"
+      ]
+    }
   ],
   "cases": [
-    {"id":"fixture-metadata-parity","fixtureIDs":["ct-explicit-vr-le-rescale","secondary-capture-rgb","us-multiframe-metadata","sr-tid1500","kos"],"encoderID":"repository-builders","decoderID":"dicomswift","backendID":"metadata-parser","comparison":"metadata-exact","testIdentifier":"ClinicalParityFixtureManifestTests","testPath":"Tests/DicomCoreTests/ClinicalParityFixtureManifestTests.swift","requiredGates":["fixture","release"],"expectedResult":"passed","supportVerdict":"qualified"},
-    {"id":"j2k-lossless-matrix","fixtureIDs":[],"encoderID":"openjpeg","decoderID":"j2kswift","backendID":"j2kswift-cpu","comparison":"pixel-exact-first-difference","testIdentifier":"DicomJ2KSwiftBackendTests.test_losslessPrecisionSignednessAndTilingMatrixMatchesOpenJPEG","testPath":"Tests/DicomCoreTests/DicomJ2KSwiftBackendTests.swift","requiredGates":["runtime","release"],"expectedResult":"passed","supportVerdict":"experimental"},
-    {"id":"j2k-rgb-cross-oracle","fixtureIDs":["secondary-capture-rgb"],"encoderID":"openjpeg","decoderID":"j2kswift","backendID":"j2kswift-cpu","comparison":"component-order-exact","testIdentifier":"DicomJ2KSwiftBackendTests.test_losslessRGBComponentOrderMatchesOpenJPEGForPlanarMetadata","testPath":"Tests/DicomCoreTests/DicomJ2KSwiftBackendTests.swift","requiredGates":["runtime","release"],"expectedResult":"passed","supportVerdict":"experimental"},
-    {"id":"htj2k-known-mismatch","fixtureIDs":["htj2k-openjph-known-mismatch"],"encoderID":"openjph","decoderID":"j2kswift","backendID":"j2kswift-cpu","comparison":"visible-known-mismatch","testIdentifier":"DicomJ2KSwiftBackendTests.test_shadowModeReturnsOpenJPEGPixelsAndRecordsHTJ2KMismatch","testPath":"Tests/DicomCoreTests/DicomJ2KSwiftBackendTests.swift","requiredGates":["runtime","release"],"expectedResult":"passed","supportVerdict":"fallback"},
-    {"id":"j2k-encode-openjpeg","fixtureIDs":[],"encoderID":"j2kswift","decoderID":"openjpeg","backendID":"j2kswift-cpu","comparison":"pixel-exact-first-difference","testIdentifier":"DicomJ2KSwiftEncoderTests.test_losslessGrayscalePrecisionSignednessAndTilingRoundTripThroughOpenJPEG","testPath":"Tests/DicomCoreTests/DicomJ2KSwiftEncoderTests.swift","requiredGates":["runtime","release"],"expectedResult":"passed","supportVerdict":"experimental"},
-    {"id":"j2k-lossy-metadata","fixtureIDs":[],"encoderID":"j2kswift","decoderID":"openjpeg","backendID":"j2kswift-cpu","comparison":"declared-error-bound-and-metadata-exact","testIdentifier":"DicomJ2KSwiftEncoderTests.test_irreversibleRGBTranscodeSetsDeterministicLossyMetadata","testPath":"Tests/DicomCoreTests/DicomJ2KSwiftEncoderTests.swift","requiredGates":["runtime","release"],"expectedResult":"passed","supportVerdict":"experimental"},
-    {"id":"jpegls-cross-oracle","fixtureIDs":[],"encoderID":"jlswift-and-charls","decoderID":"charls-and-jlswift","backendID":"jlswift","comparison":"pixel-exact-first-difference","testIdentifier":"DicomJLSwiftBackendTests.test_losslessGrayscaleCrossDecodesWithCharLSAcrossStoredDepths","testPath":"Tests/DicomCoreTests/DicomJLSwiftBackendTests.swift","requiredGates":["runtime","release"],"expectedResult":"passed","supportVerdict":"experimental"},
-    {"id":"jpegls-near-lossless","fixtureIDs":[],"encoderID":"jlswift-and-charls","decoderID":"charls-and-jlswift","backendID":"jlswift","comparison":"per-sample-explicit-near-bound","testIdentifier":"DicomJLSwiftBackendTests.test_nearLosslessCrossDecodeRespectsExplicitNearBound","testPath":"Tests/DicomCoreTests/DicomJLSwiftBackendTests.swift","requiredGates":["runtime","release"],"expectedResult":"passed","supportVerdict":"experimental"},
-    {"id":"jpegls-negative-shapes","fixtureIDs":[],"encoderID":"jlswift","decoderID":"jlswift","backendID":"jlswift","comparison":"typed-error-and-bounded-input","testIdentifier":"DicomJLSwiftBackendTests.test_restartMarkersOddDimensionsAndMalformedInputsAreHandled","testPath":"Tests/DicomCoreTests/DicomJLSwiftBackendTests.swift","requiredGates":["fixture","release"],"expectedResult":"passed","supportVerdict":"experimental"},
-    {"id":"jpegxl-lossless","fixtureIDs":[],"encoderID":"jxlswift","decoderID":"jxlswift","backendID":"jxlswift","comparison":"pixel-exact-first-difference","testIdentifier":"DicomJXLSwiftBackendTests.test_losslessSignedGray16_roundTripsTwosComplementExactly","testPath":"Tests/DicomCoreTests/DicomJXLSwiftBackendTests.swift","requiredGates":["fixture","release"],"expectedResult":"passed","supportVerdict":"experimental"},
-    {"id":"jpegxl-libjxl-cross-oracle","fixtureIDs":["secondary-capture-rgb"],"encoderID":"jxlswift-and-libjxl","decoderID":"libjxl-and-jxlswift","backendID":"jxlswift","comparison":"pixel-exact-first-difference","testIdentifier":"DicomJXLSwiftBackendTests.test_jxlswiftRGB8Output_decodesByteExactWithLibjxl","testPath":"Tests/DicomCoreTests/DicomJXLSwiftBackendTests.swift","requiredGates":["runtime","release"],"expectedResult":"passed","supportVerdict":"experimental"},
-    {"id":"jpegxl-lossy-metric","fixtureIDs":[],"encoderID":"libjxl","decoderID":"jxlswift","backendID":"jxlswift","comparison":"declared-fixture-specific-absolute-error","testIdentifier":"DicomJXLSwiftBackendTests.test_libjxlLossyOutput_decodesWithinToleranceWithJXLSwift","testPath":"Tests/DicomCoreTests/DicomJXLSwiftBackendTests.swift","requiredGates":["runtime","release"],"expectedResult":"passed","supportVerdict":"experimental"},
-    {"id":"encapsulation-offsets","fixtureIDs":[],"encoderID":"repository-builders","decoderID":"dicomswift","backendID":"encapsulated-frame-reader","comparison":"frame-order-and-offset-exact","testIdentifier":"DicomEncapsulatedPixelFrameReaderTests","testPath":"Tests/DicomCoreTests/DicomEncapsulatedPixelFrameReaderTests.swift","requiredGates":["fixture","release"],"expectedResult":"passed","supportVerdict":"qualified"},
-    {"id":"enhanced-multiframe","fixtureIDs":[],"encoderID":"repository-builders","decoderID":"dicomswift","backendID":"enhanced-multiframe-parser","comparison":"geometry-frame-order-exact","testIdentifier":"DicomEnhancedMultiframeVolumeTests","testPath":"Tests/DicomCoreTests/DicomEnhancedMultiframeVolumeTests.swift","requiredGates":["fixture","release"],"expectedResult":"passed","supportVerdict":"qualified"},
-    {"id":"native-pixel-shapes","fixtureIDs":[],"encoderID":"repository-builders","decoderID":"dicomswift","backendID":"native-pixel-reader","comparison":"stored-sample-exact","testIdentifier":"DCMPixelReaderInternalTests","testPath":"Tests/DicomCoreTests/DCMPixelReaderInternalTests.swift","requiredGates":["fixture","release"],"expectedResult":"passed","supportVerdict":"qualified"},
-    {"id":"native-color-shapes","fixtureIDs":["secondary-capture-rgb"],"encoderID":"repository-builders","decoderID":"dicomswift","backendID":"native-color-reader","comparison":"rgb-normalization-exact","testIdentifier":"DicomColorPixelDataTests","testPath":"Tests/DicomCoreTests/DicomColorPixelDataTests.swift","requiredGates":["fixture","release"],"expectedResult":"passed","supportVerdict":"qualified"},
-    {"id":"native-extended-negative","fixtureIDs":[],"encoderID":"repository-builders","decoderID":"dicomswift","backendID":"native-jpeg-extended","comparison":"typed-error-and-precision-policy","testIdentifier":"JPEGExtendedDecoderTests","testPath":"Tests/DicomCoreTests/JPEGExtendedDecoderTests.swift","requiredGates":["fixture","release"],"expectedResult":"passed","supportVerdict":"fallback"},
-    {"id":"codec-negative-security","fixtureIDs":[],"encoderID":"malformed-generators","decoderID":"dicomswift","backendID":"codec-boundaries","comparison":"typed-error-bounded-resource","testIdentifier":"DicomJXLSwiftBackendTests.test_malformedAndOversizedFrames_failWithoutAllocation","testPath":"Tests/DicomCoreTests/DicomJXLSwiftBackendTests.swift","requiredGates":["fixture","release"],"expectedResult":"passed","supportVerdict":"qualified"},
-    {"id":"clinical-object-roundtrip","fixtureIDs":["seg-binary","rtstruct-contour","rtdose-grid","gsps-annotation"],"encoderID":"dicomswift","decoderID":"dicomswift","backendID":"clinical-object-builders","comparison":"metadata-geometry-exact","testIdentifier":"DicomSegmentationTests|DicomRTObjectsTests|DicomAIInferenceTests","testPath":"Tests/DicomCoreTests/DicomSegmentationTests.swift","requiredGates":["fixture","release"],"expectedResult":"passed","supportVerdict":"qualified"},
-    {"id":"quantitative-object-roundtrip","fixtureIDs":[],"encoderID":"dicomswift","decoderID":"dicomswift","backendID":"quantitative-object-parser","comparison":"mapping-and-units-exact","testIdentifier":"DicomQuantitativeValuesTests","testPath":"Tests/DicomCoreTests/DicomQuantitativeValuesTests.swift","requiredGates":["fixture","release"],"expectedResult":"passed","supportVerdict":"qualified"},
-    {"id":"non-pixel-object-roundtrip","fixtureIDs":[],"encoderID":"dicomswift","decoderID":"dicomswift","backendID":"non-pixel-object-builders","comparison":"metadata-and-payload-exact","testIdentifier":"DicomEncapsulatedDocumentTests|DicomWaveformTests|DicomVideoTests","testPath":"Tests/DicomCoreTests/DicomEncapsulatedDocumentTests.swift","requiredGates":["fixture","release"],"expectedResult":"passed","supportVerdict":"qualified"},
-    {"id":"dicomswift-object-export","fixtureIDs":["seg-binary","rtstruct-contour","rtdose-grid","gsps-annotation","sr-tid1500","kos"],"encoderID":"dicomswift","decoderID":"dicomkit","backendID":"clinical-object-builders","comparison":"dicomkit-level1-and-tag-exact","testIdentifier":"ClinicalInteropFixtureExportTests","testPath":"Tests/DicomCoreTests/ClinicalInteropFixtureExportTests.swift","requiredGates":["nightly"],"expectedResult":"passed","supportVerdict":"experimental"},
-    {"id":"dicomkit-synthetic-read","fixtureIDs":[],"encoderID":"dicomkit","decoderID":"dicomswift","backendID":"legacy-frame-decoders","comparison":"metadata-and-pixel-exact","testIdentifier":"dicomkit-synthetic-read","testPath":"Scripts/conformance/run_dicomkit_interop.sh","requiredGates":["nightly"],"expectedResult":"passed","supportVerdict":"experimental"},
-    {"id":"dicomkit-cross-write","fixtureIDs":[],"encoderID":"dicomkit","decoderID":"dicomswift","backendID":"legacy-frame-decoders","comparison":"encapsulation-metadata-and-pixel-exact","testIdentifier":"dicomkit-cross-write","testPath":"Scripts/conformance/run_dicomkit_interop.sh","requiredGates":["nightly"],"expectedResult":"passed","supportVerdict":"experimental"},
-    {"id":"optimized-artifact-negative","fixtureIDs":[],"encoderID":"viewer-core","decoderID":"viewer-core","backendID":"optimized-volume-artifact","comparison":"digest-schema-and-fingerprint-fail-closed","testIdentifier":"OptimizedVolumeArtifactStoreTests","testPath":"../Packages/Tests/ViewerCoreTests/OptimizedVolumeArtifactStoreTests.swift","requiredGates":["isis-release"],"expectedResult":"passed","supportVerdict":"qualified"}
+    {
+      "id": "fixture-metadata-parity",
+      "fixtureIDs": [
+        "ct-explicit-vr-le-rescale",
+        "secondary-capture-rgb",
+        "us-multiframe-metadata",
+        "sr-tid1500",
+        "kos"
+      ],
+      "encoderID": "repository-builders",
+      "decoderID": "dicomswift",
+      "backendID": "metadata-parser",
+      "comparison": "metadata-exact",
+      "testIdentifier": "ClinicalParityFixtureManifestTests",
+      "testPath": "Tests/DicomCoreTests/ClinicalParityFixtureManifestTests.swift",
+      "requiredGates": [
+        "fixture",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "j2k-lossless-matrix",
+      "fixtureIDs": [],
+      "encoderID": "openjpeg",
+      "decoderID": "j2kswift",
+      "backendID": "j2kswift-cpu",
+      "comparison": "pixel-exact-first-difference",
+      "testIdentifier": "DicomJ2KSwiftBackendTests.test_losslessPrecisionSignednessAndTilingMatrixMatchesOpenJPEG",
+      "testPath": "Tests/DicomCoreTests/DicomJ2KSwiftBackendTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "j2k-rgb-cross-oracle",
+      "fixtureIDs": [
+        "secondary-capture-rgb"
+      ],
+      "encoderID": "openjpeg",
+      "decoderID": "j2kswift",
+      "backendID": "j2kswift-cpu",
+      "comparison": "component-order-exact",
+      "testIdentifier": "DicomJ2KSwiftBackendTests.test_losslessRGBComponentOrderMatchesOpenJPEGForPlanarMetadata",
+      "testPath": "Tests/DicomCoreTests/DicomJ2KSwiftBackendTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "htj2k-openjph-parity",
+      "fixtureIDs": [
+        "htj2k-openjph-fixture"
+      ],
+      "encoderID": "openjph",
+      "decoderID": "j2kswift",
+      "backendID": "j2kswift-cpu",
+      "comparison": "pixel-exact",
+      "testIdentifier": "DicomJ2KSwiftBackendTests.test_shadowModeReturnsOpenJPEGPixelsAndRecordsHTJ2KParity",
+      "testPath": "Tests/DicomCoreTests/DicomJ2KSwiftBackendTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "j2k-encode-openjpeg",
+      "fixtureIDs": [],
+      "encoderID": "j2kswift",
+      "decoderID": "openjpeg",
+      "backendID": "j2kswift-cpu",
+      "comparison": "pixel-exact-first-difference",
+      "testIdentifier": "DicomJ2KSwiftEncoderTests.test_losslessGrayscalePrecisionSignednessAndTilingRoundTripThroughOpenJPEG",
+      "testPath": "Tests/DicomCoreTests/DicomJ2KSwiftEncoderTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "j2k-lossy-metadata",
+      "fixtureIDs": [],
+      "encoderID": "j2kswift",
+      "decoderID": "openjpeg",
+      "backendID": "j2kswift-cpu",
+      "comparison": "declared-error-bound-and-metadata-exact",
+      "testIdentifier": "DicomJ2KSwiftEncoderTests.test_irreversibleRGBTranscodeSetsDeterministicLossyMetadata",
+      "testPath": "Tests/DicomCoreTests/DicomJ2KSwiftEncoderTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "jpegls-cross-oracle",
+      "fixtureIDs": [],
+      "encoderID": "jlswift-and-charls",
+      "decoderID": "charls-and-jlswift",
+      "backendID": "jlswift",
+      "comparison": "pixel-exact-first-difference",
+      "testIdentifier": "DicomJLSwiftBackendTests.test_losslessGrayscaleCrossDecodesWithCharLSAcrossStoredDepths",
+      "testPath": "Tests/DicomCoreTests/DicomJLSwiftBackendTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "jpegls-near-lossless",
+      "fixtureIDs": [],
+      "encoderID": "jlswift-and-charls",
+      "decoderID": "charls-and-jlswift",
+      "backendID": "jlswift",
+      "comparison": "per-sample-explicit-near-bound",
+      "testIdentifier": "DicomJLSwiftBackendTests.test_nearLosslessCrossDecodeRespectsExplicitNearBound",
+      "testPath": "Tests/DicomCoreTests/DicomJLSwiftBackendTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "jpegls-negative-shapes",
+      "fixtureIDs": [],
+      "encoderID": "jlswift",
+      "decoderID": "jlswift",
+      "backendID": "jlswift",
+      "comparison": "typed-error-and-bounded-input",
+      "testIdentifier": "DicomJLSwiftBackendTests.test_restartMarkersOddDimensionsAndMalformedInputsAreHandled",
+      "testPath": "Tests/DicomCoreTests/DicomJLSwiftBackendTests.swift",
+      "requiredGates": [
+        "fixture",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "jpegxl-lossless",
+      "fixtureIDs": [],
+      "encoderID": "jxlswift",
+      "decoderID": "jxlswift",
+      "backendID": "jxlswift",
+      "comparison": "pixel-exact-first-difference",
+      "testIdentifier": "DicomJXLSwiftBackendTests.test_losslessSignedGray16_roundTripsTwosComplementExactly",
+      "testPath": "Tests/DicomCoreTests/DicomJXLSwiftBackendTests.swift",
+      "requiredGates": [
+        "fixture",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "jpegxl-libjxl-cross-oracle",
+      "fixtureIDs": [
+        "secondary-capture-rgb"
+      ],
+      "encoderID": "jxlswift-and-libjxl",
+      "decoderID": "libjxl-and-jxlswift",
+      "backendID": "jxlswift",
+      "comparison": "pixel-exact-first-difference",
+      "testIdentifier": "DicomJXLSwiftBackendTests.test_jxlswiftRGB8Output_decodesByteExactWithLibjxl",
+      "testPath": "Tests/DicomCoreTests/DicomJXLSwiftBackendTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "jpegxl-lossy-metric",
+      "fixtureIDs": [],
+      "encoderID": "libjxl",
+      "decoderID": "jxlswift",
+      "backendID": "jxlswift",
+      "comparison": "declared-fixture-specific-absolute-error",
+      "testIdentifier": "DicomJXLSwiftBackendTests.test_libjxlLossyOutput_decodesWithinToleranceWithJXLSwift",
+      "testPath": "Tests/DicomCoreTests/DicomJXLSwiftBackendTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "jpegxl-modular-libjxl-decoded-by-own",
+      "fixtureIDs": [],
+      "encoderID": "libjxl",
+      "decoderID": "jxlswift",
+      "backendID": "jxlswift",
+      "comparison": "pixel-exact-first-difference",
+      "testIdentifier": "JPEGXLModularCodecTests.test_cjxlStreamsDecodeExactlyThroughTheBackend",
+      "testPath": "Tests/DicomCoreTests/JPEGXLModularCodecTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "jpegxl-modular-own-decoded-by-libjxl",
+      "fixtureIDs": [],
+      "encoderID": "jxlswift",
+      "decoderID": "libjxl",
+      "backendID": "jxlswift",
+      "comparison": "pixel-exact-first-difference",
+      "testIdentifier": "JPEGXLModularCodecTests.test_ownStreamsDecodeExactlyWithDjxl",
+      "testPath": "Tests/DicomCoreTests/JPEGXLModularCodecTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "jpegxl-modular-icc-passthrough",
+      "fixtureIDs": [],
+      "encoderID": "jxlswift-and-libjxl",
+      "decoderID": "libjxl-and-jxlswift",
+      "backendID": "jxlswift",
+      "comparison": "pixel-exact-first-difference",
+      "testIdentifier": "JPEGXLModularCodecTests.test_iccProfileTravelsInsideTheCodestreamAsPassthrough",
+      "testPath": "Tests/DicomCoreTests/JPEGXLModularCodecTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "jpegxl-vardct-libjxl-decoded-by-own",
+      "fixtureIDs": [],
+      "encoderID": "libjxl",
+      "decoderID": "jxlswift",
+      "backendID": "jxlswift",
+      "comparison": "pixel-max-difference-le-1-8-bit-le-2-deep-vs-libjxl",
+      "testIdentifier": "JPEGXLVarDCTCodecTests.test_progressiveUpsampledAndNoisyCjxlStreamsDecodeThroughTheBackendWithinTolerance",
+      "testPath": "Tests/DicomCoreTests/JPEGXLVarDCTCodecTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "jpegxl-vardct-own-accepted-by-libjxl",
+      "fixtureIDs": [],
+      "encoderID": "jxlswift",
+      "decoderID": "libjxl-and-jxlswift",
+      "backendID": "jxlswift",
+      "comparison": "djxl-accepts-and-psnr-within-3-db-of-cjxl",
+      "testIdentifier": "JPEGXLVarDCTCodecTests.test_ownVarDCTStreamsAreAcceptedByDjxlAndTrackCjxlFidelity",
+      "testPath": "Tests/DicomCoreTests/JPEGXLVarDCTCodecTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "jpegxl-vardct-explicit-lossy-derivation",
+      "fixtureIDs": [],
+      "encoderID": "jxlswift",
+      "decoderID": "jxlswift",
+      "backendID": "jxlswift",
+      "comparison": "lossy-record-and-explicit-distance-only",
+      "testIdentifier": "JPEGXLVarDCTCodecTests.test_transcoderWritesLossyDerivationRecordsOnlyForAnExplicitDistance",
+      "testPath": "Tests/DicomCoreTests/JPEGXLVarDCTCodecTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "jpegxl-vardct-typed-refusals-and-cancellation",
+      "fixtureIDs": [],
+      "encoderID": "jxlswift",
+      "decoderID": "jxlswift",
+      "backendID": "jxlswift",
+      "comparison": "typed-refusals-and-no-partial-output",
+      "testIdentifier": "JPEGXLVarDCTCodecTests.test_cancellationLeavesNoPartialOutput",
+      "testPath": "Tests/DicomCoreTests/JPEGXLVarDCTCodecTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "jpegxl-recompression-processes-byte-exact",
+      "fixtureIDs": [],
+      "encoderID": "jxlswift",
+      "decoderID": "jxlswift-and-libjxl",
+      "backendID": "jxlswift",
+      "comparison": "jpeg-bytes-exact-sof0-sof1-sof2-and-typed-refusals",
+      "testIdentifier": "JPEGXLRecompressionCodecTests.test_acceptedProcessesAreBaselineExtendedAndProgressiveHuffmanOnly",
+      "testPath": "Tests/DicomCoreTests/JPEGXLRecompressionCodecTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "jpegxl-recompression-dicom-identity",
+      "fixtureIDs": [],
+      "encoderID": "jxlswift",
+      "decoderID": "jxlswift",
+      "backendID": "jxlswift",
+      "comparison": "fragments-exact-sop-and-lossy-history-preserved-pixels-equal",
+      "testIdentifier": "JPEGXLRecompressionCodecTests.test_dicomRoundTripKeepsFragmentsIdentityAndLossyHistory",
+      "testPath": "Tests/DicomCoreTests/JPEGXLRecompressionCodecTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "jpegxl-recompression-damaged-data-typed",
+      "fixtureIDs": [],
+      "encoderID": "jxlswift",
+      "decoderID": "jxlswift",
+      "backendID": "jxlswift",
+      "comparison": "typed-failure-never-a-visually-similar-jpeg",
+      "testIdentifier": "JPEGXLRecompressionCodecTests.test_missingOrDamagedReconstructionDataIsATypedFailureNeverAVisuallySimilarJPEG",
+      "testPath": "Tests/DicomCoreTests/JPEGXLRecompressionCodecTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "jpegxl-modular-dicom-layer",
+      "fixtureIDs": [],
+      "encoderID": "jxlswift",
+      "decoderID": "jxlswift",
+      "backendID": "jxlswift",
+      "comparison": "pixel-exact-first-difference",
+      "testIdentifier": "JPEGXLModularCodecTests.test_transcoderKeepsOneFragmentPerFrameAndTheICCProfileElement",
+      "testPath": "Tests/DicomCoreTests/JPEGXLModularCodecTests.swift",
+      "requiredGates": [
+        "fixture",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "jpegxl-modular-refusals",
+      "fixtureIDs": [],
+      "encoderID": "malformed-generators",
+      "decoderID": "jxlswift",
+      "backendID": "jxlswift",
+      "comparison": "typed-error-bounded-resource",
+      "testIdentifier": "JPEGXLModularCodecTests.test_hostileStreamsAreRefusedBeforeAllocation",
+      "testPath": "Tests/DicomCoreTests/JPEGXLModularCodecTests.swift",
+      "requiredGates": [
+        "fixture",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "encapsulation-offsets",
+      "fixtureIDs": [],
+      "encoderID": "repository-builders",
+      "decoderID": "dicomswift",
+      "backendID": "encapsulated-frame-reader",
+      "comparison": "frame-order-and-offset-exact",
+      "testIdentifier": "DicomEncapsulatedPixelFrameReaderTests",
+      "testPath": "Tests/DicomCoreTests/DicomEncapsulatedPixelFrameReaderTests.swift",
+      "requiredGates": [
+        "fixture",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "enhanced-multiframe",
+      "fixtureIDs": [],
+      "encoderID": "repository-builders",
+      "decoderID": "dicomswift",
+      "backendID": "enhanced-multiframe-parser",
+      "comparison": "geometry-frame-order-exact",
+      "testIdentifier": "DicomEnhancedMultiframeVolumeTests",
+      "testPath": "Tests/DicomCoreTests/DicomEnhancedMultiframeVolumeTests.swift",
+      "requiredGates": [
+        "fixture",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "native-pixel-shapes",
+      "fixtureIDs": [],
+      "encoderID": "repository-builders",
+      "decoderID": "dicomswift",
+      "backendID": "native-pixel-reader",
+      "comparison": "stored-sample-exact",
+      "testIdentifier": "DCMPixelReaderInternalTests",
+      "testPath": "Tests/DicomCoreTests/DCMPixelReaderInternalTests.swift",
+      "requiredGates": [
+        "fixture",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "native-color-shapes",
+      "fixtureIDs": [
+        "secondary-capture-rgb"
+      ],
+      "encoderID": "repository-builders",
+      "decoderID": "dicomswift",
+      "backendID": "native-color-reader",
+      "comparison": "rgb-normalization-exact",
+      "testIdentifier": "DicomColorPixelDataTests",
+      "testPath": "Tests/DicomCoreTests/DicomColorPixelDataTests.swift",
+      "requiredGates": [
+        "fixture",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "native-extended-negative",
+      "fixtureIDs": [],
+      "encoderID": "repository-builders",
+      "decoderID": "dicomswift",
+      "backendID": "native-jpeg-extended",
+      "comparison": "typed-error-and-precision-policy",
+      "testIdentifier": "JPEGExtendedDecoderTests",
+      "testPath": "Tests/DicomCoreTests/JPEGExtendedDecoderTests.swift",
+      "requiredGates": [
+        "fixture",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "fallback"
+    },
+    {
+      "id": "codec-negative-security",
+      "fixtureIDs": [],
+      "encoderID": "malformed-generators",
+      "decoderID": "dicomswift",
+      "backendID": "codec-boundaries",
+      "comparison": "typed-error-bounded-resource",
+      "testIdentifier": "DicomJXLSwiftBackendTests.test_malformedAndOversizedFrames_failWithoutAllocation",
+      "testPath": "Tests/DicomCoreTests/DicomJXLSwiftBackendTests.swift",
+      "requiredGates": [
+        "fixture",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "clinical-object-roundtrip",
+      "fixtureIDs": [
+        "seg-binary",
+        "rtstruct-contour",
+        "rtdose-grid",
+        "gsps-annotation"
+      ],
+      "encoderID": "dicomswift",
+      "decoderID": "dicomswift",
+      "backendID": "clinical-object-builders",
+      "comparison": "metadata-geometry-exact",
+      "testIdentifier": "DicomSegmentationTests|DicomRTObjectsTests|DicomAIInferenceTests",
+      "testPath": "Tests/DicomCoreTests/DicomSegmentationTests.swift",
+      "requiredGates": [
+        "fixture",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "quantitative-object-roundtrip",
+      "fixtureIDs": [],
+      "encoderID": "dicomswift",
+      "decoderID": "dicomswift",
+      "backendID": "quantitative-object-parser",
+      "comparison": "mapping-and-units-exact",
+      "testIdentifier": "DicomQuantitativeValuesTests",
+      "testPath": "Tests/DicomCoreTests/DicomQuantitativeValuesTests.swift",
+      "requiredGates": [
+        "fixture",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "non-pixel-object-roundtrip",
+      "fixtureIDs": [],
+      "encoderID": "dicomswift",
+      "decoderID": "dicomswift",
+      "backendID": "non-pixel-object-builders",
+      "comparison": "metadata-and-payload-exact",
+      "testIdentifier": "DicomEncapsulatedDocumentTests|DicomWaveformTests|DicomVideoTests",
+      "testPath": "Tests/DicomCoreTests/DicomEncapsulatedDocumentTests.swift",
+      "requiredGates": [
+        "fixture",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "dicomswift-object-export",
+      "fixtureIDs": [
+        "seg-binary",
+        "rtstruct-contour",
+        "rtdose-grid",
+        "gsps-annotation",
+        "sr-tid1500",
+        "sr-tid1500-roi-measurement-report",
+        "kos"
+      ],
+      "encoderID": "dicomswift",
+      "decoderID": "dicomkit",
+      "backendID": "clinical-object-builders",
+      "comparison": "dicomkit-level1-and-tag-exact",
+      "testIdentifier": "ClinicalInteropFixtureExportTests",
+      "testPath": "Tests/DicomCoreTests/ClinicalInteropFixtureExportTests.swift",
+      "requiredGates": [
+        "nightly"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "geometry-object-roundtrip",
+      "fixtureIDs": [
+        "seg-labelmap",
+        "seg-fractional-sparse",
+        "rtstruct-multiloop-xor",
+        "surface-cube"
+      ],
+      "encoderID": "dicomswift",
+      "decoderID": "dicomswift",
+      "backendID": "clinical-object-builders",
+      "comparison": "exact geometry, pixels and references; independent pydicom/numpy comparison via commands.geometryObjectsOracle",
+      "testIdentifier": "DicomGeometryCorpusTests",
+      "testPath": "Tests/DicomCoreTests/DicomGeometryCorpusTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "dicomkit-synthetic-read",
+      "fixtureIDs": [],
+      "encoderID": "dicomkit",
+      "decoderID": "dicomswift",
+      "backendID": "legacy-frame-decoders",
+      "comparison": "metadata-and-pixel-exact",
+      "testIdentifier": "dicomkit-synthetic-read",
+      "testPath": "Scripts/conformance/run_dicomkit_interop.sh",
+      "requiredGates": [
+        "nightly"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "dicomkit-cross-write",
+      "fixtureIDs": [],
+      "encoderID": "dicomkit",
+      "decoderID": "dicomswift",
+      "backendID": "legacy-frame-decoders",
+      "comparison": "encapsulation-metadata-and-pixel-exact",
+      "testIdentifier": "dicomkit-cross-write",
+      "testPath": "Scripts/conformance/run_dicomkit_interop.sh",
+      "requiredGates": [
+        "nightly"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "optimized-artifact-negative",
+      "fixtureIDs": [],
+      "encoderID": "viewer-core",
+      "decoderID": "viewer-core",
+      "backendID": "optimized-volume-artifact",
+      "comparison": "digest-schema-and-fingerprint-fail-closed",
+      "testIdentifier": "OptimizedVolumeArtifactStoreTests",
+      "testPath": "../Packages/Tests/ViewerCoreTests/OptimizedVolumeArtifactStoreTests.swift",
+      "requiredGates": [
+        "isis-release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "independent-native-corpus",
+      "fixtureIDs": [
+        "independent-gray8",
+        "independent-gray12-signed",
+        "independent-gray16",
+        "independent-gray8-inverted",
+        "independent-rgb-interleaved",
+        "independent-rgb-planar"
+      ],
+      "encoderID": "pydicom",
+      "decoderID": "dicomswift",
+      "backendID": "native-uncompressed",
+      "comparison": "exact ordered frames, all components, geometry, charset and deliberate pixel/frame mutations",
+      "testIdentifier": "ClinicalIndependentCorpusTests",
+      "testPath": "Tests/DicomCoreTests/ClinicalIndependentCorpusTests.swift",
+      "requiredGates": [
+        "fixture",
+        "release",
+        "differential",
+        "isis-differential"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified",
+      "executionTier": "hermetic"
+    },
+    {
+      "id": "independent-native-rewrite",
+      "fixtureIDs": [
+        "independent-gray8",
+        "independent-gray12-signed",
+        "independent-gray16",
+        "independent-gray8-inverted",
+        "independent-rgb-interleaved",
+        "independent-rgb-planar"
+      ],
+      "encoderID": "repository-builders",
+      "decoderID": "pydicom",
+      "backendID": "native-uncompressed",
+      "comparison": "independent read of Swift-written Part 10: every stored sample and non-file-meta attribute",
+      "testIdentifier": "independent-native-rewrite",
+      "testPath": "Tests/DicomCoreTests/ClinicalIndependentCorpusTests.swift",
+      "requiredGates": [
+        "differential",
+        "isis-differential"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified",
+      "executionTier": "external-oracle"
+    },
+    {
+      "id": "rle-adversarial",
+      "fixtureIDs": [],
+      "encoderID": "malformed-generators",
+      "decoderID": "dicomswift",
+      "backendID": "rle-adversarial",
+      "comparison": "all truncation boundaries, hostile precision/offsets, 256 deterministic mutations, Data slice origin and output lifetime",
+      "testIdentifier": "ClinicalAdversarialCorpusTests",
+      "testPath": "Tests/DicomCoreTests/ClinicalAdversarialCorpusTests.swift",
+      "requiredGates": [
+        "fixture",
+        "release",
+        "differential",
+        "isis-differential"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified",
+      "executionTier": "hermetic"
+    },
+    {
+      "id": "network-adversarial",
+      "fixtureIDs": [],
+      "encoderID": "malformed-generators",
+      "decoderID": "dicomswift",
+      "backendID": "network-adversarial",
+      "comparison": "mutated status and JSON, credential origin, unsafe URL and cancellation fail closed",
+      "testIdentifier": "DicomWebClientTests.test_bulkDataOriginMutation_keepsConfiguredCredentialsOnOriginalOriginOnly|DicomWebClientTests.test_bulkDataUnsafeSchemeOrUserInfo_rejectsBeforeTransport|DicomWebClientTests.test_responseStatusAndJSONMutations_areRejectedInsteadOfBecomingSuccessfulSearches|DicomWebClientTests.test_cancelledBulkDataRequest_doesNotInvokeInjectedTransport",
+      "testPath": "Tests/DicomCoreTests/DicomWebClientTests.swift",
+      "requiredGates": [
+        "fixture",
+        "release",
+        "differential",
+        "isis-differential"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified",
+      "executionTier": "hermetic"
+    },
+    {
+      "id": "evidence-integrity",
+      "fixtureIDs": [],
+      "encoderID": "malformed-generators",
+      "decoderID": "dicomswift",
+      "backendID": "evidence-integrity",
+      "comparison": "duplicate/unknown cases rejected, missing suite unqualified, required oracle enforced, first difference retained",
+      "testIdentifier": "ClinicalCodecConformanceReportTests",
+      "testPath": "Tests/DicomCoreTests/ClinicalCodecConformanceReportTests.swift",
+      "requiredGates": [
+        "fixture",
+        "release",
+        "differential",
+        "isis-differential"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified",
+      "executionTier": "hermetic"
+    },
+    {
+      "id": "independent-mutation-detection",
+      "fixtureIDs": [
+        "independent-rgb-interleaved"
+      ],
+      "encoderID": "malformed-generators",
+      "decoderID": "pydicom",
+      "backendID": "independent-mutation-detection",
+      "comparison": "Independent oracle detects deliberate pixel, frame-order and geometry changes and persists the first difference",
+      "testIdentifier": "independent-mutation-detection",
+      "testPath": "Scripts/conformance/independent_differential_corpus.py",
+      "requiredGates": [
+        "differential",
+        "isis-differential"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified",
+      "executionTier": "external-oracle"
+    },
+    {
+      "id": "metadata-representation",
+      "fixtureIDs": [],
+      "encoderID": "repository-builders",
+      "decoderID": "dicomswift",
+      "backendID": "metadata-representation",
+      "comparison": "Complete PN groups, every nested SQ item, InlineBinary bytes and XML escaping",
+      "testIdentifier": "ClinicalMetadataRepresentationTests.test_jsonPreservesEveryPersonNameGroupSequenceItemAndBinaryByte|ClinicalMetadataRepresentationTests.test_xmlPreservesEveryPersonNameGroupSequenceItemAndBinaryByte",
+      "testPath": "Tests/DicomCoreTests/ClinicalMetadataRepresentationTests.swift",
+      "requiredGates": [
+        "fixture",
+        "release",
+        "differential",
+        "isis-differential"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified",
+      "executionTier": "hermetic"
+    },
+    {
+      "id": "parser-resource-bounds",
+      "fixtureIDs": [],
+      "encoderID": "repository-builders",
+      "decoderID": "dicomswift",
+      "backendID": "parser-resource-bounds",
+      "comparison": "Depth, item/element bounds, missing delimiters, claimed lengths and image allocation boundaries",
+      "testIdentifier": "DCMDecoderSecurityTests",
+      "testPath": "Tests/DicomCoreTests/DCMDecoderSecurityTests.swift",
+      "requiredGates": [
+        "fixture",
+        "release",
+        "differential",
+        "isis-differential"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified",
+      "executionTier": "hermetic"
+    },
+    {
+      "id": "analytic-metal-mpr",
+      "fixtureIDs": [],
+      "encoderID": "repository-builders",
+      "decoderID": "viewer-core",
+      "backendID": "analytic-metal-mpr",
+      "comparison": "All 45 analytical ramp voxels, anisotropic physical position, source frame permutation and texture replacement",
+      "testIdentifier": "MetalMPRComputeAdapterGeometryTests.test_analyticRamp_readsEveryVoxelAcrossAllAxialFramesAndDetectsFramePermutation",
+      "testPath": "../MTK/Tests/MTKCoreTests/MetalMPRComputeAdapterGeometryTests.swift",
+      "requiredGates": [
+        "isis-differential"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified",
+      "executionTier": "metal-device"
+    },
+    {
+      "id": "jpeg-own-cross-imageio",
+      "fixtureIDs": [],
+      "encoderID": "imageio",
+      "decoderID": "jpegswift-and-imageio",
+      "backendID": "jpegswift",
+      "comparison": "pixel-max-difference-le-1-gray-8-colour-420",
+      "testIdentifier": "DicomJPEGSwiftBackendTests.test_baselineAndProgressiveDecodeAgreeWithImageIO",
+      "testPath": "Tests/DicomCoreTests/DicomJPEGSwiftBackendTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "jpeg-own-twelve-bit-and-lossless",
+      "fixtureIDs": [],
+      "encoderID": "jpegswift",
+      "decoderID": "native-jpeg-extended-and-native-jpeg-lossless",
+      "backendID": "jpegswift",
+      "comparison": "pixel-exact-lossless-and-le-1-twelve-bit",
+      "testIdentifier": "DicomJPEGSwiftBackendTests.test_twelveBitExtendedAndLosslessRoundTripsAgainstNativeDecoders",
+      "testPath": "Tests/DicomCoreTests/DicomJPEGSwiftBackendTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "jpeg-own-transcode-routes",
+      "fixtureIDs": [],
+      "encoderID": "jpegswift",
+      "decoderID": "imageio-and-jpegswift",
+      "backendID": "jpegswift",
+      "comparison": "pixel-max-difference-le-8-lossy-and-exact-lossless",
+      "testIdentifier": "DicomJPEGSwiftBackendTests.test_transcoderEncodesBaselineExtendedAndLosslessWithProvenance",
+      "testPath": "Tests/DicomCoreTests/DicomJPEGSwiftBackendTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "jpeg-own-lossless-codec",
+      "fixtureIDs": [],
+      "encoderID": "jpegswift",
+      "decoderID": "jpegswift-and-jliswift-vendored",
+      "backendID": "jpegswift",
+      "comparison": "pixel-exact-2-to-16-bit-predictors-1-7-point-transform-restarts-rgb",
+      "testIdentifier": "JPEGLosslessCodecTests.test_roundTripsAcrossPrecisionsPredictorsPointTransformsRestartsAndColour",
+      "testPath": "Tests/DicomCoreTests/JPEGLosslessCodecTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "jpeg-own-lossless-vendored-cross",
+      "fixtureIDs": [],
+      "encoderID": "jpegswift-and-jliswift-vendored",
+      "decoderID": "jliswift-vendored-and-jpegswift",
+      "backendID": "jpegswift",
+      "comparison": "pixel-exact",
+      "testIdentifier": "JPEGLosslessCodecTests.test_vendoredJLIDecoderAgreesWithTheOwnEncoderAndTheOwnDecoderReadsJLIEncoderOutput",
+      "testPath": "Tests/DicomCoreTests/JPEGLosslessCodecTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "jpeg-own-lossless-transcode-options",
+      "fixtureIDs": [],
+      "encoderID": "jpegswift",
+      "decoderID": "jpegswift",
+      "backendID": "jpegswift",
+      "comparison": "pixel-exact-multiframe-and-point-transform-provenance",
+      "testIdentifier": "JPEGLosslessCodecTests.test_transcoderAppliesLosslessOptionsAcrossMultiframeAndRecordsPointTransformLoss",
+      "testPath": "Tests/DicomCoreTests/JPEGLosslessCodecTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "jpeg-own-lossless-signed",
+      "fixtureIDs": [],
+      "encoderID": "jpegswift",
+      "decoderID": "jpegswift-and-native-jpeg-lossless",
+      "backendID": "jpegswift",
+      "comparison": "pixel-exact-signed-12-bit-sign-extended",
+      "testIdentifier": "JPEGLosslessCodecTests.test_pixelReaderSignExtendsTwelveBitSignedLosslessSamples",
+      "testPath": "Tests/DicomCoreTests/JPEGLosslessCodecTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "jpegls-own-interleave-cross-charls",
+      "fixtureIDs": [],
+      "encoderID": "jlswift-and-charls",
+      "decoderID": "charls-and-jlswift",
+      "backendID": "jlswift",
+      "comparison": "pixel-exact-ilv-none-line-sample",
+      "testIdentifier": "DicomJPEGLSCodecTests.test_colourInterleaveModesCrossEncodeAndDecodeWithCharLS",
+      "testPath": "Tests/DicomCoreTests/DicomJPEGLSCodecTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "jpegls-own-restart-and-near-bound",
+      "fixtureIDs": [],
+      "encoderID": "jlswift-and-charls",
+      "decoderID": "charls-and-jlswift",
+      "backendID": "jlswift",
+      "comparison": "pixel-exact-restart-and-signed-near-bound",
+      "testIdentifier": "DicomJPEGLSCodecTests.test_nearLosslessBoundHoldsForUnsignedAndIsVerifiedAtSignedExtremes",
+      "testPath": "Tests/DicomCoreTests/DicomJPEGLSCodecTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "jpegls-own-transcode-options",
+      "fixtureIDs": [],
+      "encoderID": "jlswift",
+      "decoderID": "jlswift",
+      "backendID": "jlswift",
+      "comparison": "pixel-exact-multiframe-interleaves-and-near-provenance",
+      "testIdentifier": "DicomJPEGLSCodecTests.test_transcoderAppliesOptionsAcrossMultiframeAndBothDecodePathsUseTheOwnCodec",
+      "testPath": "Tests/DicomCoreTests/DicomJPEGLSCodecTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "j2k-own-openjpeg-independent-inputs",
+      "fixtureIDs": [],
+      "encoderID": "openjpeg",
+      "decoderID": "j2kswift",
+      "backendID": "j2kswift-cpu",
+      "comparison": "pixel-exact-tiles-precincts-progressions-and-reductions",
+      "testIdentifier": "DicomJPEG2000CodecTests.test_openJPEGEncodedInputsDecodeExactlyAcrossTilesPrecinctsProgressionsAndReductions",
+      "testPath": "Tests/DicomCoreTests/DicomJPEG2000CodecTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "j2k-own-containers",
+      "fixtureIDs": [],
+      "encoderID": "j2kswift",
+      "decoderID": "j2kswift",
+      "backendID": "j2kswift-cpu",
+      "comparison": "jp2-jpx-jph-unwrapped-byte-exact",
+      "testIdentifier": "DicomJPEG2000CodecTests.test_containersAreUnwrappedByInspectorBackendValidatorAndTranscoderWithoutReencoding",
+      "testPath": "Tests/DicomCoreTests/DicomJPEG2000CodecTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "j2k-own-deterministic-parallel",
+      "fixtureIDs": [],
+      "encoderID": "j2kswift",
+      "decoderID": "j2kswift",
+      "backendID": "j2kswift-cpu",
+      "comparison": "repeat-decodes-identical-and-cancellable",
+      "testIdentifier": "DicomJPEG2000CodecTests.test_parallelCodeBlockDecodeIsDeterministicAndHonoursCancellation",
+      "testPath": "Tests/DicomCoreTests/DicomJPEG2000CodecTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "htj2k-own-per-uid-cross-decoded",
+      "fixtureIDs": [],
+      "encoderID": "j2kswift",
+      "decoderID": "openjph+openjpeg",
+      "backendID": "j2kswift-cpu",
+      "comparison": "pixel-exact",
+      "testIdentifier": "HTJ2KCodecTests.test_ownEncodesMeetEachSyntaxAndDecodeExactlyInOpenJPHAndOpenJPEG",
+      "testPath": "Tests/DicomCoreTests/HTJ2KCodecTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "htj2k-own-tiles",
+      "fixtureIDs": [],
+      "encoderID": "j2kswift",
+      "decoderID": "openjph+openjpeg",
+      "backendID": "j2kswift-cpu",
+      "comparison": "pixel-exact",
+      "testIdentifier": "HTJ2KCodecTests.test_tiledReversibleEncodesWriteRealTilesThatOpenJPHDecodesExactly",
+      "testPath": "Tests/DicomCoreTests/HTJ2KCodecTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "htj2k-own-intent-not-uid",
+      "fixtureIDs": [],
+      "encoderID": "j2kswift",
+      "decoderID": "openjph+openjpeg",
+      "backendID": "j2kswift-cpu",
+      "comparison": "pixel-exact-and-bounded-irreversible",
+      "testIdentifier": "HTJ2KCodecTests.test_generalSyntaxEncodesLossyOnlyWithExplicitIntentAndLosslessSyntaxesRefuseIt",
+      "testPath": "Tests/DicomCoreTests/HTJ2KCodecTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "htj2k-own-openjph-independent-inputs",
+      "fixtureIDs": [],
+      "encoderID": "openjph",
+      "decoderID": "j2kswift",
+      "backendID": "j2kswift-cpu",
+      "comparison": "pixel-exact-and-reductions",
+      "testIdentifier": "HTJ2KCodecTests.test_openJPHEncodedInputsDecodeExactlyAcrossOptionsAndReductions",
+      "testPath": "Tests/DicomCoreTests/HTJ2KCodecTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "htj2k-own-syntax-capabilities",
+      "fixtureIDs": [],
+      "encoderID": "j2kswift",
+      "decoderID": "j2kswift",
+      "backendID": "j2kswift-cpu",
+      "comparison": "typed-mismatch-and-validator",
+      "testIdentifier": "HTJ2KCodecTests.test_declaredSyntaxMustMatchTheCodestreamAndTheValidatorReportsTheRPCLOptions",
+      "testPath": "Tests/DicomCoreTests/HTJ2KCodecTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "htj2k-own-encapsulation",
+      "fixtureIDs": [],
+      "encoderID": "j2kswift",
+      "decoderID": "j2kswift",
+      "backendID": "j2kswift-cpu",
+      "comparison": "fragments-bot-eot-rewrap",
+      "testIdentifier": "HTJ2KCodecTests.test_transcoderEncapsulatesOneRawCodestreamPerFrameAndRoundTripsMultiframeAndRewraps",
+      "testPath": "Tests/DicomCoreTests/HTJ2KCodecTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "htj2k-own-partial-parallel-cancel",
+      "fixtureIDs": [],
+      "encoderID": "j2kswift",
+      "decoderID": "openjph",
+      "backendID": "j2kswift-cpu",
+      "comparison": "reduced-exact-crop-deterministic",
+      "testIdentifier": "HTJ2KCodecTests.test_partialDecodeOfRPCLFramesMatchesOpenJPHReductionsAndCropsAndHonoursCancellation",
+      "testPath": "Tests/DicomCoreTests/HTJ2KCodecTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "htj2k-own-malformed",
+      "fixtureIDs": [],
+      "encoderID": "j2kswift",
+      "decoderID": "j2kswift",
+      "backendID": "j2kswift-cpu",
+      "comparison": "typed-failure",
+      "testIdentifier": "HTJ2KCodecTests.test_malformedHTCodestreamsFailTypedWithoutCrashing",
+      "testPath": "Tests/DicomCoreTests/HTJ2KCodecTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "j2k-part2-own-collections-openjpeg-components",
+      "fixtureIDs": [],
+      "encoderID": "j2kswift",
+      "decoderID": "openjpeg+numpy",
+      "backendID": "j2kswift-cpu",
+      "comparison": "coded-components-exact-and-marker-inverse",
+      "testIdentifier": "JPEG2000Part2CodecTests.test_ownCollectionsCarryTheAnnexJMarkersAndTheirCodedComponentsMatchOpenJPEG",
+      "testPath": "Tests/DicomCoreTests/JPEG2000Part2CodecTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "j2k-part2-built-annex-j-streams",
+      "fixtureIDs": [],
+      "encoderID": "openjpeg+t801-markers",
+      "decoderID": "j2kswift",
+      "backendID": "j2kswift-cpu",
+      "comparison": "pixel-exact-and-float-within-rounding",
+      "testIdentifier": "JPEG2000Part2CodecTests.test_handBuiltAnnexJStreamsDecodeExactlyIncludingPermutedCollectionsAndFloatMatrices",
+      "testPath": "Tests/DicomCoreTests/JPEG2000Part2CodecTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "j2k-part2-collections-dicom-layer",
+      "fixtureIDs": [],
+      "encoderID": "j2kswift",
+      "decoderID": "j2kswift",
+      "backendID": "j2kswift-cpu",
+      "comparison": "fragments-collections-frames-volume",
+      "testIdentifier": "JPEG2000Part2CodecTests.test_transcoderWritesCollectionsThatTheReaderValidatorAndVolumeDocumentMapBackToFrames",
+      "testPath": "Tests/DicomCoreTests/JPEG2000Part2CodecTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "j2k-part2-syntax-rules",
+      "fixtureIDs": [],
+      "encoderID": "j2kswift",
+      "decoderID": "j2kswift",
+      "backendID": "j2kswift-cpu",
+      "comparison": "typed-refusals",
+      "testIdentifier": "JPEG2000Part2CodecTests.test_syntaxRulesRefuseWrongCapabilitiesIntentsAndUnsupportedTransformsTyped",
+      "testPath": "Tests/DicomCoreTests/JPEG2000Part2CodecTests.swift",
+      "requiredGates": [
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "experimental"
+    },
+    {
+      "id": "rle-deflate-frame-codec-bounded",
+      "fixtureIDs": [],
+      "encoderID": "dicomswift",
+      "decoderID": "dicomswift",
+      "backendID": "native-deflated-frames",
+      "comparison": "raw-deflate-round-trip-odd-pad-bounded-output-typed-failures",
+      "testIdentifier": "RLEDeflateCodecTests.test_frameCodec_padsOddStreamsBoundsOutputAndFailsTyped",
+      "testPath": "Tests/DicomCoreTests/RLEDeflateCodecTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "rle-deflate-native-any-bits-allocated",
+      "fixtureIDs": [],
+      "encoderID": "dicomswift",
+      "decoderID": "dicomswift-and-pydicom",
+      "backendID": "native-deflated-frames",
+      "comparison": "native-frame-bytes-verbatim-1-8-16-32-bit-planar-and-back-to-native-exact",
+      "testIdentifier": "RLEDeflateCodecTests.test_nativeSourcesDeflateTheirOwnFrameBytesAtAnyBitsAllocated",
+      "testPath": "Tests/DicomCoreTests/RLEDeflateCodecTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "rle-deflate-compressed-sources",
+      "fixtureIDs": [],
+      "encoderID": "dicomswift",
+      "decoderID": "dicomswift",
+      "backendID": "native-deflated-frames",
+      "comparison": "stored-bytes-of-decoded-rle-sources-and-routes-to-rle-jpeg-ls",
+      "testIdentifier": "RLEDeflateCodecTests.test_compressedSourcesDecodeThenDeflateAndReachOtherCodecs",
+      "testPath": "Tests/DicomCoreTests/RLEDeflateCodecTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "rle-deflate-plans-and-streaming",
+      "fixtureIDs": [],
+      "encoderID": "dicomswift",
+      "decoderID": "dicomswift",
+      "backendID": "native-deflated-frames",
+      "comparison": "plan-steps-and-streamed-bytes-equal-in-memory",
+      "testIdentifier": "RLEDeflateCodecTests.test_plansAndStreamingExecutionMatchTheInMemoryEngine",
+      "testPath": "Tests/DicomCoreTests/RLEDeflateCodecTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "rle-deflate-malformed-fragments",
+      "fixtureIDs": [],
+      "encoderID": "dicomswift",
+      "decoderID": "dicomswift",
+      "backendID": "native-deflated-frames",
+      "comparison": "truncated-garbage-short-long-trailing-fragments-typed-no-partial-output",
+      "testIdentifier": "RLEDeflateCodecTests.test_malformedFragmentsFailTypedWithoutPartialOutput",
+      "testPath": "Tests/DicomCoreTests/RLEDeflateCodecTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "rle-deflate-cancellation",
+      "fixtureIDs": [],
+      "encoderID": "dicomswift",
+      "decoderID": "dicomswift",
+      "backendID": "native-deflated-frames",
+      "comparison": "cancelled-transcode-no-partial-object-cancelled-dataset-inflate",
+      "testIdentifier": "RLEDeflateCodecTests.test_cancellationLeavesNoPartialObjectAndDatasetDeflateLoadIsCancellable",
+      "testPath": "Tests/DicomCoreTests/RLEDeflateCodecTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "rle-deflate-registry-negotiation",
+      "fixtureIDs": [],
+      "encoderID": "dicomswift",
+      "decoderID": "dicomswift",
+      "backendID": "native-deflated-frames",
+      "comparison": "registry-capabilities-media-type-application-x-deflate",
+      "testIdentifier": "RLEDeflateCodecTests.test_registryCapabilitiesAndNegotiationDescribeTheNewSyntax",
+      "testPath": "Tests/DicomCoreTests/RLEDeflateCodecTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "rle-deflate-rle-shape-contract",
+      "fixtureIDs": [],
+      "encoderID": "dicomswift",
+      "decoderID": "dicomswift-and-pydicom",
+      "backendID": "native-rle-lossless",
+      "comparison": "rle-typed-refusals-and-decode-equals-native-ybr-palette-signed-mono1",
+      "testIdentifier": "RLEDeflateCodecTests.test_rleShapeContractIsTypedAndDecodeMatchesNativeForEveryAcceptedPhotometric",
+      "testPath": "Tests/DicomCoreTests/RLEDeflateCodecTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    },
+    {
+      "id": "rle-deflate-dataset-deflate",
+      "fixtureIDs": [],
+      "encoderID": "dicomswift",
+      "decoderID": "dicomswift",
+      "backendID": "native-deflated-frames",
+      "comparison": "meta-header-explicit-inflate-limit-symmetry-both-deflate-mechanisms",
+      "testIdentifier": "RLEDeflateCodecTests.test_datasetDeflateKeepsTheMetaHeaderEnforcesTheLimitAndStaysSeparateFromFrameDeflate",
+      "testPath": "Tests/DicomCoreTests/RLEDeflateCodecTests.swift",
+      "requiredGates": [
+        "runtime",
+        "release"
+      ],
+      "expectedResult": "passed",
+      "supportVerdict": "qualified"
+    }
   ],
   "commands": {
     "fixture": "Scripts/test_gates.sh fixture",
     "runtime": "Scripts/test_gates.sh runtime",
     "release": "Scripts/test_gates.sh release",
-    "dicomKitNightly": "DICOMKIT_CHECKOUT=/path/to/pinned/DICOMKit Scripts/conformance/run_dicomkit_interop.sh"
+    "dicomKitNightly": "DICOMKIT_CHECKOUT=/path/to/pinned/DICOMKit Scripts/conformance/run_dicomkit_interop.sh",
+    "differential": "DICOM_DIFFERENTIAL_PYTHON=/path/to/isolated/python Scripts/conformance/run_clinical_conformance.sh differential",
+    "geometryObjectsExport": "DICOM_GEOMETRY_CORPUS_DIRECTORY=.build/geometry-corpus swift test --filter DicomGeometryCorpusTests",
+    "geometryObjectsOracle": "python3 Scripts/conformance/geometry_objects_oracle.py --corpus .build/geometry-corpus --output .build/geometry-corpus/oracle.json"
   }
 }

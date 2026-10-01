@@ -14,29 +14,33 @@ final class ValidateCommandTests: XCTestCase {
 
     // MARK: - Test Fixtures
 
-    private final class MockDicomValidator: DICOMValidating {
-        private let resultProvider: (String) -> (isValid: Bool, issues: [String])
-        private(set) var validatedPaths: [String] = []
+    private final class MockDicomValidator: DICOMValidating, @unchecked Sendable {
+        private let resultProvider: @Sendable (String) -> (isValid: Bool, issues: [String])
+        private let paths = LockedValue<[String]>([])
 
-        init(resultProvider: @escaping (String) -> (isValid: Bool, issues: [String])) {
+        var validatedPaths: [String] {
+            paths.value
+        }
+
+        init(resultProvider: @escaping @Sendable (String) -> (isValid: Bool, issues: [String])) {
             self.resultProvider = resultProvider
         }
 
         func validateDICOMFile(_ filename: String) -> (isValid: Bool, issues: [String]) {
-            validatedPaths.append(filename)
+            paths.withValue { $0.append(filename) }
             return resultProvider(filename)
         }
     }
 
     override func setUp() {
         super.setUp()
-        ValidateCommand.makeValidator = {
+        ValidateCommand.replaceValidatorFactory {
             MockDicomValidator { _ in (isValid: true, issues: []) }
         }
     }
 
     override func tearDown() {
-        ValidateCommand.makeValidator = { DCMDecoder() }
+        ValidateCommand.resetValidatorFactory()
         super.tearDown()
     }
 
@@ -117,9 +121,8 @@ final class ValidateCommandTests: XCTestCase {
         let mockValidator = MockDicomValidator { _ in
             (isValid: false, issues: ["Missing DICM signature"])
         }
-        let previousFactory = ValidateCommand.makeValidator
-        ValidateCommand.makeValidator = { mockValidator }
-        defer { ValidateCommand.makeValidator = previousFactory }
+        let previousFactory = ValidateCommand.replaceValidatorFactory { mockValidator }
+        defer { ValidateCommand.replaceValidatorFactory(previousFactory) }
 
         XCTAssertThrowsError(try command.run()) { error in
             guard let exitCode = error as? ExitCode else {
@@ -141,9 +144,8 @@ final class ValidateCommandTests: XCTestCase {
         let mockValidator = MockDicomValidator { _ in
             (isValid: true, issues: ["Warning: Missing optional metadata"])
         }
-        let previousFactory = ValidateCommand.makeValidator
-        ValidateCommand.makeValidator = { mockValidator }
-        defer { ValidateCommand.makeValidator = previousFactory }
+        let previousFactory = ValidateCommand.replaceValidatorFactory { mockValidator }
+        defer { ValidateCommand.replaceValidatorFactory(previousFactory) }
 
         XCTAssertNoThrow(try command.run(), "Warning-only validation should not fail command")
         XCTAssertEqual(mockValidator.validatedPaths, [invalidFileURL.path])
@@ -177,9 +179,8 @@ final class ValidateCommandTests: XCTestCase {
             XCTAssertEqual(path, resolvedPath)
             return (isValid: true, issues: [])
         }
-        let previousFactory = ValidateCommand.makeValidator
-        ValidateCommand.makeValidator = { mockValidator }
-        defer { ValidateCommand.makeValidator = previousFactory }
+        let previousFactory = ValidateCommand.replaceValidatorFactory { mockValidator }
+        defer { ValidateCommand.replaceValidatorFactory(previousFactory) }
 
         XCTAssertNoThrow(try command.run())
         XCTAssertEqual(mockValidator.validatedPaths, [resolvedPath])
@@ -195,9 +196,8 @@ final class ValidateCommandTests: XCTestCase {
         let mockValidator = MockDicomValidator { _ in
             (isValid: true, issues: [])
         }
-        let previousFactory = ValidateCommand.makeValidator
-        ValidateCommand.makeValidator = { mockValidator }
-        defer { ValidateCommand.makeValidator = previousFactory }
+        let previousFactory = ValidateCommand.replaceValidatorFactory { mockValidator }
+        defer { ValidateCommand.replaceValidatorFactory(previousFactory) }
 
         XCTAssertNoThrow(try command.run(), "Directory path should be passed to validator")
         XCTAssertEqual(mockValidator.validatedPaths, [directoryURL.path])
@@ -282,9 +282,8 @@ final class ValidateCommandTests: XCTestCase {
             XCTAssertEqual(path, fileURL.path)
             return (isValid: true, issues: [])
         }
-        let previousFactory = ValidateCommand.makeValidator
-        ValidateCommand.makeValidator = { mockValidator }
-        defer { ValidateCommand.makeValidator = previousFactory }
+        let previousFactory = ValidateCommand.replaceValidatorFactory { mockValidator }
+        defer { ValidateCommand.replaceValidatorFactory(previousFactory) }
 
         XCTAssertNoThrow(try command.run(), "Command should use injected validator")
         XCTAssertEqual(mockValidator.validatedPaths, [fileURL.path])
@@ -353,9 +352,8 @@ final class ValidateCommandTests: XCTestCase {
         let mockValidator = MockDicomValidator { _ in
             (isValid: false, issues: ["File is empty"])
         }
-        let previousFactory = ValidateCommand.makeValidator
-        ValidateCommand.makeValidator = { mockValidator }
-        defer { ValidateCommand.makeValidator = previousFactory }
+        let previousFactory = ValidateCommand.replaceValidatorFactory { mockValidator }
+        defer { ValidateCommand.replaceValidatorFactory(previousFactory) }
 
         XCTAssertThrowsError(try command.run(), "Empty file should fail validation")
         XCTAssertEqual(mockValidator.validatedPaths, [emptyURL.path])
@@ -376,9 +374,8 @@ final class ValidateCommandTests: XCTestCase {
         let mockValidator = MockDicomValidator { _ in
             (isValid: true, issues: ["File smaller than 132 bytes; DICOM preamble may be missing"])
         }
-        let previousFactory = ValidateCommand.makeValidator
-        ValidateCommand.makeValidator = { mockValidator }
-        defer { ValidateCommand.makeValidator = previousFactory }
+        let previousFactory = ValidateCommand.replaceValidatorFactory { mockValidator }
+        defer { ValidateCommand.replaceValidatorFactory(previousFactory) }
 
         XCTAssertNoThrow(try command.run(), "Small file with warning-only result should pass")
         XCTAssertEqual(mockValidator.validatedPaths, [smallURL.path])

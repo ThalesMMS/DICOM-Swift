@@ -3,6 +3,20 @@ import XCTest
 @testable import DicomCore
 
 final class DicomFrameCodecBackendTests: XCTestCase {
+    func test_invalidFrameMetadata_isRejectedBeforeBackendSelection() {
+        let invalidShapes = [(0, 1, 1, 1), (1, -1, 1, 1), (1, 1, 0, 1), (1, 1, 2, 1), (1, 1, 1, 2)]
+        for (rows, columns, components, representation) in invalidShapes {
+            let descriptor = DicomCompressedFrameDescriptor(
+                transferSyntaxUID: DicomTransferSyntax.jpeg2000Lossless.rawValue,
+                rows: rows, columns: columns, bitsAllocated: 16, bitsStored: 12, highBit: 11,
+                pixelRepresentation: representation, samplesPerPixel: components,
+                photometricInterpretation: "MONOCHROME2", planarConfiguration: nil
+            )
+            XCTAssertNotNil(makeCapability(identifier: "production").unsupportedReason(for: descriptor),
+                            "Invalid metadata: \(rows), \(columns), \(components), \(representation)")
+        }
+    }
+
     func test_capabilityModelRepresentsPlannedPartialMetalCodec() {
         let capability = makeCapability(
             identifier: "j2kswift-metal",
@@ -27,13 +41,18 @@ final class DicomFrameCodecBackendTests: XCTestCase {
     func test_currentCapabilityCatalogIncludesLinkedAndRuntimeBackends() throws {
         let capabilities = DicomCodecCapabilities.frameBackends(environment: [:])
 
-        XCTAssertEqual(capabilities.count, 12)
+        XCTAssertEqual(capabilities.count, 14)
+        XCTAssertEqual(
+            capabilities.first { $0.identifier == "native-deflated-frames" }?.encodeTransferSyntaxUIDs,
+            [DicomTransferSyntax.deflatedImageFrameCompression.rawValue]
+        )
+        XCTAssertEqual(capabilities.first { $0.identifier == .jpegSwift }?.version, DicomJPEGSwiftBackend.version)
         XCTAssertEqual(
             capabilities.first { $0.identifier == .j2kSwiftCPU }?.transferSyntaxUIDs,
-            DicomJ2KSwiftBackend.qualifiedTransferSyntaxes
+            DicomJ2KSwiftBackend.qualifiedTransferSyntaxes.union(DicomJ2KSwiftBackend.part2TransferSyntaxes)
         )
-        XCTAssertEqual(capabilities.first { $0.identifier == .jlSwift }?.version, "0.9.0")
-        XCTAssertEqual(capabilities.first { $0.identifier == .jxlSwift }?.version, "1.4.0")
+        XCTAssertEqual(capabilities.first { $0.identifier == .jlSwift }?.version, "0.9.1-vendored")
+        XCTAssertEqual(capabilities.first { $0.identifier == .jxlSwift }?.version, "1.4.0-vendored")
         XCTAssertEqual(
             capabilities.first { $0.identifier == .jxlSwift }?.transferSyntaxUIDs,
             DicomJXLSwiftBackend.allTransferSyntaxes
@@ -149,6 +168,21 @@ final class DicomFrameCodecBackendTests: XCTestCase {
         )
     }
 
+    func test_shadowCancellation_isNotConvertedToProductionSuccess() async throws {
+        let production = Backend(capabilities: makeCapability(identifier: "production"), bytes: [1])
+        let shadow = Backend(capabilities: makeCapability(identifier: "shadow"), bytes: [2], cancels: true)
+        let request = makeRequest()
+        let selection = try DicomFrameCodecRegistry(backends: [production, shadow]).select(
+            for: request, shadowPolicy: DicomCodecShadowPolicy(candidatesByFamily: [.jpeg2000: "shadow"])
+        )
+        do {
+            _ = try await DicomFrameCodecExecutor().decode(request, selection: selection)
+            XCTFail("Shadow cancellation must survive")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+    }
+
     func test_defaultEncodeBoundaryRemainsAsyncAndTypedUnsupported() async {
         let backend = Backend(capabilities: makeCapability(identifier: "decode-only"), bytes: [1])
         let decoded = DicomCodecDecodedFrame(
@@ -230,9 +264,11 @@ final class DicomFrameCodecBackendTests: XCTestCase {
 private struct Backend: DicomFrameCodecBackend {
     let capabilities: DicomFrameCodecCapabilities
     let bytes: [UInt8]
+    var cancels = false
 
     func decode(_ request: DicomFrameDecodeRequest) async throws -> DicomCodecDecodedFrame {
-        DicomCodecDecodedFrame(
+        if cancels { throw CancellationError() }
+        return DicomCodecDecodedFrame(
             buffer: .owned(Data(bytes)),
             width: request.descriptor.columns,
             height: request.descriptor.rows,

@@ -1,11 +1,71 @@
 import Foundation
-import JPEGLS
+import DicomJPEGLS
 import XCTest
+import Synchronization
 @testable import DicomCore
 
 final class DicomJLSwiftBackendTests: XCTestCase {
-    func test_rolloutModeParsesEveryPolicyAndDefaultsToShadow() {
-        XCTAssertEqual(DicomJLSwiftRolloutMode(environment: [:]), .shadow)
+    func test_shadowCancellation_preservesProductionPixelsAndReportsCancellation() async throws {
+        try requireCharLS()
+        let source = Self.grayscaleBytes(width: 7, height: 5, bitsStored: 8)
+        let encoded = try DicomJPEGLSCodec.encodeForTesting(
+            bytes: source, width: 7, height: 5, bitsPerSample: 8
+        )
+        let recorder = DicomJLSwiftTelemetryRecorder()
+        let frame = try await DicomJLSwiftFrameDecoder.decode(
+            Self.decodeRequest(frameData: encoded, descriptor: Self.descriptor(bitsStored: 8)),
+            candidate: ShadowCandidateFixture(
+                capabilities: DicomJLSwiftBackend().capabilities, output: nil, cancelled: true
+            ),
+            environment: ["DICOM_JLSWIFT_MODE": "shadow", "DICOM_SHADOW_SAMPLE_EVERY": "1"]
+        ) { recorder.record($0) }
+        XCTAssertEqual(frame?.buffer.data, source)
+        let outcome = await recorder.waitFor { $0.backend == .jlSwift }
+        XCTAssertEqual(outcome?.outcome, .cancelled)
+    }
+
+    func test_rowCancellation_preservesCancellationErrorThroughBackend() throws {
+        try requireCharLS()
+        let source = Self.grayscaleBytes(width: 7, height: 5, bitsStored: 8)
+        let encoded = try DicomJPEGLSCodec.encodeForTesting(
+            bytes: source, width: 7, height: 5, bitsPerSample: 8
+        )
+        let checks = Mutex(0)
+        XCTAssertThrowsError(try DicomJLSwiftBackend.decodeSynchronously(
+            encoded, descriptor: Self.descriptor(bitsStored: 8)
+        ) {
+            let count = checks.withLock { $0 += 1; return $0 }
+            if count == 5 { throw CancellationError() }
+        }) { XCTAssertTrue($0 is CancellationError) }
+        XCTAssertEqual(checks.withLock { $0 }, 5)
+    }
+
+    func test_shadowFailureAndMismatch_preserveCharLSPixelsAndReportOutcome() async throws {
+        try requireCharLS()
+        let source = Self.grayscaleBytes(width: 7, height: 5, bitsStored: 8)
+        let encoded = try DicomJPEGLSCodec.encodeForTesting(
+            bytes: source, width: 7, height: 5, bitsPerSample: 8
+        )
+        for output: Data? in [nil, Data(repeating: 0, count: source.count)] {
+            let recorder = DicomJLSwiftTelemetryRecorder()
+            let frame = try await DicomJLSwiftFrameDecoder.decode(
+                Self.decodeRequest(frameData: encoded, descriptor: Self.descriptor(bitsStored: 8)),
+                candidate: ShadowCandidateFixture(capabilities: DicomJLSwiftBackend().capabilities, output: output),
+                environment: ["DICOM_JLSWIFT_MODE": "shadow", "DICOM_SHADOW_SAMPLE_EVERY": "1"]
+            ) { recorder.record($0) }
+            XCTAssertEqual(frame?.buffer.data, source)
+            let reported = await recorder.waitFor {
+                guard $0.backend == .jlSwift else { return false }
+                if output != nil { return $0.outcome == .mismatched }
+                if case .failed = $0.outcome { return true }
+                return false
+            }
+            XCTAssertNotNil(reported, "Shadow outcome must be explicit while production pixels remain intact")
+        }
+    }
+
+    func test_rolloutModeParsesEveryPolicyAndDefaultsToPreferred() {
+        XCTAssertEqual(DicomJLSwiftRolloutMode(environment: [:]), .preferred)
         for mode in DicomJLSwiftRolloutMode.allCases {
             XCTAssertEqual(
                 DicomJLSwiftRolloutMode(environment: [
@@ -18,7 +78,7 @@ final class DicomJLSwiftBackendTests: XCTestCase {
             DicomJLSwiftRolloutMode(environment: [
                 DicomJLSwiftRolloutMode.environmentKey: "unknown"
             ]),
-            .shadow
+            .preferred
         )
     }
 
@@ -26,7 +86,7 @@ final class DicomJLSwiftBackendTests: XCTestCase {
         let capability = DicomJLSwiftBackend().capabilities
 
         XCTAssertEqual(capability.identifier, .jlSwift)
-        XCTAssertEqual(capability.version, "0.9.0")
+        XCTAssertEqual(capability.version, "0.9.1-vendored")
         XCTAssertEqual(capability.source, .packageLinked)
         XCTAssertEqual(capability.operations, [.decode, .encode])
         XCTAssertEqual(capability.supportedGrayscaleBitDepths, 8...16)
@@ -166,6 +226,17 @@ final class DicomJLSwiftBackendTests: XCTestCase {
         XCTAssertEqual(try DicomJPEGLSCodec.decode(jlSwiftEncoded).bytes, source)
     }
 
+    func test_signedSamplesWithWiderCodestream_keepTheirFullPrecision() async throws {
+        let full = Self.descriptor(bitsStored: 16)
+        let words: [UInt16] = [0x8000, 0xFFFF, 0, 1, 0x7FFF] + Array(repeating: 0x8001, count: 30)
+        let encoded = try await DicomJLSwiftBackend().encode(
+            Self.encodeRequest(bytes: Self.littleEndianData(words), descriptor: full, intent: .reversible))
+        let decoded = try await DicomJLSwiftBackend().decode(
+            Self.decodeRequest(frameData: encoded, descriptor: Self.descriptor(bitsStored: 12, signed: true)))
+        XCTAssertEqual(decoded.bitsPerSample, 16)
+        XCTAssertEqual(decoded.buffer.data, Self.littleEndianData(words))
+    }
+
     func test_signedGrayscalePreservesStoredBitPatterns() async throws {
         let descriptor = Self.descriptor(bitsStored: 12, signed: true)
         let stored: [UInt16] = [0x0800, 0x0FFF, 0x0000, 0x0001, 0x07FF]
@@ -202,6 +273,11 @@ final class DicomJLSwiftBackendTests: XCTestCase {
             restartInterval: 2
         )
         let encoded = try JPEGLSEncoder().encode(image, configuration: config)
+        let restartChecks = Mutex(0)
+        XCTAssertThrowsError(try DicomJLSwiftBackend.decodeSynchronously(encoded, descriptor: descriptor) {
+            let count = restartChecks.withLock { $0 += 1; return $0 }
+            if count >= 3 { throw CancellationError() }
+        }) { XCTAssertTrue($0 is CancellationError, "Restart workers must propagate cancellation") }
         let decoded = try await DicomJLSwiftBackend().decode(
             Self.decodeRequest(frameData: encoded, descriptor: descriptor)
         )
@@ -232,7 +308,7 @@ final class DicomJLSwiftBackendTests: XCTestCase {
         let recorder = DicomJLSwiftTelemetryRecorder()
         let frame = try await DicomJLSwiftFrameDecoder.decode(
             Self.decodeRequest(frameData: encoded, descriptor: descriptor),
-            environment: [DicomJLSwiftRolloutMode.environmentKey: "shadow"]
+            environment: [DicomJLSwiftRolloutMode.environmentKey: "shadow", "DICOM_SHADOW_SAMPLE_EVERY": "1"]
         ) { recorder.record($0) }
 
         XCTAssertEqual(frame?.buffer.data, source)

@@ -137,6 +137,9 @@ internal final class TagHandlerRegistry {
         registry[Tag.redPalette.rawValue] = paletteHandler
         registry[Tag.greenPalette.rawValue] = paletteHandler
         registry[Tag.bluePalette.rawValue] = paletteHandler
+        registry[Tag.segmentedRedPalette.rawValue] = paletteHandler
+        registry[Tag.segmentedGreenPalette.rawValue] = paletteHandler
+        registry[Tag.segmentedBluePalette.rawValue] = paletteHandler
 
         // Register Pixel Data handler
         let pixelDataHandler = PixelDataTagHandler()

@@ -1,0 +1,3532 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>00000000</key>
+	<string>ULCommand Group Length</string>
+	<key>00000001</key>
+	<string>ULCommand Length to End</string>
+	<key>00000002</key>
+	<string>UIAffected SOP Class UID</string>
+	<key>00000003</key>
+	<string>UIRequested SOP Class UID</string>
+	<key>00000010</key>
+	<string>SHCommand Recognition Code</string>
+	<key>00000100</key>
+	<string>USCommand Field</string>
+	<key>00000110</key>
+	<string>USMessage ID</string>
+	<key>00000120</key>
+	<string>USMessage ID Being Responded To</string>
+	<key>00000200</key>
+	<string>AEInitiator</string>
+	<key>00000300</key>
+	<string>AEReceiver</string>
+	<key>00000400</key>
+	<string>AEFind Location</string>
+	<key>00000600</key>
+	<string>AEMove Destination</string>
+	<key>00000700</key>
+	<string>USPriority</string>
+	<key>00000800</key>
+	<string>USCommand Data Set Type</string>
+	<key>00000850</key>
+	<string>USNumber of Matches</string>
+	<key>00000860</key>
+	<string>USResponse Sequence Number</string>
+	<key>00000900</key>
+	<string>USStatus</string>
+	<key>00000901</key>
+	<string>ATOffending Element</string>
+	<key>00000902</key>
+	<string>LOError Comment</string>
+	<key>00000903</key>
+	<string>USError ID</string>
+	<key>00001000</key>
+	<string>UIAffected SOP Instance UID</string>
+	<key>00001001</key>
+	<string>UIRequested SOP Instance UID</string>
+	<key>00001002</key>
+	<string>USEvent Type ID</string>
+	<key>00001005</key>
+	<string>ATAttribute Identifier List</string>
+	<key>00001008</key>
+	<string>USAction Type ID</string>
+	<key>00001020</key>
+	<string>USNumber of Remaining Sub-operations</string>
+	<key>00001021</key>
+	<string>USNumber of Completed Sub-operations</string>
+	<key>00001022</key>
+	<string>USNumber of Failed Sub-operations</string>
+	<key>00001023</key>
+	<string>USNumber of Warning Sub-operations</string>
+	<key>00001030</key>
+	<string>AEMove Originator Application Entity Title</string>
+	<key>00001031</key>
+	<string>USMove Originator Message ID</string>
+	<key>00004000</key>
+	<string>LTDialog Receiver</string>
+	<key>00004010</key>
+	<string>LTTerminal Type</string>
+	<key>00005010</key>
+	<string>SHMessage Set ID</string>
+	<key>00005020</key>
+	<string>SHEnd Message ID</string>
+	<key>00005110</key>
+	<string>LTDisplay Format</string>
+	<key>00005120</key>
+	<string>LTPage Position ID</string>
+	<key>00005130</key>
+	<string>CSText Format ID</string>
+	<key>00005140</key>
+	<string>CSNormal/Reverse</string>
+	<key>00005150</key>
+	<string>CSAdd Gray Scale</string>
+	<key>00005160</key>
+	<string>CSBorders</string>
+	<key>00005170</key>
+	<string>ISCopies</string>
+	<key>00005180</key>
+	<string>CSCommand Magnification Type</string>
+	<key>00005190</key>
+	<string>CSErase</string>
+	<key>000051A0</key>
+	<string>CSPrint</string>
+	<key>000051B0</key>
+	<string>USOverlays</string>
+	<key>00020000</key>
+	<string>ULFile Meta Information Group Length</string>
+	<key>00020001</key>
+	<string>OBFile Meta Information Version</string>
+	<key>00020002</key>
+	<string>UIMedia Storage SOP Class UID</string>
+	<key>00020003</key>
+	<string>UIMedia Storage SOP Instance UID</string>
+	<key>00020010</key>
+	<string>UITransfer Syntax UID</string>
+	<key>00020012</key>
+	<string>UIImplementation Class UID</string>
+	<key>00020013</key>
+	<string>SHImplementation Version Name</string>
+	<key>00020016</key>
+	<string>AESource Application Entity Title</string>
+	<key>00020017</key>
+	<string>AESending Application Entity Title</string>
+	<key>00020018</key>
+	<string>AEReceiving Application Entity Title</string>
+	<key>00020026</key>
+	<string>URSource Presentation Address</string>
+	<key>00020027</key>
+	<string>URSending Presentation Address</string>
+	<key>00020028</key>
+	<string>URReceiving Presentation Address</string>
+	<key>00020031</key>
+	<string>OBRTV Meta Information Version</string>
+	<key>00020032</key>
+	<string>UIRTV Communication SOP Class UID</string>
+	<key>00020033</key>
+	<string>UIRTV Communication SOP Instance UID</string>
+	<key>00020035</key>
+	<string>OBRTV Source Identifier</string>
+	<key>00020036</key>
+	<string>OBRTV Flow Identifier</string>
+	<key>00020037</key>
+	<string>ULRTV Flow RTP Sampling Rate</string>
+	<key>00020038</key>
+	<string>FDRTV Flow Actual Frame Duration</string>
+	<key>00020100</key>
+	<string>UIPrivate Information Creator UID</string>
+	<key>00020102</key>
+	<string>OBPrivate Information</string>
+	<key>00041130</key>
+	<string>CSFile-set ID</string>
+	<key>00041141</key>
+	<string>CSFile-set Descriptor File ID</string>
+	<key>00041142</key>
+	<string>CSSpecific Character Set of File-set Descriptor File</string>
+	<key>00041200</key>
+	<string>ULOffset of the First Directory Record of the Root Directory Entity</string>
+	<key>00041202</key>
+	<string>ULOffset of the Last Directory Record of the Root Directory Entity</string>
+	<key>00041212</key>
+	<string>USFile-set Consistency Flag</string>
+	<key>00041220</key>
+	<string>SQDirectory Record Sequence</string>
+	<key>00041400</key>
+	<string>ULOffset of the Next Directory Record</string>
+	<key>00041410</key>
+	<string>USRecord In-use Flag</string>
+	<key>00041420</key>
+	<string>ULOffset of Referenced Lower-Level Directory Entity</string>
+	<key>00041430</key>
+	<string>CSDirectory Record Type</string>
+	<key>00041432</key>
+	<string>UIPrivate Record UID</string>
+	<key>00041500</key>
+	<string>CSReferenced File ID</string>
+	<key>00041504</key>
+	<string>ULMRDR Directory Record Offset</string>
+	<key>00041510</key>
+	<string>UIReferenced SOP Class UID in File</string>
+	<key>00041511</key>
+	<string>UIReferenced SOP Instance UID in File</string>
+	<key>00041512</key>
+	<string>UIReferenced Transfer Syntax UID in File</string>
+	<key>0004151A</key>
+	<string>UIReferenced Related General SOP Class UID in File</string>
+	<key>00041600</key>
+	<string>ULNumber of References</string>
+	<key>00080001</key>
+	<string>ULLength to End</string>
+	<key>00080005</key>
+	<string>CSSpecific Character Set</string>
+	<key>00080006</key>
+	<string>SQLanguage Code Sequence</string>
+	<key>00080008</key>
+	<string>CSImage Type</string>
+	<key>00080010</key>
+	<string>SHRecognition Code</string>
+	<key>00080012</key>
+	<string>DAInstance Creation Date</string>
+	<key>00080013</key>
+	<string>TMInstance Creation Time</string>
+	<key>00080014</key>
+	<string>UIInstance Creator UID</string>
+	<key>00080015</key>
+	<string>DTInstance Coercion DateTime</string>
+	<key>00080016</key>
+	<string>UISOP Class UID</string>
+	<key>00080017</key>
+	<string>UIAcquisition UID</string>
+	<key>00080018</key>
+	<string>UISOP Instance UID</string>
+	<key>00080019</key>
+	<string>UIPyramid UID</string>
+	<key>0008001A</key>
+	<string>UIRelated General SOP Class UID</string>
+	<key>0008001B</key>
+	<string>UIOriginal Specialized SOP Class UID</string>
+	<key>0008001C</key>
+	<string>CSSynthetic Data</string>
+	<key>00080020</key>
+	<string>DAStudy Date</string>
+	<key>00080021</key>
+	<string>DASeries Date</string>
+	<key>00080022</key>
+	<string>DAAcquisition Date</string>
+	<key>00080023</key>
+	<string>DAContent Date</string>
+	<key>00080024</key>
+	<string>DAOverlay Date</string>
+	<key>00080025</key>
+	<string>DACurve Date</string>
+	<key>0008002A</key>
+	<string>DTAcquisition DateTime</string>
+	<key>00080030</key>
+	<string>TMStudy Time</string>
+	<key>00080031</key>
+	<string>TMSeries Time</string>
+	<key>00080032</key>
+	<string>TMAcquisition Time</string>
+	<key>00080033</key>
+	<string>TMContent Time</string>
+	<key>00080034</key>
+	<string>TMOverlay Time</string>
+	<key>00080035</key>
+	<string>TMCurve Time</string>
+	<key>00080040</key>
+	<string>USData Set Type</string>
+	<key>00080041</key>
+	<string>LOData Set Subtype</string>
+	<key>00080042</key>
+	<string>CSNuclear Medicine Series Type</string>
+	<key>00080050</key>
+	<string>SHAccession Number</string>
+	<key>00080051</key>
+	<string>SQIssuer of Accession Number Sequence</string>
+	<key>00080052</key>
+	<string>CSQuery/Retrieve Level</string>
+	<key>00080053</key>
+	<string>CSQuery/Retrieve View</string>
+	<key>00080054</key>
+	<string>AERetrieve AE Title</string>
+	<key>00080055</key>
+	<string>AEStation AE Title</string>
+	<key>00080056</key>
+	<string>CSInstance Availability</string>
+	<key>00080058</key>
+	<string>UIFailed SOP Instance UID List</string>
+	<key>00080060</key>
+	<string>CSModality</string>
+	<key>00080061</key>
+	<string>CSModalities in Study</string>
+	<key>00080062</key>
+	<string>UISOP Classes in Study</string>
+	<key>00080063</key>
+	<string>SQAnatomic Regions in Study Code Sequence</string>
+	<key>00080064</key>
+	<string>CSConversion Type</string>
+	<key>00080068</key>
+	<string>CSPresentation Intent Type</string>
+	<key>00080070</key>
+	<string>LOManufacturer</string>
+	<key>00080080</key>
+	<string>LOInstitution Name</string>
+	<key>00080081</key>
+	<string>STInstitution Address</string>
+	<key>00080082</key>
+	<string>SQInstitution Code Sequence</string>
+	<key>00080090</key>
+	<string>PNReferring Physician's Name</string>
+	<key>00080092</key>
+	<string>STReferring Physician's Address</string>
+	<key>00080094</key>
+	<string>SHReferring Physician's Telephone Numbers</string>
+	<key>00080096</key>
+	<string>SQReferring Physician Identification Sequence</string>
+	<key>0008009C</key>
+	<string>PNConsulting Physician's Name</string>
+	<key>0008009D</key>
+	<string>SQConsulting Physician Identification Sequence</string>
+	<key>00080100</key>
+	<string>SHCode Value</string>
+	<key>00080101</key>
+	<string>LOExtended Code Value</string>
+	<key>00080102</key>
+	<string>SHCoding Scheme Designator</string>
+	<key>00080103</key>
+	<string>SHCoding Scheme Version</string>
+	<key>00080104</key>
+	<string>LOCode Meaning</string>
+	<key>00080105</key>
+	<string>CSMapping Resource</string>
+	<key>00080106</key>
+	<string>DTContext Group Version</string>
+	<key>00080107</key>
+	<string>DTContext Group Local Version</string>
+	<key>00080108</key>
+	<string>LTExtended Code Meaning</string>
+	<key>00080109</key>
+	<string>SQCoding Scheme Resources Sequence</string>
+	<key>0008010A</key>
+	<string>CSCoding Scheme URL Type</string>
+	<key>0008010B</key>
+	<string>CSContext Group Extension Flag</string>
+	<key>0008010C</key>
+	<string>UICoding Scheme UID</string>
+	<key>0008010D</key>
+	<string>UIContext Group Extension Creator UID</string>
+	<key>0008010E</key>
+	<string>URCoding Scheme URL</string>
+	<key>0008010F</key>
+	<string>CSContext Identifier</string>
+	<key>00080110</key>
+	<string>SQCoding Scheme Identification Sequence</string>
+	<key>00080112</key>
+	<string>LOCoding Scheme Registry</string>
+	<key>00080114</key>
+	<string>STCoding Scheme External ID</string>
+	<key>00080115</key>
+	<string>STCoding Scheme Name</string>
+	<key>00080116</key>
+	<string>STCoding Scheme Responsible Organization</string>
+	<key>00080117</key>
+	<string>UIContext UID</string>
+	<key>00080118</key>
+	<string>UIMapping Resource UID</string>
+	<key>00080119</key>
+	<string>UCLong Code Value</string>
+	<key>00080120</key>
+	<string>URURN Code Value</string>
+	<key>00080121</key>
+	<string>SQEquivalent Code Sequence</string>
+	<key>00080122</key>
+	<string>LOMapping Resource Name</string>
+	<key>00080123</key>
+	<string>SQContext Group Identification Sequence</string>
+	<key>00080124</key>
+	<string>SQMapping Resource Identification Sequence</string>
+	<key>00080201</key>
+	<string>SHTimezone Offset From UTC</string>
+	<key>00080202</key>
+	<string>OBRetired-blank</string>
+	<key>00080220</key>
+	<string>SQResponsible Group Code Sequence</string>
+	<key>00080221</key>
+	<string>CSEquipment Modality</string>
+	<key>00080222</key>
+	<string>LOManufacturer's Related Model Group</string>
+	<key>00080300</key>
+	<string>SQPrivate Data Element Characteristics Sequence</string>
+	<key>00080301</key>
+	<string>USPrivate Group Reference</string>
+	<key>00080302</key>
+	<string>LOPrivate Creator Reference</string>
+	<key>00080303</key>
+	<string>CSBlock Identifying Information Status</string>
+	<key>00080304</key>
+	<string>USNonidentifying Private Elements</string>
+	<key>00080305</key>
+	<string>SQDeidentification Action Sequence</string>
+	<key>00080306</key>
+	<string>USIdentifying Private Elements</string>
+	<key>00080307</key>
+	<string>CSDeidentification Action</string>
+	<key>00080308</key>
+	<string>USPrivate Data Element</string>
+	<key>00080309</key>
+	<string>ULPrivate Data Element Value Multiplicity</string>
+	<key>0008030A</key>
+	<string>CSPrivate Data Element Value Representation</string>
+	<key>0008030B</key>
+	<string>ULPrivate Data Element Number of Items</string>
+	<key>0008030C</key>
+	<string>UCPrivate Data Element Name</string>
+	<key>0008030D</key>
+	<string>UCPrivate Data Element Keyword</string>
+	<key>0008030E</key>
+	<string>UTPrivate Data Element Description</string>
+	<key>0008030F</key>
+	<string>UTPrivate Data Element Encoding</string>
+	<key>00080310</key>
+	<string>SQPrivate Data Element Definition Sequence</string>
+	<key>00080400</key>
+	<string>SQScope of Inventory Sequence</string>
+	<key>00080401</key>
+	<string>LTInventory Purpose</string>
+	<key>00080402</key>
+	<string>LTInventory Instance Description</string>
+	<key>00080403</key>
+	<string>CSInventory Level</string>
+	<key>00080404</key>
+	<string>DTItem Inventory DateTime</string>
+	<key>00080405</key>
+	<string>CSRemoved from Operational Use</string>
+	<key>00080406</key>
+	<string>SQReason for Removal Code Sequence</string>
+	<key>00080407</key>
+	<string>URStored Instance Base URI</string>
+	<key>00080408</key>
+	<string>URFolder Access URI</string>
+	<key>00080409</key>
+	<string>URFile Access URI</string>
+	<key>0008040A</key>
+	<string>CSContainer File Type</string>
+	<key>0008040B</key>
+	<string>URFilename in Container</string>
+	<key>0008040C</key>
+	<string>UVFile Offset in Container</string>
+	<key>0008040D</key>
+	<string>UVFile Length in Container</string>
+	<key>0008040E</key>
+	<string>UIStored Instance Transfer Syntax UID</string>
+	<key>0008040F</key>
+	<string>CSExtended Matching Mechanisms</string>
+	<key>00080410</key>
+	<string>SQRange Matching Sequence</string>
+	<key>00080411</key>
+	<string>SQList of UID Matching Sequence</string>
+	<key>00080412</key>
+	<string>SQEmpty Value Matching Sequence</string>
+	<key>00080413</key>
+	<string>SQGeneral Matching Sequence</string>
+	<key>00080414</key>
+	<string>USRequested Status Interval</string>
+	<key>00080415</key>
+	<string>CSRetain Instances</string>
+	<key>00080416</key>
+	<string>DTExpiration DateTime</string>
+	<key>00080417</key>
+	<string>CSTransaction Status</string>
+	<key>00080418</key>
+	<string>LTTransaction Status Comment</string>
+	<key>00080419</key>
+	<string>SQFile Set Access Sequence</string>
+	<key>0008041A</key>
+	<string>SQFile Access Sequence</string>
+	<key>0008041B</key>
+	<string>OBRecord Key</string>
+	<key>0008041C</key>
+	<string>OBPrior Record Key</string>
+	<key>0008041D</key>
+	<string>SQMetadata Sequence</string>
+	<key>0008041E</key>
+	<string>SQUpdated Metadata Sequence</string>
+	<key>0008041F</key>
+	<string>DTStudy Update DateTime</string>
+	<key>00080420</key>
+	<string>SQInventory Access End Points Sequence</string>
+	<key>00080421</key>
+	<string>SQStudy Access End Points Sequence</string>
+	<key>00080422</key>
+	<string>SQIncorporated Inventory Instance Sequence</string>
+	<key>00080423</key>
+	<string>SQInventoried Studies Sequence</string>
+	<key>00080424</key>
+	<string>SQInventoried Series Sequence</string>
+	<key>00080425</key>
+	<string>SQInventoried Instances Sequence</string>
+	<key>00080426</key>
+	<string>CSInventory Completion Status</string>
+	<key>00080427</key>
+	<string>ULNumber of Study Records in Instance</string>
+	<key>00080428</key>
+	<string>UVTotal Number of Study Records</string>
+	<key>00080429</key>
+	<string>UVMaximum Number of Records</string>
+	<key>00081000</key>
+	<string>AENetwork ID</string>
+	<key>00081010</key>
+	<string>SHStation Name</string>
+	<key>00081030</key>
+	<string>LOStudy Description</string>
+	<key>00081032</key>
+	<string>SQProcedure Code Sequence</string>
+	<key>0008103E</key>
+	<string>LOSeries Description</string>
+	<key>0008103F</key>
+	<string>SQSeries Description Code Sequence</string>
+	<key>00081040</key>
+	<string>LOInstitutional Department Name</string>
+	<key>00081041</key>
+	<string>SQInstitutional Department Type Code Sequence</string>
+	<key>00081048</key>
+	<string>PNPhysician(s) of Record</string>
+	<key>00081049</key>
+	<string>SQPhysician(s) of Record Identification Sequence</string>
+	<key>00081050</key>
+	<string>PNPerforming Physician's Name</string>
+	<key>00081052</key>
+	<string>SQPerforming Physician Identification Sequence</string>
+	<key>00081060</key>
+	<string>PNName of Physician(s) Reading Study</string>
+	<key>00081062</key>
+	<string>SQPhysician(s) Reading Study Identification Sequence</string>
+	<key>00081070</key>
+	<string>PNOperators' Name</string>
+	<key>00081072</key>
+	<string>SQOperator Identification Sequence</string>
+	<key>00081080</key>
+	<string>LOAdmitting Diagnoses Description</string>
+	<key>00081084</key>
+	<string>SQAdmitting Diagnoses Code Sequence</string>
+	<key>00081088</key>
+	<string>LOPyramid Description</string>
+	<key>00081090</key>
+	<string>LOManufacturer's Model Name</string>
+	<key>00081100</key>
+	<string>SQReferenced Results Sequence</string>
+	<key>00081110</key>
+	<string>SQReferenced Study Sequence</string>
+	<key>00081111</key>
+	<string>SQReferenced Performed Procedure Step Sequence</string>
+	<key>00081112</key>
+	<string>SQReferenced Instances by SOP Class Sequence</string>
+	<key>00081115</key>
+	<string>SQReferenced Series Sequence</string>
+	<key>00081120</key>
+	<string>SQReferenced Patient Sequence</string>
+	<key>00081125</key>
+	<string>SQReferenced Visit Sequence</string>
+	<key>00081130</key>
+	<string>SQReferenced Overlay Sequence</string>
+	<key>00081134</key>
+	<string>SQReferenced Stereometric Instance Sequence</string>
+	<key>0008113A</key>
+	<string>SQReferenced Waveform Sequence</string>
+	<key>00081140</key>
+	<string>SQReferenced Image Sequence</string>
+	<key>00081145</key>
+	<string>SQReferenced Curve Sequence</string>
+	<key>0008114A</key>
+	<string>SQReferenced Instance Sequence</string>
+	<key>0008114B</key>
+	<string>SQReferenced Real World Value Mapping Instance Sequence</string>
+	<key>0008114C</key>
+	<string>SQReferenced Segmentation Sequence</string>
+	<key>00081150</key>
+	<string>UIReferenced SOP Class UID</string>
+	<key>00081155</key>
+	<string>UIReferenced SOP Instance UID</string>
+	<key>00081156</key>
+	<string>SQDefinition Source Sequence</string>
+	<key>0008115A</key>
+	<string>UISOP Classes Supported</string>
+	<key>00081160</key>
+	<string>ISReferenced Frame Number</string>
+	<key>00081161</key>
+	<string>ULSimple Frame List</string>
+	<key>00081162</key>
+	<string>ULCalculated Frame List</string>
+	<key>00081163</key>
+	<string>FDTime Range</string>
+	<key>00081164</key>
+	<string>SQFrame Extraction Sequence</string>
+	<key>00081167</key>
+	<string>UIMulti-frame Source SOP Instance UID</string>
+	<key>00081190</key>
+	<string>URRetrieve URL</string>
+	<key>00081195</key>
+	<string>UITransaction UID</string>
+	<key>00081196</key>
+	<string>USWarning Reason</string>
+	<key>00081197</key>
+	<string>USFailure Reason</string>
+	<key>00081198</key>
+	<string>SQFailed SOP Sequence</string>
+	<key>00081199</key>
+	<string>SQReferenced SOP Sequence</string>
+	<key>0008119A</key>
+	<string>SQOther Failures Sequence</string>
+	<key>0008119B</key>
+	<string>SQFailed Study Sequence</string>
+	<key>00081200</key>
+	<string>SQStudies Containing Other Referenced Instances Sequence</string>
+	<key>00081250</key>
+	<string>SQRelated Series Sequence</string>
+	<key>00082110</key>
+	<string>CSLossy Image Compression (Retired)</string>
+	<key>00082111</key>
+	<string>STDerivation Description</string>
+	<key>00082112</key>
+	<string>SQSource Image Sequence</string>
+	<key>00082120</key>
+	<string>SHStage Name</string>
+	<key>00082122</key>
+	<string>ISStage Number</string>
+	<key>00082124</key>
+	<string>ISNumber of Stages</string>
+	<key>00082127</key>
+	<string>SHView Name</string>
+	<key>00082128</key>
+	<string>ISView Number</string>
+	<key>00082129</key>
+	<string>ISNumber of Event Timers</string>
+	<key>0008212A</key>
+	<string>ISNumber of Views in Stage</string>
+	<key>00082130</key>
+	<string>DSEvent Elapsed Time(s)</string>
+	<key>00082132</key>
+	<string>LOEvent Timer Name(s)</string>
+	<key>00082133</key>
+	<string>SQEvent Timer Sequence</string>
+	<key>00082134</key>
+	<string>FDEvent Time Offset</string>
+	<key>00082135</key>
+	<string>SQEvent Code Sequence</string>
+	<key>00082142</key>
+	<string>ISStart Trim</string>
+	<key>00082143</key>
+	<string>ISStop Trim</string>
+	<key>00082144</key>
+	<string>ISRecommended Display Frame Rate</string>
+	<key>00082200</key>
+	<string>CSTransducer Position</string>
+	<key>00082204</key>
+	<string>CSTransducer Orientation</string>
+	<key>00082208</key>
+	<string>CSAnatomic Structure</string>
+	<key>00082218</key>
+	<string>SQAnatomic Region Sequence</string>
+	<key>00082220</key>
+	<string>SQAnatomic Region Modifier Sequence</string>
+	<key>00082228</key>
+	<string>SQPrimary Anatomic Structure Sequence</string>
+	<key>00082229</key>
+	<string>SQAnatomic Structure, Space or Region Sequence</string>
+	<key>00082230</key>
+	<string>SQPrimary Anatomic Structure Modifier Sequence</string>
+	<key>00082240</key>
+	<string>SQTransducer Position Sequence</string>
+	<key>00082242</key>
+	<string>SQTransducer Position Modifier Sequence</string>
+	<key>00082244</key>
+	<string>SQTransducer Orientation Sequence</string>
+	<key>00082246</key>
+	<string>SQTransducer Orientation Modifier Sequence</string>
+	<key>00082251</key>
+	<string>SQAnatomic Structure Space Or Region Code Sequence (Trial)</string>
+	<key>00082253</key>
+	<string>SQAnatomic Portal Of Entrance Code Sequence (Trial)</string>
+	<key>00082255</key>
+	<string>SQAnatomic Approach Direction Code Sequence (Trial)</string>
+	<key>00082256</key>
+	<string>STAnatomic Perspective Description (Trial)</string>
+	<key>00082257</key>
+	<string>SQAnatomic Perspective Code Sequence (Trial)</string>
+	<key>00082258</key>
+	<string>STAnatomic Location Of Examining Instrument Description (Trial)</string>
+	<key>00082259</key>
+	<string>SQAnatomic Location Of Examining Instrument Code Sequence (Trial)</string>
+	<key>0008225A</key>
+	<string>SQAnatomic Structure Space Or Region Modifier Code Sequence (Trial)</string>
+	<key>0008225C</key>
+	<string>SQOn Axis Background Anatomic Structure Code Sequence (Trial)</string>
+	<key>00083001</key>
+	<string>SQAlternate Representation Sequence</string>
+	<key>00083002</key>
+	<string>UIAvailable Transfer Syntax UID</string>
+	<key>00083010</key>
+	<string>UIIrradiation Event UID</string>
+	<key>00083011</key>
+	<string>SQSource Irradiation Event Sequence</string>
+	<key>00083012</key>
+	<string>UIRadiopharmaceutical Administration Event UID</string>
+	<key>00084000</key>
+	<string>LTIdentifying Comments</string>
+	<key>00089007</key>
+	<string>CSFrame Type</string>
+	<key>00089092</key>
+	<string>SQReferenced Image Evidence Sequence</string>
+	<key>00089121</key>
+	<string>SQReferenced Raw Data Sequence</string>
+	<key>00089123</key>
+	<string>UICreator-Version UID</string>
+	<key>00089124</key>
+	<string>SQDerivation Image Sequence</string>
+	<key>00089154</key>
+	<string>SQSource Image Evidence Sequence</string>
+	<key>00089205</key>
+	<string>CSPixel Presentation</string>
+	<key>00089206</key>
+	<string>CSVolumetric Properties</string>
+	<key>00089207</key>
+	<string>CSVolume Based Calculation Technique</string>
+	<key>00089208</key>
+	<string>CSComplex Image Component</string>
+	<key>00089209</key>
+	<string>CSAcquisition Contrast</string>
+	<key>00089215</key>
+	<string>SQDerivation Code Sequence</string>
+	<key>00089237</key>
+	<string>SQReferenced Presentation State Sequence</string>
+	<key>00089410</key>
+	<string>SQReferenced Other Plane Sequence</string>
+	<key>00089458</key>
+	<string>SQFrame Display Sequence</string>
+	<key>00089459</key>
+	<string>FLRecommended Display Frame Rate in Float</string>
+	<key>00089460</key>
+	<string>CSSkip Frame Range Flag</string>
+	<key>00100010</key>
+	<string>PNPatient's Name</string>
+	<key>00100020</key>
+	<string>LOPatient ID</string>
+	<key>00100021</key>
+	<string>LOIssuer of Patient ID</string>
+	<key>00100022</key>
+	<string>CSType of Patient ID</string>
+	<key>00100024</key>
+	<string>SQIssuer of Patient ID Qualifiers Sequence</string>
+	<key>00100026</key>
+	<string>SQSource Patient Group Identification Sequence</string>
+	<key>00100027</key>
+	<string>SQGroup of Patients Identification Sequence</string>
+	<key>00100028</key>
+	<string>USSubject Relative Position in Image</string>
+	<key>00100030</key>
+	<string>DAPatient's Birth Date</string>
+	<key>00100032</key>
+	<string>TMPatient's Birth Time</string>
+	<key>00100033</key>
+	<string>LOPatient's Birth Date in Alternative Calendar</string>
+	<key>00100034</key>
+	<string>LOPatient's Death Date in Alternative Calendar</string>
+	<key>00100035</key>
+	<string>CSPatient's Alternative Calendar</string>
+	<key>00100040</key>
+	<string>CSPatient's Sex</string>
+	<key>00100050</key>
+	<string>SQPatient's Insurance Plan Code Sequence</string>
+	<key>00100101</key>
+	<string>SQPatient's Primary Language Code Sequence</string>
+	<key>00100102</key>
+	<string>SQPatient's Primary Language Modifier Code Sequence</string>
+	<key>00100200</key>
+	<string>CSQuality Control Subject</string>
+	<key>00100201</key>
+	<string>SQQuality Control Subject Type Code Sequence</string>
+	<key>00100212</key>
+	<string>UCStrain Description</string>
+	<key>00100213</key>
+	<string>LOStrain Nomenclature</string>
+	<key>00100214</key>
+	<string>LOStrain Stock Number</string>
+	<key>00100215</key>
+	<string>SQStrain Source Registry Code Sequence</string>
+	<key>00100216</key>
+	<string>SQStrain Stock Sequence</string>
+	<key>00100217</key>
+	<string>LOStrain Source</string>
+	<key>00100218</key>
+	<string>UTStrain Additional Information</string>
+	<key>00100219</key>
+	<string>SQStrain Code Sequence</string>
+	<key>00100221</key>
+	<string>SQGenetic Modifications Sequence</string>
+	<key>00100222</key>
+	<string>UCGenetic Modifications Description</string>
+	<key>00100223</key>
+	<string>LOGenetic Modifications Nomenclature</string>
+	<key>00100229</key>
+	<string>SQGenetic Modifications Code Sequence</string>
+	<key>00101000</key>
+	<string>LOOther Patient IDs</string>
+	<key>00101001</key>
+	<string>PNOther Patient Names</string>
+	<key>00101002</key>
+	<string>SQOther Patient IDs Sequence</string>
+	<key>00101005</key>
+	<string>PNPatient's Birth Name</string>
+	<key>00101010</key>
+	<string>ASPatient's Age</string>
+	<key>00101020</key>
+	<string>DSPatient's Size</string>
+	<key>00101021</key>
+	<string>SQPatient's Size Code Sequence</string>
+	<key>00101022</key>
+	<string>DSPatient's Body Mass Index</string>
+	<key>00101023</key>
+	<string>DSMeasured AP Dimension</string>
+	<key>00101024</key>
+	<string>DSMeasured Lateral Dimension</string>
+	<key>00101030</key>
+	<string>DSPatient's Weight</string>
+	<key>00101040</key>
+	<string>LOPatient's Address</string>
+	<key>00101050</key>
+	<string>LOInsurance Plan Identification</string>
+	<key>00101060</key>
+	<string>PNPatient's Mother's Birth Name</string>
+	<key>00101080</key>
+	<string>LOMilitary Rank</string>
+	<key>00101081</key>
+	<string>LOBranch of Service</string>
+	<key>00101090</key>
+	<string>LOMedical Record Locator</string>
+	<key>00101100</key>
+	<string>SQReferenced Patient Photo Sequence</string>
+	<key>00102000</key>
+	<string>LOMedical Alerts</string>
+	<key>00102110</key>
+	<string>LOAllergies</string>
+	<key>00102150</key>
+	<string>LOCountry of Residence</string>
+	<key>00102152</key>
+	<string>LORegion of Residence</string>
+	<key>00102154</key>
+	<string>SHPatient's Telephone Numbers</string>
+	<key>00102155</key>
+	<string>LTPatient's Telecom Information</string>
+	<key>00102160</key>
+	<string>SHEthnic Group</string>
+	<key>00102161</key>
+	<string>SQEthnic Group Code Sequence</string>
+	<key>00102180</key>
+	<string>SHOccupation</string>
+	<key>001021A0</key>
+	<string>CSSmoking Status</string>
+	<key>001021B0</key>
+	<string>LTAdditional Patient History</string>
+	<key>001021C0</key>
+	<string>USPregnancy Status</string>
+	<key>001021D0</key>
+	<string>DALast Menstrual Date</string>
+	<key>001021F0</key>
+	<string>LOPatient's Religious Preference</string>
+	<key>00102201</key>
+	<string>LOPatient Species Description</string>
+	<key>00102202</key>
+	<string>SQPatient Species Code Sequence</string>
+	<key>00102203</key>
+	<string>CSPatient's Sex Neutered</string>
+	<key>00102210</key>
+	<string>CSAnatomical Orientation Type</string>
+	<key>00102292</key>
+	<string>LOPatient Breed Description</string>
+	<key>00102293</key>
+	<string>SQPatient Breed Code Sequence</string>
+	<key>00102294</key>
+	<string>SQBreed Registration Sequence</string>
+	<key>00102295</key>
+	<string>LOBreed Registration Number</string>
+	<key>00102296</key>
+	<string>SQBreed Registry Code Sequence</string>
+	<key>00102297</key>
+	<string>PNResponsible Person</string>
+	<key>00102298</key>
+	<string>CSResponsible Person Role</string>
+	<key>00102299</key>
+	<string>LOResponsible Organization</string>
+	<key>00104000</key>
+	<string>LTPatient Comments</string>
+	<key>00109431</key>
+	<string>FLExamined Body Thickness</string>
+	<key>00120010</key>
+	<string>LOClinical Trial Sponsor Name</string>
+	<key>00120020</key>
+	<string>LOClinical Trial Protocol ID</string>
+	<key>00120021</key>
+	<string>LOClinical Trial Protocol Name</string>
+	<key>00120022</key>
+	<string>LOIssuer of Clinical Trial Protocol ID</string>
+	<key>00120023</key>
+	<string>SQOther Clinical Trial Protocol IDs Sequence</string>
+	<key>00120030</key>
+	<string>LOClinical Trial Site ID</string>
+	<key>00120031</key>
+	<string>LOClinical Trial Site Name</string>
+	<key>00120032</key>
+	<string>LOIssuer of Clinical Trial Site ID</string>
+	<key>00120040</key>
+	<string>LOClinical Trial Subject ID</string>
+	<key>00120041</key>
+	<string>LOIssuer of Clinical Trial Subject ID</string>
+	<key>00120042</key>
+	<string>LOClinical Trial Subject Reading ID</string>
+	<key>00120043</key>
+	<string>LOIssuer of Clinical Trial Subject Reading ID</string>
+	<key>00120050</key>
+	<string>LOClinical Trial Time Point ID</string>
+	<key>00120051</key>
+	<string>STClinical Trial Time Point Description</string>
+	<key>00120052</key>
+	<string>FDLongitudinal Temporal Offset from Event</string>
+	<key>00120053</key>
+	<string>CSLongitudinal Temporal Event Type</string>
+	<key>00120054</key>
+	<string>SQClinical Trial Time Point Type Code Sequence</string>
+	<key>00120055</key>
+	<string>LOIssuer of Clinical Trial Time Point ID</string>
+	<key>00120060</key>
+	<string>LOClinical Trial Coordinating Center Name</string>
+	<key>00120062</key>
+	<string>CSPatient Identity Removed</string>
+	<key>00120063</key>
+	<string>LODe-identification Method</string>
+	<key>00120064</key>
+	<string>SQDe-identification Method Code Sequence</string>
+	<key>00120071</key>
+	<string>LOClinical Trial Series ID</string>
+	<key>00120072</key>
+	<string>LOClinical Trial Series Description</string>
+	<key>00120073</key>
+	<string>LOIssuer of Clinical Trial Series ID</string>
+	<key>00120081</key>
+	<string>LOClinical Trial Protocol Ethics Committee Name</string>
+	<key>00120082</key>
+	<string>LOClinical Trial Protocol Ethics Committee Approval Number</string>
+	<key>00120083</key>
+	<string>SQConsent for Clinical Trial Use Sequence</string>
+	<key>00120084</key>
+	<string>CSDistribution Type</string>
+	<key>00120085</key>
+	<string>CSConsent for Distribution Flag</string>
+	<key>00120086</key>
+	<string>DAEthics Committee Approval Effectiveness Start Date</string>
+	<key>00120087</key>
+	<string>DAEthics Committee Approval Effectiveness End Date</string>
+	<key>00140023</key>
+	<string>STCAD File Format</string>
+	<key>00140024</key>
+	<string>STComponent Reference System</string>
+	<key>00140025</key>
+	<string>STComponent Manufacturing Procedure</string>
+	<key>00140028</key>
+	<string>STComponent Manufacturer</string>
+	<key>00140030</key>
+	<string>DSMaterial Thickness</string>
+	<key>00140032</key>
+	<string>DSMaterial Pipe Diameter</string>
+	<key>00140034</key>
+	<string>DSMaterial Isolation Diameter</string>
+	<key>00140042</key>
+	<string>STMaterial Grade</string>
+	<key>00140044</key>
+	<string>STMaterial Properties Description</string>
+	<key>00140045</key>
+	<string>STMaterial Properties File Format (Retired)</string>
+	<key>00140046</key>
+	<string>LTMaterial Notes</string>
+	<key>00140050</key>
+	<string>CSComponent Shape</string>
+	<key>00140052</key>
+	<string>CSCurvature Type</string>
+	<key>00140054</key>
+	<string>DSOuter Diameter</string>
+	<key>00140056</key>
+	<string>DSInner Diameter</string>
+	<key>00140100</key>
+	<string>LOComponent Welder IDs</string>
+	<key>00140101</key>
+	<string>CSSecondary Approval Status</string>
+	<key>00140102</key>
+	<string>DASecondary Review Date</string>
+	<key>00140103</key>
+	<string>TMSecondary Review Time</string>
+	<key>00140104</key>
+	<string>PNSecondary Reviewer Name</string>
+	<key>00140105</key>
+	<string>STRepair ID</string>
+	<key>00140106</key>
+	<string>SQMultiple Component Approval Sequence</string>
+	<key>00140107</key>
+	<string>CSOther Approval Status</string>
+	<key>00140108</key>
+	<string>CSOther Secondary Approval Status</string>
+	<key>00140200</key>
+	<string>SQData Element Label Sequence</string>
+	<key>00140201</key>
+	<string>SQData Element Label Item Sequence</string>
+	<key>00140202</key>
+	<string>ATData Element</string>
+	<key>00140203</key>
+	<string>LOData Element Name</string>
+	<key>00140204</key>
+	<string>LOData Element Description</string>
+	<key>00140205</key>
+	<string>CSData Element Conditionality</string>
+	<key>00140206</key>
+	<string>ISData Element Minimum Characters</string>
+	<key>00140207</key>
+	<string>ISData Element Maximum Characters</string>
+	<key>00141010</key>
+	<string>STActual Environmental Conditions</string>
+	<key>00141020</key>
+	<string>DAExpiry Date</string>
+	<key>00141040</key>
+	<string>STEnvironmental Conditions</string>
+	<key>00142002</key>
+	<string>SQEvaluator Sequence</string>
+	<key>00142004</key>
+	<string>ISEvaluator Number</string>
+	<key>00142006</key>
+	<string>PNEvaluator Name</string>
+	<key>00142008</key>
+	<string>ISEvaluation Attempt</string>
+	<key>00142012</key>
+	<string>SQIndication Sequence</string>
+	<key>00142014</key>
+	<string>ISIndication Number</string>
+	<key>00142016</key>
+	<string>SHIndication Label</string>
+	<key>00142018</key>
+	<string>STIndication Description</string>
+	<key>0014201A</key>
+	<string>CSIndication Type</string>
+	<key>0014201C</key>
+	<string>CSIndication Disposition</string>
+	<key>0014201E</key>
+	<string>SQIndication ROI Sequence</string>
+	<key>00142030</key>
+	<string>SQIndication Physical Property Sequence</string>
+	<key>00142032</key>
+	<string>SHProperty Label</string>
+	<key>00142202</key>
+	<string>ISCoordinate System Number of Axes</string>
+	<key>00142204</key>
+	<string>SQCoordinate System Axes Sequence</string>
+	<key>00142206</key>
+	<string>STCoordinate System Axis Description</string>
+	<key>00142208</key>
+	<string>CSCoordinate System Data Set Mapping</string>
+	<key>0014220A</key>
+	<string>ISCoordinate System Axis Number</string>
+	<key>0014220C</key>
+	<string>CSCoordinate System Axis Type</string>
+	<key>0014220E</key>
+	<string>CSCoordinate System Axis Units</string>
+	<key>00142210</key>
+	<string>OBCoordinate System Axis Values</string>
+	<key>00142220</key>
+	<string>SQCoordinate System Transform Sequence</string>
+	<key>00142222</key>
+	<string>STTransform Description</string>
+	<key>00142224</key>
+	<string>ISTransform Number of Axes</string>
+	<key>00142226</key>
+	<string>ISTransform Order of Axes</string>
+	<key>00142228</key>
+	<string>CSTransformed Axis Units</string>
+	<key>0014222A</key>
+	<string>DSCoordinate System Transform Rotation and Scale Matrix</string>
+	<key>0014222C</key>
+	<string>DSCoordinate System Transform Translation Matrix</string>
+	<key>00143011</key>
+	<string>DSInternal Detector Frame Time</string>
+	<key>00143012</key>
+	<string>DSNumber of Frames Integrated</string>
+	<key>00143020</key>
+	<string>SQDetector Temperature Sequence</string>
+	<key>00143022</key>
+	<string>STSensor Name</string>
+	<key>00143024</key>
+	<string>DSHorizontal Offset of Sensor</string>
+	<key>00143026</key>
+	<string>DSVertical Offset of Sensor</string>
+	<key>00143028</key>
+	<string>DSSensor Temperature</string>
+	<key>00143040</key>
+	<string>SQDark Current Sequence</string>
+	<key>00143050</key>
+	<string>OWDark Current Counts</string>
+	<key>00143060</key>
+	<string>SQGain Correction Reference Sequence</string>
+	<key>00143070</key>
+	<string>OWAir Counts</string>
+	<key>00143071</key>
+	<string>DSKV Used in Gain Calibration</string>
+	<key>00143072</key>
+	<string>DSMA Used in Gain Calibration</string>
+	<key>00143073</key>
+	<string>DSNumber of Frames Used for Integration</string>
+	<key>00143074</key>
+	<string>LOFilter Material Used in Gain Calibration</string>
+	<key>00143075</key>
+	<string>DSFilter Thickness Used in Gain Calibration</string>
+	<key>00143076</key>
+	<string>DADate of Gain Calibration</string>
+	<key>00143077</key>
+	<string>TMTime of Gain Calibration</string>
+	<key>00143080</key>
+	<string>OBBad Pixel Image</string>
+	<key>00143099</key>
+	<string>LTCalibration Notes</string>
+	<key>00143100</key>
+	<string>LTLinearity Correction Technique</string>
+	<key>00143101</key>
+	<string>LTBeam Hardening Correction Technique</string>
+	<key>00144002</key>
+	<string>SQPulser Equipment Sequence</string>
+	<key>00144004</key>
+	<string>CSPulser Type</string>
+	<key>00144006</key>
+	<string>LTPulser Notes</string>
+	<key>00144008</key>
+	<string>SQReceiver Equipment Sequence</string>
+	<key>0014400A</key>
+	<string>CSAmplifier Type</string>
+	<key>0014400C</key>
+	<string>LTReceiver Notes</string>
+	<key>0014400E</key>
+	<string>SQPre-Amplifier Equipment Sequence</string>
+	<key>0014400F</key>
+	<string>LTPre-Amplifier Notes</string>
+	<key>00144010</key>
+	<string>SQTransmit Transducer Sequence</string>
+	<key>00144011</key>
+	<string>SQReceive Transducer Sequence</string>
+	<key>00144012</key>
+	<string>USNumber of Elements</string>
+	<key>00144013</key>
+	<string>CSElement Shape</string>
+	<key>00144014</key>
+	<string>DSElement Dimension A</string>
+	<key>00144015</key>
+	<string>DSElement Dimension B</string>
+	<key>00144016</key>
+	<string>DSElement Pitch A</string>
+	<key>00144017</key>
+	<string>DSMeasured Beam Dimension A</string>
+	<key>00144018</key>
+	<string>DSMeasured Beam Dimension B</string>
+	<key>00144019</key>
+	<string>DSLocation of Measured Beam Diameter</string>
+	<key>0014401A</key>
+	<string>DSNominal Frequency</string>
+	<key>0014401B</key>
+	<string>DSMeasured Center Frequency</string>
+	<key>0014401C</key>
+	<string>DSMeasured Bandwidth</string>
+	<key>0014401D</key>
+	<string>DSElement Pitch B</string>
+	<key>00144020</key>
+	<string>SQPulser Settings Sequence</string>
+	<key>00144022</key>
+	<string>DSPulse Width</string>
+	<key>00144024</key>
+	<string>DSExcitation Frequency</string>
+	<key>00144026</key>
+	<string>CSModulation Type</string>
+	<key>00144028</key>
+	<string>DSDamping</string>
+	<key>00144030</key>
+	<string>SQReceiver Settings Sequence</string>
+	<key>00144031</key>
+	<string>DSAcquired Soundpath Length</string>
+	<key>00144032</key>
+	<string>CSAcquisition Compression Type</string>
+	<key>00144033</key>
+	<string>ISAcquisition Sample Size</string>
+	<key>00144034</key>
+	<string>DSRectifier Smoothing</string>
+	<key>00144035</key>
+	<string>SQDAC Sequence</string>
+	<key>00144036</key>
+	<string>CSDAC Type</string>
+	<key>00144038</key>
+	<string>DSDAC Gain Points</string>
+	<key>0014403A</key>
+	<string>DSDAC Time Points</string>
+	<key>0014403C</key>
+	<string>DSDAC Amplitude</string>
+	<key>00144040</key>
+	<string>SQPre-Amplifier Settings Sequence</string>
+	<key>00144050</key>
+	<string>SQTransmit Transducer Settings Sequence</string>
+	<key>00144051</key>
+	<string>SQReceive Transducer Settings Sequence</string>
+	<key>00144052</key>
+	<string>DSIncident Angle</string>
+	<key>00144054</key>
+	<string>STCoupling Technique</string>
+	<key>00144056</key>
+	<string>STCoupling Medium</string>
+	<key>00144057</key>
+	<string>DSCoupling Velocity</string>
+	<key>00144058</key>
+	<string>DSProbe Center Location X</string>
+	<key>00144059</key>
+	<string>DSProbe Center Location Z</string>
+	<key>0014405A</key>
+	<string>DSSound Path Length</string>
+	<key>0014405C</key>
+	<string>STDelay Law Identifier</string>
+	<key>00144060</key>
+	<string>SQGate Settings Sequence</string>
+	<key>00144062</key>
+	<string>DSGate Threshold</string>
+	<key>00144064</key>
+	<string>DSVelocity of Sound</string>
+	<key>00144070</key>
+	<string>SQCalibration Settings Sequence</string>
+	<key>00144072</key>
+	<string>STCalibration Procedure</string>
+	<key>00144074</key>
+	<string>SHProcedure Version</string>
+	<key>00144076</key>
+	<string>DAProcedure Creation Date</string>
+	<key>00144078</key>
+	<string>DAProcedure Expiration Date</string>
+	<key>0014407A</key>
+	<string>DAProcedure Last Modified Date</string>
+	<key>0014407C</key>
+	<string>TMCalibration Time</string>
+	<key>0014407E</key>
+	<string>DACalibration Date</string>
+	<key>00144080</key>
+	<string>SQProbe Drive Equipment Sequence</string>
+	<key>00144081</key>
+	<string>CSDrive Type</string>
+	<key>00144082</key>
+	<string>LTProbe Drive Notes</string>
+	<key>00144083</key>
+	<string>SQDrive Probe Sequence</string>
+	<key>00144084</key>
+	<string>DSProbe Inductance</string>
+	<key>00144085</key>
+	<string>DSProbe Resistance</string>
+	<key>00144086</key>
+	<string>SQReceive Probe Sequence</string>
+	<key>00144087</key>
+	<string>SQProbe Drive Settings Sequence</string>
+	<key>00144088</key>
+	<string>DSBridge Resistors</string>
+	<key>00144089</key>
+	<string>DSProbe Orientation Angle</string>
+	<key>0014408B</key>
+	<string>DSUser Selected Gain Y</string>
+	<key>0014408C</key>
+	<string>DSUser Selected Phase</string>
+	<key>0014408D</key>
+	<string>DSUser Selected Offset X</string>
+	<key>0014408E</key>
+	<string>DSUser Selected Offset Y</string>
+	<key>00144091</key>
+	<string>SQChannel Settings Sequence</string>
+	<key>00144092</key>
+	<string>DSChannel Threshold</string>
+	<key>0014409A</key>
+	<string>SQScanner Settings Sequence</string>
+	<key>0014409B</key>
+	<string>STScan Procedure</string>
+	<key>0014409C</key>
+	<string>DSTranslation Rate X</string>
+	<key>0014409D</key>
+	<string>DSTranslation Rate Y</string>
+	<key>0014409F</key>
+	<string>DSChannel Overlap</string>
+	<key>001440A0</key>
+	<string>LOImage Quality Indicator Type</string>
+	<key>001440A1</key>
+	<string>LOImage Quality Indicator Material</string>
+	<key>001440A2</key>
+	<string>LOImage Quality Indicator Size</string>
+	<key>00145002</key>
+	<string>ISLINAC Energy</string>
+	<key>00145004</key>
+	<string>ISLINAC Output</string>
+	<key>00145100</key>
+	<string>USActive Aperture</string>
+	<key>00145101</key>
+	<string>DSTotal Aperture</string>
+	<key>00145102</key>
+	<string>DSAperture Elevation</string>
+	<key>00145103</key>
+	<string>DSMain Lobe Angle</string>
+	<key>00145104</key>
+	<string>DSMain Roof Angle</string>
+	<key>00145105</key>
+	<string>CSConnector Type</string>
+	<key>00145106</key>
+	<string>SHWedge Model Number</string>
+	<key>00145107</key>
+	<string>DSWedge Angle Float</string>
+	<key>00145108</key>
+	<string>DSWedge Roof Angle</string>
+	<key>00145109</key>
+	<string>CSWedge Element 1 Position</string>
+	<key>0014510A</key>
+	<string>DSWedge Material Velocity</string>
+	<key>0014510B</key>
+	<string>SHWedge Material</string>
+	<key>0014510C</key>
+	<string>DSWedge Offset Z</string>
+	<key>0014510D</key>
+	<string>DSWedge Origin Offset X</string>
+	<key>0014510E</key>
+	<string>DSWedge Time Delay</string>
+	<key>0014510F</key>
+	<string>SHWedge Name</string>
+	<key>00145110</key>
+	<string>SHWedge Manufacturer Name</string>
+	<key>00145111</key>
+	<string>LOWedge Description</string>
+	<key>00145112</key>
+	<string>DSNominal Beam Angle</string>
+	<key>00145113</key>
+	<string>DSWedge Offset X</string>
+	<key>00145114</key>
+	<string>DSWedge Offset Y</string>
+	<key>00145115</key>
+	<string>DSWedge Total Length</string>
+	<key>00145116</key>
+	<string>DSWedge In Contact Length</string>
+	<key>00145117</key>
+	<string>DSWedge Front Gap</string>
+	<key>00145118</key>
+	<string>DSWedge Total Height</string>
+	<key>00145119</key>
+	<string>DSWedge Front Height</string>
+	<key>0014511A</key>
+	<string>DSWedge Rear Height</string>
+	<key>0014511B</key>
+	<string>DSWedge Total Width</string>
+	<key>0014511C</key>
+	<string>DSWedge In Contact Width</string>
+	<key>0014511D</key>
+	<string>DSWedge Chamfer Height</string>
+	<key>0014511E</key>
+	<string>CSWedge Curve</string>
+	<key>0014511F</key>
+	<string>DSRadius Along the Wedge</string>
+	<key>00146001</key>
+	<string>SQThermal Camera Settings Sequence</string>
+	<key>00146002</key>
+	<string>DSAcquisition Frame Rate</string>
+	<key>00146003</key>
+	<string>DSIntegration Time</string>
+	<key>00146004</key>
+	<string>DSNumber of Calibration Frames</string>
+	<key>00146005</key>
+	<string>DSNumber of Rows in Full Acquisition Image</string>
+	<key>00146006</key>
+	<string>DSNumber Of Columns in Full Acquisition Image</string>
+	<key>00146007</key>
+	<string>SQThermal Source Settings Sequence</string>
+	<key>00146008</key>
+	<string>DSSource Horizontal Pitch</string>
+	<key>00146009</key>
+	<string>DSSource Vertical Pitch</string>
+	<key>0014600A</key>
+	<string>DSSource Horizontal Scan Speed</string>
+	<key>0014600B</key>
+	<string>DSThermal Source Modulation Frequency</string>
+	<key>0014600C</key>
+	<string>SQInduction Source Setting Sequence</string>
+	<key>0014600D</key>
+	<string>DSCoil Frequency</string>
+	<key>0014600E</key>
+	<string>DSCurrent Amplitude Across Coil</string>
+	<key>0014600F</key>
+	<string>SQFlash Source Setting Sequence</string>
+	<key>00146010</key>
+	<string>DSFlash Duration</string>
+	<key>00146011</key>
+	<string>DSFlash Frame Number</string>
+	<key>00146012</key>
+	<string>SQLaser Source Setting Sequence</string>
+	<key>00146013</key>
+	<string>DSHorizontal Laser Spot Dimension</string>
+	<key>00146014</key>
+	<string>DSVertical Laser Spot Dimension</string>
+	<key>00146015</key>
+	<string>DSLaser Wavelength</string>
+	<key>00146016</key>
+	<string>DSLaser Power</string>
+	<key>00146017</key>
+	<string>SQForced Gas Setting Sequence</string>
+	<key>00146018</key>
+	<string>SQVibration Source Setting Sequence</string>
+	<key>00146019</key>
+	<string>DSVibration Excitation Frequency</string>
+	<key>0014601A</key>
+	<string>DSVibration Excitation Voltage</string>
+	<key>0014601B</key>
+	<string>CSThermography Data Capture Method</string>
+	<key>0014601C</key>
+	<string>CSThermal Technique</string>
+	<key>0014601D</key>
+	<string>SQThermal Camera Core Sequence</string>
+	<key>0014601E</key>
+	<string>CSDetector Wavelength Range</string>
+	<key>0014601F</key>
+	<string>CSThermal Camera Calibration Type</string>
+	<key>00146020</key>
+	<string>UVAcquisition Image Counter</string>
+	<key>00146021</key>
+	<string>DSFront Panel Temperature</string>
+	<key>00146022</key>
+	<string>DSAir Gap Temperature</string>
+	<key>00146023</key>
+	<string>DSVertical Pixel Size</string>
+	<key>00146024</key>
+	<string>DSHorizontal Pixel Size</string>
+	<key>00146025</key>
+	<string>STData Streaming Protocol</string>
+	<key>00146026</key>
+	<string>SQLens Sequence</string>
+	<key>00146027</key>
+	<string>DSField of View</string>
+	<key>00146028</key>
+	<string>LOLens Filter Manufacturer</string>
+	<key>00146029</key>
+	<string>CSCutoff Filter Type</string>
+	<key>0014602A</key>
+	<string>DSLens Filter Cut-Off Wavelength</string>
+	<key>0014602B</key>
+	<string>SQThermal Source Sequence</string>
+	<key>0014602C</key>
+	<string>CSThermal Source Motion State</string>
+	<key>0014602D</key>
+	<string>CSThermal Source Motion Type</string>
+	<key>0014602E</key>
+	<string>SQInduction Heating Sequence</string>
+	<key>0014602F</key>
+	<string>STCoil Configuration ID</string>
+	<key>00146030</key>
+	<string>DSNumber of Turns in Coil</string>
+	<key>00146031</key>
+	<string>CSShape of Individual Turn</string>
+	<key>00146032</key>
+	<string>DSSize of Individual Turn</string>
+	<key>00146033</key>
+	<string>DSDistance Between Turns</string>
+	<key>00146034</key>
+	<string>SQFlash Heating Sequence</string>
+	<key>00146035</key>
+	<string>DSNumber of Lamps</string>
+	<key>00146036</key>
+	<string>STFlash Synchronization Protocol</string>
+	<key>00146037</key>
+	<string>CSFlash Modification Status</string>
+	<key>00146038</key>
+	<string>SQLaser Heating Sequence</string>
+	<key>00146039</key>
+	<string>LOLaser Manufacturer</string>
+	<key>0014603A</key>
+	<string>LOLaser Model Number</string>
+	<key>0014603B</key>
+	<string>STLaser Type Description</string>
+	<key>0014603C</key>
+	<string>SQForced Gas Heating Sequence</string>
+	<key>0014603D</key>
+	<string>LOGas Used for Heating/Cooling Part</string>
+	<key>0014603E</key>
+	<string>SQVibration/Sonic Heating Sequence</string>
+	<key>0014603F</key>
+	<string>LOProbe Manufacturer</string>
+	<key>00146040</key>
+	<string>LOProbe Model Number</string>
+	<key>00146041</key>
+	<string>DSAperture Size</string>
+	<key>00146042</key>
+	<string>DSProbe Resonant Frequency</string>
+	<key>00146043</key>
+	<string>UTHeat Source Description</string>
+	<key>00146044</key>
+	<string>CSSurface Preparation with Optical Coating</string>
+	<key>00146045</key>
+	<string>STOptical Coating Type</string>
+	<key>00146046</key>
+	<string>DSThermal Conductivity of Exposed Surface</string>
+	<key>00146047</key>
+	<string>DSMaterial Density</string>
+	<key>00146048</key>
+	<string>DSSpecific Heat of Inspection Surface</string>
+	<key>00146049</key>
+	<string>DSEmissivity of Inspection Surface</string>
+	<key>0014604A</key>
+	<string>CSElectromagnetic Classification of Inspection Surface</string>
+	<key>0014604C</key>
+	<string>DSMoving Window Size</string>
+	<key>0014604D</key>
+	<string>CSMoving Window Type</string>
+	<key>0014604E</key>
+	<string>DSMoving Window Weights</string>
+	<key>0014604F</key>
+	<string>DSMoving Window Pitch</string>
+	<key>00146050</key>
+	<string>CSMoving Window Padding Scheme</string>
+	<key>00146051</key>
+	<string>DSMoving Window Padding Sength</string>
+	<key>00146052</key>
+	<string>SQSpatial Filtering Parameters Sequence</string>
+	<key>00146053</key>
+	<string>CSSpatial Filtering Scheme</string>
+	<key>00146056</key>
+	<string>DSHorizontal Moving Window Size</string>
+	<key>00146057</key>
+	<string>DSVertical Moving Window Size</string>
+	<key>00146059</key>
+	<string>SQPolynomial Fitting Sequence</string>
+	<key>0014605A</key>
+	<string>CSFitting Data Type</string>
+	<key>0014605B</key>
+	<string>CSOperation on Time Axis Before Fitting</string>
+	<key>0014605C</key>
+	<string>CSOperation on Pixel Intensity Before Fitting</string>
+	<key>0014605D</key>
+	<string>DSOrder of Polynomial</string>
+	<key>0014605E</key>
+	<string>CSIndependent Variable for Polynomial Fit</string>
+	<key>0014605F</key>
+	<string>DSPolynomialCoefficients</string>
+	<key>00146060</key>
+	<string>CSThermography Pixel Data Unit</string>
+	<key>00160001</key>
+	<string>DSWhite Point</string>
+	<key>00160002</key>
+	<string>DSPrimary Chromaticities</string>
+	<key>00160003</key>
+	<string>UTBattery Level</string>
+	<key>00160004</key>
+	<string>DSExposure Time in Seconds</string>
+	<key>00160005</key>
+	<string>DSF-Number</string>
+	<key>00160006</key>
+	<string>ISOECF Rows</string>
+	<key>00160007</key>
+	<string>ISOECF Columns</string>
+	<key>00160008</key>
+	<string>UCOECF Column Names</string>
+	<key>00160009</key>
+	<string>DSOECF Values</string>
+	<key>0016000A</key>
+	<string>ISSpatial Frequency Response Rows</string>
+	<key>0016000B</key>
+	<string>ISSpatial Frequency Response Columns</string>
+	<key>0016000C</key>
+	<string>UCSpatial Frequency Response Column Names</string>
+	<key>0016000D</key>
+	<string>DSSpatial Frequency Response Values</string>
+	<key>0016000E</key>
+	<string>ISColor Filter Array Pattern Rows</string>
+	<key>0016000F</key>
+	<string>ISColor Filter Array Pattern Columns</string>
+	<key>00160010</key>
+	<string>DSColor Filter Array Pattern Values</string>
+	<key>00160011</key>
+	<string>USFlash Firing Status</string>
+	<key>00160012</key>
+	<string>USFlash Return Status</string>
+	<key>00160013</key>
+	<string>USFlash Mode</string>
+	<key>00160014</key>
+	<string>USFlash Function Present</string>
+	<key>00160015</key>
+	<string>USFlash Red Eye Mode</string>
+	<key>00160016</key>
+	<string>USExposure Program</string>
+	<key>00160017</key>
+	<string>UTSpectral Sensitivity</string>
+	<key>00160018</key>
+	<string>ISPhotographic Sensitivity</string>
+	<key>00160019</key>
+	<string>ISSelf Timer Mode</string>
+	<key>0016001A</key>
+	<string>USSensitivity Type</string>
+	<key>0016001B</key>
+	<string>ISStandard Output Sensitivity</string>
+	<key>0016001C</key>
+	<string>ISRecommended Exposure Index</string>
+	<key>0016001D</key>
+	<string>ISISO Speed</string>
+	<key>0016001E</key>
+	<string>ISISO Speed Latitude yyy</string>
+	<key>0016001F</key>
+	<string>ISISO Speed Latitude zzz</string>
+	<key>00160020</key>
+	<string>UTEXIF Version</string>
+	<key>00160021</key>
+	<string>DSShutter Speed Value</string>
+	<key>00160022</key>
+	<string>DSAperture Value</string>
+	<key>00160023</key>
+	<string>DSBrightness Value</string>
+	<key>00160024</key>
+	<string>DSExposure Bias Value</string>
+	<key>00160025</key>
+	<string>DSMax Aperture Value</string>
+	<key>00160026</key>
+	<string>DSSubject Distance</string>
+	<key>00160027</key>
+	<string>USMetering Mode</string>
+	<key>00160028</key>
+	<string>USLight Source</string>
+	<key>00160029</key>
+	<string>DSFocal Length</string>
+	<key>0016002A</key>
+	<string>ISSubject Area</string>
+	<key>0016002B</key>
+	<string>OBMaker Note</string>
+	<key>00160030</key>
+	<string>DSTemperature</string>
+	<key>00160031</key>
+	<string>DSHumidity</string>
+	<key>00160032</key>
+	<string>DSPressure</string>
+	<key>00160033</key>
+	<string>DSWater Depth</string>
+	<key>00160034</key>
+	<string>DSAcceleration</string>
+	<key>00160035</key>
+	<string>DSCamera Elevation Angle</string>
+	<key>00160036</key>
+	<string>DSFlash Energy</string>
+	<key>00160037</key>
+	<string>ISSubject Location</string>
+	<key>00160038</key>
+	<string>DSPhotographic Exposure Index</string>
+	<key>00160039</key>
+	<string>USSensing Method</string>
+	<key>0016003A</key>
+	<string>USFile Source</string>
+	<key>0016003B</key>
+	<string>USScene Type</string>
+	<key>00160041</key>
+	<string>USCustom Rendered</string>
+	<key>00160042</key>
+	<string>USExposure Mode</string>
+	<key>00160043</key>
+	<string>USWhite Balance</string>
+	<key>00160044</key>
+	<string>DSDigital Zoom Ratio</string>
+	<key>00160045</key>
+	<string>ISFocal Length In 35mm Film</string>
+	<key>00160046</key>
+	<string>USScene Capture Type</string>
+	<key>00160047</key>
+	<string>USGain Control</string>
+	<key>00160048</key>
+	<string>USContrast</string>
+	<key>00160049</key>
+	<string>USSaturation</string>
+	<key>0016004A</key>
+	<string>USSharpness</string>
+	<key>0016004B</key>
+	<string>OBDevice Setting Description</string>
+	<key>0016004C</key>
+	<string>USSubject Distance Range</string>
+	<key>0016004D</key>
+	<string>UTCamera Owner Name</string>
+	<key>0016004E</key>
+	<string>DSLens Specification</string>
+	<key>0016004F</key>
+	<string>UTLens Make</string>
+	<key>00160050</key>
+	<string>UTLens Model</string>
+	<key>00160051</key>
+	<string>UTLens Serial Number</string>
+	<key>00160061</key>
+	<string>CSInteroperability Index</string>
+	<key>00160062</key>
+	<string>OBInteroperability Version</string>
+	<key>00160070</key>
+	<string>OBGPS Version ID</string>
+	<key>00160071</key>
+	<string>CSGPS Latitude Ref</string>
+	<key>00160072</key>
+	<string>DSGPS Latitude</string>
+	<key>00160073</key>
+	<string>CSGPS Longitude Ref</string>
+	<key>00160074</key>
+	<string>DSGPS Longitude</string>
+	<key>00160075</key>
+	<string>USGPS Altitude Ref</string>
+	<key>00160076</key>
+	<string>DSGPS Altitude</string>
+	<key>00160077</key>
+	<string>DTGPS Time Stamp</string>
+	<key>00160078</key>
+	<string>UTGPS Satellites</string>
+	<key>00160079</key>
+	<string>CSGPS Status</string>
+	<key>0016007A</key>
+	<string>CSGPS Measure Mode</string>
+	<key>0016007B</key>
+	<string>DSGPS DOP</string>
+	<key>0016007C</key>
+	<string>CSGPS Speed Ref</string>
+	<key>0016007D</key>
+	<string>DSGPS Speed</string>
+	<key>0016007E</key>
+	<string>CSGPS Track Ref</string>
+	<key>0016007F</key>
+	<string>DSGPS Track</string>
+	<key>00160080</key>
+	<string>CSGPS Img Direction Ref</string>
+	<key>00160081</key>
+	<string>DSGPS Img Direction</string>
+	<key>00160082</key>
+	<string>UTGPS Map Datum</string>
+	<key>00160083</key>
+	<string>CSGPS Dest Latitude Ref</string>
+	<key>00160084</key>
+	<string>DSGPS Dest Latitude</string>
+	<key>00160085</key>
+	<string>CSGPS Dest Longitude Ref</string>
+	<key>00160086</key>
+	<string>DSGPS Dest Longitude</string>
+	<key>00160087</key>
+	<string>CSGPS Dest Bearing Ref</string>
+	<key>00160088</key>
+	<string>DSGPS Dest Bearing</string>
+	<key>00160089</key>
+	<string>CSGPS Dest Distance Ref</string>
+	<key>0016008A</key>
+	<string>DSGPS Dest Distance</string>
+	<key>0016008B</key>
+	<string>OBGPS Processing Method</string>
+	<key>0016008C</key>
+	<string>OBGPS Area Information</string>
+	<key>0016008D</key>
+	<string>DTGPS Date Stamp</string>
+	<key>0016008E</key>
+	<string>ISGPS Differential</string>
+	<key>00161001</key>
+	<string>CSLight Source Polarization</string>
+	<key>00161002</key>
+	<string>DSEmitter Color Temperature</string>
+	<key>00161003</key>
+	<string>CSContact Method</string>
+	<key>00161004</key>
+	<string>CSImmersion Media</string>
+	<key>00161005</key>
+	<string>DSOptical Magnification Factor</string>
+	<key>00180010</key>
+	<string>LOContrast/Bolus Agent</string>
+	<key>00180012</key>
+	<string>SQContrast/Bolus Agent Sequence</string>
+	<key>00180013</key>
+	<string>FLContrast/Bolus T1 Relaxivity</string>
+	<key>00180014</key>
+	<string>SQContrast/Bolus Administration Route Sequence</string>
+	<key>00180015</key>
+	<string>CSBody Part Examined</string>
+	<key>00180020</key>
+	<string>CSScanning Sequence</string>
+	<key>00180021</key>
+	<string>CSSequence Variant</string>
+	<key>00180022</key>
+	<string>CSScan Options</string>
+	<key>00180023</key>
+	<string>CSMR Acquisition Type</string>
+	<key>00180024</key>
+	<string>SHSequence Name</string>
+	<key>00180025</key>
+	<string>CSAngio Flag</string>
+	<key>00180026</key>
+	<string>SQIntervention Drug Information Sequence</string>
+	<key>00180027</key>
+	<string>TMIntervention Drug Stop Time</string>
+	<key>00180028</key>
+	<string>DSIntervention Drug Dose</string>
+	<key>00180029</key>
+	<string>SQIntervention Drug Code Sequence</string>
+	<key>0018002A</key>
+	<string>SQAdditional Drug Sequence</string>
+	<key>00180030</key>
+	<string>LORadionuclide</string>
+	<key>00180031</key>
+	<string>LORadiopharmaceutical</string>
+	<key>00180032</key>
+	<string>DSEnergy Window Centerline</string>
+	<key>00180033</key>
+	<string>DSEnergy Window Total Width</string>
+	<key>00180034</key>
+	<string>LOIntervention Drug Name</string>
+	<key>00180035</key>
+	<string>TMIntervention Drug Start Time</string>
+	<key>00180036</key>
+	<string>SQIntervention Sequence</string>
+	<key>00180037</key>
+	<string>CSTherapy Type</string>
+	<key>00180038</key>
+	<string>CSIntervention Status</string>
+	<key>00180039</key>
+	<string>CSTherapy Description</string>
+	<key>0018003A</key>
+	<string>STIntervention Description</string>
+	<key>00180040</key>
+	<string>ISCine Rate</string>
+	<key>00180042</key>
+	<string>CSInitial Cine Run State</string>
+	<key>00180050</key>
+	<string>DSSlice Thickness</string>
+	<key>00180060</key>
+	<string>DSKVP</string>
+	<key>00180061</key>
+	<string>DSRetired-blank</string>
+	<key>00180070</key>
+	<string>ISCounts Accumulated</string>
+	<key>00180071</key>
+	<string>CSAcquisition Termination Condition</string>
+	<key>00180072</key>
+	<string>DSEffective Duration</string>
+	<key>00180073</key>
+	<string>CSAcquisition Start Condition</string>
+	<key>00180074</key>
+	<string>ISAcquisition Start Condition Data</string>
+	<key>00180075</key>
+	<string>ISAcquisition Termination Condition Data</string>
+	<key>00180080</key>
+	<string>DSRepetition Time</string>
+	<key>00180081</key>
+	<string>DSEcho Time</string>
+	<key>00180082</key>
+	<string>DSInversion Time</string>
+	<key>00180083</key>
+	<string>DSNumber of Averages</string>
+	<key>00180084</key>
+	<string>DSImaging Frequency</string>
+	<key>00180085</key>
+	<string>SHImaged Nucleus</string>
+	<key>00180086</key>
+	<string>ISEcho Number(s)</string>
+	<key>00180087</key>
+	<string>DSMagnetic Field Strength</string>
+	<key>00180088</key>
+	<string>DSSpacing Between Slices</string>
+	<key>00180089</key>
+	<string>ISNumber of Phase Encoding Steps</string>
+	<key>00180090</key>
+	<string>DSData Collection Diameter</string>
+	<key>00180091</key>
+	<string>ISEcho Train Length</string>
+	<key>00180093</key>
+	<string>DSPercent Sampling</string>
+	<key>00180094</key>
+	<string>DSPercent Phase Field of View</string>
+	<key>00180095</key>
+	<string>DSPixel Bandwidth</string>
+	<key>00181000</key>
+	<string>LODevice Serial Number</string>
+	<key>00181002</key>
+	<string>UIDevice UID</string>
+	<key>00181003</key>
+	<string>LODevice ID</string>
+	<key>00181004</key>
+	<string>LOPlate ID</string>
+	<key>00181005</key>
+	<string>LOGenerator ID</string>
+	<key>00181006</key>
+	<string>LOGrid ID</string>
+	<key>00181007</key>
+	<string>LOCassette ID</string>
+	<key>00181008</key>
+	<string>LOGantry ID</string>
+	<key>00181009</key>
+	<string>UTUnique Device Identifier</string>
+	<key>0018100A</key>
+	<string>SQUDI Sequence</string>
+	<key>0018100B</key>
+	<string>UIManufacturer's Device Class UID</string>
+	<key>00181010</key>
+	<string>LOSecondary Capture Device ID</string>
+	<key>00181011</key>
+	<string>LOHardcopy Creation Device ID</string>
+	<key>00181012</key>
+	<string>DADate of Secondary Capture</string>
+	<key>00181014</key>
+	<string>TMTime of Secondary Capture</string>
+	<key>00181016</key>
+	<string>LOSecondary Capture Device Manufacturer</string>
+	<key>00181017</key>
+	<string>LOHardcopy Device Manufacturer</string>
+	<key>00181018</key>
+	<string>LOSecondary Capture Device Manufacturer's Model Name</string>
+	<key>00181019</key>
+	<string>LOSecondary Capture Device Software Versions</string>
+	<key>0018101A</key>
+	<string>LOHardcopy Device Software Version</string>
+	<key>0018101B</key>
+	<string>LOHardcopy Device Manufacturer's Model Name</string>
+	<key>00181020</key>
+	<string>LOSoftware Versions</string>
+	<key>00181022</key>
+	<string>SHVideo Image Format Acquired</string>
+	<key>00181023</key>
+	<string>LODigital Image Format Acquired</string>
+	<key>00181030</key>
+	<string>LOProtocol Name</string>
+	<key>00181040</key>
+	<string>LOContrast/Bolus Route</string>
+	<key>00181041</key>
+	<string>DSContrast/Bolus Volume</string>
+	<key>00181042</key>
+	<string>TMContrast/Bolus Start Time</string>
+	<key>00181043</key>
+	<string>TMContrast/Bolus Stop Time</string>
+	<key>00181044</key>
+	<string>DSContrast/Bolus Total Dose</string>
+	<key>00181045</key>
+	<string>ISSyringe Counts</string>
+	<key>00181046</key>
+	<string>DSContrast Flow Rate</string>
+	<key>00181047</key>
+	<string>DSContrast Flow Duration</string>
+	<key>00181048</key>
+	<string>CSContrast/Bolus Ingredient</string>
+	<key>00181049</key>
+	<string>DSContrast/Bolus Ingredient Concentration</string>
+	<key>00181050</key>
+	<string>DSSpatial Resolution</string>
+	<key>00181060</key>
+	<string>DSTrigger Time</string>
+	<key>00181061</key>
+	<string>LOTrigger Source or Type</string>
+	<key>00181062</key>
+	<string>ISNominal Interval</string>
+	<key>00181063</key>
+	<string>DSFrame Time</string>
+	<key>00181064</key>
+	<string>LOCardiac Framing Type</string>
+	<key>00181065</key>
+	<string>DSFrame Time Vector</string>
+	<key>00181066</key>
+	<string>DSFrame Delay</string>
+	<key>00181067</key>
+	<string>DSImage Trigger Delay</string>
+	<key>00181068</key>
+	<string>DSMultiplex Group Time Offset</string>
+	<key>00181069</key>
+	<string>DSTrigger Time Offset</string>
+	<key>0018106A</key>
+	<string>CSSynchronization Trigger</string>
+	<key>0018106C</key>
+	<string>USSynchronization Channel</string>
+	<key>0018106E</key>
+	<string>ULTrigger Sample Position</string>
+	<key>00181070</key>
+	<string>LORadiopharmaceutical Route</string>
+	<key>00181071</key>
+	<string>DSRadiopharmaceutical Volume</string>
+	<key>00181072</key>
+	<string>TMRadiopharmaceutical Start Time</string>
+	<key>00181073</key>
+	<string>TMRadiopharmaceutical Stop Time</string>
+	<key>00181074</key>
+	<string>DSRadionuclide Total Dose</string>
+	<key>00181075</key>
+	<string>DSRadionuclide Half Life</string>
+	<key>00181076</key>
+	<string>DSRadionuclide Positron Fraction</string>
+	<key>00181077</key>
+	<string>DSRadiopharmaceutical Specific Activity</string>
+	<key>00181078</key>
+	<string>DTRadiopharmaceutical Start DateTime</string>
+	<key>00181079</key>
+	<string>DTRadiopharmaceutical Stop DateTime</string>
+	<key>00181080</key>
+	<string>CSBeat Rejection Flag</string>
+	<key>00181081</key>
+	<string>ISLow R-R Value</string>
+	<key>00181082</key>
+	<string>ISHigh R-R Value</string>
+	<key>00181083</key>
+	<string>ISIntervals Acquired</string>
+	<key>00181084</key>
+	<string>ISIntervals Rejected</string>
+	<key>00181085</key>
+	<string>LOPVC Rejection</string>
+	<key>00181086</key>
+	<string>ISSkip Beats</string>
+	<key>00181088</key>
+	<string>ISHeart Rate</string>
+	<key>00181090</key>
+	<string>ISCardiac Number of Images</string>
+	<key>00181094</key>
+	<string>ISTrigger Window</string>
+	<key>00181100</key>
+	<string>DSReconstruction Diameter</string>
+	<key>00181110</key>
+	<string>DSDistance Source to Detector</string>
+	<key>00181111</key>
+	<string>DSDistance Source to Patient</string>
+	<key>00181114</key>
+	<string>DSEstimated Radiographic Magnification Factor</string>
+	<key>00181120</key>
+	<string>DSGantry/Detector Tilt</string>
+	<key>00181121</key>
+	<string>DSGantry/Detector Slew</string>
+	<key>00181130</key>
+	<string>DSTable Height</string>
+	<key>00181131</key>
+	<string>DSTable Traverse</string>
+	<key>00181134</key>
+	<string>CSTable Motion</string>
+	<key>00181135</key>
+	<string>DSTable Vertical Increment</string>
+	<key>00181136</key>
+	<string>DSTable Lateral Increment</string>
+	<key>00181137</key>
+	<string>DSTable Longitudinal Increment</string>
+	<key>00181138</key>
+	<string>DSTable Angle</string>
+	<key>0018113A</key>
+	<string>CSTable Type</string>
+	<key>00181140</key>
+	<string>CSRotation Direction</string>
+	<key>00181141</key>
+	<string>DSAngular Position</string>
+	<key>00181142</key>
+	<string>DSRadial Position</string>
+	<key>00181143</key>
+	<string>DSScan Arc</string>
+	<key>00181144</key>
+	<string>DSAngular Step</string>
+	<key>00181145</key>
+	<string>DSCenter of Rotation Offset</string>
+	<key>00181146</key>
+	<string>DSRotation Offset</string>
+	<key>00181147</key>
+	<string>CSField of View Shape</string>
+	<key>00181149</key>
+	<string>ISField of View Dimension(s)</string>
+	<key>00181150</key>
+	<string>ISExposure Time</string>
+	<key>00181151</key>
+	<string>ISX-Ray Tube Current</string>
+	<key>00181152</key>
+	<string>ISExposure</string>
+	<key>00181153</key>
+	<string>ISExposure in uAs</string>
+	<key>00181154</key>
+	<string>DSAverage Pulse Width</string>
+	<key>00181155</key>
+	<string>CSRadiation Setting</string>
+	<key>00181156</key>
+	<string>CSRectification Type</string>
+	<key>0018115A</key>
+	<string>CSRadiation Mode</string>
+	<key>0018115E</key>
+	<string>DSImage and Fluoroscopy Area Dose Product</string>
+	<key>00181160</key>
+	<string>SHFilter Type</string>
+	<key>00181161</key>
+	<string>LOType of Filters</string>
+	<key>00181162</key>
+	<string>DSIntensifier Size</string>
+	<key>00181164</key>
+	<string>DSImager Pixel Spacing</string>
+	<key>00181166</key>
+	<string>CSGrid</string>
+	<key>00181170</key>
+	<string>ISGenerator Power</string>
+	<key>00181180</key>
+	<string>SHCollimator/grid Name</string>
+	<key>00181181</key>
+	<string>CSCollimator Type</string>
+	<key>00181182</key>
+	<string>ISFocal Distance</string>
+	<key>00181183</key>
+	<string>DSX Focus Center</string>
+	<key>00181184</key>
+	<string>DSY Focus Center</string>
+	<key>00181190</key>
+	<string>DSFocal Spot(s)</string>
+	<key>00181191</key>
+	<string>CSAnode Target Material</string>
+	<key>001811A0</key>
+	<string>DSBody Part Thickness</string>
+	<key>001811A2</key>
+	<string>DSCompression Force</string>
+	<key>001811A3</key>
+	<string>DSCompression Pressure</string>
+	<key>001811A4</key>
+	<string>LOPaddle Description</string>
+	<key>001811A5</key>
+	<string>DSCompression Contact Area</string>
+	<key>001811B0</key>
+	<string>LOAcquisition Mode</string>
+	<key>001811B1</key>
+	<string>LODose Mode Name</string>
+	<key>001811B2</key>
+	<string>CSAcquired Subtraction Mask Flag</string>
+	<key>001811B3</key>
+	<string>CSFluoroscopy Persistence Flag</string>
+	<key>001811B4</key>
+	<string>CSFluoroscopy Last Image Hold Persistence Flag</string>
+	<key>001811B5</key>
+	<string>ISUpper Limit Number Of Persistent Fluoroscopy Frames</string>
+	<key>001811B6</key>
+	<string>CSContrast/Bolus Auto Injection Trigger Flag</string>
+	<key>001811B7</key>
+	<string>FDContrast/Bolus Injection Delay</string>
+	<key>001811B8</key>
+	<string>SQXA Acquisition Phase Details Sequence</string>
+	<key>001811B9</key>
+	<string>FDXA Acquisition Frame Rate</string>
+	<key>001811BA</key>
+	<string>SQXA Plane Details Sequence</string>
+	<key>001811BB</key>
+	<string>LOAcquisition Field of View Label</string>
+	<key>001811BC</key>
+	<string>SQX-Ray Filter Details Sequence</string>
+	<key>001811BD</key>
+	<string>FDXA Acquisition Duration</string>
+	<key>001811BE</key>
+	<string>CSReconstruction Pipeline Type</string>
+	<key>001811BF</key>
+	<string>SQImage Filter Details Sequence</string>
+	<key>001811C0</key>
+	<string>CSApplied Mask Subtraction Flag</string>
+	<key>001811C1</key>
+	<string>SQRequested Series Description Code Sequence</string>
+	<key>00181200</key>
+	<string>DADate of Last Calibration</string>
+	<key>00181201</key>
+	<string>TMTime of Last Calibration</string>
+	<key>00181202</key>
+	<string>DTDateTime of Last Calibration</string>
+	<key>00181203</key>
+	<string>DTCalibration DateTime</string>
+	<key>00181204</key>
+	<string>DADate of Manufacture</string>
+	<key>00181205</key>
+	<string>DADate of Installation</string>
+	<key>00181210</key>
+	<string>SHConvolution Kernel</string>
+	<key>00181240</key>
+	<string>ISUpper/Lower Pixel Values</string>
+	<key>00181242</key>
+	<string>ISActual Frame Duration</string>
+	<key>00181243</key>
+	<string>ISCount Rate</string>
+	<key>00181244</key>
+	<string>USPreferred Playback Sequencing</string>
+	<key>00181250</key>
+	<string>SHReceive Coil Name</string>
+	<key>00181251</key>
+	<string>SHTransmit Coil Name</string>
+	<key>00181260</key>
+	<string>SHPlate Type</string>
+	<key>00181261</key>
+	<string>LOPhosphor Type</string>
+	<key>00181271</key>
+	<string>FDWater Equivalent Diameter</string>
+	<key>00181272</key>
+	<string>SQWater Equivalent Diameter Calculation Method Code Sequence</string>
+	<key>00181300</key>
+	<string>DSScan Velocity</string>
+	<key>00181301</key>
+	<string>CSWhole Body Technique</string>
+	<key>00181302</key>
+	<string>ISScan Length</string>
+	<key>00181310</key>
+	<string>USAcquisition Matrix</string>
+	<key>00181312</key>
+	<string>CSIn-plane Phase Encoding Direction</string>
+	<key>00181314</key>
+	<string>DSFlip Angle</string>
+	<key>00181315</key>
+	<string>CSVariable Flip Angle Flag</string>
+	<key>00181316</key>
+	<string>DSSAR</string>
+	<key>00181318</key>
+	<string>DSdB/dt</string>
+	<key>00181320</key>
+	<string>FLB1rms</string>
+	<key>00181400</key>
+	<string>LOAcquisition Device Processing Description</string>
+	<key>00181401</key>
+	<string>LOAcquisition Device Processing Code</string>
+	<key>00181402</key>
+	<string>CSCassette Orientation</string>
+	<key>00181403</key>
+	<string>CSCassette Size</string>
+	<key>00181404</key>
+	<string>USExposures on Plate</string>
+	<key>00181405</key>
+	<string>ISRelative X-Ray Exposure</string>
+	<key>00181411</key>
+	<string>DSExposure Index</string>
+	<key>00181412</key>
+	<string>DSTarget Exposure Index</string>
+	<key>00181413</key>
+	<string>DSDeviation Index</string>
+	<key>00181450</key>
+	<string>DSColumn Angulation</string>
+	<key>00181460</key>
+	<string>DSTomo Layer Height</string>
+	<key>00181470</key>
+	<string>DSTomo Angle</string>
+	<key>00181480</key>
+	<string>DSTomo Time</string>
+	<key>00181490</key>
+	<string>CSTomo Type</string>
+	<key>00181491</key>
+	<string>CSTomo Class</string>
+	<key>00181495</key>
+	<string>ISNumber of Tomosynthesis Source Images</string>
+	<key>00181500</key>
+	<string>CSPositioner Motion</string>
+	<key>00181508</key>
+	<string>CSPositioner Type</string>
+	<key>00181510</key>
+	<string>DSPositioner Primary Angle</string>
+	<key>00181511</key>
+	<string>DSPositioner Secondary Angle</string>
+	<key>00181520</key>
+	<string>DSPositioner Primary Angle Increment</string>
+	<key>00181521</key>
+	<string>DSPositioner Secondary Angle Increment</string>
+	<key>00181530</key>
+	<string>DSDetector Primary Angle</string>
+	<key>00181531</key>
+	<string>DSDetector Secondary Angle</string>
+	<key>00181600</key>
+	<string>CSShutter Shape</string>
+	<key>00181602</key>
+	<string>ISShutter Left Vertical Edge</string>
+	<key>00181604</key>
+	<string>ISShutter Right Vertical Edge</string>
+	<key>00181606</key>
+	<string>ISShutter Upper Horizontal Edge</string>
+	<key>00181608</key>
+	<string>ISShutter Lower Horizontal Edge</string>
+	<key>00181610</key>
+	<string>ISCenter of Circular Shutter</string>
+	<key>00181612</key>
+	<string>ISRadius of Circular Shutter</string>
+	<key>00181620</key>
+	<string>ISVertices of the Polygonal Shutter</string>
+	<key>00181622</key>
+	<string>USShutter Presentation Value</string>
+	<key>00181623</key>
+	<string>USShutter Overlay Group</string>
+	<key>00181624</key>
+	<string>USShutter Presentation Color CIELab Value</string>
+	<key>00181630</key>
+	<string>CSOutline Shape Type</string>
+	<key>00181631</key>
+	<string>FDOutline Left Vertical Edge</string>
+	<key>00181632</key>
+	<string>FDOutline Right Vertical Edge</string>
+	<key>00181633</key>
+	<string>FDOutline Upper Horizontal Edge</string>
+	<key>00181634</key>
+	<string>FDOutline Lower Horizontal Edge</string>
+	<key>00181635</key>
+	<string>FDCenter of Circular Outline</string>
+	<key>00181636</key>
+	<string>FDDiameter of Circular Outline</string>
+	<key>00181637</key>
+	<string>ULNumber of Polygonal Vertices</string>
+	<key>00181638</key>
+	<string>OFVertices of the Polygonal Outline</string>
+	<key>00181700</key>
+	<string>CSCollimator Shape</string>
+	<key>00181702</key>
+	<string>ISCollimator Left Vertical Edge</string>
+	<key>00181704</key>
+	<string>ISCollimator Right Vertical Edge</string>
+	<key>00181706</key>
+	<string>ISCollimator Upper Horizontal Edge</string>
+	<key>00181708</key>
+	<string>ISCollimator Lower Horizontal Edge</string>
+	<key>00181710</key>
+	<string>ISCenter of Circular Collimator</string>
+	<key>00181712</key>
+	<string>ISRadius of Circular Collimator</string>
+	<key>00181720</key>
+	<string>ISVertices of the Polygonal Collimator</string>
+	<key>00181800</key>
+	<string>CSAcquisition Time Synchronized</string>
+	<key>00181801</key>
+	<string>SHTime Source</string>
+	<key>00181802</key>
+	<string>CSTime Distribution Protocol</string>
+	<key>00181803</key>
+	<string>LONTP Source Address</string>
+	<key>00182001</key>
+	<string>ISPage Number Vector</string>
+	<key>00182002</key>
+	<string>SHFrame Label Vector</string>
+	<key>00182003</key>
+	<string>DSFrame Primary Angle Vector</string>
+	<key>00182004</key>
+	<string>DSFrame Secondary Angle Vector</string>
+	<key>00182005</key>
+	<string>DSSlice Location Vector</string>
+	<key>00182006</key>
+	<string>SHDisplay Window Label Vector</string>
+	<key>00182010</key>
+	<string>DSNominal Scanned Pixel Spacing</string>
+	<key>00182020</key>
+	<string>CSDigitizing Device Transport Direction</string>
+	<key>00182030</key>
+	<string>DSRotation of Scanned Film</string>
+	<key>00182041</key>
+	<string>SQBiopsy Target Sequence</string>
+	<key>00182042</key>
+	<string>UITarget UID</string>
+	<key>00182043</key>
+	<string>FLLocalizing Cursor Position</string>
+	<key>00182044</key>
+	<string>FLCalculated Target Position</string>
+	<key>00182045</key>
+	<string>SHTarget Label</string>
+	<key>00182046</key>
+	<string>FLDisplayed Z Value</string>
+	<key>00183100</key>
+	<string>CSIVUS Acquisition</string>
+	<key>00183101</key>
+	<string>DSIVUS Pullback Rate</string>
+	<key>00183102</key>
+	<string>DSIVUS Gated Rate</string>
+	<key>00183103</key>
+	<string>ISIVUS Pullback Start Frame Number</string>
+	<key>00183104</key>
+	<string>ISIVUS Pullback Stop Frame Number</string>
+	<key>00183105</key>
+	<string>ISLesion Number</string>
+	<key>00184000</key>
+	<string>LTAcquisition Comments</string>
+	<key>00185000</key>
+	<string>SHOutput Power</string>
+	<key>00185010</key>
+	<string>LOTransducer Data</string>
+	<key>00185011</key>
+	<string>SQTransducer Identification Sequence</string>
+	<key>00185012</key>
+	<string>DSFocus Depth</string>
+	<key>00185020</key>
+	<string>LOProcessing Function</string>
+	<key>00185021</key>
+	<string>LOPostprocessing Function</string>
+	<key>00185022</key>
+	<string>DSMechanical Index</string>
+	<key>00185024</key>
+	<string>DSBone Thermal Index</string>
+	<key>00185026</key>
+	<string>DSCranial Thermal Index</string>
+	<key>00185027</key>
+	<string>DSSoft Tissue Thermal Index</string>
+	<key>00185028</key>
+	<string>DSSoft Tissue-focus Thermal Index</string>
+	<key>00185029</key>
+	<string>DSSoft Tissue-surface Thermal Index</string>
+	<key>00185030</key>
+	<string>DSDynamic Range</string>
+	<key>00185040</key>
+	<string>DSTotal Gain</string>
+	<key>00185050</key>
+	<string>ISDepth of Scan Field</string>
+	<key>00185100</key>
+	<string>CSPatient Position</string>
+	<key>00185101</key>
+	<string>CSView Position</string>
+	<key>00185104</key>
+	<string>SQProjection Eponymous Name Code Sequence</string>
+	<key>00185210</key>
+	<string>DSImage Transformation Matrix</string>
+	<key>00185212</key>
+	<string>DSImage Translation Vector</string>
+	<key>00186000</key>
+	<string>DSSensitivity</string>
+	<key>00186011</key>
+	<string>SQSequence of Ultrasound Regions</string>
+	<key>00186012</key>
+	<string>USRegion Spatial Format</string>
+	<key>00186014</key>
+	<string>USRegion Data Type</string>
+	<key>00186016</key>
+	<string>ULRegion Flags</string>
+	<key>00186018</key>
+	<string>ULRegion Location Min X0</string>
+	<key>0018601A</key>
+	<string>ULRegion Location Min Y0</string>
+	<key>0018601C</key>
+	<string>ULRegion Location Max X1</string>
+	<key>0018601E</key>
+	<string>ULRegion Location Max Y1</string>
+	<key>00186020</key>
+	<string>SLReference Pixel X0</string>
+	<key>00186022</key>
+	<string>SLReference Pixel Y0</string>
+	<key>00186024</key>
+	<string>USPhysical Units X Direction</string>
+	<key>00186026</key>
+	<string>USPhysical Units Y Direction</string>
+	<key>00186028</key>
+	<string>FDReference Pixel Physical Value X</string>
+	<key>0018602A</key>
+	<string>FDReference Pixel Physical Value Y</string>
+	<key>0018602C</key>
+	<string>FDPhysical Delta X</string>
+	<key>0018602E</key>
+	<string>FDPhysical Delta Y</string>
+	<key>00186030</key>
+	<string>ULTransducer Frequency</string>
+	<key>00186031</key>
+	<string>CSTransducer Type</string>
+	<key>00186032</key>
+	<string>ULPulse Repetition Frequency</string>
+	<key>00186034</key>
+	<string>FDDoppler Correction Angle</string>
+	<key>00186036</key>
+	<string>FDSteering Angle</string>
+	<key>00186038</key>
+	<string>ULDoppler Sample Volume X Position (Retired)</string>
+	<key>00186039</key>
+	<string>SLDoppler Sample Volume X Position</string>
+	<key>0018603A</key>
+	<string>ULDoppler Sample Volume Y Position (Retired)</string>
+	<key>0018603B</key>
+	<string>SLDoppler Sample Volume Y Position</string>
+	<key>0018603C</key>
+	<string>ULTM-Line Position X0 (Retired)</string>
+	<key>0018603D</key>
+	<string>SLTM-Line Position X0</string>
+	<key>0018603E</key>
+	<string>ULTM-Line Position Y0 (Retired)</string>
+	<key>0018603F</key>
+	<string>SLTM-Line Position Y0</string>
+	<key>00186040</key>
+	<string>ULTM-Line Position X1 (Retired)</string>
+	<key>00186041</key>
+	<string>SLTM-Line Position X1</string>
+	<key>00186042</key>
+	<string>ULTM-Line Position Y1 (Retired)</string>
+	<key>00186043</key>
+	<string>SLTM-Line Position Y1</string>
+	<key>00186044</key>
+	<string>USPixel Component Organization</string>
+	<key>00186046</key>
+	<string>ULPixel Component Mask</string>
+	<key>00186048</key>
+	<string>ULPixel Component Range Start</string>
+	<key>0018604A</key>
+	<string>ULPixel Component Range Stop</string>
+	<key>0018604C</key>
+	<string>USPixel Component Physical Units</string>
+	<key>0018604E</key>
+	<string>USPixel Component Data Type</string>
+	<key>00186050</key>
+	<string>ULNumber of Table Break Points</string>
+	<key>00186052</key>
+	<string>ULTable of X Break Points</string>
+	<key>00186054</key>
+	<string>FDTable of Y Break Points</string>
+	<key>00186056</key>
+	<string>ULNumber of Table Entries</string>
+	<key>00186058</key>
+	<string>ULTable of Pixel Values</string>
+	<key>0018605A</key>
+	<string>FLTable of Parameter Values</string>
+	<key>00186060</key>
+	<string>FLR Wave Time Vector</string>
+	<key>00186070</key>
+	<string>USActive Image Area Overlay Group</string>
+	<key>00187000</key>
+	<string>CSDetector Conditions Nominal Flag</string>
+	<key>00187001</key>
+	<string>DSDetector Temperature</string>
+	<key>00187004</key>
+	<string>CSDetector Type</string>
+	<key>00187005</key>
+	<string>CSDetector Configuration</string>
+	<key>00187006</key>
+	<string>LTDetector Description</string>
+	<key>00187008</key>
+	<string>LTDetector Mode</string>
+	<key>0018700A</key>
+	<string>SHDetector ID</string>
+	<key>0018700C</key>
+	<string>DADate of Last Detector Calibration</string>
+	<key>0018700E</key>
+	<string>TMTime of Last Detector Calibration</string>
+	<key>00187010</key>
+	<string>ISExposures on Detector Since Last Calibration</string>
+	<key>00187011</key>
+	<string>ISExposures on Detector Since Manufactured</string>
+	<key>00187012</key>
+	<string>DSDetector Time Since Last Exposure</string>
+	<key>00187014</key>
+	<string>DSDetector Active Time</string>
+	<key>00187016</key>
+	<string>DSDetector Activation Offset From Exposure</string>
+	<key>0018701A</key>
+	<string>DSDetector Binning</string>
+	<key>00187020</key>
+	<string>DSDetector Element Physical Size</string>
+	<key>00187022</key>
+	<string>DSDetector Element Spacing</string>
+	<key>00187024</key>
+	<string>CSDetector Active Shape</string>
+	<key>00187026</key>
+	<string>DSDetector Active Dimension(s)</string>
+	<key>00187028</key>
+	<string>DSDetector Active Origin</string>
+	<key>0018702A</key>
+	<string>LODetector Manufacturer Name</string>
+	<key>0018702B</key>
+	<string>LODetector Manufacturer's Model Name</string>
+	<key>00187030</key>
+	<string>DSField of View Origin</string>
+	<key>00187032</key>
+	<string>DSField of View Rotation</string>
+	<key>00187034</key>
+	<string>CSField of View Horizontal Flip</string>
+	<key>00187036</key>
+	<string>FLPixel Data Area Origin Relative To FOV</string>
+	<key>00187038</key>
+	<string>FLPixel Data Area Rotation Angle Relative To FOV</string>
+	<key>00187040</key>
+	<string>LTGrid Absorbing Material</string>
+	<key>00187041</key>
+	<string>LTGrid Spacing Material</string>
+	<key>00187042</key>
+	<string>DSGrid Thickness</string>
+	<key>00187044</key>
+	<string>DSGrid Pitch</string>
+	<key>00187046</key>
+	<string>ISGrid Aspect Ratio</string>
+	<key>00187048</key>
+	<string>DSGrid Period</string>
+	<key>0018704C</key>
+	<string>DSGrid Focal Distance</string>
+	<key>00187050</key>
+	<string>CSFilter Material</string>
+	<key>00187052</key>
+	<string>DSFilter Thickness Minimum</string>
+	<key>00187054</key>
+	<string>DSFilter Thickness Maximum</string>
+	<key>00187056</key>
+	<string>FLFilter Beam Path Length Minimum</string>
+	<key>00187058</key>
+	<string>FLFilter Beam Path Length Maximum</string>
+	<key>00187060</key>
+	<string>CSExposure Control Mode</string>
+	<key>00187062</key>
+	<string>LTExposure Control Mode Description</string>
+	<key>00187064</key>
+	<string>CSExposure Status</string>
+	<key>00187065</key>
+	<string>DSPhototimer Setting</string>
+	<key>00188150</key>
+	<string>DSExposure Time in uS</string>
+	<key>00188151</key>
+	<string>DSX-Ray Tube Current in uA</string>
+	<key>00189004</key>
+	<string>CSContent Qualification</string>
+	<key>00189005</key>
+	<string>SHPulse Sequence Name</string>
+	<key>00189006</key>
+	<string>SQMR Imaging Modifier Sequence</string>
+	<key>00189008</key>
+	<string>CSEcho Pulse Sequence</string>
+	<key>00189009</key>
+	<string>CSInversion Recovery</string>
+	<key>00189010</key>
+	<string>CSFlow Compensation</string>
+	<key>00189011</key>
+	<string>CSMultiple Spin Echo</string>
+	<key>00189012</key>
+	<string>CSMulti-planar Excitation</string>
+	<key>00189014</key>
+	<string>CSPhase Contrast</string>
+	<key>00189015</key>
+	<string>CSTime of Flight Contrast</string>
+	<key>00189016</key>
+	<string>CSSpoiling</string>
+	<key>00189017</key>
+	<string>CSSteady State Pulse Sequence</string>
+	<key>00189018</key>
+	<string>CSEcho Planar Pulse Sequence</string>
+	<key>00189019</key>
+	<string>FDTag Angle First Axis</string>
+	<key>00189020</key>
+	<string>CSMagnetization Transfer</string>
+	<key>00189021</key>
+	<string>CST2 Preparation</string>
+	<key>00189022</key>
+	<string>CSBlood Signal Nulling</string>
+	<key>00189024</key>
+	<string>CSSaturation Recovery</string>
+	<key>00189025</key>
+	<string>CSSpectrally Selected Suppression</string>
+	<key>00189026</key>
+	<string>CSSpectrally Selected Excitation</string>
+	<key>00189027</key>
+	<string>CSSpatial Pre-saturation</string>
+	<key>00189028</key>
+	<string>CSTagging</string>
+	<key>00189029</key>
+	<string>CSOversampling Phase</string>
+	<key>00189030</key>
+	<string>FDTag Spacing First Dimension</string>
+	<key>00189032</key>
+	<string>CSGeometry of k-Space Traversal</string>
+	<key>00189033</key>
+	<string>CSSegmented k-Space Traversal</string>
+	<key>00189034</key>
+	<string>CSRectilinear Phase Encode Reordering</string>
+	<key>00189035</key>
+	<string>FDTag Thickness</string>
+	<key>00189036</key>
+	<string>CSPartial Fourier Direction</string>
+	<key>00189037</key>
+	<string>CSCardiac Synchronization Technique</string>
+	<key>00189041</key>
+	<string>LOReceive Coil Manufacturer Name</string>
+	<key>00189042</key>
+	<string>SQMR Receive Coil Sequence</string>
+	<key>00189043</key>
+	<string>CSReceive Coil Type</string>
+	<key>00189044</key>
+	<string>CSQuadrature Receive Coil</string>
+	<key>00189045</key>
+	<string>SQMulti-Coil Definition Sequence</string>
+	<key>00189046</key>
+	<string>LOMulti-Coil Configuration</string>
+	<key>00189047</key>
+	<string>SHMulti-Coil Element Name</string>
+	<key>00189048</key>
+	<string>CSMulti-Coil Element Used</string>
+	<key>00189049</key>
+	<string>SQMR Transmit Coil Sequence</string>
+	<key>00189050</key>
+	<string>LOTransmit Coil Manufacturer Name</string>
+	<key>00189051</key>
+	<string>CSTransmit Coil Type</string>
+	<key>00189052</key>
+	<string>FDSpectral Width</string>
+	<key>00189053</key>
+	<string>FDChemical Shift Reference</string>
+	<key>00189054</key>
+	<string>CSVolume Localization Technique</string>
+	<key>00189058</key>
+	<string>USMR Acquisition Frequency Encoding Steps</string>
+	<key>00189059</key>
+	<string>CSDe-coupling</string>
+	<key>00189060</key>
+	<string>CSDe-coupled Nucleus</string>
+	<key>00189061</key>
+	<string>FDDe-coupling Frequency</string>
+	<key>00189062</key>
+	<string>CSDe-coupling Method</string>
+	<key>00189063</key>
+	<string>FDDe-coupling Chemical Shift Reference</string>
+	<key>00189064</key>
+	<string>CSk-space Filtering</string>
+	<key>00189065</key>
+	<string>CSTime Domain Filtering</string>
+	<key>00189066</key>
+	<string>USNumber of Zero Fills</string>
+	<key>00189067</key>
+	<string>CSBaseline Correction</string>
+	<key>00189069</key>
+	<string>FDParallel Reduction Factor In-plane</string>
+	<key>00189070</key>
+	<string>FDCardiac R-R Interval Specified</string>
+	<key>00189073</key>
+	<string>FDAcquisition Duration</string>
+	<key>00189074</key>
+	<string>DTFrame Acquisition DateTime</string>
+	<key>00189075</key>
+	<string>CSDiffusion Directionality</string>
+	<key>00189076</key>
+	<string>SQDiffusion Gradient Direction Sequence</string>
+	<key>00189077</key>
+	<string>CSParallel Acquisition</string>
+	<key>00189078</key>
+	<string>CSParallel Acquisition Technique</string>
+	<key>00189079</key>
+	<string>FDInversion Times</string>
+	<key>00189080</key>
+	<string>STMetabolite Map Description</string>
+	<key>00189081</key>
+	<string>CSPartial Fourier</string>
+	<key>00189082</key>
+	<string>FDEffective Echo Time</string>
+	<key>00189083</key>
+	<string>SQMetabolite Map Code Sequence</string>
+	<key>00189084</key>
+	<string>SQChemical Shift Sequence</string>
+	<key>00189085</key>
+	<string>CSCardiac Signal Source</string>
+	<key>00189087</key>
+	<string>FDDiffusion b-value</string>
+	<key>00189089</key>
+	<string>FDDiffusion Gradient Orientation</string>
+	<key>00189090</key>
+	<string>FDVelocity Encoding Direction</string>
+	<key>00189091</key>
+	<string>FDVelocity Encoding Minimum Value</string>
+	<key>00189092</key>
+	<string>SQVelocity Encoding Acquisition Sequence</string>
+	<key>00189093</key>
+	<string>USNumber of k-Space Trajectories</string>
+	<key>00189094</key>
+	<string>CSCoverage of k-Space</string>
+	<key>00189095</key>
+	<string>ULSpectroscopy Acquisition Phase Rows</string>
+	<key>00189096</key>
+	<string>FDParallel Reduction Factor In-plane (Retired)</string>
+	<key>00189098</key>
+	<string>FDTransmitter Frequency</string>
+	<key>00189100</key>
+	<string>CSResonant Nucleus</string>
+	<key>00189101</key>
+	<string>CSFrequency Correction</string>
+	<key>00189103</key>
+	<string>SQMR Spectroscopy FOV/Geometry Sequence</string>
+	<key>00189104</key>
+	<string>FDSlab Thickness</string>
+	<key>00189105</key>
+	<string>FDSlab Orientation</string>
+	<key>00189106</key>
+	<string>FDMid Slab Position</string>
+	<key>00189107</key>
+	<string>SQMR Spatial Saturation Sequence</string>
+	<key>00189112</key>
+	<string>SQMR Timing and Related Parameters Sequence</string>
+	<key>00189114</key>
+	<string>SQMR Echo Sequence</string>
+	<key>00189115</key>
+	<string>SQMR Modifier Sequence</string>
+	<key>00189117</key>
+	<string>SQMR Diffusion Sequence</string>
+	<key>00189118</key>
+	<string>SQCardiac Synchronization Sequence</string>
+	<key>00189119</key>
+	<string>SQMR Averages Sequence</string>
+	<key>00189125</key>
+	<string>SQMR FOV/Geometry Sequence</string>
+	<key>00189126</key>
+	<string>SQVolume Localization Sequence</string>
+	<key>00189127</key>
+	<string>ULSpectroscopy Acquisition Data Columns</string>
+	<key>00189147</key>
+	<string>CSDiffusion Anisotropy Type</string>
+	<key>00189151</key>
+	<string>DTFrame Reference DateTime</string>
+	<key>00189152</key>
+	<string>SQMR Metabolite Map Sequence</string>
+	<key>00189155</key>
+	<string>FDParallel Reduction Factor out-of-plane</string>
+	<key>00189159</key>
+	<string>ULSpectroscopy Acquisition Out-of-plane Phase Steps</string>
+	<key>00189166</key>
+	<string>CSBulk Motion Status</string>
+	<key>00189168</key>
+	<string>FDParallel Reduction Factor Second In-plane</string>
+	<key>00189169</key>
+	<string>CSCardiac Beat Rejection Technique</string>
+	<key>00189170</key>
+	<string>CSRespiratory Motion Compensation Technique</string>
+	<key>00189171</key>
+	<string>CSRespiratory Signal Source</string>
+	<key>00189172</key>
+	<string>CSBulk Motion Compensation Technique</string>
+	<key>00189173</key>
+	<string>CSBulk Motion Signal Source</string>
+	<key>00189174</key>
+	<string>CSApplicable Safety Standard Agency</string>
+	<key>00189175</key>
+	<string>LOApplicable Safety Standard Description</string>
+	<key>00189176</key>
+	<string>SQOperating Mode Sequence</string>
+	<key>00189177</key>
+	<string>CSOperating Mode Type</string>
+	<key>00189178</key>
+	<string>CSOperating Mode</string>
+	<key>00189179</key>
+	<string>CSSpecific Absorption Rate Definition</string>
+	<key>00189180</key>
+	<string>CSGradient Output Type</string>
+	<key>00189181</key>
+	<string>FDSpecific Absorption Rate Value</string>
+	<key>00189182</key>
+	<string>FDGradient Output</string>
+	<key>00189183</key>
+	<string>CSFlow Compensation Direction</string>
+	<key>00189184</key>
+	<string>FDTagging Delay</string>
+	<key>00189185</key>
+	<string>STRespiratory Motion Compensation Technique Description</string>
+	<key>00189186</key>
+	<string>SHRespiratory Signal Source ID</string>
+	<key>00189195</key>
+	<string>FDChemical Shift Minimum Integration Limit in Hz</string>
+	<key>00189196</key>
+	<string>FDChemical Shift Maximum Integration Limit in Hz</string>
+	<key>00189197</key>
+	<string>SQMR Velocity Encoding Sequence</string>
+	<key>00189198</key>
+	<string>CSFirst Order Phase Correction</string>
+	<key>00189199</key>
+	<string>CSWater Referenced Phase Correction</string>
+	<key>00189200</key>
+	<string>CSMR Spectroscopy Acquisition Type</string>
+	<key>00189214</key>
+	<string>CSRespiratory Cycle Position</string>
+	<key>00189217</key>
+	<string>FDVelocity Encoding Maximum Value</string>
+	<key>00189218</key>
+	<string>FDTag Spacing Second Dimension</string>
+	<key>00189219</key>
+	<string>SSTag Angle Second Axis</string>
+	<key>00189220</key>
+	<string>FDFrame Acquisition Duration</string>
+	<key>00189226</key>
+	<string>SQMR Image Frame Type Sequence</string>
+	<key>00189227</key>
+	<string>SQMR Spectroscopy Frame Type Sequence</string>
+	<key>00189231</key>
+	<string>USMR Acquisition Phase Encoding Steps in-plane</string>
+	<key>00189232</key>
+	<string>USMR Acquisition Phase Encoding Steps out-of-plane</string>
+	<key>00189234</key>
+	<string>ULSpectroscopy Acquisition Phase Columns</string>
+	<key>00189236</key>
+	<string>CSCardiac Cycle Position</string>
+	<key>00189239</key>
+	<string>SQSpecific Absorption Rate Sequence</string>
+	<key>00189240</key>
+	<string>USRF Echo Train Length</string>
+	<key>00189241</key>
+	<string>USGradient Echo Train Length</string>
+	<key>00189250</key>
+	<string>CSArterial Spin Labeling Contrast</string>
+	<key>00189251</key>
+	<string>SQMR Arterial Spin Labeling Sequence</string>
+	<key>00189252</key>
+	<string>LOASL Technique Description</string>
+	<key>00189253</key>
+	<string>USASL Slab Number</string>
+	<key>00189254</key>
+	<string>FDASL Slab Thickness</string>
+	<key>00189255</key>
+	<string>FDASL Slab Orientation</string>
+	<key>00189256</key>
+	<string>FDASL Mid Slab Position</string>
+	<key>00189257</key>
+	<string>CSASL Context</string>
+	<key>00189258</key>
+	<string>ULASL Pulse Train Duration</string>
+	<key>00189259</key>
+	<string>CSASL Crusher Flag</string>
+	<key>0018925A</key>
+	<string>FDASL Crusher Flow Limit</string>
+	<key>0018925B</key>
+	<string>LOASL Crusher Description</string>
+	<key>0018925C</key>
+	<string>CSASL Bolus Cut-off Flag</string>
+	<key>0018925D</key>
+	<string>SQASL Bolus Cut-off Timing Sequence</string>
+	<key>0018925E</key>
+	<string>LOASL Bolus Cut-off Technique</string>
+	<key>0018925F</key>
+	<string>ULASL Bolus Cut-off Delay Time</string>
+	<key>00189260</key>
+	<string>SQASL Slab Sequence</string>
+	<key>00189295</key>
+	<string>FDChemical Shift Minimum Integration Limit in ppm</string>
+	<key>00189296</key>
+	<string>FDChemical Shift Maximum Integration Limit in ppm</string>
+	<key>00189297</key>
+	<string>CSWater Reference Acquisition</string>
+	<key>00189298</key>
+	<string>ISEcho Peak Position</string>
+	<key>00189301</key>
+	<string>SQCT Acquisition Type Sequence</string>
+	<key>00189302</key>
+	<string>CSAcquisition Type</string>
+	<key>00189303</key>
+	<string>FDTube Angle</string>
+	<key>00189304</key>
+	<string>SQCT Acquisition Details Sequence</string>
+	<key>00189305</key>
+	<string>FDRevolution Time</string>
+	<key>00189306</key>
+	<string>FDSingle Collimation Width</string>
+	<key>00189307</key>
+	<string>FDTotal Collimation Width</string>
+	<key>00189308</key>
+	<string>SQCT Table Dynamics Sequence</string>
+	<key>00189309</key>
+	<string>FDTable Speed</string>
+	<key>00189310</key>
+	<string>FDTable Feed per Rotation</string>
+	<key>00189311</key>
+	<string>FDSpiral Pitch Factor</string>
+	<key>00189312</key>
+	<string>SQCT Geometry Sequence</string>
+	<key>00189313</key>
+	<string>FDData Collection Center (Patient)</string>
+	<key>00189314</key>
+	<string>SQCT Reconstruction Sequence</string>
+	<key>00189315</key>
+	<string>CSReconstruction Algorithm</string>
+	<key>00189316</key>
+	<string>CSConvolution Kernel Group</string>
+	<key>00189317</key>
+	<string>FDReconstruction Field of View</string>
+	<key>00189318</key>
+	<string>FDReconstruction Target Center (Patient)</string>
+	<key>00189319</key>
+	<string>FDReconstruction Angle</string>
+	<key>00189320</key>
+	<string>SHImage Filter</string>
+	<key>00189321</key>
+	<string>SQCT Exposure Sequence</string>
+	<key>00189322</key>
+	<string>FDReconstruction Pixel Spacing</string>
+	<key>00189323</key>
+	<string>CSExposure Modulation Type</string>
+	<key>00189324</key>
+	<string>FDEstimated Dose Saving</string>
+	<key>00189325</key>
+	<string>SQCT X-Ray Details Sequence</string>
+	<key>00189326</key>
+	<string>SQCT Position Sequence</string>
+	<key>00189327</key>
+	<string>FDTable Position</string>
+	<key>00189328</key>
+	<string>FDExposure Time in ms</string>
+	<key>00189329</key>
+	<string>SQCT Image Frame Type Sequence</string>
+	<key>00189330</key>
+	<string>FDX-Ray Tube Current in mA</string>
+	<key>00189332</key>
+	<string>FDExposure in mAs</string>
+	<key>00189333</key>
+	<string>CSConstant Volume Flag</string>
+	<key>00189334</key>
+	<string>CSFluoroscopy Flag</string>
+	<key>00189335</key>
+	<string>FDDistance Source to Data Collection Center</string>
+	<key>00189337</key>
+	<string>USContrast/Bolus Agent Number</string>
+	<key>00189338</key>
+	<string>SQContrast/Bolus Ingredient Code Sequence</string>
+	<key>00189340</key>
+	<string>SQContrast Administration Profile Sequence</string>
+	<key>00189341</key>
+	<string>SQContrast/Bolus Usage Sequence</string>
+	<key>00189342</key>
+	<string>CSContrast/Bolus Agent Administered</string>
+	<key>00189343</key>
+	<string>CSContrast/Bolus Agent Detected</string>
+	<key>00189344</key>
+	<string>CSContrast/Bolus Agent Phase</string>
+	<key>00189345</key>
+	<string>FDCTDIvol</string>
+	<key>00189346</key>
+	<string>SQCTDI Phantom Type Code Sequence</string>
+	<key>00189351</key>
+	<string>FLCalcium Scoring Mass Factor Patient</string>
+	<key>00189352</key>
+	<string>FLCalcium Scoring Mass Factor Device</string>
+	<key>00189353</key>
+	<string>FLEnergy Weighting Factor</string>
+	<key>00189360</key>
+	<string>SQCT Additional X-Ray Source Sequence</string>
+	<key>00189361</key>
+	<string>CSMulti-energy CT Acquisition</string>
+	<key>00189362</key>
+	<string>SQMulti-energy CT Acquisition Sequence</string>
+	<key>00189363</key>
+	<string>SQMulti-energy CT Processing Sequence</string>
+	<key>00189364</key>
+	<string>SQMulti-energy CT Characteristics Sequence</string>
+	<key>00189365</key>
+	<string>SQMulti-energy CT X-Ray Source Sequence</string>
+	<key>00189366</key>
+	<string>USX-Ray Source Index</string>
+	<key>00189367</key>
+	<string>UCX-Ray Source ID</string>
+	<key>00189368</key>
+	<string>CSMulti-energy Source Technique</string>
+	<key>00189369</key>
+	<string>DTSource Start DateTime</string>
+	<key>0018936A</key>
+	<string>DTSource End DateTime</string>
+	<key>0018936B</key>
+	<string>USSwitching Phase Number</string>
+	<key>0018936C</key>
+	<string>DSSwitching Phase Nominal Duration</string>
+	<key>0018936D</key>
+	<string>DSSwitching Phase Transition Duration</string>
+	<key>0018936E</key>
+	<string>DSEffective Bin Energy</string>
+	<key>0018936F</key>
+	<string>SQMulti-energy CT X-Ray Detector Sequence</string>
+	<key>00189370</key>
+	<string>USX-Ray Detector Index</string>
+	<key>00189371</key>
+	<string>UCX-Ray Detector ID</string>
+	<key>00189372</key>
+	<string>CSMulti-energy Detector Type</string>
+	<key>00189373</key>
+	<string>STX-Ray Detector Label</string>
+	<key>00189374</key>
+	<string>DSNominal Max Energy</string>
+	<key>00189375</key>
+	<string>DSNominal Min Energy</string>
+	<key>00189376</key>
+	<string>USReferenced X-Ray Detector Index</string>
+	<key>00189377</key>
+	<string>USReferenced X-Ray Source Index</string>
+	<key>00189378</key>
+	<string>USReferenced Path Index</string>
+	<key>00189379</key>
+	<string>SQMulti-energy CT Path Sequence</string>
+	<key>0018937A</key>
+	<string>USMulti-energy CT Path Index</string>
+	<key>0018937B</key>
+	<string>UTMulti-energy Acquisition Description</string>
+	<key>0018937C</key>
+	<string>FDMonoenergetic Energy Equivalent</string>
+	<key>0018937D</key>
+	<string>SQMaterial Code Sequence</string>
+	<key>0018937E</key>
+	<string>CSDecomposition Method</string>
+	<key>0018937F</key>
+	<string>UTDecomposition Description</string>
+	<key>00189380</key>
+	<string>SQDecomposition Algorithm Identification Sequence</string>
+	<key>00189381</key>
+	<string>SQDecomposition Material Sequence</string>
+	<key>00189382</key>
+	<string>SQMaterial Attenuation Sequence</string>
+	<key>00189383</key>
+	<string>DSPhoton Energy</string>
+	<key>00189384</key>
+	<string>DSX-Ray Mass Attenuation Coefficient</string>
+	<key>00189401</key>
+	<string>SQProjection Pixel Calibration Sequence</string>
+	<key>00189402</key>
+	<string>FLDistance Source to Isocenter</string>
+	<key>00189403</key>
+	<string>FLDistance Object to Table Top</string>
+	<key>00189404</key>
+	<string>FLObject Pixel Spacing in Center of Beam</string>
+	<key>00189405</key>
+	<string>SQPositioner Position Sequence</string>
+	<key>00189406</key>
+	<string>SQTable Position Sequence</string>
+	<key>00189407</key>
+	<string>SQCollimator Shape Sequence</string>
+	<key>00189410</key>
+	<string>CSPlanes in Acquisition</string>
+	<key>00189412</key>
+	<string>SQXA/XRF Frame Characteristics Sequence</string>
+	<key>00189417</key>
+	<string>SQFrame Acquisition Sequence</string>
+	<key>00189420</key>
+	<string>CSX-Ray Receptor Type</string>
+	<key>00189423</key>
+	<string>LOAcquisition Protocol Name</string>
+	<key>00189424</key>
+	<string>LTAcquisition Protocol Description</string>
+	<key>00189425</key>
+	<string>CSContrast/Bolus Ingredient Opaque</string>
+	<key>00189426</key>
+	<string>FLDistance Receptor Plane to Detector Housing</string>
+	<key>00189427</key>
+	<string>CSIntensifier Active Shape</string>
+	<key>00189428</key>
+	<string>FLIntensifier Active Dimension(s)</string>
+	<key>00189429</key>
+	<string>FLPhysical Detector Size</string>
+	<key>00189430</key>
+	<string>FLPosition of Isocenter Projection</string>
+	<key>00189432</key>
+	<string>SQField of View Sequence</string>
+	<key>00189433</key>
+	<string>LOField of View Description</string>
+	<key>00189434</key>
+	<string>SQExposure Control Sensing Regions Sequence</string>
+	<key>00189435</key>
+	<string>CSExposure Control Sensing Region Shape</string>
+	<key>00189436</key>
+	<string>SSExposure Control Sensing Region Left Vertical Edge</string>
+	<key>00189437</key>
+	<string>SSExposure Control Sensing Region Right Vertical Edge</string>
+	<key>00189438</key>
+	<string>SSExposure Control Sensing Region Upper Horizontal Edge</string>
+	<key>00189439</key>
+	<string>SSExposure Control Sensing Region Lower Horizontal Edge</string>
+	<key>00189440</key>
+	<string>SSCenter of Circular Exposure Control Sensing Region</string>
+	<key>00189441</key>
+	<string>USRadius of Circular Exposure Control Sensing Region</string>
+	<key>00189442</key>
+	<string>SSVertices of the Polygonal Exposure Control Sensing Region</string>
+	<key>00189445</key>
+	<string>OBRetired-blank</string>
+	<key>00189447</key>
+	<string>FLColumn Angulation (Patient)</string>
+	<key>00189449</key>
+	<string>FLBeam Angle</string>
+	<key>00189451</key>
+	<string>SQFrame Detector Parameters Sequence</string>
+	<key>00189452</key>
+	<string>FLCalculated Anatomy Thickness</string>
+	<key>00189455</key>
+	<string>SQCalibration Sequence</string>
+	<key>00189456</key>
+	<string>SQObject Thickness Sequence</string>
+	<key>00189457</key>
+	<string>CSPlane Identification</string>
+	<key>00189461</key>
+	<string>FLField of View Dimension(s) in Float</string>
+	<key>00189462</key>
+	<string>SQIsocenter Reference System Sequence</string>
+	<key>00189463</key>
+	<string>FLPositioner Isocenter Primary Angle</string>
+	<key>00189464</key>
+	<string>FLPositioner Isocenter Secondary Angle</string>
+	<key>00189465</key>
+	<string>FLPositioner Isocenter Detector Rotation Angle</string>
+	<key>00189466</key>
+	<string>FLTable X Position to Isocenter</string>
+	<key>00189467</key>
+	<string>FLTable Y Position to Isocenter</string>
+	<key>00189468</key>
+	<string>FLTable Z Position to Isocenter</string>
+	<key>00189469</key>
+	<string>FLTable Horizontal Rotation Angle</string>
+	<key>00189470</key>
+	<string>FLTable Head Tilt Angle</string>
+	<key>00189471</key>
+	<string>FLTable Cradle Tilt Angle</string>
+	<key>00189472</key>
+	<string>SQFrame Display Shutter Sequence</string>
+	<key>00189473</key>
+	<string>FLAcquired Image Area Dose Product</string>
+	<key>00189474</key>
+	<string>CSC-arm Positioner Tabletop Relationship</string>
+	<key>00189476</key>
+	<string>SQX-Ray Geometry Sequence</string>
+	<key>00189477</key>
+	<string>SQIrradiation Event Identification Sequence</string>
+	<key>00189504</key>
+	<string>SQX-Ray 3D Frame Type Sequence</string>
+	<key>00189506</key>
+	<string>SQContributing Sources Sequence</string>
+	<key>00189507</key>
+	<string>SQX-Ray 3D Acquisition Sequence</string>
+	<key>00189508</key>
+	<string>FLPrimary Positioner Scan Arc</string>
+	<key>00189509</key>
+	<string>FLSecondary Positioner Scan Arc</string>
+	<key>00189510</key>
+	<string>FLPrimary Positioner Scan Start Angle</string>
+	<key>00189511</key>
+	<string>FLSecondary Positioner Scan Start Angle</string>
+	<key>00189514</key>
+	<string>FLPrimary Positioner Increment</string>
+	<key>00189515</key>
+	<string>FLSecondary Positioner Increment</string>
+	<key>00189516</key>
+	<string>DTStart Acquisition DateTime</string>
+	<key>00189517</key>
+	<string>DTEnd Acquisition DateTime</string>
+	<key>00189518</key>
+	<string>SSPrimary Positioner Increment Sign</string>
+	<key>00189519</key>
+	<string>SSSecondary Positioner Increment Sign</string>
+	<key>00189524</key>
+	<string>LOApplication Name</string>
+	<key>00189525</key>
+	<string>LOApplication Version</string>
+	<key>00189526</key>
+	<string>LOApplication Manufacturer</string>
+	<key>00189527</key>
+	<string>CSAlgorithm Type</string>
+	<key>00189528</key>
+	<string>LOAlgorithm Description</string>
+	<key>00189530</key>
+	<string>SQX-Ray 3D Reconstruction Sequence</string>
+	<key>00189531</key>
+	<string>LOReconstruction Description</string>
+	<key>00189538</key>
+	<string>SQPer Projection Acquisition Sequence</string>
+	<key>00189541</key>
+	<string>SQDetector Position Sequence</string>
+	<key>00189542</key>
+	<string>SQX-Ray Acquisition Dose Sequence</string>
+	<key>00189543</key>
+	<string>FDX-Ray Source Isocenter Primary Angle</string>
+	<key>00189544</key>
+	<string>FDX-Ray Source Isocenter Secondary Angle</string>
+	<key>00189545</key>
+	<string>FDBreast Support Isocenter Primary Angle</string>
+	<key>00189546</key>
+	<string>FDBreast Support Isocenter Secondary Angle</string>
+	<key>00189547</key>
+	<string>FDBreast Support X Position to Isocenter</string>
+	<key>00189548</key>
+	<string>FDBreast Support Y Position to Isocenter</string>
+	<key>00189549</key>
+	<string>FDBreast Support Z Position to Isocenter</string>
+	<key>00189550</key>
+	<string>FDDetector Isocenter Primary Angle</string>
+	<key>00189551</key>
+	<string>FDDetector Isocenter Secondary Angle</string>
+	<key>00189552</key>
+	<string>FDDetector X Position to Isocenter</string>
+	<key>00189553</key>
+	<string>FDDetector Y Position to Isocenter</string>
+	<key>00189554</key>
+	<string>FDDetector Z Position to Isocenter</string>
+	<key>00189555</key>
+	<string>SQX-Ray Grid Sequence</string>
+	<key>00189556</key>
+	<string>SQX-Ray Filter Sequence</string>
+	<key>00189557</key>
+	<string>FDDetector Active Area TLHC Position</string>
+	<key>00189558</key>
+	<string>FDDetector Active Area Orientation</string>
+	<key>00189559</key>
+	<string>CSPositioner Primary Angle Direction</string>
+	<key>00189601</key>
+	<string>SQDiffusion b-matrix Sequence</string>
+	<key>00189602</key>
+	<string>FDDiffusion b-value XX</string>
+	<key>00189603</key>
+	<string>FDDiffusion b-value XY</string>
+	<key>00189604</key>
+	<string>FDDiffusion b-value XZ</string>
+	<key>00189605</key>
+	<string>FDDiffusion b-value YY</string>
+	<key>00189606</key>
+	<string>FDDiffusion b-value YZ</string>
+	<key>00189607</key>
+	<string>FDDiffusion b-value ZZ</string>
+	<key>00189621</key>
+	<string>SQFunctional MR Sequence</string>
+	<key>00189622</key>
+	<string>CSFunctional Settling Phase Frames Present</string>
+	<key>00189623</key>
+	<string>DTFunctional Sync Pulse</string>
+	<key>00189624</key>
+	<string>CSSettling Phase Frame</string>
+	<key>00189701</key>
+	<string>DTDecay Correction DateTime</string>
+	<key>00189715</key>
+	<string>FDStart Density Threshold</string>
+	<key>00189716</key>
+	<string>FDStart Relative Density Difference Threshold</string>
+	<key>00189717</key>
+	<string>FDStart Cardiac Trigger Count Threshold</string>
+	<key>00189718</key>
+	<string>FDStart Respiratory Trigger Count Threshold</string>
+	<key>00189719</key>
+	<string>FDTermination Counts Threshold</string>
+	<key>00189720</key>
+	<string>FDTermination Density Threshold</string>
+	<key>00189721</key>
+	<string>FDTermination Relative Density Threshold</string>
+	<key>00189722</key>
+	<string>FDTermination Time Threshold</string>
+	<key>00189723</key>
+	<string>FDTermination Cardiac Trigger Count Threshold</string>
+	<key>00189724</key>
+	<string>FDTermination Respiratory Trigger Count Threshold</string>
+	<key>00189725</key>
+	<string>CSDetector Geometry</string>
+	<key>00189726</key>
+	<string>FDTransverse Detector Separation</string>
+	<key>00189727</key>
+	<string>FDAxial Detector Dimension</string>
+	<key>00189729</key>
+	<string>USRadiopharmaceutical Agent Number</string>
+	<key>00189732</key>
+	<string>SQPET Frame Acquisition Sequence</string>
+	<key>00189733</key>
+	<string>SQPET Detector Motion Details Sequence</string>
+	<key>00189734</key>
+	<string>SQPET Table Dynamics Sequence</string>
+	<key>00189735</key>
+	<string>SQPET Position Sequence</string>
+	<key>00189736</key>
+	<string>SQPET Frame Correction Factors Sequence</string>
+	<key>00189737</key>
+	<string>SQRadiopharmaceutical Usage Sequence</string>
+	<key>00189738</key>
+	<string>CSAttenuation Correction Source</string>
+	<key>00189739</key>
+	<string>USNumber of Iterations</string>
+	<key>00189740</key>
+	<string>USNumber of Subsets</string>
+	<key>00189749</key>
+	<string>SQPET Reconstruction Sequence</string>
+	<key>00189751</key>
+	<string>SQPET Frame Type Sequence</string>
+	<key>00189755</key>
+	<string>CSTime of Flight Information Used</string>
+	<key>00189756</key>
+	<string>CSReconstruction Type</string>
+	<key>00189758</key>
+	<string>CSDecay Corrected</string>
+	<key>00189759</key>
+	<string>CSAttenuation Corrected</string>
+	<key>00189760</key>
+	<string>CSScatter Corrected</string>
+	<key>00189761</key>
+	<string>CSDead Time Corrected</string>
+	<key>00189762</key>
+	<string>CSGantry Motion Corrected</string>
+	<key>00189763</key>
+	<string>CSPatient Motion Corrected</string>
+	<key>00189764</key>
+	<string>CSCount Loss Normalization Corrected</string>
+	<key>00189765</key>
+	<string>CSRandoms Corrected</string>
+	<key>00189766</key>
+	<string>CSNon-uniform Radial Sampling Corrected</string>
+	<key>00189767</key>
+	<string>CSSensitivity Calibrated</string>
+	<key>00189768</key>
+	<string>CSDetector Normalization Correction</string>
+	<key>00189769</key>
+	<string>CSIterative Reconstruction Method</string>
+	<key>00189770</key>
+	<string>CSAttenuation Correction Temporal Relationship</string>
+	<key>00189771</key>
+	<string>SQPatient Physiological State Sequence</string>
+	<key>00189772</key>
+	<string>SQPatient Physiological State Code Sequence</string>
+	<key>00189801</key>
+	<string>FDDepth(s) of Focus</string>
+	<key>00189803</key>
+	<string>SQExcluded Intervals Sequence</string>
+	<key>00189804</key>
+	<string>DTExclusion Start DateTime</string>
+	<key>00189805</key>
+	<string>FDExclusion Duration</string>
+	<key>00189806</key>
+	<string>SQUS Image Description Sequence</string>
+	<key>00189807</key>
+	<string>SQImage Data Type Sequence</string>
+	<key>00189808</key>
+	<string>CSData Type</string>
+	<key>00189809</key>
+	<string>SQTransducer Scan Pattern Code Sequence</string>
+	<key>0018980B</key>
+	<string>CSAliased Data Type</string>
+	<key>0018980C</key>
+	<string>CSPosition Measuring Device Used</string>
+	<key>0018980D</key>
+	<string>SQTransducer Geometry Code Sequence</string>
+	<key>0018980E</key>
+	<string>SQTransducer Beam Steering Code Sequence</string>
+	<key>0018980F</key>
+	<string>SQTransducer Application Code Sequence</string>
+	<key>00189810</key>
+	<string>USZero Velocity Pixel Value</string>
+	<key>00189821</key>
+	<string>SQPhotoacoustic Excitation Characteristics Sequence</string>
+	<key>00189822</key>
+	<string>FDExcitation Spectral Width</string>
+	<key>00189823</key>
+	<string>FDExcitation Energy</string>
+	<key>00189824</key>
+	<string>FDExcitation Pulse Duration</string>
+	<key>00189825</key>
+	<string>SQExcitation Wavelength Sequence</string>
+	<key>00189826</key>
+	<string>FDExcitation Wavelength</string>
+	<key>00189828</key>
+	<string>CSIllumination Translation Flag</string>
+	<key>00189829</key>
+	<string>CSAcoustic Coupling Medium Flag</string>
+	<key>0018982A</key>
+	<string>SQAcoustic Coupling Medium Code Sequence</string>
+	<key>0018982B</key>
+	<string>FDAcoustic Coupling Medium Temperature</string>
+	<key>0018982C</key>
+	<string>SQTransducer Response Sequence</string>
+	<key>0018982D</key>
+	<string>FDCenter Frequency</string>
+	<key>0018982E</key>
+	<string>FDFractional Bandwidth</string>
+	<key>0018982F</key>
+	<string>FDLower Cutoff Frequency</string>
+	<key>00189830</key>
+	<string>FDUpper Cutoff Frequency</string>
+	<key>00189831</key>
+	<string>SQTransducer Technology Sequence</string>
+	<key>00189832</key>
+	<string>SQSound Speed Correction Mechanism Code Sequence</string>
+	<key>00189833</key>
+	<string>FDObject Sound Speed</string>
+	<key>00189834</key>
+	<string>FDAcoustic Coupling Medium Sound Speed</string>
+	<key>00189835</key>
+	<string>SQPhotoacoustic Image Frame Type Sequence</string>
+	<key>00189836</key>
+	<string>SQImage Data Type Code Sequence</string>
+	<key>00189900</key>
+	<string>LOReference Location Label</string>
+	<key>00189901</key>
+	<string>UTReference Location Description</string>
+	<key>00189902</key>
+	<string>SQReference Basis Code Sequence</string>
+	<key>00189903</key>
+	<string>SQReference Geometry Code Sequence</string>
+	<key>00189904</key>
+	<string>DSOffset Distance</string>
+	<key>00189905</key>
+	<string>CSOffset Direction</string>
+	<key>00189906</key>
+	<string>SQPotential Scheduled Protocol Code Sequence</string>
+	<key>00189907</key>
+	<string>SQPotential Requested Procedure Code Sequence</string>
+	<key>00189908</key>
+	<string>UCPotential Reasons for Procedure</string>
+	<key>00189909</key>
+	<string>SQPotential Reasons for Procedure Code Sequence</string>
+	<key>0018990A</key>
+	<string>UCPotential Diagnostic Tasks</string>
+	<key>0018990B</key>
+	<string>SQContraindications Code Sequence</string>
+	<key>0018990C</key>
+	<string>SQReferenced Defined Protocol Sequence</string>
+	<key>0018990D</key>
+	<string>SQReferenced Performed Protocol Sequence</string>
+	<key>0018990E</key>
+	<string>SQPredecessor Protocol Sequence</string>
+	<key>0018990F</key>
+	<string>UTProtocol Planning Information</string>
+	<key>00189910</key>
+	<string>UTProtocol Design Rationale</string>
+	<key>00189911</key>
+	<string>SQPatient Specification Sequence</string>
+	<key>00189912</key>
+	<string>SQModel Specification Sequence</string>
+	<key>00189913</key>
+	<string>SQParameters Specification Sequence</string>
+	<key>00189914</key>
+	<string>SQInstruction Sequence</string>
+	<key>00189915</key>
+	<string>USInstruction Index</string>
+	<key>00189916</key>
+	<string>LOInstruction Text</string>
+	<key>00189917</key>
+	<string>UTInstruction Description</string>
+	<key>00189918</key>
+	<string>CSInstruction Performed Flag</string>
+	<key>00189919</key>
+	<string>DTInstruction Performed DateTime</string>
+	<key>0018991A</key>
+	<string>UTInstruction Performance Comment</string>
+	<key>0018991B</key>
+	<string>SQPatient Positioning Instruction Sequence</string>
+	<key>0018991C</key>
+	<string>SQPositioning Method Code Sequence</string>
+	<key>0018991D</key>
+	<string>SQPositioning Landmark Sequence</string>
+	<key>0018991E</key>
+	<string>UITarget Frame of Reference UID</string>
+	<key>0018991F</key>
+	<string>SQAcquisition Protocol Element Specification Sequence</string>
+	<key>00189920</key>
+	<string>SQAcquisition Protocol Element Sequence</string>
+	<key>00189921</key>
+	<string>USProtocol Element Number</string>
+	<key>00189922</key>
+	<string>LOProtocol Element Name</string>
+	<key>00189923</key>
+	<string>UTProtocol Element Characteristics Summary</string>
+	<key>00189924</key>
+	<string>UTProtocol Element Purpose</string>
+	<key>00189930</key>
+	<string>CSAcquisition Motion</string>
+	<key>00189931</key>
+	<string>SQAcquisition Start Location Sequence</string>
+	<key>00189932</key>
+	<string>SQAcquisition End Location Sequence</string>
+	<key>00189933</key>
+	<string>SQReconstruction Protocol Element Specification Sequence</string>
+	<key>00189934</key>
+	<string>SQReconstruction Protocol Element Sequence</string>
+	<key>00189935</key>
+	<string>SQStorage Protocol Element Specification Sequence</string>
+	<key>00189936</key>
+	<string>SQStorage Protocol Element Sequence</string>
+	<key>00189937</key>
+	<string>LORequested Series Description</string>
+	<key>00189938</key>
+	<string>USSource Acquisition Protocol Element Number</string>
+	<key>00189939</key>
+	<string>USSource Acquisition Beam Number</string>
+	<key>0018993A</key>
+	<string>USSource Reconstruction Protocol Element Number</string>
+	<key>0018993B</key>
+	<string>SQReconstruction Start Location Sequence</string>
+	<key>0018993C</key>
+	<string>SQReconstruction End Location Sequence</string>
+	<key>0018993D</key>
+	<string>SQReconstruction Algorithm Sequence</string>
+	<key>0018993E</key>
+	<string>SQReconstruction Target Center Location Sequence</string>
+	<key>00189941</key>
+	<string>UTImage Filter Description</string>
+	<key>00189942</key>
+	<string>FDCTDIvol Notification Trigger</string>
+	<key>00189943</key>
+	<string>FDDLP Notification Trigger</string>
+	<key>00189944</key>
+	<string>CSAuto KVP Selection Type</string>
+	<key>00189945</key>
+	<string>FDAuto KVP Upper Bound</string>
+	<key>00189946</key>
+	<string>FDAuto KVP Lower Bound</string>
+	<key>00189947</key>
+	<string>CSProtocol Defined Patient Position</string>
+	<key>0018A001</key>
+	<string>SQContributing Equipment Sequence</string>
+	<key>0018A002</key>
+	<string>DTContribution DateTime</string>
+	<key>0018A003</key>
+	<string>STContribution Description</string>
+</dict>
+</plist>

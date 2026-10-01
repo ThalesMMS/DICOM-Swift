@@ -887,6 +887,7 @@ final class DCMDecoderEdgeCasesTests: XCTestCase {
 
     // MARK: - Thread Safety Under Edge Conditions
 
+    @MainActor
     func testConcurrentAccessDuringFailedLoads() {
         let iterations = 10
         let expectation = self.expectation(description: "Concurrent failed loads")
@@ -903,6 +904,7 @@ final class DCMDecoderEdgeCasesTests: XCTestCase {
         waitForExpectations(timeout: 5.0)
     }
 
+    @MainActor
     func testConcurrentValidationCalls() {
         let decoder = DCMDecoder()
         let iterations = 20

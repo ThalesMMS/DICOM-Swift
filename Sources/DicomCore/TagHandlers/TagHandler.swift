@@ -159,6 +159,12 @@ internal final class DecoderContext {
     /// Byte offset to pixel data.  Updated by PixelDataTagHandler.
     var offset: Int = 0
 
+    /// Value Representation of the Pixel Data element as encoded in the file (OB or OW; `implicitRaw`
+    /// under an implicit VR syntax).  Updated by PixelDataTagHandler.  Under Explicit VR Big Endian an
+    /// OW element holds 16-bit words even when Bits Allocated is 8 (PS3.5 §7.6.1.1.1), so the bytes of
+    /// every word pair are swapped on disk; readers need the VR to undo that.
+    var pixelDataVR: DicomVR? = nil
+
     /// Number of frames in multi-frame images.  Updated by ModalityTagHandler.
     var nImages: Int = 1
 

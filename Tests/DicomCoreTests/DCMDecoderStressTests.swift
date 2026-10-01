@@ -1,5 +1,6 @@
 import XCTest
 @testable import DicomCore
+import DicomTestSupport
 
 // Compatibility coverage: this suite intentionally exercises deprecated
 // public APIs that remain available (issue #1221); the annotation keeps
@@ -14,9 +15,8 @@ final class DCMDecoderStressTests: XCTestCase {
         let decoder = DCMDecoder()
         let expectation = XCTestExpectation(description: "High concurrency stress test")
         let iterations = 50
-        var completedCount = 0
+        let completedCount = DicomTestLockedValue(0)
         let queue = DispatchQueue.global(qos: .userInitiated)
-        let countLock = NSLock()
 
         for _ in 0..<iterations {
             queue.async {
@@ -28,17 +28,18 @@ final class DCMDecoderStressTests: XCTestCase {
                 }
 
                 // Increment completed count safely
-                countLock.lock()
-                completedCount += 1
-                if completedCount == iterations {
+                let isComplete = completedCount.withValue { count in
+                    count += 1
+                    return count == iterations
+                }
+                if isComplete {
                     expectation.fulfill()
                 }
-                countLock.unlock()
             }
         }
 
         wait(for: [expectation], timeout: 10.0)
-        XCTAssertEqual(completedCount, iterations, "All stress test operations should complete")
+        XCTAssertEqual(completedCount.value, iterations, "All stress test operations should complete")
     }
 
     func testMultipleDecodersWithMixedAccess() {
@@ -47,9 +48,8 @@ final class DCMDecoderStressTests: XCTestCase {
         let decoders = (0..<decoderCount).map { _ in DCMDecoder() }
         let expectation = XCTestExpectation(description: "Multiple decoders with mixed access")
         let iterations = 30
-        var completedCount = 0
+        let completedCount = DicomTestLockedValue(0)
         let queue = DispatchQueue.global(qos: .userInitiated)
-        let countLock = NSLock()
 
         for i in 0..<iterations {
             queue.async {
@@ -64,17 +64,18 @@ final class DCMDecoderStressTests: XCTestCase {
                 _ = decoder.info(for: 0x00100010)
 
                 // Increment completed count safely
-                countLock.lock()
-                completedCount += 1
-                if completedCount == iterations {
+                let isComplete = completedCount.withValue { count in
+                    count += 1
+                    return count == iterations
+                }
+                if isComplete {
                     expectation.fulfill()
                 }
-                countLock.unlock()
             }
         }
 
         wait(for: [expectation], timeout: 5.0)
-        XCTAssertEqual(completedCount, iterations, "All operations across multiple decoders should complete")
+        XCTAssertEqual(completedCount.value, iterations, "All operations across multiple decoders should complete")
     }
 
     func testMultipleConcurrentOperationsStress() {
@@ -90,8 +91,7 @@ final class DCMDecoderStressTests: XCTestCase {
         let iterations = 100
         let timeout: TimeInterval = 15.0
         #endif
-        var completedCount = 0
-        let countLock = NSLock()
+        let completedCount = DicomTestLockedValue(0)
 
         // Use multiple queues to simulate different priority operations
         let highPriorityQueue = DispatchQueue.global(qos: .userInteractive)
@@ -212,17 +212,18 @@ final class DCMDecoderStressTests: XCTestCase {
                 }
 
                 // Increment completed count safely
-                countLock.lock()
-                completedCount += 1
-                if completedCount == iterations {
+                let isComplete = completedCount.withValue { count in
+                    count += 1
+                    return count == iterations
+                }
+                if isComplete {
                     expectation.fulfill()
                 }
-                countLock.unlock()
             }
         }
 
         wait(for: [expectation], timeout: timeout)
-        XCTAssertEqual(completedCount, iterations, "All stress test operations should complete")
+        XCTAssertEqual(completedCount.value, iterations, "All stress test operations should complete")
 
         // Verify decoder is still in consistent state after stress test
         XCTAssertFalse(decoder.isValid(), "Decoder should still be invalid after stress test")
@@ -236,8 +237,7 @@ final class DCMDecoderStressTests: XCTestCase {
         // when multiple threads simultaneously create decoder instances and load files
         let expectation = XCTestExpectation(description: "ThreadSanitizer stress test with concurrent file loads")
         let iterations = 55 // 50+ as required
-        var completedCount = 0
-        let countLock = NSLock()
+        let completedCount = DicomTestLockedValue(0)
 
         let testFiles: [String]
         do {
@@ -316,17 +316,22 @@ final class DCMDecoderStressTests: XCTestCase {
                 }
 
                 // Increment completed count safely
-                countLock.lock()
-                completedCount += 1
-                if completedCount == iterations {
+                let isComplete = completedCount.withValue { count in
+                    count += 1
+                    return count == iterations
+                }
+                if isComplete {
                     expectation.fulfill()
                 }
-                countLock.unlock()
             }
         }
 
         // Allow enough time for all operations to complete
         wait(for: [expectation], timeout: 30.0)
-        XCTAssertEqual(completedCount, iterations, "All \(iterations) concurrent file load operations should complete")
+        XCTAssertEqual(
+            completedCount.value,
+            iterations,
+            "All \(iterations) concurrent file load operations should complete"
+        )
     }
 }

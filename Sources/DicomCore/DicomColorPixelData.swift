@@ -527,6 +527,51 @@ extension DCMDecoder {
         }
     }
 
+    /// RGB8 display samples of a frame already decoded to interleaved stored samples (issue #2821): PALETTE COLOR
+    /// indices through the object's palette (segmented palettes included), YBR_FULL and YBR_FULL_422 through the
+    /// same YBR conversion as native frames, RGB as it is. A decoded YBR_FULL_422 frame carries a full sample triplet
+    /// per pixel, so it converts like YBR_FULL.
+    public func displayRGB8(decodedFrame: DicomDecodedFrame) throws -> Data {
+        try synchronized {
+            let stored = decodedFrame.storedSampleData()
+            let metadata = makeNativeColorMetadataUnsafe(descriptor: nil)
+            let context = makeColorConversionContextUnsafe(metadata: metadata)
+            let photometric: String
+            switch metadata.photometricInterpretation {
+            case .paletteColor: photometric = "PALETTE COLOR"
+            case .ybrFull, .ybrFull422: photometric = "YBR_FULL"
+            case .rgb:
+                if case .rgb8 = decodedFrame.pixels { return stored }
+                photometric = "RGB"
+            default:
+                throw DicomColorConversionError.unsupportedColorPath(
+                    context: context, reason: "\(metadata.photometricInterpretation.rawValue) is not a colour frame.")
+            }
+            let samples = photometric == "PALETTE COLOR" ? 1 : 3
+            let bitsAllocated: Int
+            switch decodedFrame.pixels {
+            case .gray16: bitsAllocated = 16
+            case .gray8, .rgb8: bitsAllocated = 8
+            }
+            guard let descriptor = DicomPixelDataDescriptor(
+                rows: decodedFrame.metadata.height, columns: decodedFrame.metadata.width, numberOfFrames: 1,
+                bitsAllocated: bitsAllocated, bitsStored: min(metadata.bitsStored, bitsAllocated),
+                highBit: min(metadata.bitsStored, bitsAllocated) - 1, pixelRepresentation: 0,
+                samplesPerPixel: samples, planarConfiguration: samples == 3 ? 0 : nil,
+                photometricInterpretation: photometric, pixelDataOffset: 0
+            ) else {
+                throw DicomColorConversionError.invalidPixelData("The decoded frame has no valid layout.")
+            }
+            let frame = DicomPixelFrame(index: decodedFrame.index, byteRange: 0..<stored.count, data: stored,
+                                        descriptor: descriptor)
+            if photometric == "PALETTE COLOR" {
+                return try makePaletteDisplayRGB(frame: frame, metadata: metadata, context: context, littleEndian: true)
+            }
+            if photometric == "RGB" { return try makeRGBDisplayData(frame: frame, context: context, littleEndian: true) }
+            return try makeYBRFullDisplayRGB(frame: frame, context: context)
+        }
+    }
+
     /// Precision-preserving color output (issue #1232): returns the RGB
     /// frame as interleaved 16-bit samples carrying the stored values.
     /// Supported for native RGB frames with 8 or 16 Bits Allocated (8-bit
@@ -688,11 +733,12 @@ extension DCMDecoder {
 
     private func makeRGBDisplayData(
         frame: DicomPixelFrame,
-        context: DicomColorConversionContext
+        context: DicomColorConversionContext,
+        littleEndian: Bool? = nil
     ) throws -> Data {
         try validateThreeSampleFrame(frame, context: context, colorSpaceName: "RGB", allowedBitsAllocated: [8, 16])
         if frame.descriptor.bitsAllocated == 16 {
-            return try makeHighBitDepthRGBDisplayData(frame: frame, context: context)
+            return try makeHighBitDepthRGBDisplayData(frame: frame, context: context, littleEndian: littleEndian)
         }
         return try makeThreeSampleDisplayRGB(frame: frame) { red, green, blue in
             (red, green, blue)
@@ -704,7 +750,8 @@ extension DCMDecoder {
     /// mapping reduces it).
     private func makeHighBitDepthRGBDisplayData(
         frame: DicomPixelFrame,
-        context: DicomColorConversionContext
+        context: DicomColorConversionContext,
+        littleEndian: Bool? = nil
     ) throws -> Data {
         let descriptor = frame.descriptor
         let pixelsPerFrame = descriptor.rows * descriptor.columns
@@ -717,7 +764,8 @@ extension DCMDecoder {
                     frameData: frame.data,
                     pixelIndex: pixelIndex,
                     sample: sample,
-                    descriptor: descriptor
+                    descriptor: descriptor,
+                    littleEndian: littleEndian
                 ) else {
                     throw DicomColorConversionError.invalidPixelData("Missing RGB sample at pixel \(pixelIndex).")
                 }
@@ -795,7 +843,8 @@ extension DCMDecoder {
     private func makePaletteDisplayRGB(
         frame: DicomPixelFrame,
         metadata: DicomNativeColorMetadata,
-        context: DicomColorConversionContext
+        context: DicomColorConversionContext,
+        littleEndian: Bool? = nil
     ) throws -> Data {
         let descriptor = frame.descriptor
         guard descriptor.samplesPerPixel == 1 else {
@@ -825,7 +874,8 @@ extension DCMDecoder {
                 frameData: frame.data,
                 pixelIndex: pixelIndex,
                 sample: 0,
-                descriptor: descriptor
+                descriptor: descriptor,
+                littleEndian: littleEndian
             ) else {
                 throw DicomColorConversionError.invalidPixelData("Missing palette index at pixel \(pixelIndex).")
             }
@@ -931,7 +981,8 @@ extension DCMDecoder {
         frameData: Data,
         pixelIndex: Int,
         sample: Int,
-        descriptor: DicomPixelDataDescriptor
+        descriptor: DicomPixelDataDescriptor,
+        littleEndian: Bool? = nil
     ) -> Int? {
         guard pixelIndex >= 0,
               sample >= 0,
@@ -961,7 +1012,7 @@ extension DCMDecoder {
         case 1:
             rawValue = Int(frameData[byteOffset])
         case 2:
-            rawValue = Int(frameData.readUInt16(at: byteOffset, littleEndian: currentLittleEndian()))
+            rawValue = Int(frameData.readUInt16(at: byteOffset, littleEndian: littleEndian ?? currentLittleEndian()))
         default:
             return nil
         }
@@ -1001,7 +1052,7 @@ extension DCMDecoder {
         output[base + 2] = rgb.2
     }
 
-    private static func ybrToRgb(y: UInt8, cb: UInt8, cr: UInt8) -> (UInt8, UInt8, UInt8) {
+    static func ybrToRgb(y: UInt8, cb: UInt8, cr: UInt8) -> (UInt8, UInt8, UInt8) {
         let luminance = Double(y)
         let cbShift = Double(cb) - 128.0
         let crShift = Double(cr) - 128.0

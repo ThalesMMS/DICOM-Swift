@@ -93,8 +93,8 @@ extension DCMWindowingProcessor {
     /// Calculates a histogram of the input 16‑bit pixel values using
     /// 256 bins spanning the range from the minimum to maximum
     /// intensity.  The function also computes the minimum,
-    /// maximum and mean values.  The histogram counts are returned
-    /// as an array of ``Int`` rather than ``NSNumber`` to avoid
+    /// maximum and mean values. The histogram counts are returned
+    /// as an array of `Int` rather than `NSNumber` to avoid
     /// boxing overhead.  This corresponds to the Objective‑C
     /// `calculateHistogram:length:minValue:maxValue:meanValue:`.
     ///
@@ -102,12 +102,6 @@ extension DCMWindowingProcessor {
     /// computes all statistics simultaneously, reducing memory
     /// bandwidth usage and cache misses.
     ///
-    /// - Parameters:
-    ///   - pixels16: An array of unsigned 16‑bit pixel values.
-    ///   - minValue: Output parameter receiving the minimum value.
-    ///   - maxValue: Output parameter receiving the maximum value.
-    ///   - meanValue: Output parameter receiving the mean value.
-    /// - Returns: A histogram array with 256 bins representing the
     /// Computes a 256-bin histogram from 16-bit pixel data and outputs the observed minimum, maximum, and mean pixel values.
     /// - Parameters:
     ///   - pixels16: Array of 16-bit pixel samples to analyze.
@@ -142,13 +136,11 @@ extension DCMWindowingProcessor {
     /// keyed by descriptive strings.  This corresponds to the
     /// Objective‑C `calculateQualityMetrics:length:`.
     ///
-    /// This method uses an optimized single‑pass implementation that
-    /// computes all statistics simultaneously via
-    /// ``calculateHistogramAndStats(pixels16:)``, reducing memory
+    /// This method uses an optimized two-pass implementation that
+    /// computes all statistics via the internal
+    /// `calculateHistogramAndStats(pixels16:)` helper, reducing memory
     /// bandwidth usage and cache misses.
     ///
-    /// - Parameter pixels16: An array of unsigned 16‑bit pixel values.
-    /// - Returns: A dictionary containing quality metrics, or an
     /// Computes a set of image-quality metrics from a 16-bit pixel array.
     /// - Returns: A dictionary mapping metric names to values. Keys:
     ///   - "mean": average pixel value.
@@ -193,13 +185,9 @@ extension DCMWindowingProcessor {
     /// Converts a value in Hounsfield Units (HU) to a raw pixel
     /// value given the DICOM rescale slope and intercept.  The
     /// relationship is HU = slope × pixel + intercept.  If
-    /// ``rescaleSlope`` is zero the function returns zero to avoid
+    /// `rescaleSlope` is zero the function returns zero to avoid
     /// division by zero.
     ///
-    /// - Parameters:
-    ///   - hu: Hounsfield unit value.
-    ///   - rescaleSlope: DICOM rescale slope.
-    ///   - rescaleIntercept: DICOM rescale intercept.
     /// Convert a Hounsfield Unit (HU) value to the corresponding raw pixel value using DICOM rescale parameters.
     /// - Parameters:
     ///   - hu: The Hounsfield Unit to convert.
@@ -217,10 +205,6 @@ extension DCMWindowingProcessor {
     /// the DICOM rescale slope and intercept.  The relationship is
     /// HU = slope × pixel + intercept.
     ///
-    /// - Parameters:
-    ///   - pixelValue: Raw pixel value.
-    ///   - rescaleSlope: DICOM rescale slope.
-    ///   - rescaleIntercept: DICOM rescale intercept.
     /// Converts a raw pixel value to Hounsfield Units (HU) using the DICOM rescale parameters.
     /// - Parameters:
     ///   - pixelValue: Raw pixel value to convert.

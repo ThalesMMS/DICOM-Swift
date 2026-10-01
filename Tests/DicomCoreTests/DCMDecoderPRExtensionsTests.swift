@@ -286,6 +286,7 @@ final class DCMDecoderPRExtensionsTests: XCTestCase {
 
     // MARK: - Thread Safety Tests
 
+    @MainActor
     func testGetPixels8ThreadSafety() {
         let decoder = DCMDecoder()
         let expectation = self.expectation(description: "Thread-safe pixel access")
@@ -303,6 +304,7 @@ final class DCMDecoderPRExtensionsTests: XCTestCase {
         waitForExpectations(timeout: 5.0)
     }
 
+    @MainActor
     func testInfoForThreadSafety() {
         let decoder = DCMDecoder()
         let expectation = self.expectation(description: "Thread-safe info access")

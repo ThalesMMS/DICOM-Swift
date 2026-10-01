@@ -145,65 +145,17 @@ final class DCMDecoderPerformanceTests: XCTestCase {
         XCTAssertLessThan(avgTime, 0.0001, "Metadata access should be <0.1ms per iteration")
     }
 
-    // MARK: - Thread-Safety Impact Analysis
-
-    /// This test documents the expected performance characteristics of the thread-safe implementation.
-    ///
-    /// ANALYSIS:
-    /// - The decoder uses a lightweight unfair lock on Apple platforms
-    /// - In uncontended scenarios (single-threaded), lock/unlock overhead is typically tiny on modern hardware
-    /// - Apple's performance guidance suggests lock/unlock costs are in the tens of nanoseconds range
-    /// - DICOM file operations are I/O-bound (reading files, parsing bytes), not CPU-bound
-    /// - Lock overhead is negligible compared to I/O operations
-    ///
-    /// EXPECTED IMPACT:
-    /// - Single-threaded performance degradation: <1% (well below 10% acceptance criteria)
-    /// - The locks protect in-memory state access, not I/O operations
-    /// - Actual file loading performance is dominated by disk I/O, not lock contention
-    ///
-    /// LIMITATION:
-    /// - This worktree contains the thread-safe implementation, so direct before/after comparison
-    ///   is not possible without checking out the previous commit
-    /// - The benchmark tests measure the current (thread-safe) implementation performance
-    /// - Lock overhead is measured synthetically to verify it meets acceptance criteria
-    func testPerformanceImpactDocumentation() {
-        // This test always passes - it exists to document the performance analysis
-        XCTAssertTrue(true, "Performance impact analysis documented")
-
-        print("""
-
-        ========== Performance Impact Analysis ==========
-        Thread-Safety Implementation: DicomLock (os_unfair_lock on Apple platforms)
-        Target: <10% performance degradation for single-threaded usage
-
-        Expected Impact:
-        - Lock acquisition/release overhead: ~20-40ns per operation
-        - File I/O operations: typically milliseconds (1,000,000+ ns)
-        - Lock overhead as % of total: <0.01% for I/O-bound operations
-
-        Acceptance Criteria: ✓ MET
-        - Lock overhead <10%: ✓ (typically <1%)
-        - Single-threaded API unchanged: ✓ (verified in subtask-3-1)
-        - No observable performance degradation for real-world usage
-        ==================================================
-
-        """)
-    }
-
     // MARK: - Streaming Pixel Access Benchmarks
 
-    /// Benchmarks first pixel access latency for streaming access.
-    /// Acceptance criteria: First pixel accessible within 500ms for files >1GB.
-    /// This test uses a mock decoder to simulate the access pattern.
-    func testFirstPixelAccessLatency() {
-        // Create a mock decoder with simulated large image (e.g., 4096x4096 16-bit)
+    /// Benchmarks validation overhead for a range request on an uninitialized decoder.
+    func testUninitializedDecoderRangeAccessLatency() {
         let decoder = DCMDecoder()
         let iterations = 100
+        XCTAssertNil(decoder.getPixels16(range: 0..<100))
 
         var totalLatency: CFAbsoluteTime = 0
 
         for _ in 0..<iterations {
-            // Measure first pixel range access (first 100 pixels)
             let start = CFAbsoluteTimeGetCurrent()
             _ = decoder.getPixels16(range: 0..<100)
             let elapsed = CFAbsoluteTimeGetCurrent() - start
@@ -214,23 +166,18 @@ final class DCMDecoderPerformanceTests: XCTestCase {
 
         print("""
 
-        ========== First Pixel Access Latency ==========
+        ========== Uninitialized Range Access Latency ==========
         Iterations: \(iterations)
         Avg latency: \(String(format: "%.6f", avgLatency))s (\(String(format: "%.2f", avgLatency * 1000))ms)
-        Target: <500ms for large files
         ================================================
 
         """)
 
-        // For in-memory access (no file loaded), latency should be extremely fast
-        // With actual files, this would measure file header parsing + first pixel access
-        XCTAssertLessThan(avgLatency, 0.5, "First pixel access should be <500ms")
+        XCTAssertLessThan(avgLatency, 0.001, "Uninitialized range validation should be <1ms")
     }
 
-    /// Benchmarks sequential streaming API overhead without actual file I/O.
-    /// Measures synchronization and validation overhead for the streaming API.
-    /// Note: Returns nil for all accesses since no file is loaded.
-    func testSequentialStreamingPerformance() {
+    /// Benchmarks sequential invalid-range checks without file I/O.
+    func testSequentialUninitializedRangeValidationPerformance() {
         let decoder = DCMDecoder()
 
         // Simulate a 2048x2048 16-bit image (8MB of pixel data)
@@ -239,8 +186,6 @@ final class DCMDecoderPerformanceTests: XCTestCase {
         let numChunks = totalPixels / chunkSize
 
         var totalTime: CFAbsoluteTime = 0
-        var totalBytesProcessed = 0
-
         let start = CFAbsoluteTimeGetCurrent()
 
         // Stream through the image in chunks
@@ -253,35 +198,29 @@ final class DCMDecoderPerformanceTests: XCTestCase {
             let chunkTime = CFAbsoluteTimeGetCurrent() - chunkStart
 
             totalTime += chunkTime
-            if let data = pixelData {
-                totalBytesProcessed += data.count * 2  // 2 bytes per UInt16
-            }
+            XCTAssertNil(pixelData)
         }
 
         let elapsed = CFAbsoluteTimeGetCurrent() - start
-        let throughputMBps = Double(totalBytesProcessed) / elapsed / (1024 * 1024)
         let avgChunkTime = totalTime / Double(numChunks)
 
         print("""
 
-        ========== Sequential Streaming Performance ==========
-        Image size: 2048x2048 (8MB)
-        Chunk size: 256x256 (\(chunkSize) pixels)
-        Number of chunks: \(numChunks)
+        ========== Sequential Uninitialized Range Validation ==========
+        Requested range coverage: 2048x2048
+        Range size: \(chunkSize) pixels
+        Number of ranges: \(numChunks)
         Total time: \(String(format: "%.6f", elapsed))s
-        Avg chunk access time: \(String(format: "%.6f", avgChunkTime))s
-        Throughput: \(String(format: "%.2f", throughputMBps)) MB/s
+        Avg validation time: \(String(format: "%.6f", avgChunkTime))s
         =======================================================
 
         """)
 
-        // Sequential access should be efficient
-        XCTAssertLessThan(avgChunkTime, 0.01, "Chunk access should be <10ms")
+        XCTAssertLessThan(avgChunkTime, 0.01, "Range validation should be <10ms")
     }
 
-    /// Benchmarks random access latency for streaming access.
-    /// This pattern is common when jumping to specific regions of interest in an image.
-    func testRandomAccessLatency() {
+    /// Benchmarks deterministic random-range validation on an uninitialized decoder.
+    func testRandomUninitializedRangeValidationLatency() {
         let decoder = DCMDecoder()
 
         // Simulate a 4096x4096 image
@@ -299,8 +238,9 @@ final class DCMDecoderPerformanceTests: XCTestCase {
             let rangeEnd = min(rangeStart + tileSize, totalPixels)
 
             let start = CFAbsoluteTimeGetCurrent()
-            _ = decoder.getPixels16(range: rangeStart..<rangeEnd)
+            let pixels = decoder.getPixels16(range: rangeStart..<rangeEnd)
             let elapsed = CFAbsoluteTimeGetCurrent() - start
+            XCTAssertNil(pixels)
             totalLatency += elapsed
         }
 
@@ -308,49 +248,39 @@ final class DCMDecoderPerformanceTests: XCTestCase {
 
         print("""
 
-        ========== Random Access Latency ==========
-        Image size: 4096x4096
-        Tile size: 512x512
-        Random accesses: \(numRandomAccesses)
-        Avg access time: \(String(format: "%.6f", avgLatency))s (\(String(format: "%.2f", avgLatency * 1000))ms)
+        ========== Random Uninitialized Range Validation ==========
+        Requested range coverage: 4096x4096
+        Range size: 512x512
+        Random ranges: \(numRandomAccesses)
+        Avg validation time: \(String(format: "%.6f", avgLatency))s (\(String(format: "%.2f", avgLatency * 1000))ms)
         ===========================================
 
         """)
 
-        // Random access should have acceptable latency
-        XCTAssertLessThan(avgLatency, 0.05, "Random access should be <50ms per tile")
+        XCTAssertLessThan(avgLatency, 0.05, "Random range validation should be <50ms")
     }
 
-    /// Benchmarks range-based access vs full pixel array access.
-    /// This demonstrates the memory efficiency benefit of streaming access.
-    func testRangeAccessVsFullAccess() {
+    /// Benchmarks range and full access validation without a loaded file.
+    func testUninitializedRangeAndFullAccessLatency() {
         let decoder = DCMDecoder()
 
-        // Test small range access
         let smallRangeStart = CFAbsoluteTimeGetCurrent()
         let smallRange = decoder.getPixels16(range: 0..<1000)
         let smallRangeTime = CFAbsoluteTimeGetCurrent() - smallRangeStart
 
-        // Test full access (simulated - returns nil without loaded file)
         let fullAccessStart = CFAbsoluteTimeGetCurrent()
         let fullAccess = decoder.getPixels16()
         let fullAccessTime = CFAbsoluteTimeGetCurrent() - fullAccessStart
 
         print("""
 
-        ========== Range Access vs Full Access ==========
+        ========== Uninitialized Range vs Full Access ==========
         Small range (1000 pixels) time: \(String(format: "%.6f", smallRangeTime))s
         Full access time: \(String(format: "%.6f", fullAccessTime))s
-
-        Memory efficiency benefit:
-        - Range access allocates only requested data
-        - Full access allocates entire pixel buffer
-        - For 2048x2048 16-bit image: ~8MB vs ~2KB
         ==================================================
 
         """)
 
-        // Both should be fast when no file is loaded, but demonstrate the API
         XCTAssertLessThan(smallRangeTime, 0.01, "Range access should be fast")
         XCTAssertLessThan(fullAccessTime, 0.01, "Full access should be fast")
 
@@ -359,12 +289,14 @@ final class DCMDecoderPerformanceTests: XCTestCase {
         XCTAssertNil(fullAccess, "No data without loaded file")
     }
 
-    /// Benchmarks streaming access with different bit depths.
-    /// Tests 8-bit, 16-bit, and 24-bit pixel access patterns.
-    func testMultiBitDepthStreamingPerformance() {
+    /// Benchmarks uninitialized range validation across all pixel APIs.
+    func testUninitializedMultiBitDepthRangeValidationPerformance() {
         let decoder = DCMDecoder()
         let testRange = 0..<10000  // 10K pixels
         let iterations = 100
+        XCTAssertNil(decoder.getPixels8(range: testRange))
+        XCTAssertNil(decoder.getPixels16(range: testRange))
+        XCTAssertNil(decoder.getPixels24(range: testRange))
 
         var time8bit: CFAbsoluteTime = 0
         var time16bit: CFAbsoluteTime = 0
@@ -393,7 +325,7 @@ final class DCMDecoderPerformanceTests: XCTestCase {
 
         print("""
 
-        ========== Multi-Bit-Depth Streaming Performance ==========
+        ========== Multi-Bit-Depth Uninitialized Range Validation ==========
         Range: 10,000 pixels
         Iterations: \(iterations)
 
@@ -401,69 +333,13 @@ final class DCMDecoderPerformanceTests: XCTestCase {
         Avg 16-bit access time: \(String(format: "%.6f", avg16))s
         Avg 24-bit access time: \(String(format: "%.6f", avg24))s
 
-        Memory per access:
-        - 8-bit:  ~10KB
-        - 16-bit: ~20KB
-        - 24-bit: ~30KB
         ============================================================
 
         """)
 
-        // All bit depths should have similar performance characteristics
         XCTAssertLessThan(avg8, 0.001, "8-bit access should be <1ms")
         XCTAssertLessThan(avg16, 0.001, "16-bit access should be <1ms")
         XCTAssertLessThan(avg24, 0.001, "24-bit access should be <1ms")
-    }
-
-    /// Documents the expected performance characteristics of streaming pixel access.
-    ///
-    /// STREAMING ACCESS BENEFITS:
-    /// - Memory efficiency: Load only required pixel ranges, not entire images
-    /// - Latency: First pixels available quickly without loading full dataset
-    /// - Scalability: Handle gigapixel images without memory constraints
-    /// - Flexibility: Support tiled rendering, progressive loading, ROI analysis
-    ///
-    /// PERFORMANCE TARGETS (from acceptance criteria):
-    /// - Memory usage: <200MB for any file size
-    /// - First pixel access: <500ms for files >1GB
-    /// - Range-based API: Efficient partial data access
-    /// - Memory-mapped compatibility: Leverages existing optimization
-    func testStreamingAccessDocumentation() {
-        // This test always passes - it exists to document the streaming access design
-        XCTAssertTrue(true, "Streaming access design documented")
-
-        print("""
-
-        ========== Streaming Pixel Access Analysis ==========
-        Implementation: Range-based pixel access methods
-        Target: Support large files (>1GB) without memory constraints
-
-        Key Features:
-        - getPixels8/16/24(range:) - Partial pixel data access
-        - Lazy loading - Pixels loaded on-demand, not at file open
-        - Memory-mapped I/O - Efficient for large files (auto-enabled >10MB)
-        - Thread-safe - Concurrent access protected by DicomLock
-
-        Performance Characteristics:
-        - First pixel latency: <500ms target (acceptance criteria)
-        - Sequential throughput: Limited by I/O, not API overhead
-        - Random access: Efficient with memory-mapped files
-        - Memory footprint: Proportional to requested range, not file size
-
-        Use Cases:
-        - Tiled rendering (load visible tiles only)
-        - Progressive image loading (coarse-to-fine)
-        - Region of interest analysis (process specific areas)
-        - Large format imaging (whole slide imaging, gigapixel photos)
-
-        Acceptance Criteria: ✓ DESIGNED TO MEET
-        - Memory usage <200MB: ✓ (range-based access prevents full load)
-        - First pixel <500ms: ✓ (lazy loading + range access)
-        - Range-based API: ✓ (getPixels*(range:) methods)
-        - Memory-mapped compatible: ✓ (works with existing optimization)
-        ======================================================
-
-        """)
     }
 
     // MARK: - JPEG Lossless Decoding Performance
@@ -497,11 +373,8 @@ final class DCMDecoderPerformanceTests: XCTestCase {
             defer { try? FileManager.default.removeItem(at: fileURL) }
 
             // Warm up decoder (first run may include one-time setup costs)
-            guard let decoder = try? DCMDecoder(contentsOf: fileURL) else {
-                XCTFail("Failed to load test file")
-                return
-            }
-            _ = decoder.getPixels16()
+            let decoder = try DCMDecoder(contentsOf: fileURL)
+            _ = try XCTUnwrap(decoder.getPixels16())
 
             // Benchmark decoding
             let iterations = 10
@@ -509,10 +382,8 @@ final class DCMDecoderPerformanceTests: XCTestCase {
 
             for _ in 0..<iterations {
                 let start = CFAbsoluteTimeGetCurrent()
-                guard let iterDecoder = try? DCMDecoder(contentsOf: fileURL) else {
-                    continue
-                }
-                _ = iterDecoder.getPixels16()
+                let iterDecoder = try DCMDecoder(contentsOf: fileURL)
+                _ = try XCTUnwrap(iterDecoder.getPixels16())
                 let elapsed = CFAbsoluteTimeGetCurrent() - start
                 totalTime += elapsed
             }
@@ -541,6 +412,8 @@ final class DCMDecoderPerformanceTests: XCTestCase {
         }
         print("=======================================================\n")
 
+        XCTAssertEqual(results.count, testCases.count)
+
         // Verify reasonable performance
         // Small images (128x128) should decode in under 100ms
         XCTAssertLessThan(results[0].avgTime, 0.1,
@@ -555,10 +428,8 @@ final class DCMDecoderPerformanceTests: XCTestCase {
                           "Large image (512x512) should decode in <2s")
     }
 
-    /// Benchmarks JPEG Lossless decoding performance compared to ImageIO baseline.
-    /// This test verifies that JPEG Lossless performance is within 2x of ImageIO
-    /// for comparable JPEG formats (acceptance criteria).
-    func testJPEGLosslessVsImageIOPerformance() throws {
+    /// Verifies the medium-resolution JPEG Lossless decode budget with complete samples.
+    func testJPEGLosslessMediumImageDecodeBudget() throws {
         let width = 256
         let height = 256
         let pixelCount = width * height
@@ -575,69 +446,29 @@ final class DCMDecoderPerformanceTests: XCTestCase {
         let jpegLosslessURL = try writeTempDICOMFile(jpegLosslessData)
         defer { try? FileManager.default.removeItem(at: jpegLosslessURL) }
 
-        // Warm up
-        guard let decoder = try? DCMDecoder(contentsOf: jpegLosslessURL) else {
-            XCTFail("Failed to load JPEG Lossless test file")
-            return
-        }
-        _ = decoder.getPixels16()
+        let decoder = try DCMDecoder(contentsOf: jpegLosslessURL)
+        _ = try XCTUnwrap(decoder.getPixels16())
 
         var jpegLosslessTime: CFAbsoluteTime = 0
         for _ in 0..<iterations {
             let start = CFAbsoluteTimeGetCurrent()
-            guard let iterDecoder = try? DCMDecoder(contentsOf: jpegLosslessURL) else {
-                continue
-            }
-            _ = iterDecoder.getPixels16()
+            let iterDecoder = try DCMDecoder(contentsOf: jpegLosslessURL)
+            _ = try XCTUnwrap(iterDecoder.getPixels16())
             jpegLosslessTime += CFAbsoluteTimeGetCurrent() - start
         }
         let avgJPEGLosslessTime = jpegLosslessTime / Double(iterations)
 
-        // Baseline measurement: In-memory uncompressed pixel data access
-        // This represents the theoretical minimum overhead for pixel access
-        var baselineTime: CFAbsoluteTime = 0
-        for _ in 0..<iterations {
-            let start = CFAbsoluteTimeGetCurrent()
-            let baselineDecoder = DCMDecoder()
-            _ = baselineDecoder.width
-            _ = baselineDecoder.height
-            baselineTime += CFAbsoluteTimeGetCurrent() - start
-        }
-        let avgBaselineTime = baselineTime / Double(iterations)
-
-        // Calculate overhead factor
-        let overheadFactor = avgJPEGLosslessTime / max(avgBaselineTime, 0.000001)
-
         print("""
 
-        ========== JPEG Lossless vs Baseline Performance ==========
+        ========== JPEG Lossless Medium Image Decode Budget ==========
         Image size: \(width)x\(height) (\(pixelCount) pixels)
         Iterations: \(iterations)
 
         JPEG Lossless decode time: \(String(format: "%.4f", avgJPEGLosslessTime))s
-        Baseline time (minimal overhead): \(String(format: "%.4f", avgBaselineTime))s
-        Overhead factor: \(String(format: "%.1f", overheadFactor))x
-
-        Performance Analysis:
-        - JPEG Lossless includes: JPEG parsing, Huffman decoding, prediction
-        - Baseline includes: minimal decoder initialization
-        - Expected overhead: Significant (compression/decompression work)
-
-        Acceptance Criteria: Performance within 2x of ImageIO baseline
-        Note: ImageIO baseline would be similar JPEG compression overhead
-        JPEG Lossless uses different algorithm (lossless vs lossy) so
-        direct comparison is limited. This benchmark documents actual
-        performance characteristics for regression detection.
         ===========================================================
 
         """)
 
-        // Document that JPEG Lossless has measurable overhead (expected)
-        XCTAssertGreaterThan(avgJPEGLosslessTime, avgBaselineTime,
-                            "JPEG Lossless should have measurable decoding overhead")
-
-        // Verify JPEG Lossless decoding completes in reasonable time
-        // For 256x256 image, should complete in under 500ms
         XCTAssertLessThan(avgJPEGLosslessTime, 0.5,
                           "JPEG Lossless decoding should complete in <500ms for 256x256 image")
     }
@@ -664,21 +495,23 @@ final class DCMDecoderPerformanceTests: XCTestCase {
             let fileURL = try writeTempDICOMFile(dicomData)
             defer { try? FileManager.default.removeItem(at: fileURL) }
 
-            // Warm up
-            guard let decoder = try? DCMDecoder(contentsOf: fileURL) else {
-                XCTFail("Failed to load \(bitDepth)-bit test file")
-                continue
+            let decoder = try DCMDecoder(contentsOf: fileURL)
+            if bitDepth == 8 {
+                XCTAssertEqual(try XCTUnwrap(decoder.getPixels8()).count, pixelCount)
+            } else {
+                XCTAssertEqual(try XCTUnwrap(decoder.getPixels16()).count, pixelCount)
             }
-            _ = decoder.getPixels16()
 
             // Benchmark
             var totalTime: CFAbsoluteTime = 0
             for _ in 0..<iterations {
                 let start = CFAbsoluteTimeGetCurrent()
-                guard let iterDecoder = try? DCMDecoder(contentsOf: fileURL) else {
-                    continue
+                let iterDecoder = try DCMDecoder(contentsOf: fileURL)
+                if bitDepth == 8 {
+                    XCTAssertEqual(try XCTUnwrap(iterDecoder.getPixels8()).count, pixelCount)
+                } else {
+                    XCTAssertEqual(try XCTUnwrap(iterDecoder.getPixels16()).count, pixelCount)
                 }
-                _ = iterDecoder.getPixels16()
                 totalTime += CFAbsoluteTimeGetCurrent() - start
             }
             let avgTime = totalTime / Double(iterations)
@@ -698,6 +531,8 @@ final class DCMDecoderPerformanceTests: XCTestCase {
         }
         print("=========================================================\n")
 
+        XCTAssertEqual(results.count, bitDepths.count)
+
         // Verify all bit depths decode in reasonable time
         for result in results {
             XCTAssertLessThan(result.avgTime, 0.5,
@@ -706,17 +541,16 @@ final class DCMDecoderPerformanceTests: XCTestCase {
 
         // Performance should be relatively similar across bit depths
         // since the decoding algorithm is the same
-        if let min = results.map({ $0.avgTime }).min(),
-           let max = results.map({ $0.avgTime }).max() {
-            let variationFactor = max / min
-            #if targetEnvironment(simulator)
-            let maxVariation: Double = 5.0 // Simulator timing variance is higher.
-            #else
-            let maxVariation: Double = 3.0
-            #endif
-            XCTAssertLessThan(variationFactor, maxVariation,
-                              "Performance variation across bit depths should be <\(maxVariation)x")
-        }
+        let minimumTime = try XCTUnwrap(results.map(\.avgTime).min())
+        let maximumTime = try XCTUnwrap(results.map(\.avgTime).max())
+        let variationFactor = maximumTime / minimumTime
+        #if targetEnvironment(simulator)
+        let maxVariation: Double = 5.0 // Simulator timing variance is higher.
+        #else
+        let maxVariation: Double = 3.0
+        #endif
+        XCTAssertLessThan(variationFactor, maxVariation,
+                          "Performance variation across bit depths should be <\(maxVariation)x")
     }
 
     // MARK: - Helper Methods for JPEG Lossless Performance Tests

@@ -13,6 +13,7 @@
 
 import Foundation
 import XCTest
+import Synchronization
 import simd
 @testable import DicomCore
 
@@ -146,7 +147,8 @@ final class DicomEnhancedMultiframeVolumeTests: XCTestCase {
             zPositions: [0.0, 2.5],
             frameIntercepts: ["0", "0"],
             framePixelValues: [[1, 2, 3, 4], [5, 6, 7, 8]],
-            pixelSpacingValues: pixelSpacing.map { String($0) }
+            pixelSpacingValues: pixelSpacing.map { String($0) },
+            encodeMalformedDecimalStrings: true
         )
         defer { try? FileManager.default.removeItem(at: url) }
 
@@ -365,7 +367,8 @@ final class DicomEnhancedMultiframeVolumeTests: XCTestCase {
                 zPositions: [0.0, 2.5],
                 frameIntercepts: ["0", "0"],
                 framePixelValues: [[1, 1, 1, 1], [2, 2, 2, 2]],
-                orientationValues: orientation
+                orientationValues: orientation,
+                encodeMalformedDecimalStrings: true
             )
             defer { try? FileManager.default.removeItem(at: url) }
 
@@ -533,6 +536,231 @@ final class DicomEnhancedMultiframeVolumeTests: XCTestCase {
     }
 
     // MARK: - Native Enhanced CT assembly
+
+    func test_selectedVolume_rejectsIncorrectAllocationLength() throws {
+        let url = try Self.writeEnhancedObject(
+            zPositions: [0, 1], frameIntercepts: ["0", "0"],
+            framePixelValues: [[1, 1, 1, 1], [2, 2, 2, 2]], stackIDs: ["A", "A"]
+        )
+        defer { try? FileManager.default.removeItem(at: url) }
+        let groups = try XCTUnwrap(DCMDecoder(contentsOf: url).enhancedMultiframeFunctionalGroups)
+        let partition = try XCTUnwrap(DicomEnhancedFramePartition.resolve(groups).first)
+
+        for adjustment in [-2, 2] {
+            let loader = DicomSeriesLoader(allocateVoxelData: { Data(count: $0 + adjustment) })
+            XCTAssertThrowsError(try loader.loadEnhancedMultiframeVolume(at: url, selection: partition.selection)) { error in
+                guard case DicomSeriesLoaderError.invalidVoxelAllocationLength(let expected, let actual) = error else {
+                    return XCTFail("Unexpected allocation error: \(error)")
+                }
+                XCTAssertEqual(expected, 16)
+                XCTAssertEqual(actual, 16 + adjustment)
+            }
+        }
+    }
+
+    func test_converter_rejectsUnresolvedSelectionWithSpecificError() throws {
+        let url = try Self.writeEnhancedObject(
+            zPositions: [0, 1], frameIntercepts: ["0", "0"],
+            framePixelValues: [[1, 1, 1, 1], [2, 2, 2, 2]], stackIDs: ["A", "A"]
+        )
+        defer { try? FileManager.default.removeItem(at: url) }
+        let groups = try XCTUnwrap(DCMDecoder(contentsOf: url).enhancedMultiframeFunctionalGroups)
+        let partition = try XCTUnwrap(DicomEnhancedFramePartition.resolve(groups).first)
+        let missing = DicomEnhancedFramePartition.Selection(axes: partition.selection.axes, ordinals: [99, nil])
+
+        XCTAssertThrowsError(try DicomEnhancedMultiframeConverter().convert(contentsOf: url, selection: missing)) { error in
+            XCTAssertEqual(error as? DicomEnhancedMultiframeConverter.ConversionError, .unresolvedSelection)
+        }
+
+        let duplicateURL = try Self.writeEnhancedObject(
+            zPositions: [0, 0], frameIntercepts: ["0", "0"],
+            framePixelValues: [[1, 1, 1, 1], [2, 2, 2, 2]], stackIDs: ["A", "A"],
+            inStackPositionNumbers: [1, 1]
+        )
+        defer { try? FileManager.default.removeItem(at: duplicateURL) }
+        XCTAssertThrowsError(try DicomEnhancedMultiframeConverter().convert(
+            contentsOf: duplicateURL, selection: partition.selection
+        )) { error in
+            XCTAssertEqual(error as? DicomEnhancedMultiframeConverter.ConversionError, .unresolvedSelection)
+        }
+    }
+
+    func test_twoStacksAndTimes_selectsEveryPartitionWithoutFlattening() throws {
+        // Physical order interleaves stack, time and position. The expected slices
+        // below are specified independently of the resolver's ordering.
+        let url = try Self.writeEnhancedObject(
+            zPositions: [1, 0, 0, 1, 0, 1, 1, 0],
+            frameIntercepts: ["211", "120", "210", "111", "110", "221", "121", "220"],
+            framePixelValues: [211, 120, 210, 111, 110, 221, 121, 220].map { Array(repeating: Int16($0), count: 4) },
+            stackIDs: ["B", "A", "B", "A", "A", "B", "A", "B"],
+            temporalPositionIndexes: [1, 2, 1, 1, 1, 2, 2, 2],
+            additionalDimensionIndexPointer: DicomTag.temporalPositionIndex.rawValue,
+            frameDimensionIndexValues: [[2, 2, 1], [1, 1, 2], [2, 1, 1], [1, 2, 1],
+                                        [1, 1, 1], [2, 2, 2], [1, 2, 2], [2, 1, 2]],
+            inStackPositionNumbers: [2, 1, 1, 2, 1, 2, 2, 1]
+        )
+        defer { try? FileManager.default.removeItem(at: url) }
+        let groups = try XCTUnwrap(DCMDecoder(contentsOf: url).enhancedMultiframeFunctionalGroups)
+        let partitions = try DicomEnhancedFramePartition.resolve(groups)
+        XCTAssertEqual(partitions.count, 4)
+        let expectedValues: [[Int16]] = [[110, 111], [120, 121], [210, 211], [220, 221]]
+        let expectedReferences = [[4, 3], [1, 6], [2, 0], [7, 5]]
+        for (index, partition) in partitions.enumerated() {
+            let volume = try DicomSeriesLoader().loadEnhancedMultiframeVolume(at: [url], selection: partition.selection)
+            XCTAssertEqual(volume.depth, 2)
+            XCTAssertEqual(volume.spacing.z, 1)
+            XCTAssertEqual(volume.voxels.withUnsafeBytes { Array($0.bindMemory(to: Int16.self)) },
+                           expectedValues[index].flatMap { Array(repeating: $0, count: 4) })
+            XCTAssertEqual(volume.sliceRescaleParameters.map(\.intercept), expectedValues[index].map(Double.init))
+            XCTAssertEqual(volume.enhancedFrameReferences.map(\.frameIndex), expectedReferences[index])
+            let decodedIndices = Mutex<[Int]>([])
+            let hostVolume = try DicomSeriesLoader().loadEnhancedMultiframeVolume(
+                at: [url], selection: partition.selection,
+                decodeStoredFrame: { decoder, frameIndex in
+                    decodedIndices.withLock { $0.append(frameIndex) }
+                    return try XCTUnwrap(decoder.getFrame(frameIndex)?.data)
+                }
+            )
+            XCTAssertEqual(decodedIndices.withLock { $0 }, expectedReferences[index])
+            XCTAssertEqual(hostVolume.voxels, volume.voxels)
+            XCTAssertEqual(hostVolume.sliceRescaleParameters, volume.sliceRescaleParameters)
+        }
+        XCTAssertThrowsError(try DicomSeriesLoader().loadEnhancedMultiframeVolume(
+            at: [url], selection: partitions[0].selection,
+            decodeStoredFrame: { _, _ in throw CancellationError() }
+        )) { XCTAssertTrue($0 is CancellationError) }
+    }
+
+    func test_concatenationAcrossObjects_ordersByGeometryAndPreservesEverySourceFrame() throws {
+        let first = try Self.writeEnhancedObject(
+            zPositions: [3, 0], frameIntercepts: ["300", "100"],
+            framePixelValues: [[30, 30, 30, 30], [0, 0, 0, 0]], stackIDs: ["A", "A"]
+        )
+        let second = try Self.writeEnhancedObject(
+            zPositions: [2, 1], frameIntercepts: ["200", "150"],
+            framePixelValues: [[20, 20, 20, 20], [10, 10, 10, 10]], stackIDs: ["A", "A"],
+            dimensionOrdinalOffset: 2
+        )
+        defer {
+            try? FileManager.default.removeItem(at: first)
+            try? FileManager.default.removeItem(at: second)
+        }
+        try Self.setConcatenation(at: first, sopInstanceUID: "2.25.999", number: 1, offset: 0)
+        try Self.setConcatenation(at: second, sopInstanceUID: "2.25.111", number: 2, offset: 2)
+        let groups = try XCTUnwrap(DCMDecoder(contentsOf: first).enhancedMultiframeFunctionalGroups)
+        let selection = try XCTUnwrap(DicomEnhancedFramePartition.resolve(groups).first?.selection)
+        let volume = try DicomSeriesLoader().loadEnhancedMultiframeVolume(at: [second, first], selection: selection)
+        XCTAssertEqual(volume.depth, 4)
+        XCTAssertEqual(volume.origin, SIMD3<Double>(0, 0, 0))
+        XCTAssertEqual(volume.spacing.z, 1)
+        XCTAssertEqual(volume.voxels.withUnsafeBytes { Array($0.bindMemory(to: Int16.self)) },
+                       [0, 0, 0, 0, 10, 10, 10, 10, 20, 20, 20, 20, 30, 30, 30, 30])
+        XCTAssertEqual(volume.sliceRescaleParameters.map(\.intercept), [100, 150, 200, 300])
+        XCTAssertEqual(volume.enhancedFrameReferences.map(\.sopInstanceUID),
+                       ["2.25.999", "2.25.111", "2.25.111", "2.25.999"])
+        XCTAssertEqual(volume.enhancedFrameReferences.map(\.frameIndex), [1, 1, 0, 0])
+        XCTAssertEqual(volume.enhancedFrameReferences.map(\.concatenationFrameIndex), [1, 3, 2, 0])
+
+        XCTAssertThrowsError(try DicomSeriesLoader().loadEnhancedMultiframeVolume(at: [first], selection: selection))
+    }
+
+    private static func setConcatenation(at url: URL, sopInstanceUID: String, number: UInt, offset: UInt) throws {
+        let decoder = try DCMDecoder(contentsOf: url)
+        var dataSet = decoder.dataSet
+        let frames = try XCTUnwrap(decoder.getAllFrames())
+        let pixels = frames.reduce(into: Data()) { $0.append($1.data) }
+        dataSet.set(.init(tag: DicomTag.pixelData.rawValue, vr: .OW, value: .bytes(pixels)))
+        dataSet.set(.init(tag: DicomTag.sopInstanceUID.rawValue, vr: .UI, value: .strings([sopInstanceUID])))
+        dataSet.set(.init(tag: 0x0020_9161, vr: .UI, value: .strings(["2.25.23420001"])))
+        dataSet.set(.init(tag: 0x0020_0242, vr: .UI, value: .strings(["2.25.23420002"])))
+        dataSet.set(.init(tag: 0x0020_9162, vr: .US, value: .unsignedIntegers([number])))
+        dataSet.set(.init(tag: 0x0020_9163, vr: .US, value: .unsignedIntegers([2])))
+        dataSet.set(.init(tag: 0x0020_9228, vr: .UL, value: .unsignedIntegers([offset])))
+        try DicomDataSetWriter.part10Data(from: dataSet).write(to: url)
+    }
+
+    func test_selectedStack_loadsOnlyItsPixelsRescaleAndVOIInSpatialOrder() throws {
+        let url = try Self.writeEnhancedObject(
+            zPositions: [2.5, 0, 0, 2.5], frameIntercepts: ["30", "900", "10", "800"],
+            framePixelValues: [[3, 3, 3, 3], [9, 9, 9, 9], [1, 1, 1, 1], [8, 8, 8, 8]],
+            stackIDs: ["A", "B", "A", "B"],
+            frameWindowCenters: ["30", "900", "10", "800"],
+            frameWindowWidths: ["100", "100", "100", "100"]
+        )
+        defer { try? FileManager.default.removeItem(at: url) }
+        let groups = try XCTUnwrap(DCMDecoder(contentsOf: url).enhancedMultiframeFunctionalGroups)
+        let partitions = try DicomEnhancedFramePartition.resolve(groups)
+        XCTAssertEqual(partitions.map(\.frameIndices), [[0, 2], [1, 3]])
+        let volume = try DicomSeriesLoader().loadEnhancedMultiframeVolume(
+            at: url, selection: partitions[0].selection
+        )
+        XCTAssertEqual(volume.depth, 2)
+        XCTAssertEqual(volume.spacing.z, 2.5)
+        XCTAssertEqual(volume.origin, SIMD3<Double>(0, 0, 0))
+        XCTAssertEqual(volume.voxels.withUnsafeBytes { Array($0.bindMemory(to: Int16.self)) },
+                       [1, 1, 1, 1, 3, 3, 3, 3])
+        XCTAssertEqual(volume.sliceRescaleParameters.map(\.intercept), [10, 30])
+        XCTAssertEqual(volume.windowCenter, 10)
+        let converted = try DicomEnhancedMultiframeConverter().convert(contentsOf: url, selection: partitions[0].selection)
+        XCTAssertEqual(converted.instances.map(\.sourceFrameNumber), [3, 1])
+        XCTAssertEqual(converted.instances.map(\.instanceNumber), [1, 2])
+        for (instance, expectedFrame) in zip(converted.instances, [3, 1]) {
+            let output = try DCMDecoder(data: instance.part10Data)
+            let reference = try XCTUnwrap(output.dataSet.sequenceItems(for: .sourceImageSequence).first?.dataSet)
+            XCTAssertEqual(reference.string(for: .referencedSOPInstanceUID), converted.sourceSOPInstanceUID)
+            XCTAssertEqual(reference.int(for: .referencedFrameNumber), expectedFrame)
+            XCTAssertNotEqual(output.info(for: .sopInstanceUID), converted.sourceSOPInstanceUID)
+        }
+    }
+
+    func test_dimensionOrdinalsDifferentFromInStackPositions_acceptsValidVolume() throws {
+        let url = try Self.writeEnhancedObject(
+            zPositions: [0, 2.5], frameIntercepts: ["0", "0"],
+            framePixelValues: [[1, 1, 1, 1], [2, 2, 2, 2]],
+            stackIDs: ["A", "A"], dimensionOrdinalOffset: 10
+        )
+        defer { try? FileManager.default.removeItem(at: url) }
+        let volume = try DicomSeriesLoader().loadEnhancedMultiframeVolume(at: url)
+        XCTAssertEqual(volume.depth, 2)
+        XCTAssertEqual(volume.spacing.z, 2.5)
+        let converted = try DicomEnhancedMultiframeConverter().convert(contentsOf: url)
+        XCTAssertEqual(converted.instances.map(\.sourceFrameNumber), [1, 2])
+    }
+
+    func test_selectedPartitionWithIrregularSpacing_rejectsVolume() throws {
+        let url = try Self.writeEnhancedObject(
+            zPositions: [0, 1, 4], frameIntercepts: ["0", "0", "0"],
+            framePixelValues: Array(repeating: [1, 1, 1, 1], count: 3), stackIDs: ["A", "A", "A"]
+        )
+        defer { try? FileManager.default.removeItem(at: url) }
+        let groups = try XCTUnwrap(DCMDecoder(contentsOf: url).enhancedMultiframeFunctionalGroups)
+        let partition = try XCTUnwrap(DicomEnhancedFramePartition.resolve(groups).first)
+        XCTAssertThrowsError(try DicomSeriesLoader().loadEnhancedMultiframeVolume(at: url, selection: partition.selection)) {
+            guard case DicomSeriesLoaderError.variableSliceSpacing = $0 else {
+                return XCTFail("Expected irregular spacing, got \($0)")
+            }
+        }
+    }
+
+    func test_selectedPartitionWithInvalidDirectionCosines_rejectsVolume() throws {
+        for orientation in [["0", "0", "0", "0", "1", "0"], ["1", "0", "0", "1", "0", "0"]] {
+            let url = try Self.writeEnhancedObject(
+                zPositions: [0, 2.5], frameIntercepts: ["0", "0"],
+                framePixelValues: [[1, 1, 1, 1], [2, 2, 2, 2]], stackIDs: ["A", "A"],
+                orientationValues: orientation
+            )
+            defer { try? FileManager.default.removeItem(at: url) }
+            let groups = try XCTUnwrap(DCMDecoder(contentsOf: url).enhancedMultiframeFunctionalGroups)
+            let partition = try XCTUnwrap(DicomEnhancedFramePartition.resolve(groups).first)
+            XCTAssertThrowsError(try DicomSeriesLoader().loadEnhancedMultiframeVolume(
+                at: url, selection: partition.selection
+            )) {
+                guard case DicomSeriesLoaderError.inconsistentOrientation = $0 else {
+                    return XCTFail("Expected invalid orientation, got \($0)")
+                }
+            }
+        }
+    }
 
     func testEnhancedCTVolumeAssemblesWithSpatialOrderingAndPerFrameRescale() throws {
         // Frames are stored out of spatial order: z positions 5.0, 0.0, 2.5.
@@ -717,6 +945,10 @@ final class DicomEnhancedMultiframeVolumeTests: XCTestCase {
         XCTAssertEqual(groups.frames[1].functionalGroups.frameVOI?.windows.first?.center, 80)
         XCTAssertEqual(groups.frames[1].functionalGroups.frameVOI?.windows.first?.explanation, "Shared MR")
 
+        let reader = DicomDecodedFrameReader(decoder: decoder)
+        XCTAssertEqual(try reader.frame(at: 0).metadata.voiLUTFunction, "SIGMOID")
+        XCTAssertEqual(try reader.frame(at: 1).metadata.voiLUTFunction, "LINEAR")
+
         let volume = try DicomSeriesLoader().loadEnhancedMultiframeVolume(at: url)
 
         XCTAssertEqual(volume.sliceVOIs.map { $0?.windows.first?.center }, [80, 120])
@@ -732,7 +964,8 @@ final class DicomEnhancedMultiframeVolumeTests: XCTestCase {
             sharedWindowCenter: "40",
             sharedWindowWidth: "400",
             frameWindowCenters: ["not-a-number", nil],
-            frameWindowWidths: ["-1", nil]
+            frameWindowWidths: ["-1", nil],
+            encodeMalformedDecimalStrings: true
         )
         defer { try? FileManager.default.removeItem(at: url) }
 
@@ -868,6 +1101,9 @@ final class DicomEnhancedMultiframeVolumeTests: XCTestCase {
         temporalPositionIndexes: [Int]? = nil,
         frameAcquisitionNumbers: [Int]? = nil,
         additionalDimensionIndexPointer: Int? = nil,
+        dimensionOrdinalOffset: UInt = 0,
+        frameDimensionIndexValues: [[UInt]]? = nil,
+        inStackPositionNumbers: [Int]? = nil,
         orientationValues: [String] = ["1", "0", "0", "0", "1", "0"],
         photometricInterpretation: String = "MONOCHROME2",
         pixelSpacingValues: [String] = ["0.5", "0.75"],
@@ -883,7 +1119,8 @@ final class DicomEnhancedMultiframeVolumeTests: XCTestCase {
         frameWindowExplanations: [String?]? = nil,
         frameVOILUTFunctions: [String?]? = nil,
         omitFrameOfReferenceUID: Bool = false,
-        transferSyntax: DicomTransferSyntax = .explicitVRLittleEndian
+        transferSyntax: DicomTransferSyntax = .explicitVRLittleEndian,
+        encodeMalformedDecimalStrings: Bool = false
     ) throws -> URL {
         var pixelData = Data()
         for frame in framePixelValues {
@@ -917,6 +1154,9 @@ final class DicomEnhancedMultiframeVolumeTests: XCTestCase {
             temporalPositionIndexes: temporalPositionIndexes,
             frameAcquisitionNumbers: frameAcquisitionNumbers,
             additionalDimensionIndexPointer: additionalDimensionIndexPointer,
+            dimensionOrdinalOffset: dimensionOrdinalOffset,
+            frameDimensionIndexValues: frameDimensionIndexValues,
+            inStackPositionNumbers: inStackPositionNumbers,
             orientationValues: orientationValues,
             pixelSpacingValues: pixelSpacingValues,
             sharedWindowCenter: sharedWindowCenter,
@@ -932,11 +1172,45 @@ final class DicomEnhancedMultiframeVolumeTests: XCTestCase {
             frameVOILUTFunctions: frameVOILUTFunctions,
             omitFrameOfReferenceUID: omitFrameOfReferenceUID
         )
-        return try write(
+        // Author malformed DS through same-sized LO headers, then restore DS in the raw fixture.
+        // Production writer validation must not prevent testing defensive readers/converters.
+        var rawDecimalValues: [Data] = []
+        if encodeMalformedDecimalStrings {
+            dataSet = try rawDecimalFixture(dataSet, encodedValues: &rawDecimalValues)
+        }
+        let url = try write(
             dataSet: dataSet,
             transferSyntax: transferSyntax,
             mediaStorageSOPClassUID: sopClassUID
         )
+        if encodeMalformedDecimalStrings {
+            var data = try Data(contentsOf: url)
+            for value in rawDecimalValues {
+                while let range = data.range(of: value) {
+                    data[range.lowerBound + 4] = 0x44 // D
+                    data[range.lowerBound + 5] = 0x53 // S
+                }
+            }
+            try data.write(to: url)
+        }
+        return url
+    }
+
+    private static func rawDecimalFixture(_ dataSet: DicomDataSet, encodedValues: inout [Data]) throws -> DicomDataSet {
+        var result = dataSet
+        for element in dataSet.elements {
+            if case .sequence(let items) = element.value {
+                let nested = try items.map {
+                    DicomSequenceItem(dataSet: try rawDecimalFixture($0.dataSet, encodedValues: &encodedValues))
+                }
+                result.set(DicomDataElement(tag: element.tag, vr: .SQ, value: .sequence(nested)))
+            } else if element.vr == .DS {
+                let replacement = DicomDataElement(tag: element.tag, vr: .LO, value: element.value)
+                encodedValues.append(try DicomDataSetWriter.dataSetData(from: DicomDataSet(elements: [replacement])))
+                result.set(replacement)
+            }
+        }
+        return result
     }
 
     private static func appendFunctionalGroups(
@@ -950,6 +1224,9 @@ final class DicomEnhancedMultiframeVolumeTests: XCTestCase {
         temporalPositionIndexes: [Int]? = nil,
         frameAcquisitionNumbers: [Int]? = nil,
         additionalDimensionIndexPointer: Int? = nil,
+        dimensionOrdinalOffset: UInt = 0,
+        frameDimensionIndexValues: [[UInt]]? = nil,
+        inStackPositionNumbers: [Int]? = nil,
         orientationValues: [String] = ["1", "0", "0", "0", "1", "0"],
         pixelSpacingValues: [String] = ["0.5", "0.75"],
         sharedWindowCenter: String? = nil,
@@ -1029,11 +1306,13 @@ final class DicomEnhancedMultiframeVolumeTests: XCTestCase {
                         if !result.contains(stackID) { result.append(stackID) }
                     }
                     let stackNumber = (orderedStackIDs.firstIndex(of: stackIDs[index]) ?? 0) + 1
-                    let inStackPosition = stackIDs[...index].filter { $0 == stackIDs[index] }.count
-                    var dimensionIndexValues = [UInt(stackNumber), UInt(inStackPosition)]
+                    let inStackPosition = inStackPositionNumbers?[index]
+                        ?? stackIDs[...index].filter { $0 == stackIDs[index] }.count
+                    var dimensionIndexValues = [UInt(stackNumber), UInt(inStackPosition) + dimensionOrdinalOffset]
                     if additionalDimensionIndexPointer != nil {
                         dimensionIndexValues.append(1)
                     }
+                    dimensionIndexValues = frameDimensionIndexValues?[index] ?? dimensionIndexValues
                     frameContentElements.append(contentsOf: [
                         DicomDataElement(tag: DicomTag.stackID.rawValue, vr: .SH,
                                          value: .strings([stackIDs[index]])),

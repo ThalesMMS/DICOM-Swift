@@ -15,6 +15,18 @@ final class BenchmarkReporterTests: XCTestCase {
 
     // MARK: - Test Helpers
 
+    func test_modelIdentifier_nullTerminatedBufferExcludesTerminatorAndTrailingBytes() {
+        let machine = Array("Mac16,12".utf8).map { CChar(bitPattern: $0) } + [0, 88]
+
+        XCTAssertEqual(PlatformInfo.decodeModelIdentifier(machine), "Mac16,12")
+    }
+
+    func test_modelIdentifier_bufferWithoutTerminatorDecodesItsBoundedContents() {
+        let machine = Array("Mac16,12".utf8).map { CChar(bitPattern: $0) }
+
+        XCTAssertEqual(PlatformInfo.decodeModelIdentifier(machine), "Mac16,12")
+    }
+
     /// Create sample benchmark results for testing
     private func createSampleResults() -> BenchmarkSuiteResult {
         let config = BenchmarkConfig(

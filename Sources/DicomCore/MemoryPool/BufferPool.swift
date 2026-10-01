@@ -66,7 +66,9 @@ import Foundation
 ///
 /// This design balances performance (avoiding repeated allocations) with memory
 /// efficiency (releasing buffers when needed).
-public final class BufferPool {
+/// `BufferPool` is safe to share because every mutable pool, monitor, and
+/// statistics field is accessed while holding `lock`.
+public final class BufferPool: @unchecked Sendable {
     /// Shared singleton instance for global buffer pooling.
     public static let shared = BufferPool()
 
@@ -183,7 +185,10 @@ public final class BufferPool {
     ///         Always use the `count` parameter to track actual size needed.
     public func acquire<T>(type: [T].Type, count: Int) -> [T] {
         let bucket = BucketSize.bucket(for: count)
-        let bucketSize = bucket.rawValue
+        // Above the largest bucket a buffer is exact and never pooled: the
+        // largest bucket's buffer would be shorter than asked (issue #2849).
+        let pooled = count <= BucketSize.xlarge.rawValue
+        let bucketSize = pooled ? bucket.rawValue : count
 
         return lock.withLock {
             let poolHit: Bool
@@ -191,7 +196,7 @@ public final class BufferPool {
 
             switch T.self {
             case is UInt16.Type:
-                if !pools.uint16[bucket, default: []].isEmpty {
+                if pooled, !pools.uint16[bucket, default: []].isEmpty {
                     poolHit = true
                     statsCurrentPoolSize -= 1
                     buffer = pools.uint16[bucket]!.removeLast() as! [T]
@@ -201,7 +206,7 @@ public final class BufferPool {
                 }
 
             case is UInt8.Type:
-                if !pools.uint8[bucket, default: []].isEmpty {
+                if pooled, !pools.uint8[bucket, default: []].isEmpty {
                     poolHit = true
                     statsCurrentPoolSize -= 1
                     buffer = pools.uint8[bucket]!.removeLast() as! [T]
@@ -211,7 +216,7 @@ public final class BufferPool {
                 }
 
             case is Int16.Type:
-                if !pools.int16[bucket, default: []].isEmpty {
+                if pooled, !pools.int16[bucket, default: []].isEmpty {
                     poolHit = true
                     statsCurrentPoolSize -= 1
                     buffer = pools.int16[bucket]!.removeLast() as! [T]
@@ -221,7 +226,7 @@ public final class BufferPool {
                 }
 
             case is Float.Type:
-                if !pools.float[bucket, default: []].isEmpty {
+                if pooled, !pools.float[bucket, default: []].isEmpty {
                     poolHit = true
                     statsCurrentPoolSize -= 1
                     buffer = pools.float[bucket]!.removeLast() as! [T]
@@ -254,13 +259,14 @@ public final class BufferPool {
     /// - Returns: A Data buffer with capacity >= count
     public func acquireData(count: Int) -> Data {
         let bucket = BucketSize.bucket(for: count)
-        let bucketSize = bucket.rawValue
+        let pooled = count <= BucketSize.xlarge.rawValue
+        let bucketSize = pooled ? bucket.rawValue : count
 
         return lock.withLock {
             let poolHit: Bool
             let buffer: Data
 
-            if !pools.data[bucket, default: []].isEmpty {
+            if pooled, !pools.data[bucket, default: []].isEmpty {
                 poolHit = true
                 statsCurrentPoolSize -= 1
                 buffer = pools.data[bucket]!.removeLast()
@@ -291,9 +297,10 @@ public final class BufferPool {
     /// - Note: Do not use the buffer after releasing it. The contents may
     ///         be overwritten by future users of the pool.
     public func release<T>(_ buffer: [T]) {
-        guard !buffer.isEmpty else { return }
-
         let bucket = BucketSize.bucket(for: buffer.count)
+        // Only a buffer of a bucket's exact size is pooled: any other would be
+        // handed out for that bucket shorter than asked (issue #2849).
+        guard buffer.count == bucket.rawValue else { return }
 
         lock.withLock {
             switch T.self {
@@ -329,9 +336,8 @@ public final class BufferPool {
     ///
     /// - Parameter buffer: The Data buffer to release
     public func releaseData(_ buffer: Data) {
-        guard !buffer.isEmpty else { return }
-
         let bucket = BucketSize.bucket(for: buffer.count)
+        guard buffer.count == bucket.rawValue else { return }
 
         lock.withLock {
             pools.data[bucket, default: []].append(buffer)

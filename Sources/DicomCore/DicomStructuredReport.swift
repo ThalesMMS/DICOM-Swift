@@ -57,6 +57,23 @@ public struct DicomSRContentItem: Equatable, Sendable {
     public let graphicData: [Double]
     public let trackingID: String?
     public let trackingUID: String?
+    public let referencedContentItemIdentifier: [Int]?
+    public let frameOfReferenceUID: String?
+    public let fiducialUID: String?
+    public let temporalRangeType: String?
+    public let referencedSamplePositions: [Int]
+    public let referencedTimeOffsets: [Double]
+    public let referencedDateTimes: [DicomDateTime]
+    public let numericValueQualifier: DicomCodedConcept?
+    public let floatingPointValue: Double?
+    public let rationalNumeratorValue: Int?
+    public let rationalDenominatorValue: Int?
+    public let observationDateTime: DicomDateTime?
+    public let observationUID: String?
+    public let contentTemplate: DicomSRTemplateIdentification?
+
+    public var isByReference: Bool { referencedContentItemIdentifier != nil }
+
     public let children: [DicomSRContentItem]
 
     public init(
@@ -78,7 +95,21 @@ public struct DicomSRContentItem: Equatable, Sendable {
         graphicData: [Double] = [],
         trackingID: String? = nil,
         trackingUID: String? = nil,
-        children: [DicomSRContentItem] = []
+        children: [DicomSRContentItem] = [],
+        referencedContentItemIdentifier: [Int]? = nil,
+        frameOfReferenceUID: String? = nil,
+        fiducialUID: String? = nil,
+        temporalRangeType: String? = nil,
+        referencedSamplePositions: [Int] = [],
+        referencedTimeOffsets: [Double] = [],
+        referencedDateTimes: [DicomDateTime] = [],
+        numericValueQualifier: DicomCodedConcept? = nil,
+        floatingPointValue: Double? = nil,
+        rationalNumeratorValue: Int? = nil,
+        rationalDenominatorValue: Int? = nil,
+        observationDateTime: DicomDateTime? = nil,
+        observationUID: String? = nil,
+        contentTemplate: DicomSRTemplateIdentification? = nil
     ) {
         self.relationshipType = relationshipType?.dicomSRNonEmptyValue?.uppercased()
         self.valueType = valueType.dicomSRNonEmptyValue?.uppercased() ?? "CONTAINER"
@@ -99,14 +130,105 @@ public struct DicomSRContentItem: Equatable, Sendable {
         self.trackingID = trackingID?.dicomSRNonEmptyValue
         self.trackingUID = trackingUID?.dicomSRNonEmptyValue
         self.children = children
+        self.referencedContentItemIdentifier = referencedContentItemIdentifier
+        self.frameOfReferenceUID = frameOfReferenceUID
+        self.fiducialUID = fiducialUID
+        self.temporalRangeType = temporalRangeType
+        self.referencedSamplePositions = referencedSamplePositions
+        self.referencedTimeOffsets = referencedTimeOffsets
+        self.referencedDateTimes = referencedDateTimes
+        self.numericValueQualifier = numericValueQualifier
+        self.floatingPointValue = floatingPointValue
+        self.rationalNumeratorValue = rationalNumeratorValue
+        self.rationalDenominatorValue = rationalDenominatorValue
+        self.observationDateTime = observationDateTime
+        self.observationUID = observationUID
+        self.contentTemplate = contentTemplate
     }
 
     public var flattened: [DicomSRContentItem] {
-        [self] + children.flatMap(\.flattened)
+        var result: [DicomSRContentItem] = []
+        var pending = [self]
+        while let item = pending.popLast() {
+            result.append(item)
+            pending.append(contentsOf: item.children.reversed())
+        }
+        return result
     }
 
     public var allSourceImageReferences: [DicomSourceImageReference] {
-        (referencedSOPs + children.flatMap(\.allSourceImageReferences)).removingDuplicateSRElements()
+        var result: [DicomSourceImageReference] = []
+        var seen = Set<DicomSourceImageReferenceIdentity>()
+        for item in flattened {
+            for reference in item.referencedSOPs
+            where seen.insert(DicomSourceImageReferenceIdentity(reference)).inserted {
+                result.append(reference)
+            }
+        }
+        return result
+    }
+
+    public static func == (lhs: DicomSRContentItem, rhs: DicomSRContentItem) -> Bool {
+        guard locallyEquals(lhs, rhs) else { return false }
+        var pending = [EqualityChildrenFrame(lhs: lhs.children, rhs: rhs.children)]
+        while !pending.isEmpty {
+            let frameIndex = pending.index(before: pending.endIndex)
+            let childIndex = pending[frameIndex].nextChildIndex
+            guard childIndex < pending[frameIndex].lhs.count else {
+                pending.removeLast()
+                continue
+            }
+            let left = pending[frameIndex].lhs[childIndex]
+            let right = pending[frameIndex].rhs[childIndex]
+            pending[frameIndex].nextChildIndex += 1
+            guard locallyEquals(left, right) else { return false }
+            if !left.children.isEmpty {
+                pending.append(EqualityChildrenFrame(lhs: left.children, rhs: right.children))
+            }
+        }
+        return true
+    }
+
+    private static func locallyEquals(_ lhs: DicomSRContentItem, _ rhs: DicomSRContentItem) -> Bool {
+        lhs.relationshipType == rhs.relationshipType &&
+            lhs.valueType == rhs.valueType &&
+            lhs.conceptName == rhs.conceptName &&
+            lhs.continuityOfContent == rhs.continuityOfContent &&
+            lhs.textValue == rhs.textValue &&
+            lhs.codeValue == rhs.codeValue &&
+            lhs.numericValue == rhs.numericValue &&
+            lhs.measurementUnits == rhs.measurementUnits &&
+            lhs.dateTimeValue == rhs.dateTimeValue &&
+            lhs.dateValue == rhs.dateValue &&
+            lhs.timeValue == rhs.timeValue &&
+            lhs.personNameValue == rhs.personNameValue &&
+            lhs.uidValue == rhs.uidValue &&
+            lhs.referencedSOPs == rhs.referencedSOPs &&
+            lhs.graphicType == rhs.graphicType &&
+            lhs.graphicData == rhs.graphicData &&
+            lhs.trackingID == rhs.trackingID &&
+            lhs.trackingUID == rhs.trackingUID &&
+            lhs.referencedContentItemIdentifier == rhs.referencedContentItemIdentifier &&
+            lhs.frameOfReferenceUID == rhs.frameOfReferenceUID &&
+            lhs.fiducialUID == rhs.fiducialUID &&
+            lhs.temporalRangeType == rhs.temporalRangeType &&
+            lhs.referencedSamplePositions == rhs.referencedSamplePositions &&
+            lhs.referencedTimeOffsets == rhs.referencedTimeOffsets &&
+            lhs.referencedDateTimes == rhs.referencedDateTimes &&
+            lhs.numericValueQualifier == rhs.numericValueQualifier &&
+            lhs.floatingPointValue == rhs.floatingPointValue &&
+            lhs.rationalNumeratorValue == rhs.rationalNumeratorValue &&
+            lhs.rationalDenominatorValue == rhs.rationalDenominatorValue &&
+            lhs.observationDateTime == rhs.observationDateTime &&
+            lhs.observationUID == rhs.observationUID &&
+            lhs.contentTemplate == rhs.contentTemplate &&
+            lhs.children.count == rhs.children.count
+    }
+
+    private struct EqualityChildrenFrame {
+        let lhs: [DicomSRContentItem]
+        let rhs: [DicomSRContentItem]
+        var nextChildIndex = 0
     }
 }
 
@@ -209,6 +331,8 @@ public struct DicomSRDocument: Equatable, Sendable {
     public let sopClassUID: String?
     public let sopInstanceUID: String?
     public let modality: String?
+    /// Content Label and Description as read from a file. The SR and Key Object Selection IODs have no Content
+    /// Identification module (PS3.3 A.35), so `DicomStructuredReportBuilder` never writes them.
     public let contentLabel: String?
     public let contentDescription: String?
     public let completionFlag: String?
@@ -216,6 +340,14 @@ public struct DicomSRDocument: Equatable, Sendable {
     public let templateIdentifier: String?
     public let root: DicomSRContentItem
     public let evidenceReferences: [DicomKeyObjectReference]
+    public let currentRequestedProcedureEvidence: [DicomKeyObjectReference]
+    public let pertinentOtherEvidence: [DicomKeyObjectReference]
+    /// Predecessor Documents Sequence (0040,A360): the SR instances this revision replaces (issue #2823).
+    public let predecessorDocuments: [DicomKeyObjectReference]
+    /// Verifying Observer Sequence (0040,A073), written only with a Verification Flag of VERIFIED.
+    public let verifyingObservers: [DicomSRVerifyingObserver]
+    public let parseDiagnostics: [DicomSRParseDiagnostic]
+
 
     public init(
         sopClassUID: String? = enhancedSRStorageSOPClassUID,
@@ -227,7 +359,12 @@ public struct DicomSRDocument: Equatable, Sendable {
         verificationFlag: String? = nil,
         templateIdentifier: String? = nil,
         root: DicomSRContentItem,
-        evidenceReferences: [DicomKeyObjectReference] = []
+        evidenceReferences: [DicomKeyObjectReference] = [],
+        currentRequestedProcedureEvidence: [DicomKeyObjectReference] = [],
+        pertinentOtherEvidence: [DicomKeyObjectReference] = [],
+        predecessorDocuments: [DicomKeyObjectReference] = [],
+        verifyingObservers: [DicomSRVerifyingObserver] = [],
+        parseDiagnostics: [DicomSRParseDiagnostic] = []
     ) {
         self.sopClassUID = sopClassUID?.dicomSRNonEmptyValue
         self.sopInstanceUID = sopInstanceUID?.dicomSRNonEmptyValue
@@ -238,7 +375,13 @@ public struct DicomSRDocument: Equatable, Sendable {
         self.verificationFlag = verificationFlag?.dicomSRNonEmptyValue?.uppercased()
         self.templateIdentifier = templateIdentifier?.dicomSRNonEmptyValue
         self.root = root
-        self.evidenceReferences = evidenceReferences.removingDuplicateSRElements()
+        self.evidenceReferences = (evidenceReferences + currentRequestedProcedureEvidence + pertinentOtherEvidence)
+            .removingDuplicateSRElements()
+        self.currentRequestedProcedureEvidence = currentRequestedProcedureEvidence
+        self.pertinentOtherEvidence = pertinentOtherEvidence
+        self.predecessorDocuments = predecessorDocuments
+        self.verifyingObservers = verifyingObservers
+        self.parseDiagnostics = parseDiagnostics
     }
 
     public var flattenedContentItems: [DicomSRContentItem] {
@@ -266,9 +409,26 @@ public struct DicomSRDocument: Equatable, Sendable {
                 referencedFrameNumbers: $0.referencedFrameNumbers
             )
         }
-        var result = evidenceReferences
-        for reference in contentReferences where !result.contains(where: { $0.referencesSameObject(as: reference) }) {
-            result.append(reference)
+        let contentByObject = Dictionary(grouping: contentReferences) {
+            DicomSourceImageReferenceIdentity($0.sourceImageReference, includesFrames: false)
+        }
+        var result: [DicomKeyObjectReference] = []
+        var seenReferences: Set<DicomKeyObjectReference> = []
+        for evidence in evidenceReferences {
+            let identity = DicomSourceImageReferenceIdentity(evidence.sourceImageReference, includesFrames: false)
+            let selected = evidence.referencedFrameNumbers.isEmpty ? contentByObject[identity] ?? [] : []
+            let contextual = selected.isEmpty ? [evidence] : selected.map {
+                DicomKeyObjectReference(studyInstanceUID: evidence.studyInstanceUID, seriesInstanceUID: evidence.seriesInstanceUID,
+                    referencedSOPClassUID: $0.referencedSOPClassUID, referencedSOPInstanceUID: $0.referencedSOPInstanceUID,
+                    referencedFrameNumbers: $0.referencedFrameNumbers)
+            }
+            for reference in contextual where seenReferences.insert(reference).inserted { result.append(reference) }
+        }
+        var seenObjects = Set(result.map { DicomSourceImageReferenceIdentity($0.sourceImageReference) })
+        for reference in contentReferences {
+            if seenObjects.insert(DicomSourceImageReferenceIdentity(reference.sourceImageReference)).inserted {
+                result.append(reference)
+            }
         }
         return result
     }
@@ -305,6 +465,14 @@ public enum DicomStructuredReportBuilder {
         sopInstanceUID: String? = nil
     ) throws -> DicomDataSet {
         try DicomSRSemanticValidator.validateForSemanticUse(document)
+        let represented = Set(document.root.allSourceImageReferences.map {
+            DicomSourceImageReferenceIdentity($0, includesContentSelectors: false)
+        })
+        for (index, reference) in document.evidenceReferences.enumerated()
+            where !reference.referencedFrameNumbers.isEmpty &&
+            !represented.contains(DicomSourceImageReferenceIdentity(reference.sourceImageReference)) {
+            throw DicomStructuredReportBuildError.unrepresentedEvidenceFrames(index: index)
+        }
         return dataSet(
             from: document,
             studyInstanceUID: studyInstanceUID,
@@ -324,6 +492,7 @@ public enum DicomStructuredReportBuilder {
             ?? DicomDataSetWriter.makeUID()
         let sopClassUID = document.sopClassUID ?? DicomSRDocument.enhancedSRStorageSOPClassUID
         var elements: [DicomDataElement] = [
+            string(.specificCharacterSet, vr: .CS, "ISO_IR 192"),
             string(.sopClassUID, vr: .UI, sopClassUID),
             string(.sopInstanceUID, vr: .UI, instanceUID),
             string(.studyInstanceUID, vr: .UI, studyInstanceUID),
@@ -338,39 +507,111 @@ public enum DicomStructuredReportBuilder {
         if let continuity = document.root.continuityOfContent {
             elements.append(string(.continuityOfContent, vr: .CS, continuity))
         }
-        if let contentLabel = document.contentLabel {
-            elements.append(string(.contentLabel, vr: .LO, contentLabel))
+        let isKeyObject = sopClassUID == DicomSRDocument.keyObjectSelectionDocumentStorageSOPClassUID
+        // Type 2 attributes of the Patient, General Study, General Equipment and SR/KO Document Series
+        // modules (PS3.3 A.35): present and empty until the caller supplies their values.
+        elements += [
+            string(.patientName, vr: .PN, ""), string(.patientID, vr: .LO, ""),
+            DicomDataElement(tag: 0x00100030, vr: .DA, value: .strings([""])), string(.patientSex, vr: .CS, ""),
+            string(.studyDate, vr: .DA, ""), string(.studyTime, vr: .TM, ""),
+            DicomDataElement(tag: 0x00080090, vr: .PN, value: .strings([""])),
+            DicomDataElement(tag: 0x00200010, vr: .SH, value: .strings([""])),
+            DicomDataElement(tag: 0x00080050, vr: .SH, value: .strings([""])),
+            DicomDataElement(tag: 0x00080070, vr: .LO, value: .strings([""])),
+            DicomDataElement(tag: 0x00081111, vr: .SQ, value: .sequence([]))
+        ]
+        if !isKeyObject {
+            elements.append(DicomDataElement(tag: 0x0040A372, vr: .SQ, value: .sequence([])))
         }
-        if let contentDescription = document.contentDescription {
-            elements.append(string(.contentDescription, vr: .ST, contentDescription))
-        }
-        if let completionFlag = document.completionFlag {
+        if !isKeyObject, let completionFlag = document.completionFlag {
             elements.append(string(.completionFlag, vr: .CS, completionFlag))
         }
-        if let verificationFlag = document.verificationFlag {
+        if !isKeyObject, let verificationFlag = document.verificationFlag {
             elements.append(string(.verificationFlag, vr: .CS, verificationFlag))
         }
-        if let templateIdentifier = document.templateIdentifier {
+        // PS3.3 C.17.2 (issue #2823): Verifying Observer Sequence is Type 1C, present only when VERIFIED.
+        if !isKeyObject, document.verificationFlag == "VERIFIED", !document.verifyingObservers.isEmpty {
+            elements.append(DicomDataElement(tag: 0x0040A073, vr: .SQ, value: .sequence(document.verifyingObservers.map {
+                DicomSequenceItem(dataSet: DicomDataSet(elements: [
+                    DicomDataElement(tag: 0x0040A030, vr: .DT, value: .strings([$0.dateTime])),
+                    DicomDataElement(tag: 0x0040A075, vr: .PN, value: .strings([$0.name])),
+                    DicomDataElement(tag: 0x0040A027, vr: .LO, value: .strings([$0.organization])),
+                    DicomDataElement(tag: 0x0040A088, vr: .SQ, value: .sequence([]))
+                ]))
+            })))
+        }
+        // Predecessor Documents Sequence is Type 1C, present when this instance is a revision of others.
+        if !isKeyObject, !document.predecessorDocuments.isEmpty {
+            elements.append(DicomDataElement(tag: 0x0040A360, vr: .SQ, value: .sequence(
+                evidenceStudyDataSets(from: document.predecessorDocuments, representedImages: [])
+                    .map(DicomSequenceItem.init(dataSet:))
+            )))
+        }
+        // A.35.4.3.1.3 mandates the KOS root template; a document without an explicit identifier uses it.
+        let templateIdentifier = document.templateIdentifier ?? DicomSRProfileConstraints(sopClassUID: sopClassUID)?.rootTemplateIdentifier
+        if let templateIdentifier, document.root.contentTemplate == nil {
             elements.append(sequence(.contentTemplateSequence, [
                 DicomDataSet(elements: [
-                    string(.mappingResource, vr: .SH, "DCMR"),
+                    string(.mappingResource, vr: .CS, "DCMR"),
                     string(.templateIdentifier, vr: .CS, templateIdentifier)
                 ])
             ]))
         }
+        elements.append(contentsOf: additionalContentElements(document.root))
         if !document.root.children.isEmpty {
-            elements.append(sequence(.contentSequence, document.root.children.map(contentItemDataSet)))
+            elements.append(sequence(.contentSequence, contentItemDataSets(document.root.children)))
         }
-        if !document.evidenceReferences.isEmpty {
-            elements.append(sequence(
-                .currentRequestedProcedureEvidenceSequence,
-                evidenceStudyDataSets(from: document.evidenceReferences)
-            ))
+        let groupedEvidence = Set(document.currentRequestedProcedureEvidence + document.pertinentOtherEvidence)
+        let currentEvidence = document.currentRequestedProcedureEvidence + document.evidenceReferences.filter {
+            !groupedEvidence.contains($0)
+        }
+        let representedImages = Set(document.root.allSourceImageReferences.map {
+            DicomSourceImageReferenceIdentity($0, includesContentSelectors: false)
+        })
+        for (tag, references) in [
+            (DicomTag.currentRequestedProcedureEvidenceSequence, currentEvidence),
+            (DicomTag.pertinentOtherEvidenceSequence, document.pertinentOtherEvidence)
+        ] where !references.isEmpty {
+            elements.append(sequence(tag, evidenceStudyDataSets(from: references, representedImages: representedImages)))
         }
         return DicomDataSet(elements: elements)
     }
 
     static func contentItemDataSet(_ item: DicomSRContentItem) -> DicomDataSet {
+        var pending = [ContentItemBuildFrame(item: item)]
+        while !pending.isEmpty {
+            let frameIndex = pending.index(before: pending.endIndex)
+            let childIndex = pending[frameIndex].nextChildIndex
+            if !pending[frameIndex].item.isByReference, childIndex < pending[frameIndex].item.children.count {
+                let child = pending[frameIndex].item.children[childIndex]
+                pending[frameIndex].nextChildIndex += 1
+                pending.append(ContentItemBuildFrame(item: child))
+                continue
+            }
+
+            let frame = pending.removeLast()
+            let dataSet = contentItemDataSet(frame.item, childDataSets: frame.childDataSets)
+            guard !pending.isEmpty else { return dataSet }
+            pending[pending.index(before: pending.endIndex)].childDataSets.append(dataSet)
+        }
+        return DicomDataSet()
+    }
+
+    private static func contentItemDataSets(_ items: [DicomSRContentItem]) -> [DicomDataSet] {
+        items.map(contentItemDataSet)
+    }
+
+    fileprivate static func contentItemDataSet(
+        _ item: DicomSRContentItem,
+        childDataSets: [DicomDataSet]
+    ) -> DicomDataSet {
+        if let identifier = item.referencedContentItemIdentifier {
+            var elements = [DicomDataElement(tag: 0x0040DB73, vr: .UL, value: .signedIntegers(identifier))]
+            if let relationship = item.relationshipType {
+                elements.insert(string(.relationshipType, vr: .CS, relationship), at: 0)
+            }
+            return DicomDataSet(elements: elements)
+        }
         var elements: [DicomDataElement] = [
             string(.valueType, vr: .CS, item.valueType)
         ]
@@ -389,12 +630,24 @@ public enum DicomStructuredReportBuilder {
         if let codeValue = item.codeValue {
             elements.append(sequence(.conceptCodeSequence, [codedConceptDataSet(codeValue)]))
         }
-        if let numericValue = item.numericValue {
-            var measuredElements = [ds(.numericValue, [numericValue])]
+        if item.numericValue != nil || item.floatingPointValue != nil || item.rationalNumeratorValue != nil ||
+            item.rationalDenominatorValue != nil || item.numericValueQualifier != nil {
+            var measuredElements: [DicomDataElement] = []
+            if let value = item.numericValue { measuredElements.append(ds(.numericValue, [value])) }
+            if let value = item.floatingPointValue {
+                measuredElements.append(.init(tag: 0x0040A161, vr: .FD, value: .floats([value])))
+            }
+            if let value = item.rationalNumeratorValue {
+                measuredElements.append(.init(tag: 0x0040A162, vr: .SL, value: .signedIntegers([value])))
+            }
+            if let value = item.rationalDenominatorValue {
+                measuredElements.append(.init(tag: 0x0040A163, vr: .UL, value: .signedIntegers([value])))
+            }
             if let units = item.measurementUnits {
                 measuredElements.append(sequence(.measurementUnitsCodeSequence, [codedConceptDataSet(units)]))
             }
-            elements.append(sequence(.measuredValueSequence, [DicomDataSet(elements: measuredElements)]))
+            elements.append(sequence(.measuredValueSequence,
+                measuredElements.isEmpty ? [] : [DicomDataSet(elements: measuredElements)]))
         }
         if let dateTimeValue = item.dateTimeValue {
             elements.append(string(.dateTime, vr: .DT, dateTimeValue.rawValue))
@@ -421,24 +674,76 @@ public enum DicomStructuredReportBuilder {
             elements.append(DicomDataElement(tag: DicomTag.graphicData.rawValue, vr: .FL, value: .floats(item.graphicData)))
         }
         if let trackingID = item.trackingID {
-            elements.append(string(.trackingID, vr: .LO, trackingID))
+            elements.append(string(.trackingID, vr: .UT, trackingID))
         }
         if let trackingUID = item.trackingUID {
             elements.append(string(.trackingUID, vr: .UI, trackingUID))
         }
-        if !item.children.isEmpty {
-            elements.append(sequence(.contentSequence, item.children.map(contentItemDataSet)))
+        elements.append(contentsOf: additionalContentElements(item))
+        if !childDataSets.isEmpty {
+            elements.append(sequence(.contentSequence, childDataSets))
         }
         return DicomDataSet(elements: elements)
     }
 
-    static func evidenceStudyDataSets(from references: [DicomKeyObjectReference]) -> [DicomDataSet] {
+    private static func additionalContentElements(_ item: DicomSRContentItem) -> [DicomDataElement] {
+        var elements: [DicomDataElement] = []
+        if let value = item.frameOfReferenceUID {
+            elements.append(.init(tag: 0x30060024, vr: .UI, value: .strings([value])))
+        }
+        if let value = item.fiducialUID {
+            elements.append(.init(tag: 0x0070031A, vr: .UI, value: .strings([value])))
+        }
+        if let value = item.temporalRangeType {
+            elements.append(.init(tag: 0x0040A130, vr: .CS, value: .strings([value])))
+        }
+        if let value = item.observationUID {
+            elements.append(.init(tag: 0x0040A171, vr: .UI, value: .strings([value])))
+        }
+        if let value = item.observationDateTime {
+            elements.append(.init(tag: 0x0040A032, vr: .DT, value: .strings([value.rawValue])))
+        }
+        if !item.referencedSamplePositions.isEmpty {
+            elements.append(.init(tag: 0x0040A132, vr: .UL, value: .signedIntegers(item.referencedSamplePositions)))
+        }
+        if !item.referencedTimeOffsets.isEmpty {
+            elements.append(.init(tag: 0x0040A138, vr: .DS, value: .strings(item.referencedTimeOffsets.map { String($0) })))
+        }
+        if !item.referencedDateTimes.isEmpty {
+            elements.append(.init(tag: 0x0040A13A, vr: .DT, value: .strings(item.referencedDateTimes.map(\.rawValue))))
+        }
+        if let qualifier = item.numericValueQualifier {
+            elements.append(.init(tag: 0x0040A301, vr: .SQ,
+                value: .sequence([.init(dataSet: codedConceptDataSet(qualifier))])))
+        }
+        if let template = item.contentTemplate {
+            elements.append(sequence(.contentTemplateSequence, [.init(elements: [
+                string(.mappingResource, vr: .CS, template.mappingResource),
+                string(.templateIdentifier, vr: .CS, template.templateIdentifier)
+            ])]))
+        }
+        return elements
+    }
+
+    private struct ContentItemBuildFrame {
+        let item: DicomSRContentItem
+        var nextChildIndex = 0
+        var childDataSets: [DicomDataSet] = []
+    }
+
+    static func evidenceStudyDataSets(from references: [DicomKeyObjectReference],
+                                     representedImages: Set<DicomSourceImageReferenceIdentity>) -> [DicomDataSet] {
         let groupedByStudy = Dictionary(grouping: references) { $0.studyInstanceUID ?? "" }
         return groupedByStudy.keys.sorted().map { studyUID in
             let studyReferences = groupedByStudy[studyUID] ?? []
             let groupedBySeries = Dictionary(grouping: studyReferences) { $0.seriesInstanceUID ?? "" }
             let seriesDataSets = groupedBySeries.keys.sorted().map { seriesUID in
-                let sopItems = (groupedBySeries[seriesUID] ?? []).map(referencedSOPDataSet)
+                let sopItems = (groupedBySeries[seriesUID] ?? []).map {
+                    // Frame selection belongs in IMAGE content. Compatibility writing retains
+                    // unrepresented legacy scope; validated writing rejects it before serialization.
+                    referencedSOPDataSet($0, includeFrameNumbers:
+                        !representedImages.contains(DicomSourceImageReferenceIdentity($0.sourceImageReference)))
+                }
                 return DicomDataSet(elements: [
                     string(.seriesInstanceUID, vr: .UI, seriesUID),
                     sequence(.referencedSOPSequence, sopItems)
@@ -456,6 +761,9 @@ public enum DicomStructuredReportBuilder {
             string(.codeValue, vr: .SH, concept.codeValue),
             string(.codingSchemeDesignator, vr: .SH, concept.codingSchemeDesignator)
         ]
+        if let version = concept.codingSchemeVersion {
+            elements.append(.init(tag: 0x00080103, vr: .SH, value: .strings([version])))
+        }
         if let meaning = concept.codeMeaning {
             elements.append(string(.codeMeaning, vr: .LO, meaning))
         }
@@ -463,14 +771,22 @@ public enum DicomStructuredReportBuilder {
     }
 
     private static func referencedSOPDataSet(_ reference: DicomSourceImageReference) -> DicomDataSet {
-        referencedSOPDataSet(DicomKeyObjectReference(
+        var dataSet = referencedSOPDataSet(DicomKeyObjectReference(
             referencedSOPClassUID: reference.referencedSOPClassUID,
             referencedSOPInstanceUID: reference.referencedSOPInstanceUID,
             referencedFrameNumbers: reference.referencedFrameNumbers
         ))
+        if !reference.referencedSegmentNumbers.isEmpty {
+            dataSet.set(.init(tag: 0x0062000B, vr: .US, value: .signedIntegers(reference.referencedSegmentNumbers)))
+        }
+        if !reference.referencedWaveformChannels.isEmpty {
+            dataSet.set(.init(tag: 0x0040A0B0, vr: .US, value: .signedIntegers(reference.referencedWaveformChannels)))
+        }
+        return dataSet
     }
 
-    private static func referencedSOPDataSet(_ reference: DicomKeyObjectReference) -> DicomDataSet {
+    private static func referencedSOPDataSet(_ reference: DicomKeyObjectReference,
+                                           includeFrameNumbers: Bool = true) -> DicomDataSet {
         var elements: [DicomDataElement] = []
         if let sopClassUID = reference.referencedSOPClassUID {
             elements.append(string(.referencedSOPClassUID, vr: .UI, sopClassUID))
@@ -478,7 +794,7 @@ public enum DicomStructuredReportBuilder {
         if let sopInstanceUID = reference.referencedSOPInstanceUID {
             elements.append(string(.referencedSOPInstanceUID, vr: .UI, sopInstanceUID))
         }
-        if !reference.referencedFrameNumbers.isEmpty {
+        if includeFrameNumbers, !reference.referencedFrameNumbers.isEmpty {
             elements.append(DicomDataElement(
                 tag: DicomTag.referencedFrameNumber.rawValue,
                 vr: .IS,
@@ -500,8 +816,10 @@ public enum DicomStructuredReportBuilder {
         DicomDataElement(tag: tag.rawValue, vr: vr, value: .strings([value]))
     }
 
+    /// The writer fits each number into the 16 bytes a DS allows: `String(Double)` gives up to 17 significant
+    /// digits, so a mean such as 43.333333333333336 could not be written.
     private static func ds(_ tag: DicomTag, _ values: [Double]) -> DicomDataElement {
-        DicomDataElement(tag: tag.rawValue, vr: .DS, value: .strings(values.map { String($0) }))
+        DicomDataElement(tag: tag.rawValue, vr: .DS, value: .floats(values))
     }
 }
 
@@ -515,8 +833,31 @@ public enum DicomKeyObjectSelectionBuilder {
         studyInstanceUID: String,
         seriesInstanceUID: String,
         sopInstanceUID: String? = nil,
-        contentLabel: String = "KEY_IMAGES"
+        titleModifiers: [DicomCodedConcept] = [],
+        procedureCodes: [DicomCodedConcept] = [],
+        language: DicomSRLanguage? = nil,
+        observers: [DicomSRObserver] = [],
+        keyObjectDescription: String? = nil,
+        compositeObjects: [DicomKeyObjectReference] = [],
+        waveforms: [DicomKeyObjectReference] = []
     ) -> DicomDataSet {
+        var additionalItems = titleModifiers.map {
+            DicomSRMeasurementReportBuilder.item("CODE", "113011", "Document Title Modifier", rel: "HAS CONCEPT MOD", value: $0)
+        }
+        additionalItems += procedureCodes.map {
+            DicomSRMeasurementReportBuilder.item("CODE", "121023", "Procedure Code", rel: "HAS CONCEPT MOD", value: $0)
+        }
+        if let language { additionalItems.append(DicomSRMeasurementReportBuilder.languageItem(language)) }
+        additionalItems += DicomSRMeasurementReportBuilder.observerItems(observers)
+        if let keyObjectDescription {
+            additionalItems.append(DicomSRMeasurementReportBuilder.item("TEXT", "113012", "Key Object Description", text: keyObjectDescription))
+        }
+        additionalItems += compositeObjects.map {
+            DicomSRContentItem(relationshipType: "CONTAINS", valueType: "COMPOSITE", referencedSOPs: [$0.sourceImageReference])
+        }
+        additionalItems += waveforms.map {
+            DicomSRContentItem(relationshipType: "CONTAINS", valueType: "WAVEFORM", referencedSOPs: [$0.sourceImageReference])
+        }
         let root = DicomSRContentItem(
             valueType: "CONTAINER",
             conceptName: title,
@@ -528,16 +869,13 @@ public enum DicomKeyObjectSelectionBuilder {
                     conceptName: title,
                     referencedSOPs: [$0.sourceImageReference]
                 )
-            }
+            } + additionalItems
         )
         let document = DicomSRDocument(
             sopClassUID: keyObjectSelectionDocumentStorageSOPClassUID,
             modality: "KO",
-            contentLabel: contentLabel,
-            completionFlag: "COMPLETE",
-            verificationFlag: "UNVERIFIED",
             root: root,
-            evidenceReferences: keyObjects
+            evidenceReferences: keyObjects + compositeObjects + waveforms
         )
         return DicomStructuredReportBuilder.dataSet(
             from: document,
@@ -548,27 +886,17 @@ public enum DicomKeyObjectSelectionBuilder {
     }
 }
 
-private enum DicomSRParser {
+enum DicomSRParser {
     static func makeDocument(from decoder: DCMDecoder) -> DicomSRDocument? {
         guard matches(decoder) else { return nil }
-        let rootChildren = parseItems(in: decoder, for: .contentSequence).compactMap {
-            contentItem(from: $0.dataSet)
-        }
-        let templateIdentifier = parseItems(in: decoder, for: .contentTemplateSequence)
-            .first?
-            .dataSet
-            .string(for: .templateIdentifier)
-        let root = DicomSRContentItem(
-            valueType: decoder.info(for: .valueType).dicomSRNonEmptyValue ?? "CONTAINER",
-            conceptName: parseItems(in: decoder, for: .conceptNameCodeSequence)
-                .first
-                .flatMap { DicomCodedConcept(dataSet: $0.dataSet) },
-            continuityOfContent: decoder.info(for: .continuityOfContent),
-            textValue: decoder.info(for: .textValue),
-            children: rootChildren
-        )
-        let evidenceReferences = references(in: decoder, for: .currentRequestedProcedureEvidenceSequence) +
-            references(in: decoder, for: .pertinentOtherEvidenceSequence)
+        var diagnostics: [DicomSRParseDiagnostic] = []
+        let rootDataSet = decoder.dataSet
+        let root = contentItem(from: rootDataSet, diagnostics: &diagnostics, isDocumentRoot: true)
+            ?? DicomSRContentItem(valueType: "CONTAINER")
+        let templateIdentifier = root.contentTemplate?.templateIdentifier
+        let currentEvidence = references(in: decoder, for: .currentRequestedProcedureEvidenceSequence)
+        let otherEvidence = references(in: decoder, for: .pertinentOtherEvidenceSequence)
+        let evidenceReferences = currentEvidence + otherEvidence
 
         return DicomSRDocument(
             sopClassUID: decoder.info(for: .sopClassUID),
@@ -580,8 +908,31 @@ private enum DicomSRParser {
             verificationFlag: decoder.info(for: .verificationFlag),
             templateIdentifier: templateIdentifier,
             root: root,
-            evidenceReferences: evidenceReferences
+            evidenceReferences: evidenceReferences,
+            currentRequestedProcedureEvidence: currentEvidence,
+            pertinentOtherEvidence: otherEvidence,
+            predecessorDocuments: hierarchicalReferences(rootDataSet.sequenceItems(for: 0x0040A360)),
+            verifyingObservers: rootDataSet.sequenceItems(for: 0x0040A073).compactMap { item in
+                guard let name = item.dataSet.string(for: 0x0040A075) else { return nil }
+                return DicomSRVerifyingObserver(name: name,
+                                                organization: item.dataSet.string(for: 0x0040A027) ?? "",
+                                                dateTime: item.dataSet.string(for: 0x0040A030) ?? "")
+            },
+            parseDiagnostics: diagnostics
         )
+    }
+
+    /// References of a Hierarchical SOP Instance Reference Macro sequence (study, series, instance).
+    private static func hierarchicalReferences(_ studyItems: [DicomSequenceItem]) -> [DicomKeyObjectReference] {
+        studyItems.flatMap { studyItem in
+            let studyUID = studyItem.dataSet.string(for: .studyInstanceUID)
+            return studyItem.dataSet.sequenceItems(for: .referencedSeriesSequence).flatMap { seriesItem in
+                let seriesUID = seriesItem.dataSet.string(for: .seriesInstanceUID)
+                return seriesItem.dataSet.sequenceItems(for: .referencedSOPSequence).map {
+                    keyObjectReference(from: $0.dataSet, studyUID: studyUID, seriesUID: seriesUID)
+                }
+            }
+        }
     }
 
     private static func matches(_ decoder: DCMDecoder) -> Bool {
@@ -593,9 +944,89 @@ private enum DicomSRParser {
             decoder.tagMetadataCache[DicomTag.contentSequence.rawValue] != nil
     }
 
-    private static func contentItem(from dataSet: DicomDataSet) -> DicomSRContentItem? {
-        let children = dataSet.sequenceItems(for: .contentSequence).compactMap {
-            contentItem(from: $0.dataSet)
+    static func contentItem(from dataSet: DicomDataSet) -> DicomSRContentItem? {
+        var diagnostics: [DicomSRParseDiagnostic] = []
+        return contentItem(from: dataSet, diagnostics: &diagnostics)
+    }
+
+    static func contentItem(
+        from dataSet: DicomDataSet,
+        diagnostics: inout [DicomSRParseDiagnostic],
+        isDocumentRoot: Bool = false
+    ) -> DicomSRContentItem? {
+        var path: [Int] = []
+        var pending = [ContentItemParseFrame(dataSet: dataSet)]
+        while !pending.isEmpty {
+            let frameIndex = pending.index(before: pending.endIndex)
+            let childIndex = pending[frameIndex].nextChildIndex
+            if childIndex < pending[frameIndex].childDataSets.count {
+                let child = pending[frameIndex].childDataSets[childIndex]
+                pending[frameIndex].nextChildIndex += 1
+                path.append(childIndex)
+                pending.append(ContentItemParseFrame(dataSet: child,
+                    isSkipped: pending[frameIndex].isSkipped || pending[frameIndex].dataSet.contains(0x0040DB73)))
+                continue
+            }
+
+            let frame = pending.removeLast()
+            let item = frame.isSkipped ? nil : contentItem(from: frame.dataSet, children: frame.children)
+            if let item {
+                recordUnrepresentedAttributes(frame.dataSet, item: item, path: path,
+                    isDocumentRoot: isDocumentRoot && pending.isEmpty, diagnostics: &diagnostics)
+            } else {
+                diagnostics.append(.init(path: path, code: "itemSkipped", message: "Content item could not be parsed."))
+            }
+            if !path.isEmpty { path.removeLast() }
+            guard !pending.isEmpty else { return item }
+            if let item {
+                pending[pending.index(before: pending.endIndex)].children.append(item)
+            }
+        }
+        return nil
+    }
+
+    private static func recordUnrepresentedAttributes(
+        _ dataSet: DicomDataSet,
+        item: DicomSRContentItem,
+        path: [Int],
+        isDocumentRoot: Bool,
+        diagnostics: inout [DicomSRParseDiagnostic]
+    ) {
+        let represented = DicomStructuredReportBuilder.contentItemDataSet(item, childDataSets: [])
+        let rootTags: Set<Int> = [0x0040A040, 0x0040A043, 0x0040A050, 0x0040A160, 0x0040A504,
+            0x0040A032, 0x0040A171, 0x0040DB73]
+        var pending = [(dataSet, represented, isDocumentRoot)]
+        while let (original, encoded, isRoot) = pending.popLast() {
+            for element in original.elements {
+                if element.tag == 0x0040A730 && !item.isByReference { continue }
+                if isRoot && !rootTags.contains(element.tag) { continue }
+                let replacement = encoded.element(for: element.tag)
+                if replacement == nil || replacement!.vm.count < element.vm.count {
+                    diagnostics.append(.init(path: path, code: "attributeNotRepresentable",
+                        message: "Attribute " + String(format: "%08X", element.tag) + " could not be fully represented."))
+                }
+                if element.vr == .SQ {
+                    let before = original.sequenceItems(for: element.tag)
+                    let after = encoded.sequenceItems(for: element.tag)
+                    if before.count > after.count && replacement != nil {
+                        diagnostics.append(.init(path: path, code: "attributeNotRepresentable",
+                            message: "Sequence items could not be fully represented."))
+                    }
+                    for index in 0..<min(before.count, after.count) {
+                        pending.append((before[index].dataSet, after[index].dataSet, false))
+                    }
+                }
+            }
+        }
+    }
+
+    private static func contentItem(
+        from dataSet: DicomDataSet,
+        children: [DicomSRContentItem]
+    ) -> DicomSRContentItem? {
+        if dataSet.element(for: 0x0040DB73) != nil {
+            return .init(relationshipType: dataSet.string(for: .relationshipType), valueType: "CONTAINER",
+                referencedContentItemIdentifier: dataSet.ints(for: 0x0040DB73))
         }
         let measuredValue = dataSet.sequenceItems(for: .measuredValueSequence).first?.dataSet
         let referencedSOPs = dataSet.sequenceItems(for: .referencedSOPSequence).map(sourceImageReference)
@@ -636,8 +1067,42 @@ private enum DicomSRParser {
             graphicData: dataSet.floats(for: .graphicData),
             trackingID: dataSet.string(for: .trackingID),
             trackingUID: dataSet.string(for: .trackingUID),
-            children: children
+            children: children,
+            frameOfReferenceUID: dataSet.string(for: 0x30060024),
+            fiducialUID: dataSet.string(for: 0x0070031A),
+            temporalRangeType: dataSet.string(for: 0x0040A130),
+            referencedSamplePositions: dataSet.ints(for: 0x0040A132),
+            referencedTimeOffsets: dataSet.floats(for: 0x0040A138),
+            referencedDateTimes: dataSet.strings(for: 0x0040A13A).compactMap { DicomDateTime($0) },
+            numericValueQualifier: dataSet.sequenceItems(for: 0x0040A301).first.flatMap { DicomCodedConcept(dataSet: $0.dataSet) },
+            floatingPointValue: measuredValue?.float(for: 0x0040A161),
+            rationalNumeratorValue: measuredValue?.int(for: 0x0040A162),
+            rationalDenominatorValue: measuredValue?.int(for: 0x0040A163),
+            observationDateTime: dataSet.dateTime(for: 0x0040A032),
+            observationUID: dataSet.string(for: 0x0040A171),
+            contentTemplate: template(in: dataSet)
         )
+    }
+
+    private static func template(in dataSet: DicomDataSet) -> DicomSRTemplateIdentification? {
+        guard let item = dataSet.sequenceItems(for: .contentTemplateSequence).first?.dataSet,
+              let resource = item.string(for: .mappingResource),
+              let identifier = item.string(for: .templateIdentifier) else { return nil }
+        return .init(mappingResource: resource, templateIdentifier: identifier)
+    }
+
+    private struct ContentItemParseFrame {
+        let dataSet: DicomDataSet
+        let childDataSets: [DicomDataSet]
+        let isSkipped: Bool
+        var nextChildIndex = 0
+        var children: [DicomSRContentItem] = []
+
+        init(dataSet: DicomDataSet, isSkipped: Bool = false) {
+            self.dataSet = dataSet
+            self.isSkipped = isSkipped
+            self.childDataSets = dataSet.sequenceItems(for: .contentSequence).map(\.dataSet)
+        }
     }
 
     private static func references(in decoder: DCMDecoder, for tag: DicomTag) -> [DicomKeyObjectReference] {
@@ -670,7 +1135,9 @@ private enum DicomSRParser {
         DicomSourceImageReference(
             referencedSOPClassUID: item.dataSet.string(for: .referencedSOPClassUID),
             referencedSOPInstanceUID: item.dataSet.string(for: .referencedSOPInstanceUID),
-            referencedFrameNumbers: item.dataSet.ints(for: .referencedFrameNumber)
+            referencedFrameNumbers: item.dataSet.ints(for: .referencedFrameNumber),
+            referencedSegmentNumbers: item.dataSet.ints(for: 0x0062000B),
+            referencedWaveformChannels: item.dataSet.ints(for: 0x0040A0B0)
         )
     }
 
@@ -693,67 +1160,24 @@ private enum DicomSRParser {
     }
 }
 
-private enum DicomSRExtraction {
-    static func measurements(in item: DicomSRContentItem) -> [DicomSRMeasurement] {
-        var result: [DicomSRMeasurement] = []
-        if item.valueType == "NUM", let value = item.numericValue {
-            let roi = firstGraphicRegion(in: item)
-            let sources = item.allSourceImageReferences
-            result.append(DicomSRMeasurement(
-                name: item.conceptName,
-                value: value,
-                units: item.measurementUnits,
-                trackingID: item.trackingID,
-                trackingUID: item.trackingUID,
-                sourceImageReferences: sources,
-                roi: roi
-            ))
+private extension Array where Element == DicomSourceImageReference {
+    func removingDuplicateSRElements() -> [Element] {
+        var seen = Set<DicomSourceImageReferenceIdentity>()
+        var result: [Element] = []
+        result.reserveCapacity(count)
+        for element in self where seen.insert(DicomSourceImageReferenceIdentity(element)).inserted {
+            result.append(element)
         }
-        result.append(contentsOf: item.children.flatMap(measurements))
         return result
-    }
-
-    static func cadFindings(in item: DicomSRContentItem) -> [DicomSRCADFinding] {
-        var result: [DicomSRCADFinding] = []
-        if item.valueType == "CONTAINER", isCADFinding(item) {
-            result.append(DicomSRCADFinding(
-                title: item.conceptName,
-                trackingID: item.trackingID,
-                trackingUID: item.trackingUID,
-                sourceImageReferences: item.allSourceImageReferences,
-                measurements: measurements(in: item),
-                contentItem: item
-            ))
-        }
-        result.append(contentsOf: item.children.flatMap(cadFindings))
-        return result
-    }
-
-    private static func firstGraphicRegion(in item: DicomSRContentItem) -> DicomSRGraphicRegion? {
-        if item.valueType == "SCOORD", let graphicType = item.graphicType, !item.graphicData.isEmpty {
-            return DicomSRGraphicRegion(
-                graphicType: graphicType,
-                graphicData: item.graphicData,
-                sourceImageReferences: item.allSourceImageReferences
-            )
-        }
-        return item.children.lazy.compactMap(firstGraphicRegion).first
-    }
-
-    private static func isCADFinding(_ item: DicomSRContentItem) -> Bool {
-        let haystack = [
-            item.conceptName?.codeMeaning,
-            item.conceptName?.codeValue,
-            item.trackingID
-        ].compactMap { $0?.uppercased() }.joined(separator: " ")
-        return haystack.contains("CAD") || haystack.contains("FINDING")
     }
 }
 
-private extension Array where Element: Equatable {
+private extension Array where Element == DicomKeyObjectReference {
     func removingDuplicateSRElements() -> [Element] {
+        var seen = Set<Element>()
         var result: [Element] = []
-        for element in self where !result.contains(element) {
+        result.reserveCapacity(count)
+        for element in self where seen.insert(element).inserted {
             result.append(element)
         }
         return result

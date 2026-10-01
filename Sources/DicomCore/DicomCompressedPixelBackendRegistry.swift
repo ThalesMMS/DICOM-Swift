@@ -12,8 +12,10 @@ import Foundation
 internal enum DicomCompressedPixelBackend: Equatable {
     case nativeJPEGLossless
     case nativeRLELossless
+    case nativeDeflatedFrames
     case nativeJPEGLS
     case nativeJPEGExtended
+    case nativeJPEG
     case imageIOJPEGBaseline
     case imageIOJPEGExtended
     case imageIOJPEG2000
@@ -34,7 +36,8 @@ internal enum DicomCompressedPixelBackendRegistry {
         requestedBitDepth: Int?,
         samplesPerPixel: Int?,
         photometricInterpretation: String? = nil,
-        bitsStored: Int? = nil
+        bitsStored: Int? = nil,
+        environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> DicomCompressedPixelBackendDecision {
         guard let transferSyntax else {
             return selected(.legacyImageIO)
@@ -48,6 +51,8 @@ internal enum DicomCompressedPixelBackendRegistry {
         switch transferSyntax {
         case .rleLossless:
             return selected(.nativeRLELossless)
+        case .deflatedImageFrameCompression:
+            return selected(.nativeDeflatedFrames)
         case .jpegLSLossless, .jpegLSNearLossless:
             if let samplesPerPixel, samplesPerPixel > 1, let requestedBitDepth, requestedBitDepth > 8 {
                 return unsupported(
@@ -60,50 +65,29 @@ internal enum DicomCompressedPixelBackendRegistry {
                 let storedBits = bitsStored ?? requestedBitDepth
                 let photometric = photometricInterpretation?
                     .trimmingCharacters(in: .whitespacesAndNewlines)
-                if samplesPerPixel == 3, photometric == "RGB", let storedBits, storedBits <= 8 {
+                // Lossless JPEG keeps the components as coded: YBR_FULL(_422) samples come out as stored and the
+                // caller converts them (issue #2821).
+                if samplesPerPixel == 3, ["RGB", "YBR_FULL", "YBR_FULL_422"].contains(photometric ?? ""),
+                   let storedBits, storedBits <= 8 {
                     return selected(.nativeJPEGLossless)
                 }
                 return unsupported(
                     "\(transferSyntax.registryEntry.name) (transfer syntax \(transferSyntax.rawValue)) multi-component"
-                        + " decode supports 8-bit interleaved RGB only; "
+                        + " decode supports 8-bit RGB, YBR_FULL and YBR_FULL_422 only; "
                         + "\(storedBits.map { "\($0)-bit" } ?? "unknown-depth")"
                         + " output for \(componentContext) has no unambiguous mapping."
                 )
             }
             return selected(.nativeJPEGLossless)
-        case .jpegBaseline:
-            if let requestedBitDepth, requestedBitDepth > 8 {
-                return unsupported(
-                    "JPEG Baseline (Process 1) is limited to 8-bit output; refusing "
-                        + "\(requestedBitDepth)-bit decode to avoid precision loss."
-                )
+        case .jpegBaseline, .jpegExtended:
+            if DicomJPEGSwiftRolloutMode(environment: environment) != .disabled,
+               Self.ownJPEGHandles(bitsStored: bitsStored ?? requestedBitDepth, requestedBitDepth: requestedBitDepth,
+                                   samplesPerPixel: samplesPerPixel, photometricInterpretation: photometricInterpretation,
+                                   syntax: transferSyntax) {
+                return selected(.nativeJPEG)
             }
-            return selected(.imageIOJPEGBaseline)
-        case .jpegExtended:
-            guard let storedBits = bitsStored ?? requestedBitDepth else {
-                return unsupported(
-                    "JPEG Extended (Process 2 and 4) decode requires DICOM bit-depth metadata "
-                        + "before selecting a backend."
-                )
-            }
-            if storedBits > 12 {
-                return unsupported(
-                    "JPEG Extended (Process 2 and 4, transfer syntax \(transferSyntax.rawValue)) caps sample"
-                        + " precision at 12 bits; \(storedBits)-bit output is not representable"
-                        + " (\(componentContext))."
-                )
-            }
-            if storedBits > 8 {
-                if let samplesPerPixel, samplesPerPixel > 1 {
-                    return unsupported(
-                        "JPEG Extended (Process 2 and 4, transfer syntax \(transferSyntax.rawValue))"
-                            + " \(storedBits)-bit decode supports single-component grayscale only;"
-                            + " no precision-preserving backend exists for \(componentContext)."
-                    )
-                }
-                return selected(.nativeJPEGExtended)
-            }
-            return selected(.imageIOJPEGExtended)
+            return legacyJPEGDecision(transferSyntax, requestedBitDepth: requestedBitDepth, samplesPerPixel: samplesPerPixel,
+                                      bitsStored: bitsStored, componentContext: componentContext)
         case .jpeg2000Lossless, .jpeg2000:
             if let requestedBitDepth, requestedBitDepth > 16 {
                 return unsupported(
@@ -116,7 +100,7 @@ internal enum DicomCompressedPixelBackendRegistry {
                         + "(\(componentContext))."
                 )
             }
-            if DicomJPEG2000Codec.isAvailable {
+            if DicomCodecCapabilities.capability(for: .openJPEG, environment: environment).isAvailable {
                 return selected(.openJPEG2000)
             }
             if let requestedBitDepth, requestedBitDepth > 8 {
@@ -127,10 +111,12 @@ internal enum DicomCompressedPixelBackendRegistry {
             return selected(.imageIOJPEG2000)
         case .jpeg2000Part2MulticomponentLossless, .jpeg2000Part2Multicomponent:
             return unsupported(
-                "\(transferSyntax.registryEntry.name) stores frames as a multi-component volume "
-                    + "(\(componentContext)); use DicomJP3DVolumeDocument to decode the volume buffer."
+                "\(transferSyntax.registryEntry.name) codes frames as the components of Annex J collections "
+                    + "(\(componentContext)); the synchronous frame path has no collection decoder — use DicomDecodedFrameReader "
+                    + "(experimental own DicomJPEG2000 collection codec)."
             )
-        case .jpipReferenced, .jpipReferencedDeflate:
+        case .jpipReferenced, .jpipReferencedDeflate,
+             .jpipHTJ2KReferenced, .jpipHTJ2KReferencedDeflate:
             return unsupported(
                 "\(transferSyntax.registryEntry.name) references remote pixel data; "
                     + "use DicomJPIPClient to stream progressive updates."
@@ -156,7 +142,11 @@ internal enum DicomCompressedPixelBackendRegistry {
                     + "use DicomVideo to forward it to a video player."
             )
         case .htj2kLossless, .htj2kLosslessRPCL, .htj2k:
-            if let reason = DicomJPEG2000Codec.htj2kUnsupportedReason() {
+            let runtime = DicomCodecCapabilities.capability(for: .openJPEG, environment: environment)
+            if let reason = DicomJPEG2000Codec.htj2kUnsupportedReason(
+                runtimeAvailable: runtime.isAvailable,
+                runtimeMessage: runtime.unsupportedReason ?? "OpenJPEG is available.", version: runtime.version
+            ) {
                 return unsupported(
                     "\(transferSyntax.registryEntry.name) (transfer syntax \(transferSyntax.rawValue)) \(reason)"
                         + " ImageIO JPEG 2000 fallback is not used for HTJ2K."
@@ -196,12 +186,23 @@ internal enum DicomCompressedPixelBackendRegistry {
             DicomJ2KSwiftBackend().capabilities,
             DicomJLSwiftBackend().capabilities,
             DicomJXLSwiftBackend().capabilities,
+            DicomJPEGSwiftBackend().capabilities,
             capability(
                 id: "native-rle-lossless",
                 families: [.rle],
                 syntaxes: [.rleLossless],
+                encodeSyntaxes: [.rleLossless],
                 grayscale: 1...16,
                 color: 1...16,
+                source: .packageLinked
+            ),
+            capability(
+                id: "native-deflated-frames",
+                families: [.deflatedFrames],
+                syntaxes: [.deflatedImageFrameCompression],
+                encodeSyntaxes: [.deflatedImageFrameCompression],
+                grayscale: 1...32,
+                color: 1...32,
                 source: .packageLinked
             ),
             capability(
@@ -286,7 +287,11 @@ internal enum DicomCompressedPixelBackendRegistry {
         runtime: DicomCodecCapability?,
         syntaxes: [DicomTransferSyntax]? = nil
     ) -> DicomFrameCodecCapabilities {
-        DicomFrameCodecCapabilities(
+        let htj2kReason = family == .htj2k ? DicomJPEG2000Codec.htj2kUnsupportedReason(
+            runtimeAvailable: runtime?.isAvailable ?? false,
+            runtimeMessage: runtime?.unsupportedReason ?? "OpenJPEG is unavailable.", version: runtime?.version
+        ) : nil
+        return DicomFrameCodecCapabilities(
             identifier: id,
             families: [family],
             transferSyntaxUIDs: Set(syntaxes?.map(\.rawValue) ?? runtime?.transferSyntaxUIDs ?? []),
@@ -295,15 +300,73 @@ internal enum DicomCompressedPixelBackendRegistry {
             executionClass: .cpu,
             source: runtime?.source ?? .unavailable,
             version: runtime?.version,
-            isAvailable: runtime?.isAvailable ?? false,
-            unsupportedReason: runtime?.unsupportedReason ?? "Codec runtime capability is unavailable."
+            isAvailable: (runtime?.isAvailable ?? false) && htj2kReason == nil,
+            unsupportedReason: htj2kReason ?? runtime?.unsupportedReason
         )
+    }
+
+    /// Shapes the own JPEG backend decodes for the legacy pixel reader: 8-bit grayscale and YBR colour for
+    /// Baseline, 8/12-bit grayscale and 8-bit YBR colour for Extended.
+    static func ownJPEGHandles(bitsStored: Int?, requestedBitDepth: Int?, samplesPerPixel: Int?,
+                               photometricInterpretation: String?, syntax: DicomTransferSyntax) -> Bool {
+        let stored = bitsStored ?? 8
+        let samples = samplesPerPixel ?? 1
+        let photometric = photometricInterpretation?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() ?? "MONOCHROME2"
+        if samples == 3 {
+            return stored == 8 && (requestedBitDepth ?? 8) == 8 && ["YBR_FULL", "YBR_FULL_422"].contains(photometric)
+        }
+        guard samples == 1, ["MONOCHROME1", "MONOCHROME2", "PALETTE COLOR"].contains(photometric) else { return false }
+        if syntax == .jpegBaseline { return stored == 8 && (requestedBitDepth ?? 8) == 8 }
+        return stored == 8 ? (requestedBitDepth ?? 8) == 8 : stored == 12 && (requestedBitDepth ?? 16) == 16
+    }
+
+    /// The pre-#2326 Baseline/Extended decision (native 12-bit decoder, ImageIO otherwise).
+    private static func legacyJPEGDecision(_ transferSyntax: DicomTransferSyntax, requestedBitDepth: Int?, samplesPerPixel: Int?,
+                                           bitsStored: Int?, componentContext: String) -> DicomCompressedPixelBackendDecision {
+        switch transferSyntax {
+        case .jpegBaseline:
+            if let requestedBitDepth, requestedBitDepth > 8 {
+                return unsupported(
+                    "JPEG Baseline (Process 1) is limited to 8-bit output; refusing "
+                        + "\(requestedBitDepth)-bit decode to avoid precision loss."
+                )
+            }
+            return selected(.imageIOJPEGBaseline)
+        case .jpegExtended:
+            guard let storedBits = bitsStored ?? requestedBitDepth else {
+                return unsupported(
+                    "JPEG Extended (Process 2 and 4) decode requires DICOM bit-depth metadata "
+                        + "before selecting a backend."
+                )
+            }
+            if storedBits > 12 {
+                return unsupported(
+                    "JPEG Extended (Process 2 and 4, transfer syntax \(transferSyntax.rawValue)) caps sample"
+                        + " precision at 12 bits; \(storedBits)-bit output is not representable"
+                        + " (\(componentContext))."
+                )
+            }
+            if storedBits > 8 {
+                if let samplesPerPixel, samplesPerPixel > 1 {
+                    return unsupported(
+                        "JPEG Extended (Process 2 and 4, transfer syntax \(transferSyntax.rawValue))"
+                            + " \(storedBits)-bit decode supports single-component grayscale only;"
+                            + " no precision-preserving backend exists for \(componentContext)."
+                    )
+                }
+                return selected(.nativeJPEGExtended)
+            }
+            return selected(.imageIOJPEGExtended)
+        default:
+            return selected(.legacyImageIO)
+        }
     }
 
     private static func capability(
         id: DicomCodecBackendIdentifier,
         families: Set<DicomCodecFamily>,
         syntaxes: [DicomTransferSyntax],
+        encodeSyntaxes: [DicomTransferSyntax] = [],
         grayscale: ClosedRange<Int>,
         color: ClosedRange<Int> = 1...8,
         maximumComponents: Int = 3,
@@ -313,6 +376,8 @@ internal enum DicomCompressedPixelBackendRegistry {
             identifier: id,
             families: families,
             transferSyntaxUIDs: Set(syntaxes.map(\.rawValue)),
+            encodeTransferSyntaxUIDs: Set(encodeSyntaxes.map(\.rawValue)),
+            operations: encodeSyntaxes.isEmpty ? [.decode] : [.decode, .encode],
             supportedGrayscaleBitDepths: grayscale,
             supportedColorBitDepths: color,
             maximumComponents: maximumComponents,

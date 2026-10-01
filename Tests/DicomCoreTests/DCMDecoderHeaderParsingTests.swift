@@ -25,6 +25,221 @@ final class DCMDecoderHeaderParsingTests: XCTestCase {
         XCTAssertGreaterThan(decoder.offset, 0)
     }
 
+    @MainActor
+    func test_cancelledTask_completedHeaderParseSucceeds() async throws {
+        let image = DicomDataSet(elements: [
+            DicomDataElement(tag: DicomTag.rows.rawValue, vr: .US, value: .unsignedIntegers([1])),
+            DicomDataElement(tag: DicomTag.columns.rawValue, vr: .US, value: .unsignedIntegers([1])),
+            DicomDataElement(tag: DicomTag.pixelData.rawValue, vr: .OW, value: .bytes(Data([0, 0])))
+        ])
+        // Also exercise the no-Pixel-Data branch without evaluating the RT Dose DVH accessor (#2517).
+        let structureSet = DicomDataSet(elements: [
+            DicomDataElement(tag: DicomTag.sopClassUID.rawValue, vr: .UI,
+                             value: .strings([DicomRTStructureSet.storageSOPClassUID]))
+        ])
+        for source in [image, structureSet] {
+            let data = try DicomDataSetWriter.part10Data(from: source)
+            let task = Task {
+                withUnsafeCurrentTask { $0?.cancel() }
+                return try DCMDecoder(data: data)
+            }
+            let decoder = try await task.value
+            XCTAssertTrue(decoder.fileReadSucceeded)
+            XCTAssertTrue(decoder.dicomFound)
+            XCTAssertEqual(decoder.width, 1)
+        }
+    }
+
+    @MainActor
+    func test_cancelledDVHAccessor_discardsIncompleteHeader() async throws {
+        let data = try DicomDataSetWriter.part10Data(from: DicomDataSet(elements: [
+            DicomDataElement(tag: DicomTag.sopClassUID.rawValue, vr: .UI,
+                             value: .strings([DicomRTDoseVolume.storageSOPClassUID])),
+            DicomDataElement(tag: 0x30040050, vr: .SQ, value: .sequence([
+                DicomSequenceItem(dataSet: DicomDataSet())
+            ]))
+        ]))
+        let decoder = DCMDecoder()
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            try decoder.loadDicomData(data)
+        }
+        do {
+            try await task.value
+            XCTFail("expected cancellation from the DVH sequence accessor")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+        XCTAssertFalse(decoder.fileReadSucceeded)
+        XCTAssertTrue(decoder.tagMetadataCache.isEmpty)
+        XCTAssertTrue(decoder.dicomData.isEmpty)
+    }
+
+    @MainActor
+    func test_cancelledSequenceScan_codecWorkflowPreservesCancellation() async throws {
+        let data = try makeEncapsulatedDicomWithUndefinedSequence()
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try DicomCodecWorkflowEngine().inspect(data)
+        }
+        do {
+            _ = try await task.value
+            XCTFail("expected cancellation through makeDecoder")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+    }
+
+    @MainActor
+    func test_cancelledSequenceScan_deidentifierPreservesCancellation() async throws {
+        let data = try makeEncapsulatedDicomWithUndefinedSequence()
+        let deidentifier = try DicomDeidentifier(profile: .basic, session: DicomDeidentificationSession())
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try deidentifier.apply(data)
+        }
+        do {
+            _ = try await task.value
+            XCTFail("expected cancellation through deidentification")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+    }
+
+    @MainActor
+    func test_cancelledSequenceScan_throwsBeforePixelData() async throws {
+        let data = try makeEncapsulatedDicomWithUndefinedSequence()
+        let decoder = DCMDecoder()
+        decoder.dicomData = data
+        let reader = DCMBinaryReader(data: data, littleEndian: true)
+        decoder.reader = reader
+        decoder.tagParser = DCMTagParser(data: data, dict: decoder.dict, binaryReader: reader)
+        let sequenceHeader = Data([0x08, 0x00, 0x32, 0x10, 0x53, 0x51, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF])
+        let sequence = try XCTUnwrap(data.range(of: sequenceHeader))
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try decoder.readFileInfoUnsafe()
+        }
+        do {
+            _ = try await task.value
+            XCTFail("expected cancellation")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+        // The scanner, rather than an earlier entry check, observed cancellation (#2517).
+        XCTAssertEqual(decoder.location, sequence.upperBound)
+        XCTAssertFalse(decoder.fileReadSucceeded)
+        let reparsed = try DCMDecoder(data: data)
+        XCTAssertNotNil(reparsed.encapsulatedPixelDataDescriptor)
+        XCTAssertGreaterThan(reparsed.offset, 0)
+    }
+
+    @MainActor
+    func test_cancelledLoad_discardsPartialMetadataAndAllowsRetry() async throws {
+        let data = try makeEncapsulatedDicomWithUndefinedSequence()
+        let decoder = DCMDecoder()
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            try decoder.loadDicomData(data)
+        }
+        do {
+            try await task.value
+            XCTFail("expected cancellation")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+        XCTAssertFalse(decoder.fileReadSucceeded)
+        XCTAssertFalse(decoder.dicomFound)
+        XCTAssertTrue(decoder.dicomFileName.isEmpty)
+        XCTAssertTrue(decoder.dicomData.isEmpty)
+        XCTAssertTrue(decoder.dicomInfoDict.isEmpty)
+        XCTAssertTrue(decoder.cachedInfo.isEmpty)
+        XCTAssertTrue(decoder.tagMetadataCache.isEmpty)
+        XCTAssertNil(decoder.reader)
+        XCTAssertNil(decoder.tagParser)
+        XCTAssertNil(decoder.encapsulatedPixelDataDescriptor)
+        XCTAssertEqual(decoder.offset, 0)
+        XCTAssertEqual(decoder.width, 0)
+        XCTAssertNil(decoder.imagePosition)
+        try decoder.loadDicomData(data)
+        XCTAssertTrue(decoder.fileReadSucceeded)
+        XCTAssertNotNil(decoder.encapsulatedPixelDataDescriptor)
+        XCTAssertGreaterThan(decoder.offset, 0)
+    }
+
+    @MainActor
+    func test_cancelledInitializers_preserveCancellationError() async throws {
+        let data = try makeEncapsulatedDicomWithUndefinedSequence()
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".dcm")
+        try data.write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+        // Synchronous closures disambiguate the sync and async file initializers.
+        let loaders: [@Sendable () throws -> DCMDecoder] = [
+            { try DCMDecoder(data: data) },
+            { try DCMDecoder(contentsOf: url) },
+            { try DCMDecoder(contentsOfFile: url.path) }
+        ]
+        for load in loaders {
+            let task = Task {
+                withUnsafeCurrentTask { $0?.cancel() }
+                return try load()
+            }
+            do {
+                _ = try await task.value
+                XCTFail("expected cancellation")
+            } catch {
+                XCTAssertTrue(error is CancellationError)
+            }
+        }
+        for useURL in [true, false] {
+            let task = Task {
+                withUnsafeCurrentTask { $0?.cancel() }
+                if useURL { return try await DCMDecoder(contentsOf: url) }
+                return try await DCMDecoder(contentsOfFile: url.path)
+            }
+            do {
+                _ = try await task.value
+                XCTFail("expected cancellation")
+            } catch {
+                XCTAssertTrue(error is CancellationError)
+            }
+        }
+    }
+
+    private func makeEncapsulatedDicomWithUndefinedSequence() throws -> Data {
+        var data = Data()
+        appendTag(0x00081032, to: &data)
+        data.append(contentsOf: [0x53, 0x51, 0, 0])
+        appendUInt32(UInt32.max, to: &data)
+        let item = try DicomDataSetWriter.dataSetData(from: DicomDataSet(elements: [
+            DicomDataElement(tag: 0x00080100, vr: .SH, value: .strings(["TEST"]))
+        ]))
+        appendTag(0xFFFEE000, to: &data)
+        appendUInt32(UInt32(item.count), to: &data)
+        data.append(item)
+        appendTag(0xFFFEE0DD, to: &data)
+        appendUInt32(0, to: &data)
+        data.append(try DicomDataSetWriter.dataSetData(from: DicomDataSet(elements: [
+            DicomDataElement(tag: DicomTag.rows.rawValue, vr: .US, value: .unsignedIntegers([2])),
+            DicomDataElement(tag: DicomTag.columns.rawValue, vr: .US, value: .unsignedIntegers([2])),
+            DicomDataElement(tag: DicomTag.bitsAllocated.rawValue, vr: .US, value: .unsignedIntegers([16]))
+        ])))
+        appendTag(DicomTag.pixelData.rawValue, to: &data)
+        data.append(contentsOf: [0x4F, 0x42, 0, 0])
+        appendUInt32(UInt32.max, to: &data)
+        appendTag(0xFFFEE000, to: &data)
+        appendUInt32(0, to: &data)
+        appendTag(0xFFFEE000, to: &data)
+        appendUInt32(4, to: &data)
+        data.append(contentsOf: [0xFF, 0x4F, 0xFF, 0xD9])
+        appendTag(0xFFFEE0DD, to: &data)
+        appendUInt32(0, to: &data)
+        return try DicomDataSetWriter.part10Data(
+            fromEncodedDataSet: data, transferSyntax: .jpeg2000,
+            mediaStorageSOPClassUID: "1.2.840.10008.5.1.4.1.1.2",
+            mediaStorageSOPInstanceUID: "2.25.2517")
+    }
+
     private func makeDicomWithUndefinedSequenceBeforeDimensions(
         rows: UInt16,
         columns: UInt16,

@@ -99,29 +99,29 @@ private typealias VR = DicomVR
 /// }
 /// ```
 ///
-/// ## Topics
+/// ## API overview
 ///
 /// ### Creating a Decoder
 ///
 /// - ``init()``
-/// - ``init(contentsOf:)``
-/// - ``init(contentsOfFile:)``
+/// - ``init(contentsOf:)-76800``
+/// - ``init(contentsOfFile:)-314zg``
 /// - ``init(data:)``
-/// - ``load(from:)``
-/// - ``load(fromFile:)``
+/// - ``load(from:)-zam1``
+/// - ``load(fromFile:)-1k7qc``
 ///
 /// ### Loading Files (Legacy)
 ///
 /// - ``setDicomFilename(_:)``
-/// - ``loadDICOMFileAsync(filename:)``
+/// - ``loadDICOMFileAsync(_:)``
 /// - ``dicomFileReadSuccess``
 /// - ``dicomFound``
 ///
 /// ### Accessing Metadata
 ///
-/// - ``info(for:)``
-/// - ``intValue(for:)``
-/// - ``doubleValue(for:)``
+/// - ``info(for:)-6hsvp``
+/// - ``intValue(for:)-5luhd``
+/// - ``doubleValue(for:)-60qji``
 /// - ``windowSettingsV2``
 /// - ``pixelSpacingV2``
 /// - ``rescaleParametersV2``
@@ -191,7 +191,7 @@ private typealias VR = DicomVR
 /// ### Eager Parsing (Critical Tags)
 ///
 /// Tags that affect decoder behavior or are frequently accessed are parsed immediately during
-/// file loading (``setDicomFilename(_:)`` or ``loadDICOMFileAsync(filename:)``):
+/// file loading (``setDicomFilename(_:)`` or ``loadDICOMFileAsync(_:)``):
 ///
 /// - **Parsing Control:** `transferSyntaxUID`, `pixelData` — determine compression handling
 ///   and pixel data location
@@ -215,7 +215,7 @@ private typealias VR = DicomVR
 ///
 /// 1. File parsing stores tag metadata (tag ID, file offset, VR, length) in an internal cache
 ///    without reading values
-/// 2. First call to ``info(for:)`` triggers on-demand parsing which reads and formats the tag
+/// 2. First call to `info(for:)` triggers on-demand parsing which reads and formats the tag
 ///    value from the file
 /// 3. Parsed value is cached for fast subsequent access
 ///
@@ -434,6 +434,9 @@ public final class DCMDecoder: DicomDecoderProtocol, @unchecked Sendable {
         set { synchronized { _offset = newValue } }
     }
 
+    /// Frame ↔ component-collection layout and last decoded collection of a JPEG 2000 Part 2 object (#2331).
+    let part2CollectionCache = DicomJ2KPart2CollectionCache()
+
     /// Number of frames in a multi‑frame image.  Defaults to 1.
     private var _nImages: Int = 1
     public internal(set) var nImages: Int {
@@ -543,6 +546,19 @@ public final class DCMDecoder: DicomDecoderProtocol, @unchecked Sendable {
         get { synchronized { _compressedImage } }
         set { synchronized { _compressedImage = newValue } }
     }
+    private var _pixelDataVR: DicomVR?
+    /// Value Representation of the Pixel Data element as encoded in the file (OB, OW or `implicitRaw`);
+    /// nil until the header has been parsed or when the element is absent.
+    public internal(set) var pixelDataVR: DicomVR? {
+        get { synchronized { _pixelDataVR } }
+        set { synchronized { _pixelDataVR = newValue } }
+    }
+    /// True when native 8-bit samples are stored as byte-swapped 16-bit words: an OW Pixel Data element
+    /// under Explicit VR Big Endian (PS3.5 §7.6.1.1.1). Frame readers swap each word pair back so the
+    /// samples come out in raster order, as GDCM, DCMTK and pydicom do.
+    public var nativeEightBitSamplesAreWordSwapped: Bool {
+        synchronized { !_compressedImage && bigEndianTransferSyntax && !littleEndian && _bitDepth == 8 && _pixelDataVR == .OW }
+    }
     private var _signedImage: Bool = false
     public internal(set) var signedImage: Bool {
         get { synchronized { _signedImage } }
@@ -561,7 +577,7 @@ public final class DCMDecoder: DicomDecoderProtocol, @unchecked Sendable {
 
     /// Creates a new DICOM decoder instance.  The default initializer
     /// creates an empty decoder with no file loaded.  Use
-    /// ``init(contentsOf:)`` or ``setDicomFilename(_:)`` to load a
+    /// `init(contentsOf:)` or ``setDicomFilename(_:)`` to load a
     /// DICOM file.
     public init() {
         // All properties have default values, no explicit initialization needed

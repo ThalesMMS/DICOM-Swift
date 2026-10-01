@@ -122,54 +122,56 @@ final class DicomJXLSwiftBackendTests: XCTestCase {
             ),
             frameIndex: 0
         ))
-        let reference = try XCTUnwrap(DCMPixelReader.decodeCompressedFrameData(
-            data: jpeg,
-            transferSyntax: .jpegBaseline,
-            width: 2,
-            height: 2,
-            bitDepth: 8,
-            samplesPerPixel: 3,
-            pixelRepresentation: 0,
-            photometricInterpretation: "RGB",
-            bitsStored: 8
-        ))
+        // The pixels of a .111 frame are those of the same JPEG through the own
+        // JPEG backend (the .50 route), not those of another decoder.
+        let reference = try DicomJPEGSwiftBackend.decodeSynchronously(jpeg, descriptor: makeDescriptor(
+            rows: 2, columns: 2, bitsAllocated: 8, samplesPerPixel: 3, photometricInterpretation: "RGB",
+            planarConfiguration: 0, syntax: .jpegBaseline))
 
         XCTAssertEqual(reconstructed, jpeg)
-        XCTAssertEqual(decoded.buffer.data, Data(try XCTUnwrap(reference.pixels24)))
+        XCTAssertEqual(decoded.buffer.data, reference.buffer.data)
         XCTAssertEqual(decoded.componentCount, 3)
     }
 
-    func test_unqualifiedTwelveBitLayout_isRejectedWithTypedError() async {
-        let descriptor = makeDescriptor(
-            rows: 2,
-            columns: 2,
-            bitsAllocated: 16,
-            bitsStored: 12,
-            highBit: 11
-        )
-        let frame = DicomCodecDecodedFrame(
-            buffer: .owned(Data(repeating: 0, count: 8)),
-            width: 2,
-            height: 2,
-            bitsPerSample: 12,
-            componentCount: 1
-        )
-
-        do {
-            _ = try await DicomJXLSwiftBackend().encode(DicomFrameEncodeRequest(
-                frame: frame,
-                descriptor: descriptor,
-                targetTransferSyntaxUID: DicomTransferSyntax.jpegXLLossless.rawValue,
-                intent: .reversible
-            ))
-            XCTFail("Expected the unqualified 12-bit path to fail")
-        } catch let error as DicomJXLSwiftBackendError {
-            guard case .unsupportedShape(_, let reason) = error else {
-                return XCTFail("Expected unsupportedShape, got \(error)")
+    func test_twelveBitLayouts_roundTripExactlyThroughTheModularCore() async throws {
+        // Issue #2332: Bits Stored 1...16 in 8/16-bit containers is coded at
+        // the declared depth; signed samples use the reversible level shift.
+        for (signed, bitsAllocated, bitsStored) in [(0, 16, 12), (1, 16, 12), (0, 8, 4), (1, 8, 7), (1, 16, 10)] {
+            let rows = 9, columns = 13
+            let descriptor = makeDescriptor(
+                rows: rows, columns: columns,
+                bitsAllocated: bitsAllocated, bitsStored: bitsStored, highBit: bitsStored - 1,
+                pixelRepresentation: signed
+            )
+            let low = signed == 1 ? -(1 << (bitsStored - 1)) : 0
+            let high = signed == 1 ? (1 << (bitsStored - 1)) - 1 : (1 << bitsStored) - 1
+            var bytes = Data()
+            for i in 0..<(rows * columns) {
+                let value = low + (i * 37 + 5) % (high - low + 1)
+                if bitsAllocated == 8 {
+                    bytes.append(UInt8(truncatingIfNeeded: value))
+                } else {
+                    let v = UInt16(truncatingIfNeeded: value)
+                    bytes.append(UInt8(v & 0xFF)); bytes.append(UInt8(v >> 8))
+                }
             }
-            XCTAssertTrue(reason.contains("10/12-bit"))
-        } catch {
-            XCTFail("Unexpected error: \(error)")
+            let frame = DicomCodecDecodedFrame(
+                buffer: .owned(bytes), width: columns, height: rows,
+                bitsPerSample: bitsStored, componentCount: 1
+            )
+            let backend = DicomJXLSwiftBackend()
+            let codestream = try await backend.encode(DicomFrameEncodeRequest(
+                frame: frame, descriptor: descriptor,
+                targetTransferSyntaxUID: DicomTransferSyntax.jpegXLLossless.rawValue, intent: .reversible
+            ))
+            XCTAssertEqual(codestream.prefix(2), Data([0xFF, 0x0A]))
+            let inspection = try DicomJXLSwiftBackend.inspectFrame(codestream)
+            XCTAssertEqual(inspection.bitsPerSample, bitsStored, "the codestream declares Bits Stored")
+            let decoded = try await backend.decode(DicomFrameDecodeRequest(
+                frameData: codestream, descriptor: descriptor, frameIndex: 0
+            ))
+            XCTAssertEqual(decoded.buffer.data, bytes, "signed=\(signed) allocated=\(bitsAllocated) stored=\(bitsStored)")
+            XCTAssertEqual(decoded.bitsPerSample, bitsStored)
         }
     }
 

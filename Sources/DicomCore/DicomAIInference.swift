@@ -161,8 +161,6 @@ public enum DicomAIInferenceBuilder {
             sopClassUID: DicomSRDocument.comprehensiveSRStorageSOPClassUID,
             sopInstanceUID: options.sopInstanceUID,
             modality: "SR",
-            contentLabel: options.contentLabel,
-            contentDescription: options.contentDescription,
             completionFlag: "COMPLETE",
             verificationFlag: "UNVERIFIED",
             templateIdentifier: "1500",
@@ -246,12 +244,13 @@ public enum DicomAIInferenceBuilder {
         )
     }
 
+    /// Throws `DICOMError.missingRequiredTag` when a source image reference has no nonblank Series Instance UID.
     public static func presentationStateDataSet(
         annotations: [DicomAIAnnotation],
         options: DicomAIInferenceBuildOptions,
         displayedArea: DicomPresentationDisplayedArea? = nil
-    ) -> DicomDataSet {
-        let referencedSeries = referencedSeries(from: annotations.flatMap(\.sourceImageReferences))
+    ) throws -> DicomDataSet {
+        let referencedSeries = try referencedSeries(from: annotations.flatMap(\.sourceImageReferences))
         let graphicAnnotations = annotations.map {
             DicomPresentationGraphicAnnotation(
                 graphicLayer: $0.layer.name,
@@ -265,7 +264,7 @@ public enum DicomAIInferenceBuilder {
                 graphicObjects: [$0.graphicObject]
             )
         }
-        return DicomGrayscalePresentationStateBuilder.dataSet(
+        return try DicomGrayscalePresentationStateBuilder.dataSet(
             referencedSeries: referencedSeries,
             graphicAnnotations: graphicAnnotations,
             graphicLayers: annotations.map(\.layer).removingDuplicateAIElements(),
@@ -384,11 +383,13 @@ public enum DicomAIInferenceBuilder {
         )
     }
 
-    private static func referencedSeries(from references: [DicomKeyObjectReference]) -> [DicomPresentationReferencedSeries] {
+    private static func referencedSeries(
+        from references: [DicomKeyObjectReference]
+    ) throws -> [DicomPresentationReferencedSeries] {
         let uniqueReferences = references.removingDuplicateAIElements()
         let grouped = Dictionary(grouping: uniqueReferences) { $0.seriesInstanceUID ?? "" }
-        return grouped.keys.sorted().map { seriesUID in
-            DicomPresentationReferencedSeries(
+        return try grouped.keys.sorted().map { seriesUID in
+            try DicomPresentationReferencedSeries(
                 seriesInstanceUID: seriesUID,
                 images: (grouped[seriesUID] ?? []).map {
                     DicomPresentationReferencedImage(

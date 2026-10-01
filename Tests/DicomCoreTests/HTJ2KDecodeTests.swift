@@ -2,13 +2,14 @@
 //  HTJ2KDecodeTests.swift
 //  DicomCoreTests
 //
-//  HTJ2K decode behind explicit capability checks (issue #1231). Backend
-//  strategy of record: HTJ2K (ISO/IEC 15444-15) codestreams decode through
-//  the preflighted OpenJPEG runtime when it includes the HT block decoder
-//  (version 2.5+, BSD-2-Clause — the same system dependency as classic
-//  JPEG 2000, no new license). The generic ImageIO JPEG 2000 fallback is
-//  never used for HTJ2K. The curated fixture is generated with OpenJPH's
-//  ojph_compress (reversible) and pinned by pixel hash.
+//  HTJ2K decode behind explicit capability checks (issue #1231; own decoder
+//  qualified in #2330). Strategy of record: the async frame reader decodes
+//  HTJ2K (ISO/IEC 15444-15) through the own DicomJPEG2000 backend; the
+//  synchronous DCMPixelReader route exercised here keeps the preflighted
+//  OpenJPEG runtime (HT block decoder, version 2.5+, BSD-2-Clause) as the
+//  established path. The generic ImageIO JPEG 2000 fallback is never used
+//  for HTJ2K. The curated fixture is generated with OpenJPH's ojph_compress
+//  (reversible) and pinned by pixel hash.
 //
 
 import Foundation

@@ -1,14 +1,26 @@
 import Foundation
 
 public enum DicomWebUPSSupport: String, Sendable {
-    case p2Deferred = "P2 deferred"
+    case notConfigured = "not configured"
+    case worklist = "UPS-RS worklist"
+    case worklistAndNotifications = "UPS-RS worklist and WebSocket notifications"
 }
 
 /// Stable server-side error identifiers exposed in `X-DICOMweb-Error-Code`.
 public enum DicomWebServerErrorCode: String, Sendable {
-    case upsDeferred = "DICOMWEB_UPS_DEFERRED"
+    case invalidWorkitem = "DICOMWEB_INVALID_WORKITEM"
+    case workitemConflict = "DICOMWEB_WORKITEM_CONFLICT"
+    case workitemNotFound = "DICOMWEB_WORKITEM_NOT_FOUND"
+    case workitemDeleted = "DICOMWEB_WORKITEM_DELETED"
     case frameRetrievalUnsupported = "DICOMWEB_FRAME_RETRIEVAL_UNSUPPORTED"
     case renderedFrameUnsupported = "DICOMWEB_RENDERED_FRAME_UNSUPPORTED"
+    case invalidFrameList = "DICOMWEB_INVALID_FRAME_LIST"
+    case frameNotFound = "DICOMWEB_FRAME_NOT_FOUND"
+    case mediaTypeNotAcceptable = "DICOMWEB_MEDIA_TYPE_NOT_ACCEPTABLE"
+    case frameResponseTooLarge = "DICOMWEB_FRAME_RESPONSE_TOO_LARGE"
+    case invalidRenderParameter = "DICOMWEB_INVALID_RENDER_PARAMETER"
+    case malformedPixelData = "DICOMWEB_MALFORMED_PIXEL_DATA"
+    case renderingFailed = "DICOMWEB_RENDERING_FAILED"
     case routeNotFound = "DICOMWEB_ROUTE_NOT_FOUND"
 }
 
@@ -53,29 +65,29 @@ public struct DicomWebConformanceMatrix: Equatable, Sendable {
     public static let packageDefault = DicomWebConformanceMatrix(rows: [
         DicomWebConformanceRow(feature: "QIDO-RS",
                                client: "supported",
-                               server: "study-level supported",
+                               server: "study, series and instance searches",
                                responsibility: "DicomWebClient/DicomWebServer",
-                               notes: "Study search supports tested metadata filters plus limit/offset pagination."),
+                               notes: "Injected search providers use PS3.4 matching, projection, limit/offset and Warning 299."),
         DicomWebConformanceRow(feature: "WADO-RS metadata",
                                client: "supported",
                                server: "supported",
                                responsibility: "DicomWebClient/DicomWebServer",
-                               notes: "Study metadata is DICOM JSON on the client; the server can emit DICOM JSON or XML."),
+                               notes: "Metadata at all three levels is JSON or multipart XML, with server-owned BulkDataURI references."),
         DicomWebConformanceRow(feature: "WADO-RS instance",
                                client: "supported",
                                server: "supported",
                                responsibility: "DicomWebClient/DicomWebServer",
-                               notes: "Instance retrieval uses multipart/related application/dicom payloads."),
+                               notes: "Instance retrieval labels the stored transfer syntax and uses exact entity/part lengths plus part Content-Location."),
         DicomWebConformanceRow(feature: "WADO-RS frame",
-                               client: "transport-injected",
-                               server: "stable 501",
-                               responsibility: "Remote DICOMweb service or caller transport",
-                               notes: "Client serializes frame retrieval; in-memory server returns DICOMWEB_FRAME_RETRIEVAL_UNSUPPORTED."),
+                               client: "supported",
+                               server: "supported",
+                               responsibility: "DicomWebClient/DicomWebServer",
+                               notes: "Strict ascending frame lists return bounded native or compressed multipart representations."),
         DicomWebConformanceRow(feature: "WADO-RS rendered frame",
-                               client: "transport-injected",
-                               server: "stable 501",
-                               responsibility: "Remote DICOMweb service or caller renderer",
-                               notes: "Client serializes rendered-frame retrieval; in-memory server returns DICOMWEB_RENDERED_FRAME_UNSUPPORTED."),
+                               client: "supported",
+                               server: "supported",
+                               responsibility: "DicomWebClient/DicomWebServer",
+                               notes: "Native grayscale and color frames render as JPEG, PNG, or GIF with bounded output."),
         DicomWebConformanceRow(feature: "WADO-URI",
                                client: "supported",
                                server: "supported",
@@ -85,32 +97,32 @@ public struct DicomWebConformanceMatrix: Equatable, Sendable {
                                client: "supported",
                                server: "supported for Part 10 payloads",
                                responsibility: "DicomWebClient/DicomWebServer",
-                               notes: "Multipart boundaries and payload preservation are covered by package tests."),
+                               notes: "Streaming STOW validates Part 10 identity and transfer syntax and returns the Annex I response module."),
         DicomWebConformanceRow(feature: "UPS-RS",
-                               client: "deferred",
-                               server: "stable 501",
-                               responsibility: "Deferred P2 work",
-                               notes: "UPS routes return DICOMWEB_UPS_DEFERRED until a concrete UPS scope is implemented."),
+                               client: "supported",
+                               server: "A1 engine-backed worklist and notifications",
+                               responsibility: "DicomWebClient/DicomWebServer/DicomWebHTTP",
+                               notes: "PS3.18 chapter 11; JSON and multipart XML; /subscribers/{requester} WebSocket text frames contain one DICOM JSON event object."),
         DicomWebConformanceRow(feature: "BulkDataURI",
                                client: "transport-injected",
-                               server: "unsupported",
+                               server: "provider-backed opaque routes",
                                responsibility: "DicomWebClient or caller transport",
                                notes: "DICOM JSON BulkDataURI values are preserved; retrieveBulkData fetches absolute or relative URIs through the configured transport."),
         DicomWebConformanceRow(feature: "JPIP",
                                client: "caller-supplied transport",
-                               server: "unsupported",
-                               responsibility: "DicomJPIPClient with DicomJPIPTransport",
-                               notes: "JPIP progressive pixel delivery is not proxied through DicomWebServer."),
+                               server: "conditional on an injected DicomJPIPServer",
+                               responsibility: "DicomJPIPClient/DicomJPIPTransport/DicomJPIPServer",
+                               notes: "An injected JPIP server handles progressive pixel delivery under the configured service path."),
         DicomWebConformanceRow(feature: "Multipart",
                                client: "supported",
                                server: "supported",
                                responsibility: "DicomWebMultipartParser and STOW/WADO helpers",
-                               notes: "multipart/related parsing and emission are tested, including large payload preservation."),
+                               notes: "Emitters use exact lengths and WADO resource locations. Parsing validates declared lengths and tolerates legacy missing length/location; incremental parsing supports start/Content-ID root selection."),
         DicomWebConformanceRow(feature: "Authentication",
                                client: "caller headers",
-                               server: "optional bearer token",
+                               server: "injected bearer, Basic or JWT verifier",
                                responsibility: "Application security layer",
-                               notes: "No authorization policy, TLS termination, or PHI audit trail is implemented by the in-memory server."),
+                               notes: "Applications own authorization and audit policy; optional DicomWebHTTP shares the package TLS policy."),
         DicomWebConformanceRow(feature: "Pagination",
                                client: "limit/offset query items",
                                server: "limit/offset applied",
@@ -120,12 +132,12 @@ public struct DicomWebConformanceMatrix: Equatable, Sendable {
                                client: "stable typed errors",
                                server: "stable HTTP status and error-code headers",
                                responsibility: "DicomWebClientError and DicomWebServerErrorCode",
-                               notes: "Unsupported routes use 501 with X-DICOMweb-Error-Code; missing resources use HTTP status codes."),
+                               notes: "Frame routes expose stable 400, 404, 406, 413, and 422 error-code headers; UPS-RS uses transaction-specific status and Warning headers."),
         DicomWebConformanceRow(feature: "Large payload streaming",
-                               client: "Data-backed request bodies",
-                               server: "Data-backed responses",
-                               responsibility: "Caller-provided transport for zero-copy streaming",
-                               notes: "The package preserves large multipart payloads, but true streaming is outside this helper API.")
+                               client: "streaming transport and bounded staging",
+                               server: "incremental STOW and multipart instance output",
+                               responsibility: "DicomWebServer and optional DicomWebHTTP",
+                               notes: "STOW and aggregate retrieval materialize at most one instance payload at a time; send remains a buffered compatibility adapter.")
     ])
 
     /// Returns the row with the requested feature name, ignoring case.
@@ -147,19 +159,62 @@ public struct DicomWebConformanceMatrix: Equatable, Sendable {
 }
 
 public struct DicomWebServerConfiguration: Equatable, Sendable {
+    /// DICOMweb service path prefix.
     public var servicePath: String
+    /// Bearer token required by the in-memory transport, or `nil` for no token check.
     public var requiredBearerToken: String?
+    /// Whether bounded metadata and instance responses are cached in memory.
     public var cacheEnabled: Bool
+    /// Name emitted by the conformance statement.
     public var serverName: String
+    /// Maximum UTF-8 byte length accepted for a WADO-RS frame-list component.
+    public var maximumFrameListLength: Int
+    /// Maximum number of frames accepted by one WADO-RS frame request.
+    public var maximumFramesPerRequest: Int
+    /// Maximum encoded byte size of a raw frame response.
+    public var maximumFrameResponseBytes: Int
+    /// Maximum pixel count rendered for each requested frame.
+    public var maximumRenderedPixels: Int
+    /// Maximum encoded byte size of a rendered-frame response.
+    public var maximumRenderedResponseBytes: Int
 
+    /// Ordinary binary metadata up to this size remains inline; bulk payload tags are always references.
+    public var inlineBinaryThresholdBytes: Int
+
+    public var maximumRequestBodyBytes: Int = 1024 * 1024 * 1024
+    public var multipartLimits: DicomWebMultipartLimits = .init()
+    public var maximumSearchResults: Int = 1000
+    /// Maximum provider rows examined by one QIDO request, including denied rows, offset and lookahead.
+    /// Requests that cannot resolve their page within this budget return 413 and must be narrowed.
+    public var maximumSearchCandidates: Int = 10_000
+    public var supportsFilteredWorklistSubscriptions = true
+    /// Unsupported fuzzy matching may be rejected, or performed literally with Warning 299.
+    public var rejectUnsupportedFuzzyMatching: Bool = false
+    public var supportedMediaTypes: [String] = ["application/dicom", "application/dicom+json",
+        "application/dicom+xml", "application/octet-stream", "image/jpeg", "image/png", "image/gif",
+        "image/jls", "image/jp2", "image/jphc", "image/dicom-rle", "image/jxl", "application/x-deflate"]
+
+    /// Creates bounded in-memory DICOMweb server settings.
     public init(servicePath: String = "/dicom-web",
                 requiredBearerToken: String? = nil,
                 cacheEnabled: Bool = true,
-                serverName: String = "DICOM-Swift DICOMweb") {
+                serverName: String = "DICOM-Swift DICOMweb",
+                maximumFrameListLength: Int = 4_096,
+                maximumFramesPerRequest: Int = 256,
+                maximumFrameResponseBytes: Int = 128 * 1_024 * 1_024,
+                maximumRenderedPixels: Int = 64 * 1_024 * 1_024,
+                maximumRenderedResponseBytes: Int = 64 * 1_024 * 1_024,
+                inlineBinaryThresholdBytes: Int = 64 * 1_024) {
+        self.inlineBinaryThresholdBytes = inlineBinaryThresholdBytes
         self.servicePath = servicePath.hasPrefix("/") ? servicePath : "/\(servicePath)"
         self.requiredBearerToken = requiredBearerToken
         self.cacheEnabled = cacheEnabled
         self.serverName = serverName
+        self.maximumFrameListLength = maximumFrameListLength
+        self.maximumFramesPerRequest = maximumFramesPerRequest
+        self.maximumFrameResponseBytes = maximumFrameResponseBytes
+        self.maximumRenderedPixels = maximumRenderedPixels
+        self.maximumRenderedResponseBytes = maximumRenderedResponseBytes
     }
 }
 
@@ -186,7 +241,7 @@ public struct DicomWebConformanceStatement: Equatable, Sendable {
                 supportsXML: Bool = true,
                 supportsMultipart: Bool = true,
                 oauth2Optional: Bool = true,
-                upsSupport: DicomWebUPSSupport = .p2Deferred,
+                upsSupport: DicomWebUPSSupport = .worklistAndNotifications,
                 matrix: DicomWebConformanceMatrix = .packageDefault) {
         self.serverName = serverName
         self.supportsQIDORS = supportsQIDORS
@@ -255,581 +310,231 @@ public struct DicomWebStoredInstance: Equatable, Sendable {
     }
 }
 
-public final class DicomWebInMemoryStore: @unchecked Sendable {
-    private let lock = NSLock()
-    private var storage: [String: DicomWebStoredInstance] = [:]
 
-    public init(instances: [DicomWebStoredInstance] = []) {
-        for instance in instances {
-            storage[instance.sopInstanceUID] = instance
-        }
-    }
-
-    @discardableResult
-    public func add(dataSet: DicomDataSet,
-                    part10Data: Data? = nil,
-                    transferSyntax: DicomTransferSyntax = .explicitVRLittleEndian) throws -> DicomWebStoredInstance {
-        let normalized = Self.normalizedDataSet(dataSet)
-        let data = try part10Data ?? DicomDataSetWriter.part10Data(
-            from: normalized.dataSet,
-            options: DicomPart10WriterOptions(transferSyntax: transferSyntax,
-                                              mediaStorageSOPClassUID: normalized.sopClassUID,
-                                              mediaStorageSOPInstanceUID: normalized.sopInstanceUID)
-        )
-        let instance = DicomWebStoredInstance(dataSet: normalized.dataSet,
-                                             part10Data: data,
-                                             studyInstanceUID: normalized.studyInstanceUID,
-                                             seriesInstanceUID: normalized.seriesInstanceUID,
-                                             sopInstanceUID: normalized.sopInstanceUID,
-                                             sopClassUID: normalized.sopClassUID,
-                                             transferSyntax: transferSyntax)
-        lock.lock()
-        storage[instance.sopInstanceUID] = instance
-        lock.unlock()
-        return instance
-    }
-
-    @discardableResult
-    public func add(part10Data: Data,
-                    transferSyntax: DicomTransferSyntax = .explicitVRLittleEndian) -> DicomWebStoredInstance {
-        let dataSet = Self.dataSet(fromPart10Data: part10Data)
-        let normalized = Self.normalizedDataSet(dataSet)
-        let instance = DicomWebStoredInstance(dataSet: normalized.dataSet,
-                                             part10Data: part10Data,
-                                             studyInstanceUID: normalized.studyInstanceUID,
-                                             seriesInstanceUID: normalized.seriesInstanceUID,
-                                             sopInstanceUID: normalized.sopInstanceUID,
-                                             sopClassUID: normalized.sopClassUID,
-                                             transferSyntax: transferSyntax)
-        lock.lock()
-        storage[instance.sopInstanceUID] = instance
-        lock.unlock()
-        return instance
-    }
-
-    public func allInstances() -> [DicomWebStoredInstance] {
-        lock.lock()
-        let values = Array(storage.values)
-        lock.unlock()
-        return values.sorted { $0.sopInstanceUID < $1.sopInstanceUID }
-    }
-
-    public func instances(studyInstanceUID: String) -> [DicomWebStoredInstance] {
-        allInstances().filter { $0.studyInstanceUID == studyInstanceUID }
-    }
-
-    public func instance(studyInstanceUID: String,
-                         seriesInstanceUID: String,
-                         sopInstanceUID: String) -> DicomWebStoredInstance? {
-        lock.lock()
-        let value = storage[sopInstanceUID]
-        lock.unlock()
-        guard value?.studyInstanceUID == studyInstanceUID,
-              value?.seriesInstanceUID == seriesInstanceUID else {
-            return nil
-        }
-        return value
-    }
-
-    public var count: Int {
-        lock.lock()
-        let value = storage.count
-        lock.unlock()
-        return value
-    }
-
-    private static func normalizedDataSet(_ dataSet: DicomDataSet) -> (
-        dataSet: DicomDataSet,
-        studyInstanceUID: String,
-        seriesInstanceUID: String,
-        sopInstanceUID: String,
-        sopClassUID: String
-    ) {
-        var copy = dataSet
-        let studyUID = dataSet.string(for: .studyInstanceUID)?.dicomWebNonEmpty ?? DicomDataSetWriter.makeUID()
-        let seriesUID = dataSet.string(for: .seriesInstanceUID)?.dicomWebNonEmpty ?? DicomDataSetWriter.makeUID()
-        let sopUID = dataSet.string(for: .sopInstanceUID)?.dicomWebNonEmpty ?? DicomDataSetWriter.makeUID()
-        let sopClassUID = dataSet.string(for: .sopClassUID)?.dicomWebNonEmpty ??
-            DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID
-
-        copy.set(dicomWebStringElement(DicomTag.studyInstanceUID.rawValue, .UI, studyUID))
-        copy.set(dicomWebStringElement(DicomTag.seriesInstanceUID.rawValue, .UI, seriesUID))
-        copy.set(dicomWebStringElement(DicomTag.sopInstanceUID.rawValue, .UI, sopUID))
-        copy.set(dicomWebStringElement(DicomTag.sopClassUID.rawValue, .UI, sopClassUID))
-        return (copy, studyUID, seriesUID, sopUID, sopClassUID)
-    }
-
-    private static func dataSet(fromPart10Data data: Data) -> DicomDataSet {
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("dicomweb-\(UUID().uuidString).dcm")
-        do {
-            try data.write(to: url, options: [.atomic])
-            defer { try? FileManager.default.removeItem(at: url) }
-            let decoder = try DCMDecoder(contentsOf: url)
-            return DicomDataSet(elements: [
-                dicomWebStringElement(DicomTag.patientName.rawValue, .PN, decoder.info(for: .patientName)),
-                dicomWebStringElement(DicomTag.patientID.rawValue, .LO, decoder.info(for: .patientID)),
-                dicomWebStringElement(DicomTag.studyDate.rawValue, .DA, decoder.info(for: .studyDate)),
-                dicomWebStringElement(DicomTag.studyDescription.rawValue, .LO, decoder.info(for: .studyDescription)),
-                dicomWebStringElement(DicomTag.studyInstanceUID.rawValue, .UI, decoder.info(for: .studyInstanceUID)),
-                dicomWebStringElement(DicomTag.seriesInstanceUID.rawValue, .UI, decoder.info(for: .seriesInstanceUID)),
-                dicomWebStringElement(DicomTag.sopClassUID.rawValue, .UI, decoder.info(for: .sopClassUID)),
-                dicomWebStringElement(DicomTag.sopInstanceUID.rawValue, .UI, decoder.info(for: .sopInstanceUID)),
-                dicomWebStringElement(DicomTag.modality.rawValue, .CS, decoder.info(for: .modality))
-            ].filter { !$0.stringValues.isEmpty })
-        } catch {
-            return DicomDataSet()
-        }
-    }
-}
-
-public final class DicomWebServer: DicomWebHTTPTransport, @unchecked Sendable {
+public final class DicomWebServer: DicomWebHTTPTransport, Sendable {
     public let configuration: DicomWebServerConfiguration
+    public let jpip: DicomJPIPServer?
     public let store: DicomWebInMemoryStore
+    public let storage: any DicomWebStorageProviding
+    public let principals: (any DicomWebPrincipalResolving)?
+    public let authorizer: (any DicomAuthorizing)?
+    public let audit: DicomAuditRecorder?
+    /// Nil preserves legacy behavior without exposure validation. Hosts exposed beyond loopback MUST
+    /// pass a policy; the product and dicomtool always supply one.
+    public let exposure: DicomExposurePolicy?
+    public let authentication: (any DicomWebAuthenticating)?
+    public let transcoding: (any DicomWebServerTranscoding)?
+    public let representationResolver: (any DicomRepresentationResolving)?
     public let conformanceStatement: DicomWebConformanceStatement
+    let searchCache = DicomWebSearchCache()
+    public let unifiedProcedureSteps: DicomUnifiedProcedureStepService?
+    public let notifications: DicomWebNotificationHub?
+    public let authorizeWorklistSubscription: @Sendable (String) -> Bool
 
-    private let lock = NSLock()
-    private var cache: [String: DicomWebHTTPResponse] = [:]
-
-    public init(configuration: DicomWebServerConfiguration = DicomWebServerConfiguration(),
-                store: DicomWebInMemoryStore = DicomWebInMemoryStore()) {
+    public init(configuration: DicomWebServerConfiguration = .init(), store: DicomWebInMemoryStore = .init(),
+                storage: (any DicomWebStorageProviding)? = nil,
+                authentication: (any DicomWebAuthenticating)? = nil,
+                transcoding: (any DicomWebServerTranscoding)? = nil,
+                representationResolver: (any DicomRepresentationResolving)? = nil,
+                jpip: DicomJPIPServer? = nil,
+                unifiedProcedureSteps: DicomUnifiedProcedureStepService? = nil,
+                notifications: DicomWebNotificationHub? = nil,
+                authorizeWorklistSubscription: @escaping @Sendable (String) -> Bool = { _ in true },
+                principals: (any DicomWebPrincipalResolving)? = nil,
+                authorizer: (any DicomAuthorizing)? = nil, audit: DicomAuditRecorder? = nil,
+                exposure: DicomExposurePolicy? = nil) {
+        self.unifiedProcedureSteps = unifiedProcedureSteps
+        self.notifications = notifications
+        self.authorizeWorklistSubscription = authorizeWorklistSubscription
+        if let notifications { unifiedProcedureSteps?.installEventSinkIfAbsent(DicomWebNotificationEventSink(hub: notifications)) }
         self.configuration = configuration
         self.store = store
-        self.conformanceStatement = DicomWebConformanceStatement(
-            serverName: configuration.serverName,
-            oauth2Optional: configuration.requiredBearerToken != nil
-        )
+        self.storage = storage ?? store
+        self.authentication = authentication ?? configuration.requiredBearerToken.map { DicomWebBearerAuthentication(token: $0) }
+        self.principals = principals ?? (self.authentication as? any DicomWebPrincipalResolving)
+        self.authorizer = authorizer; self.audit = audit; self.exposure = exposure
+        self.transcoding = transcoding
+        self.representationResolver = representationResolver
+        self.jpip = jpip
+        let upsSupport: DicomWebUPSSupport = unifiedProcedureSteps == nil ? .notConfigured :
+            (notifications == nil ? .worklist : .worklistAndNotifications)
+        var matrix = DicomWebConformanceMatrix.packageDefault
+        if let index = matrix.rows.firstIndex(where: { $0.feature == "UPS-RS" }) {
+            matrix.rows[index].server = upsSupport.rawValue
+            if unifiedProcedureSteps == nil {
+                matrix.rows[index].notes = "No UPS service is configured on this server."
+            } else if notifications == nil {
+                matrix.rows[index].notes = "PS3.18 chapter 11; JSON and multipart XML. WebSocket notifications are not configured."
+            }
+        }
+        conformanceStatement = .init(serverName: configuration.serverName, upsSupport: upsSupport, matrix: matrix)
     }
 
     public func send(_ request: DicomWebHTTPRequest) async throws -> DicomWebHTTPResponse {
-        handle(request)
+        let response = await handleStreaming(request, body: Self.body(for: request))
+        var data = Data()
+        do { for try await chunk in response.body { data.append(chunk) } }
+        catch { response.cancel(); throw error }
+        var headers = response.headers
+        headers["Content-Length"] = String(data.count)
+        return .init(statusCode: response.statusCode, headers: headers, body: data)
     }
 
+    public func stream(_ request: DicomWebHTTPRequest) async throws -> DicomWebHTTPStreamedResponse {
+        await handleStreaming(request, body: Self.body(for: request))
+    }
+
+    /// Compatibility entry point. Async callers should use send or handleStreaming.
     public func handle(_ request: DicomWebHTTPRequest) -> DicomWebHTTPResponse {
-        guard isAuthorized(request) else {
-            return response(statusCode: 401,
-                            headers: ["WWW-Authenticate": "Bearer realm=\"DICOMweb\""],
-                            text: "Bearer token required.")
-        }
-
-        let cacheKey = self.cacheKey(for: request)
-        if configuration.cacheEnabled, request.method == .get, let cached = cachedResponse(for: cacheKey) {
-            var hit = cached
-            hit.headers["X-DICOMweb-Cache"] = "HIT"
-            return hit
-        }
-
-        let routed = route(request)
-        if configuration.cacheEnabled, request.method == .get, (200..<300).contains(routed.statusCode) {
-            storeCachedResponse(routed, for: cacheKey)
-        }
-        return routed
+        let result = DicomWebSynchronousResult()
+        Task.detached { result.complete((try? await self.send(request)) ?? self.error(500, "Request failed.")) }
+        return result.wait()
     }
 
-    private func route(_ request: DicomWebHTTPRequest) -> DicomWebHTTPResponse {
-        let path = pathComponents(for: request.url)
-        switch (request.method, path) {
-        case (.get, []), (.get, ["conformance"]):
-            return response(statusCode: 200,
-                            headers: ["Content-Type": "text/markdown"],
-                            body: Data(conformanceStatement.markdown.utf8))
-        case (.get, ["ups"]), (.get, ["workitems"]):
-            return stableError(statusCode: 501,
-                               code: .upsDeferred,
-                               text: "UPS is explicitly \(conformanceStatement.upsSupport.rawValue).")
-        case (.get, ["studies"]):
-            return qidoStudies(request)
-        case (.get, ["wado"]):
-            return wadoURI(request)
-        case (.post, ["studies"]):
-            return stow(request, forcedStudyInstanceUID: nil)
-        default:
-            break
-        }
-
-        if request.method == .get,
-           path.count == 3,
-           path[0] == "studies",
-           path[2] == "metadata" {
-            return wadoMetadata(studyInstanceUID: path[1], request: request)
-        }
-
-        if request.method == .get,
-           path.count == 6,
-           path[0] == "studies",
-           path[2] == "series",
-           path[4] == "instances" {
-            return wadoInstance(studyInstanceUID: path[1],
-                                seriesInstanceUID: path[3],
-                                sopInstanceUID: path[5])
-        }
-
-        if request.method == .get,
-           path.count == 8,
-           path[0] == "studies",
-           path[2] == "series",
-           path[4] == "instances",
-           path[6] == "frames" {
-            return stableError(statusCode: 501,
-                               code: .frameRetrievalUnsupported,
-                               text: "WADO-RS frame retrieval is not implemented by this in-memory DICOMweb server.")
-        }
-
-        if request.method == .get,
-           path.count == 9,
-           path[0] == "studies",
-           path[2] == "series",
-           path[4] == "instances",
-           path[6] == "frames",
-           path[8] == "rendered" {
-            return stableError(statusCode: 501,
-                               code: .renderedFrameUnsupported,
-                               text: "WADO-RS rendered-frame retrieval is not implemented by this in-memory DICOMweb server.")
-        }
-
-        if request.method == .post,
-           path.count == 2,
-           path[0] == "studies" {
-            return stow(request, forcedStudyInstanceUID: path[1])
-        }
-
-        return stableError(statusCode: 404,
-                           code: .routeNotFound,
-                           text: "DICOMweb route not found.")
-    }
-
-    private func qidoStudies(_ request: DicomWebHTTPRequest) -> DicomWebHTTPResponse {
-        let filters = queryItems(for: request.url)
-        guard let pagination = pagination(from: filters) else {
-            return response(statusCode: 400, text: "Invalid QIDO pagination.")
-        }
-        let modalityFilter = filters["ModalitiesInStudy"] ?? filters["Modality"]
-        let studies = uniqueStudies().filter { dataSet in
-            matches(dataSet: dataSet, tag: .patientName, filter: filters["PatientName"]) &&
-            matches(dataSet: dataSet, tag: .patientID, filter: filters["PatientID"]) &&
-            matches(dataSet: dataSet, tag: 0x0008_0050, filter: filters["AccessionNumber"]) &&
-            matches(dataSet: dataSet, tag: .studyDate, filter: filters["StudyDate"]) &&
-            matches(dataSet: dataSet, tag: .studyDescription, filter: filters["StudyDescription"]) &&
-            matches(dataSet: dataSet, tag: .referringPhysicianName, filter: filters["ReferringPhysicianName"]) &&
-            matches(dataSet: dataSet, tag: .institutionName, filter: filters["InstitutionName"]) &&
-            matches(dataSet: dataSet, tag: .studyInstanceUID, filter: filters["StudyInstanceUID"]) &&
-            matches(dataSet: dataSet, tag: .modalitiesInStudy, fallbackTag: .modality, filter: modalityFilter)
-        }
-        return encodedDataSets(page(studies, pagination: pagination), request: request)
-    }
-
-    private func wadoMetadata(studyInstanceUID: String, request: DicomWebHTTPRequest) -> DicomWebHTTPResponse {
-        let dataSets = store.instances(studyInstanceUID: studyInstanceUID)
-            .map { $0.dataSet.removing(.pixelData) }
-        guard !dataSets.isEmpty else {
-            return response(statusCode: 404, text: "Study not found.")
-        }
-        return encodedDataSets(dataSets, request: request)
-    }
-
-    private func wadoInstance(studyInstanceUID: String,
-                              seriesInstanceUID: String,
-                              sopInstanceUID: String) -> DicomWebHTTPResponse {
-        guard let instance = store.instance(studyInstanceUID: studyInstanceUID,
-                                            seriesInstanceUID: seriesInstanceUID,
-                                            sopInstanceUID: sopInstanceUID) else {
-            return response(statusCode: 404, text: "Instance not found.")
-        }
-        return multipartResponse(contentType: "application/dicom", payload: instance.part10Data)
-    }
-
-    private func wadoURI(_ request: DicomWebHTTPRequest) -> DicomWebHTTPResponse {
-        let query = queryItems(for: request.url)
-        guard query["requestType"]?.caseInsensitiveCompare("WADO") == .orderedSame,
-              let studyUID = query["studyUID"],
-              let seriesUID = query["seriesUID"],
-              let objectUID = query["objectUID"] else {
-            return response(statusCode: 400, text: "Invalid WADO-URI request.")
-        }
-        guard let instance = store.instance(studyInstanceUID: studyUID,
-                                            seriesInstanceUID: seriesUID,
-                                            sopInstanceUID: objectUID) else {
-            return response(statusCode: 404, text: "Instance not found.")
-        }
-        return response(statusCode: 200,
-                        headers: ["Content-Type": query["contentType"] ?? "application/dicom"],
-                        body: instance.part10Data)
-    }
-
-    private func stow(_ request: DicomWebHTTPRequest, forcedStudyInstanceUID: String?) -> DicomWebHTTPResponse {
-        let body = request.body ?? Data()
-        let contentType = request.headers.dicomWebHeaderValue("Content-Type")
-        let payloads: [Data]
+    public func handleStreaming(_ request: DicomWebHTTPRequest,
+                                body: AsyncThrowingStream<Data, Error>) async -> DicomWebHTTPStreamedResponse {
         do {
-            if let contentType, contentType.lowercased().contains("multipart/related") {
-                guard let boundary = DicomWebMultipartParser.boundary(from: contentType) else {
-                    return response(statusCode: 400, text: "Missing multipart boundary.")
+            try Task.checkCancellation()
+            if let authentication, case let .deny(status, challenge) = await authentication.authenticate(request) {
+                try await audit?.record(DicomAuditMessages.userAuthentication(.failure, principal: nil,
+                    context: .init(protocol: .dicomweb)))
+                return streamed(error(status == 403 ? 403 : 401, "Access denied.",
+                                      headers: challenge.map { ["WWW-Authenticate": $0] } ?? [:]))
+            }
+            let principal = await principals?.principal(for: request)
+            let required = authorizer != nil || exposure.map {
+                $0.mode != .localOnly && !($0.mode == .intranetLab && $0.allowUnauthorizedIntranetLab)
+            } == true
+            if required && (principal == nil || principal?.kind == .anonymous || principal?.source == DicomPrincipal.Source.none) {
+                try await audit?.record(DicomAuditMessages.userAuthentication(.failure, principal: nil,
+                    context: .init(protocol: .dicomweb)))
+                return streamed(error(401, "Authentication required."))
+            }
+            let access = DicomEnforcement(principal: principal, authorizer: authorizer, audit: audit,
+                context: .init(transportSecured: request.url.scheme == "https", protocol: .dicomweb))
+            if let authorizer, await authorizer.policyVersion < 0 {
+                throw DicomWebServerFailure(503, "Authorization unavailable.")
+            }
+            return try await DicomRequestAuthorization.$current.withValue(access) {
+                try await dispatchAuthorized(request, body: body)
+            }
+        } catch let failure as DicomWebServerFailure {
+            return streamed(error(failure.status, failure.message))
+        } catch let failure as DicomWebError {
+            return streamed(error(failure.kind == .notAcceptable ? 406 : 400, String(describing: failure)))
+        } catch let failure as DicomWebHTTPBodyError {
+            return streamed(error(failure == .payloadTooLarge ? 413 : 400, "Invalid request body."))
+        } catch is DicomAuditError {
+            return streamed(error(503, "Audit unavailable."))
+        } catch is CancellationError {
+            return streamed(error(499, "Request cancelled."))
+        } catch { return streamed(self.error(500, "Request failed.")) }
+    }
+
+    private func dispatchAuthorized(_ request: DicomWebHTTPRequest,
+                                    body: AsyncThrowingStream<Data, Error>) async throws -> DicomWebHTTPStreamedResponse {
+            guard let path = path(request.url) else { return streamed(notFound()) }
+            if let jpip, path.first == "jpip" {
+                return await jpip.handle(request)
+            }
+            if request.method == .post, path == ["studies"] || (path.count == 2 && path[0] == "studies") {
+                return streamed(try await stow(request, body: body, study: path.count == 2 ? path[1] : nil))
+            }
+            if path.first == "workitems" || path.first == "subscribers" {
+                let resource = DicomResourceRef(kind: path.first == "subscribers" ? .subscription : .workitem,
+                    id: path.dropFirst().first ?? "worklist")
+                let operation: DicomAccessOperation = path.contains("subscribers") ? .subscribe
+                    : request.method == .get ? .readMetadata : .workitemChange
+                if path.first == "subscribers" || path.contains("subscribers") {
+                    _ = try await DicomRequestAuthorization.current?.check(operation, resource)
                 }
-                payloads = try DicomWebMultipartParser.parts(from: body, boundary: boundary).map(\.body)
-            } else if !body.isEmpty {
-                payloads = [body]
-            } else {
-                payloads = []
-            }
-        } catch {
-            return response(statusCode: 400, text: error.localizedDescription)
-        }
-
-        guard !payloads.isEmpty else {
-            return response(statusCode: 400, text: "STOW request did not include DICOM payloads.")
-        }
-
-        var stored: [DicomWebStoredInstance] = []
-        for payload in payloads {
-            let instance = store.add(part10Data: payload)
-            if let forcedStudyInstanceUID, instance.studyInstanceUID != forcedStudyInstanceUID {
-                var dataSet = instance.dataSet
-                dataSet.set(dicomWebStringElement(DicomTag.studyInstanceUID.rawValue, .UI, forcedStudyInstanceUID))
-                if let replacement = try? store.add(dataSet: dataSet, part10Data: payload, transferSyntax: instance.transferSyntax) {
-                    stored.append(replacement)
-                } else {
-                    stored.append(instance)
+                var response = streamed(try await worklist(request, path: path, body: body))
+                if response.statusCode == 101, let access = DicomRequestAuthorization.current {
+                    response.authorizeNotification = { text in
+                        try await access.recheck(.subscribe, resource)
+                        guard let object = try DicomJSONCodec.decode(Data(("[" + text + "]").utf8)).first,
+                              let uid = object.dataSet.string(for: 0x00001000) else {
+                            throw DicomWebServerFailure(403, "Unresolved notification resource.")
+                        }
+                        try await access.recheck(.readMetadata, .init(kind: .workitem, id: uid))
+                    }
                 }
-            } else {
-                stored.append(instance)
+                return response
             }
+            guard request.method == .get else { return streamed(notFound()) }
+            if path.isEmpty || path == ["conformance"] { return streamed(try capabilities(request)) }
+            if path == ["wado"] { return streamed(try await wadoURI(request)) }
+            if path.first == "bulkdata" { return streamed(try await bulkData(request, path: path)) }
+            if let query = try searchParameters(request, path: path) { return streamed(try await search(request, parameters: query)) }
+            return try await retrieve(request, path: path)
+    }
+
+    public func validateExposure(bindAddress: String, tlsEnabled: Bool, ephemeralPortNotPinned: Bool = false) async throws {
+        guard let exposure else { return }
+        // Local compatibility is permitted only on an actual numeric loopback bind.
+        let local = exposure.mode == .localOnly
+        if !local, !(exposure.mode == .intranetLab && exposure.allowUnauthorizedIntranetLab), !tlsEnabled {
+            throw DicomExposureValidationError(findings: [.init(code: .tlsRequired)])
         }
-        clearCache()
-
-        let json: [String: Any] = [
-            "storedInstanceCount": stored.count,
-            "sopInstanceUIDs": stored.map(\.sopInstanceUID)
-        ]
-        let data = (try? JSONSerialization.data(withJSONObject: json, options: [.sortedKeys])) ?? Data()
-        return response(statusCode: 200,
-                        headers: ["Content-Type": "application/json"],
-                        body: data)
+        var findings = try exposure.validate(bindAddress: bindAddress, tlsEnabled: tlsEnabled,
+            authenticationConfigured: local || (principals != nil && authorizer != nil))
+        if ephemeralPortNotPinned { findings.append(.init(code: .ephemeralPortNotPinned, isError: false)) }
+        try await audit?.record(DicomAuditMessages.exposureFindings(findings, principal: nil,
+            context: .init(transportSecured: tlsEnabled, protocol: .dicomweb)))
     }
 
-    private func encodedDataSets(_ dataSets: [DicomDataSet], request: DicomWebHTTPRequest) -> DicomWebHTTPResponse {
-        let accept = request.headers.dicomWebHeaderValue("Accept") ?? "application/dicom+json"
-        if accept.lowercased().contains("application/dicom+xml") {
-            return response(statusCode: 200,
-                            headers: ["Content-Type": "application/dicom+xml"],
-                            body: DicomWebDataSetEncoder.xmlData(from: dataSets))
+    func path(_ url: URL) -> [String]? {
+        let prefix = configuration.servicePath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let all = url.path.split(separator: "/").map(String.init)
+        let base = prefix.split(separator: "/").map(String.init)
+        guard Array(all.prefix(base.count)) == base else { return nil }
+        return Array(all.dropFirst(base.count))
+    }
+    func baseURL(_ request: DicomWebHTTPRequest) -> URL {
+        var components = URLComponents(url: request.url, resolvingAgainstBaseURL: false)!
+        components.path = configuration.servicePath
+        components.query = nil
+        return components.url!
+    }
+    func error(_ status: Int, _ message: String, headers: [String: String] = [:]) -> DicomWebHTTPResponse {
+        .init(statusCode: status, headers: ["Content-Type": "text/plain"].merging(headers) { _, new in new }, body: Data(message.utf8))
+    }
+    func notFound() -> DicomWebHTTPResponse {
+        error(404, "DICOMweb route not found.", headers: ["X-DICOMweb-Error-Code": DicomWebServerErrorCode.routeNotFound.rawValue])
+    }
+    func streamed(_ response: DicomWebHTTPResponse) -> DicomWebHTTPStreamedResponse {
+        .init(statusCode: response.statusCode, headers: response.headers, body: AsyncThrowingStream { continuation in
+            continuation.yield(response.body); continuation.finish()
+        })
+    }
+    static func body(for request: DicomWebHTTPRequest) -> AsyncThrowingStream<Data, Error> {
+        if let file = request.bodyFileURL {
+            let reader = DicomWebServerFileReader(file)
+            return AsyncThrowingStream(unfolding: { try await reader.next() })
         }
-        do {
-            return response(statusCode: 200,
-                            headers: ["Content-Type": "application/dicom+json"],
-                            body: try DicomWebDataSetEncoder.jsonData(from: dataSets))
-        } catch {
-            return response(statusCode: 500, text: error.localizedDescription)
+        return AsyncThrowingStream { continuation in
+            if let data = request.body { continuation.yield(data) }
+            continuation.finish()
         }
-    }
-
-    private func uniqueStudies() -> [DicomDataSet] {
-        var seen: Set<String> = []
-        return store.allInstances().compactMap { instance in
-            guard !seen.contains(instance.studyInstanceUID) else { return nil }
-            seen.insert(instance.studyInstanceUID)
-            return instance.dataSet.removing(.pixelData)
-        }
-    }
-
-    private func matches(dataSet: DicomDataSet,
-                         tag: DicomTag,
-                         fallbackTag: DicomTag? = nil,
-                         filter: String?) -> Bool {
-        guard let filter = filter?.dicomWebNonEmpty else { return true }
-        let value = dataSet.string(for: tag) ?? fallbackTag.flatMap { dataSet.string(for: $0) } ?? ""
-        if tag == .patientName {
-            return value.localizedCaseInsensitiveContains(filter)
-        }
-        return value == filter
-    }
-
-    private func matches(dataSet: DicomDataSet, tag: Int, filter: String?) -> Bool {
-        guard let filter = filter?.dicomWebNonEmpty else { return true }
-        return dataSet.string(for: tag) == filter
-    }
-
-    private func multipartResponse(contentType: String, payload: Data) -> DicomWebHTTPResponse {
-        let boundary = "dicomweb-\(UUID().uuidString)"
-        var body = Data()
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Type: \(contentType)\r\n\r\n".data(using: .utf8)!)
-        body.append(payload)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
-        return response(statusCode: 200,
-                        headers: ["Content-Type": "multipart/related; type=\"\(contentType)\"; boundary=\(boundary)"],
-                        body: body)
-    }
-
-    private func isAuthorized(_ request: DicomWebHTTPRequest) -> Bool {
-        guard let token = configuration.requiredBearerToken?.dicomWebNonEmpty else { return true }
-        return request.headers.dicomWebHeaderValue("Authorization") == "Bearer \(token)"
-    }
-
-    private func pathComponents(for url: URL) -> [String] {
-        var path = url.path
-        if path.hasPrefix(configuration.servicePath) {
-            path.removeFirst(configuration.servicePath.count)
-        }
-        return path.split(separator: "/").map(String.init)
-    }
-
-    private func queryItems(for url: URL) -> [String: String] {
-        URLComponents(url: url, resolvingAgainstBaseURL: false)?
-            .queryItems?
-            .reduce(into: [String: String]()) { result, item in
-                result[item.name] = item.value
-            } ?? [:]
-    }
-
-    private func response(statusCode: Int,
-                          headers: [String: String] = [:],
-                          text: String) -> DicomWebHTTPResponse {
-        response(statusCode: statusCode,
-                 headers: ["Content-Type": "text/plain"].merging(headers) { _, new in new },
-                 body: Data(text.utf8))
-    }
-
-    private func stableError(statusCode: Int,
-                             code: DicomWebServerErrorCode,
-                             text: String) -> DicomWebHTTPResponse {
-        response(statusCode: statusCode,
-                 headers: ["X-DICOMweb-Error-Code": code.rawValue],
-                 text: text)
-    }
-
-    private func response(statusCode: Int,
-                          headers: [String: String] = [:],
-                          body: Data) -> DicomWebHTTPResponse {
-        DicomWebHTTPResponse(statusCode: statusCode, headers: headers, body: body)
-    }
-
-    private func cacheKey(for request: DicomWebHTTPRequest) -> String {
-        "\(request.method.rawValue) \(request.url.absoluteString) \(request.headers.dicomWebHeaderValue("Accept") ?? "")"
-    }
-
-    private func cachedResponse(for key: String) -> DicomWebHTTPResponse? {
-        lock.lock()
-        let value = cache[key]
-        lock.unlock()
-        return value
-    }
-
-    private func storeCachedResponse(_ response: DicomWebHTTPResponse, for key: String) {
-        lock.lock()
-        cache[key] = response
-        lock.unlock()
-    }
-
-    private func clearCache() {
-        lock.lock()
-        cache.removeAll()
-        lock.unlock()
-    }
-
-    private func pagination(from filters: [String: String]) -> (offset: Int, limit: Int?)? {
-        let offset: Int
-        if let value = filters["offset"] {
-            guard let parsed = Int(value), parsed >= 0 else { return nil }
-            offset = parsed
-        } else {
-            offset = 0
-        }
-
-        let limit: Int?
-        if let value = filters["limit"] {
-            guard let parsed = Int(value), parsed >= 0 else { return nil }
-            limit = parsed
-        } else {
-            limit = nil
-        }
-        return (offset, limit)
-    }
-
-    private func page(_ dataSets: [DicomDataSet], pagination: (offset: Int, limit: Int?)) -> [DicomDataSet] {
-        let offsetDataSets = Array(dataSets.dropFirst(pagination.offset))
-        guard let limit = pagination.limit else {
-            return offsetDataSets
-        }
-        return Array(offsetDataSets.prefix(limit))
     }
 }
 
-private enum DicomWebDataSetEncoder {
-    static func jsonData(from dataSets: [DicomDataSet]) throws -> Data {
-        let objects = try dataSets.map { try jsonObject(from: $0) }
-        return try JSONSerialization.data(withJSONObject: objects, options: [.sortedKeys])
-    }
-
-    static func xmlData(from dataSets: [DicomDataSet]) -> Data {
-        let models = dataSets.map { dataSet in
-            let attributes = dataSet.elements
-                .filter { $0.tag != DicomTag.pixelData.rawValue }
-                .map(xmlAttribute)
-                .joined()
-            return "<NativeDicomModel>\(attributes)</NativeDicomModel>"
-        }.joined()
-        return Data("<DicomWebMetadata>\(models)</DicomWebMetadata>".utf8)
-    }
-
-    private static func jsonObject(from dataSet: DicomDataSet) throws -> [String: Any] {
-        var object: [String: Any] = [:]
-        for element in dataSet.elements where element.tag != DicomTag.pixelData.rawValue {
-            object[String(format: "%08X", element.tag)] = try jsonElement(from: element)
-        }
-        return object
-    }
-
-    private static func jsonElement(from element: DicomDataElement) throws -> [String: Any] {
-        var object: [String: Any] = ["vr": element.vr.dicomWebCode]
-        switch element.value {
-        case .empty:
-            break
-        case .strings(let values):
-            if element.vr == .PN {
-                object["Value"] = values.map { ["Alphabetic": $0] }
-            } else {
-                object["Value"] = values
-            }
-        case .signedIntegers(let values):
-            object["Value"] = values
-        case .unsignedIntegers(let values):
-            object["Value"] = values.map { Int($0) }
-        case .floats(let values):
-            object["Value"] = values
-        case .bytes(let data):
-            object["InlineBinary"] = data.base64EncodedString()
-        case .sequence(let items):
-            object["Value"] = try items.map { try jsonObject(from: $0.dataSet) }
-        }
-        return object
-    }
-
-    private static func xmlAttribute(_ element: DicomDataElement) -> String {
-        let tag = String(format: "%08X", element.tag)
-        let vr = element.vr.dicomWebCode
-        let values = element.stringValues.enumerated().map { index, value in
-            "<Value number=\"\(index + 1)\">\(escape(value))</Value>"
-        }.joined()
-        return "<DicomAttribute tag=\"\(tag)\" vr=\"\(vr)\">\(values)</DicomAttribute>"
-    }
-
-    private static func escape(_ value: String) -> String {
-        value
-            .replacingOccurrences(of: "&", with: "&amp;")
-            .replacingOccurrences(of: "<", with: "&lt;")
-            .replacingOccurrences(of: ">", with: "&gt;")
-            .replacingOccurrences(of: "\"", with: "&quot;")
-    }
+private final class DicomWebSynchronousResult: @unchecked Sendable {
+    private let semaphore = DispatchSemaphore(value: 0)
+    private var response: DicomWebHTTPResponse?
+    func complete(_ value: DicomWebHTTPResponse) { response = value; semaphore.signal() }
+    func wait() -> DicomWebHTTPResponse { semaphore.wait(); return response! }
 }
 
-private func dicomWebStringElement(_ tag: Int, _ vr: DicomVR, _ value: String) -> DicomDataElement {
-    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-    return DicomDataElement(tag: tag, vr: vr, value: trimmed.isEmpty ? .empty : .strings([trimmed]))
-}
-
-private extension String {
-    var dicomWebNonEmpty: String? {
-        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
+private actor DicomWebServerFileReader {
+    let url: URL
+    var handle: FileHandle?
+    init(_ url: URL) { self.url = url }
+    func next() throws -> Data? {
+        try Task.checkCancellation()
+        if handle == nil { handle = try FileHandle(forReadingFrom: url) }
+        let data = try handle?.read(upToCount: 64 * 1024)
+        return data?.isEmpty == false ? data : nil
     }
+    deinit { try? handle?.close() }
 }

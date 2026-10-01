@@ -176,12 +176,12 @@ public struct DicomDecodedSeries: Sendable {
 
 public extension DicomSeriesLoader {
     func loadDecodedSeries(from url: URL,
-                           progress: ((DicomDecodedSeriesProgress) -> Void)? = nil) throws -> DicomDecodedSeries {
+                           progress: (@Sendable (DicomDecodedSeriesProgress) -> Void)? = nil) throws -> DicomDecodedSeries {
         try loadDecodedSeries(from: DicomSeriesSource.source(for: url), progress: progress)
     }
 
     func loadDecodedSeries(from source: DicomSeriesSource,
-                           progress: ((DicomDecodedSeriesProgress) -> Void)? = nil) throws -> DicomDecodedSeries {
+                           progress: (@Sendable (DicomDecodedSeriesProgress) -> Void)? = nil) throws -> DicomDecodedSeries {
         let prepared = try prepareDirectory(from: source)
         defer {
             if let cleanupRoot = prepared.cleanupRoot {
@@ -189,10 +189,9 @@ public extension DicomSeriesLoader {
             }
         }
 
-        var didSendStarted = false
+        let started = DicomSynchronousResult<Void>()
         let volume = try loadSeries(in: prepared.directory) { fraction, slicesCopied, sliceData, volume in
-            if !didSendStarted {
-                didSendStarted = true
+            if started.resolve(.success(())) {
                 progress?(.started(totalSlices: volume.depth))
             }
             progress?(.reading(fraction: fraction, slicesLoaded: slicesCopied))

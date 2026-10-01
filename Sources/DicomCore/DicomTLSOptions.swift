@@ -105,13 +105,34 @@ enum DicomTLSOptionsFactory {
             sec_protocol_options_set_min_tls_protocol_version(options.securityProtocolOptions, version)
         }
         let trustedCertificates = try trustAnchors(from: tls.material)
-        let peerAuthenticationRequired = role == .client || !trustedCertificates.isEmpty
+        let verifiesPeer: Bool
+        let peerAuthenticationRequired: Bool
+        switch (role, tls.clientCertificatePolicy) {
+        case (.client, _):
+            verifiesPeer = !trustedCertificates.isEmpty
+            peerAuthenticationRequired = true
+        case (.server, nil):
+            verifiesPeer = !trustedCertificates.isEmpty
+            peerAuthenticationRequired = !trustedCertificates.isEmpty
+        case (.server, .notRequested?):
+            verifiesPeer = false
+            peerAuthenticationRequired = false
+        case (.server, .required?):
+            // A server that verifies callers needs something to verify them
+            // against; without anchors it would accept any certificate.
+            guard !trustedCertificates.isEmpty else {
+                throw DicomNetworkError.tlsConfigurationInvalid(
+                    "Verifying callers' certificates needs a trust store of the certificates to accept."
+                )
+            }
+            verifiesPeer = true
+            peerAuthenticationRequired = true
+        }
         sec_protocol_options_set_peer_authentication_required(
             options.securityProtocolOptions,
             peerAuthenticationRequired
         )
 
-        #if os(macOS)
         let localIdentity = try localIdentityIfNeeded(from: tls.material)
         var protocolIdentity: sec_identity_t?
         if let identity = localIdentity.identity {
@@ -125,18 +146,9 @@ enum DicomTLSOptionsFactory {
             }
             sec_protocol_options_set_local_identity(options.securityProtocolOptions, protocolIdentity)
         }
-        #else
-        let hasIdentityMaterial = tls.material?.certificatePath != nil
-            || tls.material?.privateKeyPath != nil
-            || tls.material?.privateKeyData != nil
-        if hasIdentityMaterial {
-            throw DicomNetworkError.tlsConfigurationInvalid(
-                "Separate certificate and private key TLS identity loading is only supported on macOS."
-            )
-        }
-        #endif
 
-        if !trustedCertificates.isEmpty {
+
+        if verifiesPeer {
             let queue = DispatchQueue(label: "DicomTLSOptionsFactory.trust")
             let serverName = tls.serverName
             sec_protocol_options_set_verify_block(options.securityProtocolOptions, { _, secTrust, complete in
@@ -146,7 +158,7 @@ enum DicomTLSOptionsFactory {
                 let setOnlyStatus = SecTrustSetAnchorCertificatesOnly(trust, true)
                 let policy = role == .client
                     ? SecPolicyCreateSSL(true, serverName as CFString?)
-                    : SecPolicyCreateBasicX509()
+                    : SecPolicyCreateSSL(false, nil)
                 let setPolicyStatus = SecTrustSetPolicies(trust, policy)
                 guard setAnchorsStatus == errSecSuccess,
                       setOnlyStatus == errSecSuccess,
@@ -159,7 +171,6 @@ enum DicomTLSOptionsFactory {
             }, queue)
         }
 
-        #if os(macOS)
         let context = DicomAppliedTLSContext(
             role: role,
             serverName: tls.serverName,
@@ -170,18 +181,7 @@ enum DicomTLSOptionsFactory {
             peerAuthenticationRequired: peerAuthenticationRequired,
             protocolIdentity: protocolIdentity
         )
-        #else
-        let context = DicomAppliedTLSContext(
-            role: role,
-            serverName: tls.serverName,
-            hasLocalIdentity: false,
-            trustedCertificateCount: trustedCertificates.count,
-            securityProfile: tls.securityProfile,
-            minimumProtocolVersionName: minimumTLSProtocolVersionName(for: tls.securityProfile),
-            peerAuthenticationRequired: peerAuthenticationRequired,
-            protocolIdentity: nil
-        )
-        #endif
+
         return (options, context)
         #else
         throw DicomNetworkError.tlsConfigurationInvalid(
@@ -257,8 +257,42 @@ enum DicomTLSOptionsFactory {
     }
     #endif
 
-    #if canImport(Security) && os(macOS)
+    #if canImport(Security)
     private static func localIdentityIfNeeded(
+        from material: DicomTLSMaterial?
+    ) throws -> (identity: SecIdentity?, certificates: [SecCertificate]) {
+        guard let material else { return (nil, []) }
+        if let data = material.pkcs12Data {
+            var items: CFArray?
+            let options: [String: Any] = [
+                kSecImportExportPassphrase as String: material.pkcs12Password ?? "",
+                kSecImportToMemoryOnly as String: true
+            ]
+            let status = SecPKCS12Import(data as CFData, options as CFDictionary, &items)
+            guard status == errSecSuccess,
+                  let imported = items as? [[String: Any]],
+                  let first = imported.first,
+                  let value = first[kSecImportItemIdentity as String],
+                  CFGetTypeID(value as CFTypeRef) == SecIdentityGetTypeID() else {
+                throw DicomNetworkError.tlsConfigurationInvalid("PKCS#12 identity import failed (\(status)).")
+            }
+            let identity = value as! SecIdentity
+            let chain = first[kSecImportItemCertChain as String] as? [SecCertificate] ?? []
+            return (identity, Array(chain.dropFirst()))
+        }
+        #if os(macOS)
+        return try separateLocalIdentityIfNeeded(from: material)
+        #else
+        if material.certificatePath != nil || material.privateKeyPath != nil || material.privateKeyData != nil {
+            throw DicomNetworkError.tlsConfigurationInvalid("Use PKCS#12 identity material on this platform.")
+        }
+        return (nil, [])
+        #endif
+    }
+    #endif
+
+    #if canImport(Security) && os(macOS)
+    private static func separateLocalIdentityIfNeeded(
         from material: DicomTLSMaterial?
     ) throws -> (identity: SecIdentity?, certificates: [SecCertificate]) {
         guard let material else { return (nil, []) }
@@ -338,12 +372,27 @@ enum DicomTLSOptionsFactory {
             throw DicomNetworkError.tlsConfigurationInvalid(reason)
         }
         for item in items as [AnyObject] where CFGetTypeID(item) == SecKeyGetTypeID() {
-            return unsafeBitCast(item, to: SecKey.self)
+            return unsafeDowncast(item, to: SecKey.self)
         }
         let reason = path.map { "TLS private key import did not produce a key: \($0)" }
             ?? "TLS private key data did not produce a key."
         throw DicomNetworkError.tlsConfigurationInvalid(reason)
     }
     #endif
+}
+#endif
+
+#if canImport(Network)
+/// Public Network.framework facade; policy and identity handling remain in the shared factory.
+public enum DicomTLSNetworkParameters {
+    public static func client(_ configuration: DicomTLSConfiguration, serverName: String?) throws -> NWParameters {
+        var configuration = configuration
+        if let serverName { configuration.serverName = serverName }
+        return try DicomTLSOptionsFactory.preparedParameters(for: configuration, role: .client).parameters
+    }
+
+    public static func server(_ configuration: DicomTLSConfiguration) throws -> NWParameters {
+        try DicomTLSOptionsFactory.preparedParameters(for: configuration, role: .server).parameters
+    }
 }
 #endif

@@ -49,7 +49,28 @@ final class DCMDictionaryTests: XCTestCase {
         XCTAssertNotNil(dictionary.description(forKey: "00280011"), "Columns should exist")
     }
 
+    func testEnhancedAndOverlayTagsHaveConcreteVRs() {
+        XCTAssertEqual(dictionary.vrCode(forTag: 0x0020_1209), "IS")
+        XCTAssertEqual(dictionary.vrCode(forTag: 0x0028_1056), "CS")
+        XCTAssertEqual(dictionary.vrCode(forTag: 0x5200_9229), "SQ")
+        XCTAssertEqual(dictionary.vrCode(forTag: 0x5200_9230), "SQ")
+        XCTAssertEqual(dictionary.vrCode(forTag: 0x6002_0010), "US")
+        XCTAssertEqual(dictionary.vrCode(forTag: 0x601E_3000), "OW")
+    }
+
     // MARK: - Decoder Validation Tests
+
+    func test_referencePixelAndOrderNumbers_haveStandardTagsAndVRs() {
+        XCTAssertEqual(dictionary.value(forKey: "00186028"), "FDReference Pixel Physical Value X")
+        XCTAssertNil(dictionary.value(forKey: "00181628"))
+        for (tag, name) in [("00401006", "Placer Order Number / Procedure"),
+                             ("00401007", "Filler Order Number / Procedure"),
+                             ("00402006", "Placer Order Number / Imaging Service Request (Retired)"),
+                             ("00402007", "Filler Order Number / Imaging Service Request (Retired)")] {
+            XCTAssertEqual(dictionary.vrCode(forKey: tag), "SH")
+            XCTAssertEqual(dictionary.description(forKey: tag), name)
+        }
+    }
 
     func testDecoderValidation() {
         let decoder = DCMDecoder()

@@ -1,7 +1,7 @@
 import Foundation
-import J2KCodec
-import J2KCore
+import DicomJPEG2000
 import XCTest
+import DicomTestSupport
 @testable import DicomCore
 
 #if os(macOS)
@@ -9,8 +9,131 @@ import Darwin
 #endif
 
 final class DicomJ2KSwiftBackendTests: XCTestCase {
-    func test_rolloutModeParsesEveryPolicyAndDefaultsToShadow() {
-        XCTAssertEqual(DicomJ2KSwiftRolloutMode(environment: [:]), .shadow)
+    func test_shadowCancellation_preservesProductionPixelsAndReportsCancellation() async throws {
+        try HTJ2KDecodeTests.skipUnlessHTJ2KSupported()
+        let recorder = DicomJ2KSwiftTelemetryRecorder()
+        let before = await DicomShadowExecutor.shared.snapshot
+        let frame = try await DicomJ2KSwiftFrameDecoder.decode(
+            Self.fixture().request,
+            environment: ["DICOM_J2KSWIFT_MODE": "shadow", "DICOM_SHADOW_SAMPLE_EVERY": "1"],
+            candidate: ShadowCandidateFixture(
+                capabilities: DicomJ2KSwiftBackend().capabilities, output: nil, cancelled: true
+            )
+        ) { recorder.record($0) }
+        XCTAssertEqual(frame?.buffer.data, Data(HTJ2KDecodeTests.sourcePixels()))
+        let outcome = await recorder.waitFor { $0.backend == .j2kSwiftCPU }
+        XCTAssertEqual(outcome?.outcome, .cancelled)
+        let after = await DicomShadowExecutor.shared.snapshot
+        XCTAssertEqual(after.cancelled, before.cancelled + 1)
+        XCTAssertEqual(after.failed, before.failed)
+    }
+
+    func test_shadowFailureAndMismatch_preserveOpenJPEGPixelsAndReportOutcome() async throws {
+        try HTJ2KDecodeTests.skipUnlessHTJ2KSupported()
+        let request = try Self.fixture().request
+        let expected = Data(HTJ2KDecodeTests.sourcePixels())
+        for output: Data? in [nil, Data(repeating: 0, count: expected.count)] {
+            let recorder = DicomJ2KSwiftTelemetryRecorder()
+            let frame = try await DicomJ2KSwiftFrameDecoder.decode(
+                request,
+                environment: ["DICOM_J2KSWIFT_MODE": "shadow", "DICOM_SHADOW_SAMPLE_EVERY": "1"],
+                candidate: ShadowCandidateFixture(capabilities: DicomJ2KSwiftBackend().capabilities, output: output)
+            ) { recorder.record($0) }
+            XCTAssertEqual(frame?.buffer.data, expected)
+            let reported = await recorder.waitFor {
+                guard $0.backend == .j2kSwiftCPU else { return false }
+                if output != nil { return $0.outcome == .mismatched }
+                if case .failed = $0.outcome { return true }
+                return false
+            }
+            XCTAssertNotNil(reported)
+        }
+    }
+
+    func test_cancellationBetweenPipelineStages_preventsImagePublication() async throws {
+        let data = try Self.fixture().request.frameData
+        let task = Task {
+            try await J2KDecoder().decode(data) { update in
+                if update.stage == .tileExtraction && update.progress == 1 {
+                    withUnsafeCurrentTask { $0?.cancel() }
+                }
+            }
+        }
+        do {
+            _ = try await task.value
+            XCTFail("Cancelled pipeline published an image")
+        } catch { XCTAssertTrue(error is CancellationError) }
+    }
+
+    private struct FailingCandidate: DicomFrameCodecBackend {
+        let capabilities = DicomJ2KSwiftBackend().capabilities
+        let error: any Error
+
+        func decode(_ request: DicomFrameDecodeRequest) async throws -> DicomCodecDecodedFrame {
+            throw error
+        }
+    }
+
+    func test_preferredCandidateUnsupportedFeature_retriesQualifiedOpenJPEG() async throws {
+        try DicomTestRuntimePreflight.require(.openJPEG)
+        let codestream = try await Self.losslessCodestream(width: 8, height: 8, levels: 0)
+        let request = Self.request(codestream: codestream, width: 8, height: 8,
+                                   bitsStored: 8, samplesPerPixel: 1, pixelRepresentation: 0)
+        let recorder = DicomJ2KSwiftTelemetryRecorder()
+        let frame = try await DicomJ2KSwiftFrameDecoder.decode(
+            request, environment: ["DICOM_J2KSWIFT_MODE": "preferred"],
+            candidate: FailingCandidate(error: J2KError.unsupportedFeature("candidate profile"))
+        ) { recorder.record($0) }
+        let expected = try await DicomOpenJPEGFrameBackend().decode(request)
+        XCTAssertEqual(frame?.buffer.data, expected.buffer.data)
+        XCTAssertEqual(recorder.values.map(\.backend), [.j2kSwiftCPU, .openJPEGCPU, .openJPEGCPU])
+        guard case .fellBack = recorder.values.last?.outcome else { return XCTFail("Missing fallback telemetry") }
+    }
+
+    func test_preferredCandidateCorruptedEntropy_retriesOpenJPEGWithTelemetry() async throws {
+        try DicomTestRuntimePreflight.require(.openJPEG)
+        let codestream = try await Self.losslessCodestream(width: 8, height: 8, levels: 0)
+        let request = Self.request(codestream: codestream, width: 8, height: 8,
+                                   bitsStored: 8, samplesPerPixel: 1, pixelRepresentation: 0)
+        let recorder = DicomJ2KSwiftTelemetryRecorder()
+        _ = try await DicomJ2KSwiftFrameDecoder.decode(
+            request, environment: ["DICOM_J2KSWIFT_MODE": "preferred"],
+            candidate: FailingCandidate(error: J2KError.corruptedEntropyData("a code-block left 9 of 40 declared bytes unread"))
+        ) { recorder.record($0) }
+        guard case .fellBack(let reason) = recorder.values.last?.outcome else { return XCTFail("Missing fallback telemetry") }
+        XCTAssertTrue(reason.contains("Corrupted entropy data"), reason)
+    }
+
+    func test_preferredCandidateFailure_respectsStrictPreferenceCancellationAndCorruption() async throws {
+        let request = Self.request(codestream: Data([0, 1]), width: 8, height: 8,
+                                   bitsStored: 8, samplesPerPixel: 1, pixelRepresentation: 0)
+        let cases: [(any Error, Bool)] = [
+            (J2KError.unsupportedFeature("strict preference"), false),
+            (J2KError.invalidData("corrupt stream"), true),
+            (CancellationError(), true)
+        ]
+        for (error, allowsFallback) in cases {
+            let recorder = DicomJ2KSwiftTelemetryRecorder()
+            let selected = DicomFrameDecodeRequest(frameData: request.frameData, descriptor: request.descriptor,
+                frameIndex: 0, backendPreference: .preferred(.j2kSwiftCPU, allowsFallback: allowsFallback))
+            do {
+                _ = try await DicomJ2KSwiftFrameDecoder.decode(
+                    selected, environment: ["DICOM_J2KSWIFT_MODE": "preferred"],
+                    candidate: FailingCandidate(error: error)
+                ) { recorder.record($0) }
+                XCTFail("Expected candidate failure")
+            } catch let actual {
+                XCTAssertEqual(actual is CancellationError, error is CancellationError)
+            }
+            XCTAssertEqual(recorder.values.map(\.backend), [.j2kSwiftCPU])
+            if error is CancellationError {
+                XCTAssertEqual(recorder.values.last?.outcome, .cancelled)
+            }
+        }
+    }
+
+    func test_rolloutModeParsesEveryPolicyAndDefaultsToPreferred() {
+        XCTAssertEqual(DicomJ2KSwiftRolloutMode(environment: [:]), .preferred)
         for mode in DicomJ2KSwiftRolloutMode.allCases {
             XCTAssertEqual(
                 DicomJ2KSwiftRolloutMode(environment: [
@@ -23,26 +146,24 @@ final class DicomJ2KSwiftBackendTests: XCTestCase {
             DicomJ2KSwiftRolloutMode(environment: [
                 DicomJ2KSwiftRolloutMode.environmentKey: "unknown"
             ]),
-            .shadow
+            .preferred
         )
     }
 
     func test_capabilitiesListOnlyQualifiedFrameSyntaxesAndShapes() {
         let capabilities = DicomJ2KSwiftBackend().capabilities
         XCTAssertEqual(capabilities.identifier, .j2kSwiftCPU)
-        XCTAssertEqual(capabilities.version, "11.0.2")
+        XCTAssertEqual(capabilities.version, "11.0.2-vendored")
         XCTAssertEqual(capabilities.source, .packageLinked)
         XCTAssertEqual(capabilities.executionClass, .cpu)
         XCTAssertEqual(capabilities.supportedGrayscaleBitDepths, 1...16)
         XCTAssertEqual(capabilities.supportedColorBitDepths, 1...8)
-        XCTAssertEqual(
-            capabilities.transferSyntaxUIDs,
-            Set([
-                DicomTransferSyntax.jpeg2000Lossless.rawValue,
-                DicomTransferSyntax.jpeg2000.rawValue
-            ])
-        )
-        XCTAssertFalse(
+        // #2330: the five frame syntaxes (.90/.91 and .201/.202/.203) are qualified for decode and encode alike;
+        // #2331 adds the two Part 2 collection syntaxes (experimental, frames as components).
+        XCTAssertEqual(capabilities.transferSyntaxUIDs,
+                       DicomJ2KSwiftBackend.allFrameTransferSyntaxes.union(DicomJ2KSwiftBackend.part2TransferSyntaxes))
+        XCTAssertEqual(capabilities.transferSyntaxUIDs.count, 7)
+        XCTAssertTrue(
             capabilities.transferSyntaxUIDs.contains(
                 DicomTransferSyntax.jpeg2000Part2MulticomponentLossless.rawValue
             )
@@ -63,11 +184,9 @@ final class DicomJ2KSwiftBackendTests: XCTestCase {
         XCTAssertEqual(decoded.bitsPerSample, 8)
         XCTAssertEqual(decoded.componentCount, 1)
         XCTAssertEqual(decoded.buffer.data.count, HTJ2KDecodeTests.sourcePixels().count)
-        XCTAssertNotEqual(
-            [UInt8](decoded.buffer.data),
-            HTJ2KDecodeTests.sourcePixels(),
-            "v11.0.2 is intentionally not qualified for this OpenJPH HTJ2K fixture"
-        )
+        // Before #2329 the vendored 11.0.2 core mis-decoded this OpenJPH fixture (precinct partition anchored to the
+        // band origin); the T.800 B.6/B.7 geometry fix makes it exact.
+        XCTAssertEqual([UInt8](decoded.buffer.data), HTJ2KDecodeTests.sourcePixels())
 
         let telemetry = recorder.values
         XCTAssertEqual(telemetry.count, 1)
@@ -78,13 +197,29 @@ final class DicomJ2KSwiftBackendTests: XCTestCase {
         XCTAssertGreaterThan(telemetry[0].durationNanoseconds, 0)
     }
 
-    func test_shadowModeReturnsOpenJPEGPixelsAndRecordsHTJ2KMismatch() async throws {
+    func test_preferredModeDecodesHTJ2KWithoutTheOpenJPEGRuntime() async throws {
+        // #2330: HTJ2K decode is qualified on the own backend; the OpenJPEG runtime is only the fallback.
+        let fixture = try Self.fixture()
+        let recorder = DicomJ2KSwiftTelemetryRecorder()
+        let frame = try await DicomJ2KSwiftFrameDecoder.decode(
+            fixture.request,
+            environment: [
+                DicomJ2KSwiftRolloutMode.environmentKey: "preferred",
+                "DICOM_DECODER_OPENJPEG_LIBRARY_PATH": "/nonexistent/libopenjp2.dylib"
+            ]
+        ) { recorder.record($0) }
+        XCTAssertEqual(frame.map { [UInt8]($0.buffer.data) }, HTJ2KDecodeTests.sourcePixels())
+        XCTAssertEqual(recorder.values.map(\.backend), [.j2kSwiftCPU])
+        XCTAssertEqual(recorder.values.first?.outcome, .succeeded)
+    }
+
+    func test_shadowModeReturnsOpenJPEGPixelsAndRecordsHTJ2KParity() async throws {
         try HTJ2KDecodeTests.skipUnlessHTJ2KSupported()
         let fixture = try Self.fixture()
         let recorder = DicomJ2KSwiftTelemetryRecorder()
         let frame = try await DicomJ2KSwiftFrameDecoder.decode(
             fixture.request,
-            environment: [DicomJ2KSwiftRolloutMode.environmentKey: "shadow"]
+            environment: [DicomJ2KSwiftRolloutMode.environmentKey: "shadow", "DICOM_SHADOW_SAMPLE_EVERY": "1"]
         ) { recorder.record($0) }
 
         XCTAssertEqual(
@@ -95,13 +230,12 @@ final class DicomJ2KSwiftBackendTests: XCTestCase {
             $0.backend == .j2kSwiftCPU
                 && $0.width == 8
                 && $0.height == 8
-                && $0.outcome == .mismatched
+                && $0.outcome == .matched
         }
-        XCTAssertNotNil(comparison)
+        XCTAssertNotNil(comparison, "the own decoder now matches OpenJPEG on the OpenJPH fixture")
     }
 
-    func test_preferredModeKeepsHTJ2KOnOpenJPEGFallback() async throws {
-        try HTJ2KDecodeTests.skipUnlessHTJ2KSupported()
+    func test_preferredModeUsesTheOwnBackendForHTJ2KWithoutFallingBack() async throws {
         let fixture = try Self.fixture()
         let recorder = DicomJ2KSwiftTelemetryRecorder()
         let frame = try await DicomJ2KSwiftFrameDecoder.decode(
@@ -113,13 +247,8 @@ final class DicomJ2KSwiftBackendTests: XCTestCase {
             frame.map { [UInt8]($0.buffer.data) },
             HTJ2KDecodeTests.sourcePixels()
         )
-        XCTAssertTrue(recorder.values.contains {
-            guard $0.backend == .openJPEGCPU,
-                  case .fellBack(let reason) = $0.outcome else {
-                return false
-            }
-            return reason.contains(DicomTransferSyntax.htj2kLossless.rawValue)
-        })
+        XCTAssertEqual(recorder.values.map(\.backend), [.j2kSwiftCPU])
+        XCTAssertFalse(recorder.values.contains { if case .fellBack = $0.outcome { return true }; return false })
     }
 
     func test_disabledModeLeavesTheLegacyPathUntouched() async throws {
@@ -140,10 +269,11 @@ final class DicomJ2KSwiftBackendTests: XCTestCase {
         )
         XCTAssertFalse(adapter.contains("temporaryDirectory"))
         XCTAssertFalse(adapter.contains(".write(to:"))
-        XCTAssertTrue(adapter.contains("J2KDecoder()"))
+        XCTAssertTrue(adapter.contains("J2KDecoder(sampleByteOrder: .littleEndian)"))
     }
 
     func test_losslessPrecisionSignednessAndTilingMatrixMatchesOpenJPEG() async throws {
+        try DicomTestRuntimePreflight.require(.openJPEG)
         for bitDepth in [8, 10, 12, 14, 16] {
             for signed in [false, true] {
                 for tiled in [false, true] {
@@ -187,6 +317,7 @@ final class DicomJ2KSwiftBackendTests: XCTestCase {
     }
 
     func test_losslessRGBComponentOrderMatchesOpenJPEGForPlanarMetadata() async throws {
+        try DicomTestRuntimePreflight.require(.openJPEG)
         let width = 31
         let height = 23
         let pixelCount = width * height
@@ -254,6 +385,40 @@ final class DicomJ2KSwiftBackendTests: XCTestCase {
         }
     }
 
+    /// A codestream whose signedness contradicts Pixel Representation (pydicom `J2K_pixelrep_mismatch`) is
+    /// decoded as the codestream declares and the Bits Stored pattern is then read under the DICOM attribute,
+    /// the convention GDCM, DCMTK and pydicom share; the backend no longer refuses the object.
+    func test_signednessContradictionBetweenCodestreamAndPixelRepresentationFollowsTheOracleConvention() async throws {
+        let width = 23, height = 19, bitsStored = 13
+        for codestreamSigned in [false, true] {
+            let image = Self.grayscaleImage(width: width, height: height, bitDepth: bitsStored, signed: codestreamSigned)
+            let codestream = try await J2KEncoder(encodingConfiguration: J2KEncodingConfiguration(
+                quality: 1, lossless: true, decompositionLevels: 2, qualityLayers: 1, progressionOrder: .lrcp
+            )).encode(image)
+            let consistent = try await DicomJ2KSwiftBackend().decode(Self.request(
+                codestream: codestream, width: width, height: height, bitsStored: bitsStored, samplesPerPixel: 1,
+                pixelRepresentation: codestreamSigned ? 1 : 0))
+            let contradictory = try await DicomJ2KSwiftBackend().decode(Self.request(
+                codestream: codestream, width: width, height: height, bitsStored: bitsStored, samplesPerPixel: 1,
+                pixelRepresentation: codestreamSigned ? 0 : 1))
+            XCTAssertEqual(contradictory.width, width); XCTAssertEqual(contradictory.height, height)
+            XCTAssertEqual(contradictory.bitsPerSample, bitsStored)
+            // The 16-bit words carry the reconstructed samples; only the stored bit pattern matters downstream.
+            let mask = UInt16((1 << bitsStored) - 1)
+            let expected = consistent.buffer.data.withUnsafeBytes { Array($0.bindMemory(to: UInt16.self)).map { $0 & mask } }
+            let actual = contradictory.buffer.data.withUnsafeBytes { Array($0.bindMemory(to: UInt16.self)).map { $0 & mask } }
+            XCTAssertEqual(actual, expected, "codestreamSigned=\(codestreamSigned): the stored bit pattern is unchanged")
+            XCTAssertTrue(expected.contains { $0 >> (bitsStored - 1) == 1 }, "the fixture exercises the sign bit")
+            if (try? DicomTestRuntimePreflight.require(.openJPEG)) != nil {
+                let oracle = try await DicomOpenJPEGFrameBackend().decode(Self.request(
+                    codestream: codestream, width: width, height: height, bitsStored: bitsStored, samplesPerPixel: 1,
+                    pixelRepresentation: codestreamSigned ? 0 : 1))
+                let oracleValues = oracle.buffer.data.withUnsafeBytes { Array($0.bindMemory(to: UInt16.self)).map { $0 & mask } }
+                XCTAssertEqual(actual, oracleValues, "codestreamSigned=\(codestreamSigned): OpenJPEG agrees on the stored pattern")
+            }
+        }
+    }
+
     func test_asyncFrameReaderUsesTheShadowPipelineWithoutChangingPixels() async throws {
         try HTJ2KDecodeTests.skipUnlessHTJ2KSupported()
         let url = Self.repoRoot().appendingPathComponent(HTJ2KDecodeTests.fixtureRelativePath)
@@ -271,7 +436,81 @@ final class DicomJ2KSwiftBackendTests: XCTestCase {
         XCTAssertTrue(partial.supportsResolutionLevels)
         XCTAssertTrue(partial.supportsQualityLayers)
         XCTAssertTrue(partial.supportsCombinedRegionAndResolution)
-        XCTAssertFalse(partial.supportsQualityWithSpatialReduction)
+        XCTAssertTrue(partial.supportsQualityWithSpatialReduction, "issue #2382: layers combine with region and resolution")
+    }
+
+    /// Issue #2854 (`Osirix10vs8BitsStored`): a 10-bit codestream under Bits Stored 8 in 16-bit words keeps its
+    /// precision, as GDCM reads it; a codestream wider than Bits Allocated is still refused.
+    func test_codestreamMorePreciseThanBitsStored_keepsItsPrecisionWithinBitsAllocated() async throws {
+        let width = 11, height = 9
+        let image = Self.grayscaleImage(width: width, height: height, bitDepth: 10, signed: false)
+        let codestream = try await J2KEncoder(encodingConfiguration: J2KEncodingConfiguration(
+            quality: 1, lossless: true, decompositionLevels: 1, qualityLayers: 1, progressionOrder: .lrcp
+        )).encode(image)
+        var request = Self.request(codestream: codestream, width: width, height: height, bitsStored: 10,
+                                   samplesPerPixel: 1, pixelRepresentation: 0)
+        let reference = try await DicomJ2KSwiftBackend().decode(request)
+        request = DicomFrameDecodeRequest(
+            frameData: codestream,
+            descriptor: DicomCompressedFrameDescriptor(
+                transferSyntaxUID: DicomTransferSyntax.jpeg2000Lossless.rawValue, rows: height, columns: width,
+                bitsAllocated: 16, bitsStored: 8, highBit: 7, pixelRepresentation: 0, samplesPerPixel: 1,
+                photometricInterpretation: "MONOCHROME2", planarConfiguration: nil),
+            frameIndex: 0)
+        let decoded = try await DicomJ2KSwiftBackend().decode(request)
+        XCTAssertEqual(decoded.bitsPerSample, 10)
+        XCTAssertEqual(decoded.buffer.data, reference.buffer.data)
+        let values = decoded.buffer.data.withUnsafeBytes { Array($0.bindMemory(to: UInt16.self)) }
+        XCTAssertGreaterThan(values.max() ?? 0, 255, "the fixture uses the bits above Bits Stored")
+
+        let narrow = DicomFrameDecodeRequest(
+            frameData: codestream,
+            descriptor: DicomCompressedFrameDescriptor(
+                transferSyntaxUID: DicomTransferSyntax.jpeg2000Lossless.rawValue, rows: height, columns: width,
+                bitsAllocated: 8, bitsStored: 8, highBit: 7, pixelRepresentation: 0, samplesPerPixel: 1,
+                photometricInterpretation: "MONOCHROME2", planarConfiguration: nil),
+            frameIndex: 0)
+        do {
+            _ = try await DicomJ2KSwiftBackend().decode(narrow)
+            XCTFail("a 10-bit codestream does not fit 8-bit words")
+        } catch is DicomJ2KSwiftBackendError {}
+    }
+
+    /// Issue #2856 (`SC16BitsAllocated_8BitsStoredJ2K`): an 8-bit lossless codestream under Bits Allocated and Bits
+    /// Stored 16 decodes to 8-bit samples instead of being refused for its precision.
+    func test_eightBitCodestreamUnderSixteenBitDeclaration_decodesToEightBitSamples() async throws {
+        let width = 9, height = 7
+        let codestream = try await Self.losslessCodestream(width: width, height: height, levels: 1)
+        let eightBit = try await DicomJ2KSwiftBackend().decode(Self.request(
+            codestream: codestream, width: width, height: height, bitsStored: 8, samplesPerPixel: 1,
+            pixelRepresentation: 0))
+        let declared16 = DicomFrameDecodeRequest(
+            frameData: codestream,
+            descriptor: DicomCompressedFrameDescriptor(
+                transferSyntaxUID: DicomTransferSyntax.jpeg2000Lossless.rawValue, rows: height, columns: width,
+                bitsAllocated: 16, bitsStored: 16, highBit: 15, pixelRepresentation: 0, samplesPerPixel: 1,
+                photometricInterpretation: "MONOCHROME2", planarConfiguration: nil),
+            frameIndex: 0)
+        let decoded = try await DicomJ2KSwiftBackend().decode(declared16)
+        XCTAssertEqual(decoded.bitsPerSample, 8)
+        XCTAssertEqual(decoded.buffer.data, eightBit.buffer.data)
+    }
+
+    /// Issue #2858: CT frames pad after EOC with whatever byte the encoder's buffer held; they decode like the
+    /// unpadded codestream instead of being refused as unparseable.
+    func test_anyPadByteAfterEndOfCodestream_decodesLikeTheUnpaddedFrame() async throws {
+        let codestream = try await Self.losslessCodestream(width: 9, height: 7, levels: 2)
+        let padded = codestream + Data([0x5A])
+        XCTAssertNil(DicomHTJ2KProfile.violation(of: DicomTransferSyntax.jpeg2000Lossless.rawValue, in: padded))
+        let request = { (data: Data) in
+            Self.request(codestream: data, width: 9, height: 7, bitsStored: 8, samplesPerPixel: 1,
+                         pixelRepresentation: 0)
+        }
+
+        let expected = try await DicomJ2KSwiftBackend().decode(request(codestream))
+        let decoded = try await DicomJ2KSwiftBackend().decode(request(padded))
+
+        XCTAssertEqual(decoded.buffer.data, expected.buffer.data)
     }
 
     func test_partialRegionMatchesCropFromFullDecode() async throws {
@@ -362,57 +601,40 @@ final class DicomJ2KSwiftBackendTests: XCTestCase {
         XCTAssertEqual(partial.buffer.data.count, 9)
     }
 
-    func test_qualityLayerDecodeIsProvisionalAndCannotCombineWithSpatialDecode() async throws {
-        let width = 33
-        let height = 25
-        let image = Self.grayscaleImage(width: width, height: height, bitDepth: 8, signed: false)
-        let codestream = try await J2KEncoder(
-            encodingConfiguration: J2KEncodingConfiguration(
-                quality: 0.7,
-                lossless: false,
-                decompositionLevels: 2,
-                qualityLayers: 3,
-                progressionOrder: .lrcp
-            )
-        ).encode(image)
-        let base = Self.request(
-            codestream: codestream,
-            width: width,
-            height: height,
-            bitsStored: 8,
-            samplesPerPixel: 1,
-            pixelRepresentation: 0,
-            transferSyntax: .jpeg2000
-        )
+    func test_qualityLayerDecodeCombinesWithRegionAndMatchesTheCropOfTheLayerDecode() async throws {
+        // The own encoder collapses to one layer here; the pinned 4-layer fixture exercises the combination.
+        let fixtureURL = Self.repoRoot().appendingPathComponent(".build/checkouts/J2KSwift/Tests/Fixtures/MultiLayer/ct512_L4.j2k")
+        guard FileManager.default.fileExists(atPath: fixtureURL.path) else {
+            throw XCTSkip("The pinned J2KSwift multi-layer fixture is unavailable")
+        }
+        let codestream = try Data(contentsOf: fixtureURL)
+        let width = 512, height = 512
+        let base = Self.request(codestream: codestream, width: width, height: height, bitsStored: 16, samplesPerPixel: 1, pixelRepresentation: 0)
         let qualityRequest = DicomFrameDecodeRequest(
-            frameData: codestream,
-            descriptor: base.descriptor,
-            frameIndex: 0,
-            partialRequest: DicomPartialDecodeRequest(maximumQualityLayer: 0)
-        )
+            frameData: codestream, descriptor: base.descriptor, frameIndex: 0,
+            partialRequest: DicomPartialDecodeRequest(maximumQualityLayer: 0))
         let combinedRequest = DicomFrameDecodeRequest(
-            frameData: codestream,
-            descriptor: base.descriptor,
-            frameIndex: 0,
-            partialRequest: DicomPartialDecodeRequest(
-                region: .init(x: 0, y: 0, width: 8, height: 8),
-                maximumQualityLayer: 0
-            )
-        )
+            frameData: codestream, descriptor: base.descriptor, frameIndex: 0,
+            partialRequest: DicomPartialDecodeRequest(region: .init(x: 100, y: 60, width: 64, height: 48), maximumQualityLayer: 0))
 
         let preview = try await DicomJ2KSwiftBackend().decode(qualityRequest)
         XCTAssertEqual(preview.width, width)
         XCTAssertEqual(preview.height, height)
-        XCTAssertNotNil(DicomJ2KSwiftBackend().capabilities.unsupportedReason(for: combinedRequest))
-        do {
-            _ = try await DicomJ2KSwiftBackend().decode(combinedRequest)
-            XCTFail("Expected unsupported combined partial decode")
-        } catch let error as DicomJ2KSwiftBackendError {
-            guard case .unsupportedShape(_, let reason) = error else {
-                return XCTFail("Unexpected error: \(error)")
-            }
-            XCTAssertTrue(reason.contains("quality and spatial"))
+        XCTAssertGreaterThan(try XCTUnwrap(preview.codecBytesAvoided), 0, "layers 1...3 are parsed past, never entropy-decoded")
+        XCTAssertNil(DicomJ2KSwiftBackend().capabilities.unsupportedReason(for: combinedRequest), "issue #2382: quality combines with spatial decode")
+        let combined = try await DicomJ2KSwiftBackend().decode(combinedRequest)
+        XCTAssertEqual(combined.width, 64)
+        XCTAssertEqual(combined.height, 48)
+        var expected = Data()
+        for y in 60..<108 {
+            expected.append(preview.buffer.data.subdata(in: ((y * width + 100) * 2)..<((y * width + 164) * 2)))
         }
+        XCTAssertEqual(combined.buffer.data, expected, "region of layer 0 equals the crop of the layer-0 decode")
+        XCTAssertEqual(combined.codecBytesAvoided, preview.codecBytesAvoided)
+        let finalLayer = try await DicomJ2KSwiftBackend().decode(DicomFrameDecodeRequest(
+            frameData: codestream, descriptor: base.descriptor, frameIndex: 0,
+            partialRequest: DicomPartialDecodeRequest(region: .init(x: 100, y: 60, width: 64, height: 48), maximumQualityLayer: 3)))
+        XCTAssertEqual(finalLayer.codecBytesAvoided, 0, "the last layer skips nothing")
     }
 
     func test_partialBackendHonorsCancellationBeforeDecode() async throws {
@@ -582,6 +804,7 @@ final class DicomJ2KSwiftBackendTests: XCTestCase {
     }
 
     func test_performanceReportComparesColdWarmThroughputAndRSS() async throws {
+        try DicomTestRuntimePreflight.require(.openJPEG)
         let width = 128
         let height = 128
         let iterations = 8

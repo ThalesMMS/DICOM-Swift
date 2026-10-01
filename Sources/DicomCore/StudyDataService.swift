@@ -87,7 +87,7 @@ import ImageIO
 ///
 /// ### Creating a Service
 ///
-/// - ``init(fileManager:decoderFactory:)``
+/// - ``init(fileManager:decoderFactory:seriesLoaderFactory:)``
 ///
 /// ### Metadata Extraction
 ///
@@ -116,8 +116,8 @@ public final class StudyDataService: StudyDataServiceProtocol, @unchecked Sendab
 
     private let logger: LoggerProtocol
     private let fileManager: FileManager
-    private let decoderFactory: (String) throws -> DicomDecoderProtocol
-    private let seriesLoaderFactory: () -> any DicomBatchFileLoading
+    private let decoderFactory: @Sendable (String) throws -> DicomDecoderProtocol
+    private let seriesLoaderFactory: @Sendable () -> any DicomBatchFileLoading
 
     // MARK: - Initialization
 
@@ -126,6 +126,7 @@ public final class StudyDataService: StudyDataServiceProtocol, @unchecked Sendab
     /// - Parameters:
     ///   - fileManager: File system manager (defaults to `.default`)
     ///   - decoderFactory: Factory closure that creates ``DicomDecoderProtocol`` instances from a file path
+    ///   - seriesLoaderFactory: Factory closure that creates the batch series loader.
     ///
     /// ## Example
     /// ```swift
@@ -138,8 +139,8 @@ public final class StudyDataService: StudyDataServiceProtocol, @unchecked Sendab
     /// ```
     public init(
         fileManager: FileManager = .default,
-        decoderFactory: @escaping (String) throws -> DicomDecoderProtocol,
-        seriesLoaderFactory: (() -> any DicomBatchFileLoading)? = nil
+        decoderFactory: @escaping @Sendable (String) throws -> DicomDecoderProtocol,
+        seriesLoaderFactory: (@Sendable () -> any DicomBatchFileLoading)? = nil
     ) {
         self.fileManager = fileManager
         self.decoderFactory = decoderFactory

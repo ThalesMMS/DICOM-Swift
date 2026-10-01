@@ -110,14 +110,23 @@ extension DCMDecoder {
         pixels16 = nil
         pixels24 = nil
 
-        // Use DCMPixelReader to read pixel data
+        // Use DCMPixelReader to read pixel data. Word-swapped 8-bit samples (OW under Explicit VR Big
+        // Endian) are restored to raster order first; the reader then addresses the restored copy.
+        var source = dicomData
+        var pixelOffset = offset
+        if !compressedImage, bigEndianTransferSyntax, !littleEndian, bitDepth == 8, pixelDataVR == .OW,
+           let descriptor = makePixelDataDescriptorUnsafe(),
+           let restored = descriptor.nativeFrameData(in: dicomData, frame: 0) {
+            source = Data(count: descriptor.pixelDataOffset) + restored
+            pixelOffset = descriptor.pixelDataOffset
+        }
         let result = DCMPixelReader.readPixels(
-            data: dicomData,
+            data: source,
             width: width,
             height: height,
             bitDepth: bitDepth,
             samplesPerPixel: samplesPerPixel,
-            offset: offset,
+            offset: pixelOffset,
             pixelRepresentation: pixelRepresentation,
             littleEndian: littleEndian,
             photometricInterpretation: photometricInterpretation,
@@ -163,6 +172,7 @@ extension DCMDecoder {
     /// - Note: Must be called from within a synchronized block.
     private func decodeCompressedPixelDataUnsafe() {
         let bitsStored = intValue(for: DicomTag.bitsStored.rawValue)
+        let planarConfiguration = intValue(for: DicomTag.planarConfiguration.rawValue) ?? 0
         if let frame = getEncapsulatedFrame(0),
            let result = DCMPixelReader.decodeCompressedFrameData(
                data: frame.data,
@@ -174,6 +184,7 @@ extension DCMDecoder {
                pixelRepresentation: pixelRepresentationTagValue,
                photometricInterpretation: photometricInterpretation,
                bitsStored: bitsStored,
+               planarConfiguration: planarConfiguration,
                logger: logger
            ) {
             applyCompressedPixelReadResult(result)
@@ -192,6 +203,7 @@ extension DCMDecoder {
             pixelRepresentation: pixelRepresentationTagValue,
             photometricInterpretation: photometricInterpretation,
             bitsStored: bitsStored,
+            planarConfiguration: planarConfiguration,
             logger: logger
         ) else {
             fileReadSucceeded = false

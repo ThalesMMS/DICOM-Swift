@@ -10,49 +10,37 @@ internal enum DicomRLELosslessDecoder {
         pixelRepresentation: Int,
         photometricInterpretation: String
     ) throws -> DCMPixelReadResult {
+        guard bitsAllocated == 8 || bitsAllocated == 16 else {
+            throw DICOMError.invalidPixelData(reason: "RLE supports only 8-bit and 16-bit samples in this decoder")
+        }
+        guard (samplesPerPixel == 1 && (pixelRepresentation == 0 || pixelRepresentation == 1))
+                || (samplesPerPixel == 3 && bitsAllocated == 8 && pixelRepresentation == 0) else {
+            throw DICOMError.invalidPixelData(reason: "RLE supports grayscale samples or 8-bit RGB samples")
+        }
         guard let metrics = DCMPixelReader.computePixelMetrics(
             width: width,
             height: height,
-            bytesPerPixel: Int64(max(1, samplesPerPixel) * max(1, (bitsAllocated + 7) / 8)),
+            bytesPerPixel: Int64(samplesPerPixel * (bitsAllocated / 8)),
             context: "RLE Lossless",
             logger: nil
         ) else {
             throw DICOMError.invalidPixelData(reason: "Invalid RLE image dimensions")
         }
 
-        let bytesPerSample = max(1, (bitsAllocated + 7) / 8)
-        guard bytesPerSample == 1 || bytesPerSample == 2 else {
-            throw DICOMError.invalidPixelData(reason: "RLE supports only 8-bit and 16-bit samples in this decoder")
-        }
-        guard samplesPerPixel == 1 || (samplesPerPixel == 3 && bytesPerSample == 1) else {
-            throw DICOMError.invalidPixelData(reason: "RLE supports grayscale samples or 8-bit RGB samples")
-        }
-        guard data.count >= 64 else {
-            throw DICOMError.invalidPixelData(reason: "RLE frame is shorter than the 64-byte header")
-        }
-
-        let segmentCount = Int(readUInt32LE(data, offset: 0))
-        let expectedSegments = samplesPerPixel * bytesPerSample
-        guard segmentCount == expectedSegments, segmentCount > 0, segmentCount <= 15 else {
-            throw DICOMError.invalidPixelData(reason: "RLE segment count \(segmentCount) does not match expected count \(expectedSegments)")
-        }
-
-        let offsets = (0..<segmentCount).map { index in
-            Int(readUInt32LE(data, offset: 4 + index * 4))
-        }
-        for offset in offsets {
-            guard offset >= 64, offset <= data.count else {
-                throw DICOMError.invalidPixelData(reason: "RLE segment offset \(offset) is outside frame bounds")
-            }
-        }
-
+        let bytesPerSample = bitsAllocated / 8
         let pixelCount = metrics.numPixels
-        let decodedSegments = try offsets.enumerated().map { index, offset in
-            let end = index + 1 < offsets.count ? offsets[index + 1] : data.count
-            guard end >= offset else {
-                throw DICOMError.invalidPixelData(reason: "RLE segment offsets are not monotonic")
-            }
-            return try decodePackBitsSegment(data[offset..<end], expectedCount: pixelCount)
+        let expectedSegments = samplesPerPixel * bytesPerSample
+        let decodedSegments: [[UInt8]]
+        do {
+            decodedSegments = try DicomRLECodec.decodeSegments(data, width: width, height: height,
+                limits: .init(maximumDecodedBytes: metrics.numPixels * expectedSegments),
+                // Readers accept a stray pad byte and a segment cut short within the last row (issue #2855).
+                allowNonzeroPadding: true, allowShortSegments: true)
+        } catch {
+            throw DICOMError.invalidPixelData(reason: "RLE header or segment is malformed or exceeds the pixel budget")
+        }
+        guard decodedSegments.count == expectedSegments else {
+            throw DICOMError.invalidPixelData(reason: "RLE segment count does not match sample allocation")
         }
 
         if samplesPerPixel == 1 && bytesPerSample == 1 {
@@ -126,48 +114,4 @@ internal enum DicomRLELosslessDecoder {
         )
     }
 
-    private static func decodePackBitsSegment(_ segment: Data.SubSequence, expectedCount: Int) throws -> [UInt8] {
-        var output: [UInt8] = []
-        output.reserveCapacity(expectedCount)
-        var index = segment.startIndex
-
-        while index < segment.endIndex && output.count < expectedCount {
-            let control = Int(Int8(bitPattern: segment[index]))
-            index = segment.index(after: index)
-
-            if control >= 0 {
-                let count = control + 1
-                guard segment.distance(from: index, to: segment.endIndex) >= count else {
-                    throw DICOMError.invalidPixelData(reason: "RLE literal run exceeds segment bounds")
-                }
-                guard output.count + count <= expectedCount else {
-                    throw DICOMError.invalidPixelData(reason: "RLE literal run exceeds expected segment length")
-                }
-                output.append(contentsOf: segment[index..<segment.index(index, offsetBy: count)])
-                index = segment.index(index, offsetBy: count)
-            } else if control >= -127 {
-                guard index < segment.endIndex else {
-                    throw DICOMError.invalidPixelData(reason: "RLE replicated run is missing its value byte")
-                }
-                let count = 1 - control
-                guard output.count + count <= expectedCount else {
-                    throw DICOMError.invalidPixelData(reason: "RLE replicated run exceeds expected segment length")
-                }
-                output.append(contentsOf: repeatElement(segment[index], count: count))
-                index = segment.index(after: index)
-            }
-        }
-
-        guard output.count == expectedCount else {
-            throw DICOMError.invalidPixelData(reason: "RLE segment decoded \(output.count) bytes; expected \(expectedCount)")
-        }
-        return output
-    }
-
-    private static func readUInt32LE(_ data: Data, offset: Int) -> UInt32 {
-        UInt32(data[offset])
-            | (UInt32(data[offset + 1]) << 8)
-            | (UInt32(data[offset + 2]) << 16)
-            | (UInt32(data[offset + 3]) << 24)
-    }
 }

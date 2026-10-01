@@ -6,7 +6,7 @@ public enum DicomCodecRuntime: String, CaseIterable, Sendable {
     /// CharLS runtime used for JPEG-LS lossless and near-lossless decoding.
     case charLS
 
-    /// OpenJPEG runtime used for JPEG 2000 and JPEG 2000 Part 2 decoding.
+    /// OpenJPEG runtime used for JPEG 2000 and version-qualified HTJ2K decoding.
     case openJPEG
 
     /// Human-readable runtime name for diagnostics.

@@ -265,13 +265,11 @@ final class DCMDecoderExtensionCoverageTests: XCTestCase {
     func testGetValidationStatusTupleFields() {
         let decoder = DCMDecoder()
         let status = decoder.getValidationStatus()
-        // Verify all fields are accessible
-        _ = status.isValid
-        _ = status.width
-        _ = status.height
-        _ = status.hasPixels
-        _ = status.isCompressed
-        XCTAssertTrue(true, "All tuple fields should be accessible")
+        XCTAssertFalse(status.isValid)
+        XCTAssertEqual(status.width, 1)
+        XCTAssertEqual(status.height, 1)
+        XCTAssertFalse(status.hasPixels)
+        XCTAssertFalse(status.isCompressed)
     }
 
     func testGetValidationStatusConsistency() {

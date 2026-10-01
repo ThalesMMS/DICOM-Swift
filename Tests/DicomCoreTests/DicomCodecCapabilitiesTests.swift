@@ -22,7 +22,7 @@ final class DicomCodecCapabilitiesTests: XCTestCase {
         )
 
         XCTAssertTrue(status.isAvailable)
-        XCTAssertEqual(status.version, "0.9.0")
+        XCTAssertEqual(status.version, "0.9.1-vendored")
         XCTAssertEqual(status.source, .packageLinked)
         XCTAssertEqual(status.operations, ["decode", "encode"])
         XCTAssertEqual(status.supportedGrayscaleBitDepths, 8...16)

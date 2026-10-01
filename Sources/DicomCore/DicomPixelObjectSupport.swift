@@ -223,10 +223,15 @@ public enum DicomPixelObjectClassifier {
             }
             return .rtDose(dose)
         case .parametricMap:
-            guard let map = decoder.parametricMap else {
-                throw rejection("Parametric Map requires Float or Double Float Pixel Data and Real World Value Mapping.")
+            do {
+                return .parametricMap(try decoder.decodeParametricMap())
+            } catch let error as DicomParametricMapDecodeError {
+                // Carry the typed object-level reason (dimensions, payload,
+                // missing/ambiguous mapping, all pixels invalid) instead of
+                // one generic message; recoverable per-pixel problems never
+                // reach this path (issue #1875).
+                throw rejection("Parametric Map rejected [\(error.reason.code)]: \(error.reason.message)")
             }
-            return .parametricMap(map)
         case .classicImage:
             guard classification.pixelElement == .integer else {
                 throw rejection("The object carries no Pixel Data element to decode.")

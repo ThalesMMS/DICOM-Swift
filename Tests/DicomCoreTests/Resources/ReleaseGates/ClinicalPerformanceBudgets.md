@@ -27,3 +27,9 @@ Correctness always runs before performance. Absolute warning/failure budgets
 apply without a baseline; relative warning/failure deltas apply only to the
 same host, OS, architecture, build, mode, fixture, tier, and CLI-startup scope.
 Reports contain aggregate measurements and non-PHI fixture identifiers only.
+
+`ClinicalPathWorkloadManifest.json` (#2367) is the companion manifest for the
+complete clinical path: pinned synthetic corpus digests, one workload per stage
+with release budgets and a debug multiplier, external collectors, the Voxelia
+registry and promotion profiles. See `../../../../DISTRIBUTION.md`
+(section "Clinical path workloads").

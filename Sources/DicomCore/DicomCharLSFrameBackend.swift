@@ -7,8 +7,10 @@ import Foundation
 
 struct DicomCharLSFrameBackend: DicomFrameCodecBackend {
     let capabilities: DicomFrameCodecCapabilities
+    private let environment: [String: String]
 
     init(environment: [String: String] = ProcessInfo.processInfo.environment) {
+        self.environment = environment
         let runtime = DicomCodecCapabilities.capability(for: .charLS, environment: environment)
         capabilities = DicomFrameCodecCapabilities(
             identifier: .charLSCPU,
@@ -36,7 +38,7 @@ struct DicomCharLSFrameBackend: DicomFrameCodecBackend {
                 reasons: [reason]
             )
         }
-        let decoded = try DicomJPEGLSCodec.decode(request.frameData)
+        let decoded = try DicomJPEGLSCodec.decode(request.frameData, environment: environment)
         let descriptor = request.descriptor
         guard decoded.width == descriptor.columns, decoded.height == descriptor.rows,
               decoded.bitsPerSample == descriptor.bitsStored,
@@ -90,7 +92,8 @@ struct DicomCharLSFrameBackend: DicomFrameCodecBackend {
             height: frame.height,
             bitsPerSample: frame.bitsPerSample,
             componentCount: frame.componentCount,
-            nearLossless: near
+            nearLossless: near,
+            environment: environment
         )
     }
 

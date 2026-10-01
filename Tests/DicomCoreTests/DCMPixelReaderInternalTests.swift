@@ -708,6 +708,16 @@ final class DCMPixelReaderInternalTests: XCTestCase {
         XCTAssertEqual(result?.pixels16?[1], 16, "Big endian [0x00, 0x10] should be 16")
     }
 
+    /// Issue #2849: a MONOCHROME1 image above 2048×2048 (a CR or a mammogram)
+    /// is inverted whole, with no write past the pooled buffer.
+    func testInvertMonochrome1Vectorized_imageLargerThanTheLargestPoolBucket() {
+        let count = 2964 * 2364
+        var buffer = (0 ..< count).map { UInt16(truncatingIfNeeded: $0) }
+        DCMPixelReader.invertMonochrome1Vectorized(buffer: &buffer, count: count)
+        XCTAssertEqual(buffer[0], 65535)
+        XCTAssertEqual(buffer[count - 1], 65535 - UInt16(truncatingIfNeeded: count - 1))
+    }
+
     private func writeLittleEndianUInt16(_ value: UInt16, to data: inout Data, at offset: Int) {
         data[offset] = UInt8(value & 0x00FF)
         data[offset + 1] = UInt8((value >> 8) & 0x00FF)

@@ -35,7 +35,7 @@ extension DCMDecoder {
 
     /// Convenience initializer that loads a DICOM file from the
     /// specified file path.  This is a Swift-idiomatic alternative
-    /// to ``init(contentsOf:)`` for workflows that work directly with
+    /// to `init(contentsOf:)` for workflows that work directly with
     /// String paths instead of URL objects.  The file is loaded and
     /// parsed immediately; if loading fails an error is thrown.
     ///
@@ -44,7 +44,7 @@ extension DCMDecoder {
     /// the legacy ``setDicomFilename(_:)`` API, this initializer follows
     /// Swift best practices by throwing errors instead of relying on
     /// boolean success flags.  The underlying file loading mechanism is
-    /// identical to ``init(contentsOf:)``.
+    /// identical to `init(contentsOf:)`.
     ///
     /// Example usage:
     ///
@@ -91,7 +91,7 @@ extension DCMDecoder {
     /// The file is loaded and parsed immediately; if loading fails
     /// an error is thrown.
     ///
-    /// This method is semantically equivalent to ``init(contentsOf:)``
+    /// This method is semantically equivalent to `init(contentsOf:)`
     /// but may be preferred in contexts where factory methods are more
     /// idiomatic (e.g., when chaining with other static methods or
     /// when explicitly showing the allocation step).
@@ -121,7 +121,7 @@ extension DCMDecoder {
     ///
     /// Provides an alternative factory pattern for developers who prefer
     /// static method initialization or work primarily with String paths.
-    /// This is a convenience wrapper around ``init(contentsOfFile:)`` that
+    /// This is a convenience wrapper around `init(contentsOfFile:)` that
     /// provides the same functionality with a factory method style.
     ///
     /// **Example:**
@@ -159,6 +159,8 @@ extension DCMDecoder {
     public func setDicomFilename(_ filename: String) {
         do {
             try loadDicomFile(at: filename)
+        } catch is CancellationError {
+            return
         } catch {
             logger.warning("Failed to load file at \(filename): \(error)")
             synchronized {
@@ -226,11 +228,16 @@ extension DCMDecoder {
 
     private func loadDicomDataUnsafe(_ data: Data, sourceDescription: String) throws {
         do {
-            fileSize = data.count
-            dicomData = try DicomDeflatedDataSetCodec.inflatedPart10DataIfNeeded(data)
+            let normalizedData = data.startIndex == 0 ? data : Data(data)
+            fileSize = normalizedData.count
+            dicomData = try DicomDeflatedDataSetCodec.inflatedPart10DataIfNeeded(normalizedData)
         } catch {
             dicomFileName = ""
             fileReadSucceeded = false
+            if error is CancellationError || Task.isCancelled {
+                discardCancelledLoadUnsafe()
+                throw CancellationError()
+            }
             throw error
         }
 
@@ -254,7 +261,14 @@ extension DCMDecoder {
             tagParser = DCMTagParser(data: dicomData, dict: dict, binaryReader: reader)
         }
         // Parse the header (readFileInfo is called within synchronized block)
-        if readFileInfoUnsafe() {
+        let parsed: Bool
+        do {
+            parsed = try readFileInfoUnsafe()
+        } catch is CancellationError {
+            discardCancelledLoadUnsafe()
+            throw CancellationError()
+        }
+        if parsed {
             // Pixel payload stays lazy until first getPixels* call.
             pixelsNotLoaded = true
             dicomFileName = sourceDescription
@@ -265,6 +279,56 @@ extension DCMDecoder {
             pixelsNotLoaded = true
             try throwIfLoadFailed()
         }
+    }
+
+    // A cancelled header must not be observable as a partially loaded file (#2517).
+    private func discardCancelledLoadUnsafe() {
+        fileReadSucceeded = false
+        dicomFileName = ""
+        dicomData = Data()
+        fileSize = 0
+        location = 0
+        reader = nil
+        tagParser = nil
+        dicomFound = false
+        dicomInfoDict.removeAll()
+        cachedInfo.removeAll()
+        tagMetadataCache.removeAll()
+        transferSyntaxUID = ""
+        compressedImage = false
+        bigEndianTransferSyntax = false
+        littleEndian = true
+        isExplicitVRTransferSyntax = true
+        activeCharacterSet = .defaultCharacterSet
+        width = 0
+        height = 0
+        offset = 0
+        pixelDataVR = nil
+        imageOrientation = nil
+        imagePosition = nil
+        bitDepth = 16
+        nImages = 1
+        samplesPerPixel = 1
+        photometricInterpretation = ""
+        pixelRepresentation = 0
+        pixelWidth = 1
+        pixelHeight = 1
+        pixelDepth = 1
+        rescaleSlope = 1
+        rescaleIntercept = 0
+        windowCenter = 0
+        windowWidth = 0
+        reds = nil
+        greens = nil
+        blues = nil
+        redPaletteDescriptor = nil
+        greenPaletteDescriptor = nil
+        bluePaletteDescriptor = nil
+        pixelsNotLoaded = true
+        pixels8 = nil
+        pixels16 = nil
+        pixels24 = nil
+        signedImage = false
     }
 
     /// Throws `DICOMError.invalidDICOMFormat` with a descriptive reason if the last load attempt failed.

@@ -1,29 +1,5 @@
 import Foundation
 
-public struct DicomCodedConcept: Equatable, Hashable, Sendable {
-    public let codeValue: String
-    public let codingSchemeDesignator: String
-    public let codeMeaning: String?
-
-    public init(codeValue: String, codingSchemeDesignator: String, codeMeaning: String? = nil) {
-        self.codeValue = codeValue.dicomNonEmptyValue ?? codeValue
-        self.codingSchemeDesignator = codingSchemeDesignator.dicomNonEmptyValue ?? codingSchemeDesignator
-        self.codeMeaning = codeMeaning?.dicomNonEmptyValue
-    }
-
-    init?(dataSet: DicomDataSet) {
-        guard let codeValue = dataSet.string(for: .codeValue)?.dicomNonEmptyValue,
-              let codingScheme = dataSet.string(for: .codingSchemeDesignator)?.dicomNonEmptyValue else {
-            return nil
-        }
-        self.init(
-            codeValue: codeValue,
-            codingSchemeDesignator: codingScheme,
-            codeMeaning: dataSet.string(for: .codeMeaning)
-        )
-    }
-}
-
 public struct DicomRealWorldValueMap: Equatable, Hashable, Sendable {
     public let label: String?
     public let explanation: String?
@@ -33,6 +9,9 @@ public struct DicomRealWorldValueMap: Equatable, Hashable, Sendable {
     public let intercept: Double?
     public let slope: Double?
     public let lutData: [Double]
+    /// False for a linear item without Real World Value First/Last Value Mapped (Type 1, but absent from Philips
+    /// MR conversions): it covers every stored value, as GDCM reads it (Isis issue #2842).
+    public let declaresMappedRange: Bool
 
     public init?(label: String?,
                  explanation: String?,
@@ -41,8 +20,13 @@ public struct DicomRealWorldValueMap: Equatable, Hashable, Sendable {
                  units: DicomCodedConcept?,
                  intercept: Double?,
                  slope: Double?,
-                 lutData: [Double]) {
+                 lutData: [Double],
+                 declaresMappedRange: Bool = true) {
         guard firstMappedValue <= lastMappedValue else { return nil }
+        if !lutData.isEmpty {
+            let (span, overflowed) = lastMappedValue.subtractingReportingOverflow(firstMappedValue)
+            guard !overflowed, span == lutData.count - 1 else { return nil }
+        }
         guard (!lutData.isEmpty) || (intercept != nil && slope != nil) else { return nil }
         self.label = label?.dicomNonEmptyValue
         self.explanation = explanation?.dicomNonEmptyValue
@@ -52,13 +36,19 @@ public struct DicomRealWorldValueMap: Equatable, Hashable, Sendable {
         self.intercept = intercept
         self.slope = slope
         self.lutData = lutData
+        self.declaresMappedRange = declaresMappedRange
     }
 
     init?(dataSet: DicomDataSet) {
-        guard let first = dataSet.int(for: .realWorldValueFirstValueMapped),
-              let last = dataSet.int(for: .realWorldValueLastValueMapped) else {
+        let declared = dataSet.int(for: .realWorldValueFirstValueMapped)
+            .flatMap { first in dataSet.int(for: .realWorldValueLastValueMapped).map { (first, $0) } }
+        let lutData = dataSet.floats(for: .realWorldValueLUTData)
+        // A LUT needs its first value; a complete linear item without a range maps any stored value.
+        guard declared != nil || (lutData.isEmpty && dataSet.float(for: .realWorldValueSlope) != nil
+                                  && dataSet.float(for: .realWorldValueIntercept) != nil) else {
             return nil
         }
+        let (first, last) = declared ?? (Int(Int32.min), Int(Int32.max))
         self.init(
             label: dataSet.string(for: .realWorldValueLUTLabel),
             explanation: dataSet.string(for: .lutExplanation),
@@ -69,18 +59,22 @@ public struct DicomRealWorldValueMap: Equatable, Hashable, Sendable {
                 .flatMap { DicomCodedConcept(dataSet: $0.dataSet) },
             intercept: dataSet.float(for: .realWorldValueIntercept),
             slope: dataSet.float(for: .realWorldValueSlope),
-            lutData: dataSet.floats(for: .realWorldValueLUTData)
+            lutData: lutData,
+            declaresMappedRange: declared != nil
         )
     }
 
     public var physicalRange: ClosedRange<Double>? {
+        guard declaresMappedRange else { return nil }
         if !lutData.isEmpty {
-            guard let minimum = lutData.min(), let maximum = lutData.max() else { return nil }
+            guard lutData.allSatisfy(\.isFinite),
+                  let minimum = lutData.min(), let maximum = lutData.max() else { return nil }
             return minimum...maximum
         }
-        guard let intercept, let slope else { return nil }
+        guard let intercept, let slope, intercept.isFinite, slope.isFinite else { return nil }
         let first = slope * Double(firstMappedValue) + intercept
         let last = slope * Double(lastMappedValue) + intercept
+        guard first.isFinite, last.isFinite else { return nil }
         return min(first, last)...max(first, last)
     }
 
@@ -92,10 +86,11 @@ public struct DicomRealWorldValueMap: Equatable, Hashable, Sendable {
         guard contains(storedPixelValue: storedPixelValue) else { return nil }
         if !lutData.isEmpty {
             let index = storedPixelValue - firstMappedValue
-            return lutData.indices.contains(index) ? lutData[index] : nil
+            return lutData.indices.contains(index) && lutData[index].isFinite ? lutData[index] : nil
         }
-        guard let intercept, let slope else { return nil }
-        return slope * Double(storedPixelValue) + intercept
+        guard let intercept, let slope, intercept.isFinite, slope.isFinite else { return nil }
+        let value = slope * Double(storedPixelValue) + intercept
+        return value.isFinite ? value : nil
     }
 }
 
@@ -145,7 +140,20 @@ public struct DicomSUVMetadata: Equatable, Sendable {
     public let radiopharmaceuticalStartTime: DicomTime?
     public let radiopharmaceuticalStartDateTime: DicomDateTime?
     public let acquisitionTime: DicomTime?
-    public let diagnostics: [DicomQuantitativeDiagnostic]
+    public let seriesTime: DicomTime?
+    public let seriesDate: DicomDate?
+    public let acquisitionDateTime: DicomDateTime?
+    public let timeZoneOffsetMinutes: Int?
+
+    public var diagnostics: [DicomQuantitativeDiagnostic] {
+        Self.makeCommonDiagnostics(
+            units: units, decayReference: decayReference, decayCorrection: decayCorrection,
+            injectedDoseBq: injectedDoseBq, radionuclideHalfLifeSeconds: radionuclideHalfLifeSeconds,
+            radiopharmaceuticalStartTime: radiopharmaceuticalStartTime,
+            radiopharmaceuticalStartDateTime: radiopharmaceuticalStartDateTime,
+            referenceTimeIsKnown: acquisitionTime != nil
+        ) + timingDiagnostics
+    }
 
     public init(units: String?,
                 suvType: String?,
@@ -159,7 +167,11 @@ public struct DicomSUVMetadata: Equatable, Sendable {
                 radionuclideHalfLifeSeconds: Double?,
                 radiopharmaceuticalStartTime: DicomTime?,
                 radiopharmaceuticalStartDateTime: DicomDateTime?,
-                acquisitionTime: DicomTime?) {
+                acquisitionTime: DicomTime?,
+                seriesTime: DicomTime? = nil,
+                seriesDate: DicomDate? = nil,
+                acquisitionDateTime: DicomDateTime? = nil,
+                timeZoneOffsetMinutes: Int? = nil) {
         self.units = units?.dicomNonEmptyValue?.uppercased()
         self.suvType = suvType?.dicomNonEmptyValue?.uppercased()
         self.correctedImage = correctedImage.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() }
@@ -172,20 +184,27 @@ public struct DicomSUVMetadata: Equatable, Sendable {
         self.radionuclideHalfLifeSeconds = radionuclideHalfLifeSeconds
         self.radiopharmaceuticalStartTime = radiopharmaceuticalStartTime
         self.radiopharmaceuticalStartDateTime = radiopharmaceuticalStartDateTime
-        self.acquisitionTime = acquisitionTime
-        self.diagnostics = DicomSUVMetadata.makeCommonDiagnostics(
-            units: self.units,
-            decayFactor: decayFactor,
-            injectedDoseBq: injectedDoseBq,
-            radionuclideHalfLifeSeconds: radionuclideHalfLifeSeconds,
-            radiopharmaceuticalStartTime: radiopharmaceuticalStartTime,
-            radiopharmaceuticalStartDateTime: radiopharmaceuticalStartDateTime,
-            acquisitionTime: acquisitionTime
-        )
+        self.acquisitionTime = acquisitionTime ?? acquisitionDateTime?.time
+        self.seriesTime = seriesTime
+        self.seriesDate = seriesDate
+        self.acquisitionDateTime = acquisitionDateTime
+        self.timeZoneOffsetMinutes = timeZoneOffsetMinutes
     }
 
     init(dataSet: DicomDataSet, radiopharmaceuticalDataSet: DicomDataSet?) {
         let radiopharm = radiopharmaceuticalDataSet ?? dataSet
+        let datasetOffset = dataSet.string(for: 0x00080201)
+        func resolvedDateTime(_ value: DicomDateTime?) -> DicomDateTime? {
+            guard let value, value.timeZoneOffsetMinutes == nil, let datasetOffset else { return value }
+            return DicomDateTime(value.rawValue + datasetOffset) ?? value
+        }
+        let acquisitionTime = dataSet.time(for: .acquisitionTime)
+        let acquisitionDateTime = dataSet.dateTime(for: 0x0008002A)
+            ?? dataSet.date(for: .acquisitionDate).flatMap { date in
+                acquisitionTime.flatMap { time in
+                    DicomDateTime(date.rawValue + time.rawValue + (dataSet.string(for: 0x00080201) ?? ""))
+                }
+            }
         self.init(
             units: dataSet.string(for: .units),
             suvType: dataSet.string(for: .suvType),
@@ -198,8 +217,12 @@ public struct DicomSUVMetadata: Equatable, Sendable {
             injectedDoseBq: radiopharm.decimalString(for: .radionuclideTotalDose),
             radionuclideHalfLifeSeconds: radiopharm.decimalString(for: .radionuclideHalfLife),
             radiopharmaceuticalStartTime: radiopharm.time(for: .radiopharmaceuticalStartTime),
-            radiopharmaceuticalStartDateTime: radiopharm.dateTime(for: .radiopharmaceuticalStartDateTime),
-            acquisitionTime: dataSet.time(for: .acquisitionTime) ?? dataSet.time(for: .seriesTime)
+            radiopharmaceuticalStartDateTime: resolvedDateTime(radiopharm.dateTime(for: .radiopharmaceuticalStartDateTime)),
+            acquisitionTime: acquisitionTime,
+            seriesTime: dataSet.time(for: .seriesTime),
+            seriesDate: dataSet.date(for: .seriesDate),
+            acquisitionDateTime: resolvedDateTime(acquisitionDateTime),
+            timeZoneOffsetMinutes: datasetOffset.flatMap { DicomDateTime("19700101" + $0)?.timeZoneOffsetMinutes }
         )
     }
 
@@ -224,7 +247,8 @@ public struct DicomSUVMetadata: Equatable, Sendable {
             for: type,
             units: units,
             suvType: suvType,
-            decayFactor: decayFactor,
+            decayReference: decayReference,
+            decayCorrection: decayCorrection,
             patientWeightKg: patientWeightKg,
             patientSizeMeters: patientSizeMeters,
             normalizedPatientSex: normalizedPatientSex,
@@ -232,22 +256,53 @@ public struct DicomSUVMetadata: Equatable, Sendable {
             radionuclideHalfLifeSeconds: radionuclideHalfLifeSeconds,
             radiopharmaceuticalStartTime: radiopharmaceuticalStartTime,
             radiopharmaceuticalStartDateTime: radiopharmaceuticalStartDateTime,
-            acquisitionTime: acquisitionTime
-        )
+            referenceTimeIsKnown: acquisitionTime != nil
+        ) + timingDiagnostics
     }
 
-    public func decayCorrectedInjectedDoseBq() -> Double? {
-        guard let dose = injectedDoseBq, dose > 0 else { return nil }
-        if let decayFactor, decayFactor > 0 {
-            return dose / decayFactor
-        }
+    /// The moment the pixel values are decay-corrected to, which decides how
+    /// far the injected dose is decayed for SUV.
+    public enum DecayReference: String, Equatable, Sendable {
+        /// Decay Correction ADMIN: values are corrected to the administration,
+        /// so the dose is used as injected.
+        case administration
+        /// Decay Correction START: values are corrected to the start of the
+        /// scan, so the dose is decayed from the administration to it.
+        case scanStart
+    }
 
-        guard let halfLife = radionuclideHalfLifeSeconds,
-              halfLife > 0,
-              let decaySeconds = decayTimeSeconds() else {
-            return nil
+    /// Nil when the values are not decay-corrected (NONE) or the dataset does
+    /// not say: no SUV is derived then.
+    public var decayReference: DecayReference? {
+        Self.decayReference(decayCorrection: decayCorrection, correctedImage: correctedImage)
+    }
+
+    static func decayReference(decayCorrection: String?, correctedImage: [String]) -> DecayReference? {
+        switch decayCorrection {
+        case "ADMIN": return .administration
+        case "START": return .scanStart
+        // Corrected Image does not identify the correction's reference time.
+        case nil: return nil
+        default: return nil
         }
-        return dose * pow(2.0, -decaySeconds / halfLife)
+    }
+
+    /// The injected dose at the decay reference. Decay Factor (0054,1321) is
+    /// not used: it is the per-frame factor already applied to the pixel
+    /// values, not the decay of the dose since the administration.
+    public func decayCorrectedInjectedDoseBq() -> Double? {
+        guard let dose = injectedDoseBq, dose > 0, let decayReference else { return nil }
+        switch decayReference {
+        case .administration:
+            return dose
+        case .scanStart:
+            guard let halfLife = radionuclideHalfLifeSeconds,
+                  halfLife > 0,
+                  let decaySeconds = decayTimeSeconds() else {
+                return nil
+            }
+            return dose * pow(2.0, -decaySeconds / halfLife)
+        }
     }
 
     public func patientSizeCorrectionFactor(for type: DicomSUVType) -> Double? {
@@ -307,20 +362,118 @@ public struct DicomSUVMetadata: Equatable, Sendable {
         return patientSizeMeters * 100.0
     }
 
-    private func decayTimeSeconds() -> Double? {
-        let start = radiopharmaceuticalStartDateTime?.time ?? radiopharmaceuticalStartTime
-        guard let start, let acquisitionTime else { return nil }
-        var delta = acquisitionTime.secondsSinceStartOfDay - start.secondsSinceStartOfDay
-        if delta < 0 {
-            delta += 24.0 * 60.0 * 60.0
+    /// Seconds from administration to the scan start for Decay Correction START.
+    /// The scan starts at the earlier of Series Time and Acquisition Time: a
+    /// later bed position has a later Acquisition Time, but every bed of the
+    /// volume is corrected to the start (issue #2775); a derived series has a
+    /// later Series Time and keeps its Acquisition Time. Series Time alone is
+    /// not enough. Complete dates take precedence; time-only values retain the
+    /// midnight rollover.
+    public func decayTimeSeconds() -> Double? {
+        guard let start = radiopharmaceuticalStartDateTime?.time ?? radiopharmaceuticalStartTime,
+              let acquisition = acquisitionTime else { return nil }
+        if let dateTimeTime = acquisitionDateTime?.time,
+           dateTimeTime.secondsSinceStartOfDay != acquisition.secondsSinceStartOfDay {
+            return nil
         }
+        var reference = acquisition
+        var referenceDate = acquisitionDateTime?.date
+        var referenceOffset = acquisitionDateTime?.timeZoneOffsetMinutes ?? timeZoneOffsetMinutes
+        if let seriesTime {
+            let useSeries: Bool
+            if let seriesDate, let acquisitionDateTime {
+                guard (timeZoneOffsetMinutes == nil) == (referenceOffset == nil),
+                      let seriesInstant = Self.instant(date: seriesDate, time: seriesTime,
+                                                       offsetMinutes: timeZoneOffsetMinutes ?? 0),
+                      let acquisitionInstant = Self.instant(date: acquisitionDateTime.date, time: acquisition,
+                                                            offsetMinutes: referenceOffset ?? 0) else { return nil }
+                useSeries = seriesInstant < acquisitionInstant
+            } else {
+                guard seriesDate == nil else { return nil }
+                useSeries = acquisitionDateTime == nil
+                    && seriesTime.secondsSinceStartOfDay < acquisition.secondsSinceStartOfDay
+            }
+            if useSeries {
+                reference = seriesTime
+                referenceDate = seriesDate
+                referenceOffset = timeZoneOffsetMinutes
+            }
+        }
+        let startOffset = radiopharmaceuticalStartDateTime?.timeZoneOffsetMinutes ?? timeZoneOffsetMinutes
+        // Two local times remain comparable; one known offset cannot supply the other's zone.
+        guard (startOffset == nil) == (referenceOffset == nil) else { return nil }
+        if let startDateTime = radiopharmaceuticalStartDateTime, let referenceDate {
+            guard let startDate = Self.instant(
+                date: startDateTime.date, time: start,
+                offsetMinutes: startOffset ?? 0
+            ), let referenceDate = Self.instant(
+                date: referenceDate, time: reference,
+                offsetMinutes: referenceOffset ?? 0
+            ) else { return nil }
+            let delta = referenceDate.timeIntervalSince(startDate)
+            return delta >= 0 ? delta : nil
+        }
+        let localDelta = reference.secondsSinceStartOfDay - start.secondsSinceStartOfDay
+        // Infer midnight rollover only from the local clocks, before comparing instants.
+        let rolledDelta = localDelta < 0 ? localDelta + 24 * 60 * 60 : localDelta
+        let delta = rolledDelta - Double((referenceOffset ?? 0) - (startOffset ?? 0)) * 60
         return delta >= 0 ? delta : nil
+    }
+
+    private static func instant(date: DicomDate, time: DicomTime, offsetMinutes: Int) -> Date? {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let components = DateComponents(year: date.year, month: date.month, day: date.day)
+        guard components.isValidDate(in: calendar), let midnight = calendar.date(from: components) else { return nil }
+        return midnight.addingTimeInterval(time.secondsSinceStartOfDay - Double(offsetMinutes * 60))
+    }
+
+    private var timingDiagnostics: [DicomQuantitativeDiagnostic] {
+        guard units == "BQML", decayReference == .scanStart, acquisitionTime != nil,
+              radiopharmaceuticalStartDateTime?.time != nil || radiopharmaceuticalStartTime != nil,
+              decayTimeSeconds() == nil else { return [] }
+        return [DicomQuantitativeDiagnostic(
+            code: "inconsistent_pet_timing",
+            message: "PET acquisition and administration timing is inconsistent; SUV is not derived.",
+            tag: DicomTag.acquisitionTime.rawValue
+        )]
+    }
+
+    private static func decayDiagnostics(decayReference: DecayReference?,
+                                         decayCorrection: String?,
+                                         radionuclideHalfLifeSeconds: Double?,
+                                         radiopharmaceuticalStartTime: DicomTime?,
+                                         radiopharmaceuticalStartDateTime: DicomDateTime?,
+                                         referenceTimeIsKnown: Bool) -> [DicomQuantitativeDiagnostic] {
+        guard let decayReference else {
+            if let decayCorrection {
+                return [DicomQuantitativeDiagnostic(
+                    code: "decay_not_corrected",
+                    message: "PET values are not decay-corrected to a known reference (Decay Correction \(decayCorrection)); SUV is not derived.",
+                    tag: DicomTag.decayCorrection.rawValue
+                )]
+            }
+            return [.missing(.decayCorrection, "Decay Correction")]
+        }
+        guard decayReference == .scanStart else { return [] }
+        var diagnostics: [DicomQuantitativeDiagnostic] = []
+        if radionuclideHalfLifeSeconds == nil {
+            diagnostics.append(.missing(.radionuclideHalfLife, "Radionuclide Half Life"))
+        }
+        if radiopharmaceuticalStartTime == nil && radiopharmaceuticalStartDateTime?.time == nil {
+            diagnostics.append(.missing(.radiopharmaceuticalStartTime, "Radiopharmaceutical Start Time"))
+        }
+        if !referenceTimeIsKnown {
+            diagnostics.append(.missing(.acquisitionTime, "Acquisition Time"))
+        }
+        return diagnostics
     }
 
     private static func makeDiagnostics(for type: DicomSUVType,
                                         units: String?,
                                         suvType: String?,
-                                        decayFactor: Double?,
+                                        decayReference: DecayReference?,
+                                        decayCorrection: String?,
                                         patientWeightKg: Double?,
                                         patientSizeMeters: Double?,
                                         normalizedPatientSex: String?,
@@ -328,7 +481,7 @@ public struct DicomSUVMetadata: Equatable, Sendable {
                                         radionuclideHalfLifeSeconds: Double?,
                                         radiopharmaceuticalStartTime: DicomTime?,
                                         radiopharmaceuticalStartDateTime: DicomDateTime?,
-                                        acquisitionTime: DicomTime?) -> [DicomQuantitativeDiagnostic] {
+                                        referenceTimeIsKnown: Bool) -> [DicomQuantitativeDiagnostic] {
         var diagnostics: [DicomQuantitativeDiagnostic] = []
         if units == nil {
             diagnostics.append(.missing(.units, "Units"))
@@ -351,17 +504,14 @@ public struct DicomSUVMetadata: Equatable, Sendable {
         if injectedDoseBq == nil {
             diagnostics.append(.missing(.radionuclideTotalDose, "Radionuclide Total Dose"))
         }
-        if decayFactor == nil {
-            if radionuclideHalfLifeSeconds == nil {
-                diagnostics.append(.missing(.radionuclideHalfLife, "Radionuclide Half Life"))
-            }
-            if radiopharmaceuticalStartTime == nil && radiopharmaceuticalStartDateTime == nil {
-                diagnostics.append(.missing(.radiopharmaceuticalStartTime, "Radiopharmaceutical Start Time"))
-            }
-            if acquisitionTime == nil {
-                diagnostics.append(.missing(.acquisitionTime, "Acquisition Time"))
-            }
-        }
+        diagnostics.append(contentsOf: decayDiagnostics(
+            decayReference: decayReference,
+            decayCorrection: decayCorrection,
+            radionuclideHalfLifeSeconds: radionuclideHalfLifeSeconds,
+            radiopharmaceuticalStartTime: radiopharmaceuticalStartTime,
+            radiopharmaceuticalStartDateTime: radiopharmaceuticalStartDateTime,
+            referenceTimeIsKnown: referenceTimeIsKnown
+        ))
 
         switch type {
         case .bw:
@@ -390,12 +540,13 @@ public struct DicomSUVMetadata: Equatable, Sendable {
     }
 
     private static func makeCommonDiagnostics(units: String?,
-                                              decayFactor: Double?,
+                                              decayReference: DecayReference?,
+                                              decayCorrection: String?,
                                               injectedDoseBq: Double?,
                                               radionuclideHalfLifeSeconds: Double?,
                                               radiopharmaceuticalStartTime: DicomTime?,
                                               radiopharmaceuticalStartDateTime: DicomDateTime?,
-                                              acquisitionTime: DicomTime?) -> [DicomQuantitativeDiagnostic] {
+                                              referenceTimeIsKnown: Bool) -> [DicomQuantitativeDiagnostic] {
         var diagnostics: [DicomQuantitativeDiagnostic] = []
         if units == nil {
             diagnostics.append(.missing(.units, "Units"))
@@ -412,17 +563,14 @@ public struct DicomSUVMetadata: Equatable, Sendable {
         if injectedDoseBq == nil {
             diagnostics.append(.missing(.radionuclideTotalDose, "Radionuclide Total Dose"))
         }
-        if decayFactor == nil {
-            if radionuclideHalfLifeSeconds == nil {
-                diagnostics.append(.missing(.radionuclideHalfLife, "Radionuclide Half Life"))
-            }
-            if radiopharmaceuticalStartTime == nil && radiopharmaceuticalStartDateTime == nil {
-                diagnostics.append(.missing(.radiopharmaceuticalStartTime, "Radiopharmaceutical Start Time"))
-            }
-            if acquisitionTime == nil {
-                diagnostics.append(.missing(.acquisitionTime, "Acquisition Time"))
-            }
-        }
+        diagnostics.append(contentsOf: decayDiagnostics(
+            decayReference: decayReference,
+            decayCorrection: decayCorrection,
+            radionuclideHalfLifeSeconds: radionuclideHalfLifeSeconds,
+            radiopharmaceuticalStartTime: radiopharmaceuticalStartTime,
+            radiopharmaceuticalStartDateTime: radiopharmaceuticalStartDateTime,
+            referenceTimeIsKnown: referenceTimeIsKnown
+        ))
         return diagnostics
     }
 }
@@ -501,9 +649,21 @@ public struct DicomQuantitativeValueProfile: Equatable, Sendable {
 }
 
 extension DCMDecoder {
+    /// Object-wide inventory. Use the frame-specific profile for measurements.
     public var quantitativeValueProfile: DicomQuantitativeValueProfile {
         synchronized {
             makeQuantitativeValueProfileUnsafe()
+        }
+    }
+
+    public func quantitativeValueProfile(forFrame frame: Int) -> DicomQuantitativeValueProfile {
+        synchronized {
+            guard frame >= 0, frame < max(1, nImages) else {
+                return DicomQuantitativeValueProfile(diagnostics: [.init(
+                    code: "quantitative_frame_out_of_range", message: "Requested quantitative frame is outside the source."
+                )])
+            }
+            return makeQuantitativeValueProfileUnsafe(frame: frame)
         }
     }
 
@@ -518,7 +678,7 @@ extension DCMDecoder {
         }
 
         let displayProfile = displayTransformProfile
-        let quantitativeProfile = quantitativeValueProfile
+        let quantitativeProfile = quantitativeValueProfile(forFrame: frame)
 
         if let suvType {
             let suvValue = quantitativeProfile.suvMetadata?.suvValue(
@@ -551,9 +711,11 @@ extension DCMDecoder {
         )
     }
 
-    private func makeQuantitativeValueProfileUnsafe() -> DicomQuantitativeValueProfile {
+    private func makeQuantitativeValueProfileUnsafe(frame: Int? = nil) -> DicomQuantitativeValueProfile {
         let dataSet = self.dataSet
-        let maps = makeRealWorldValueMapsUnsafe()
+        let items = realWorldValueItemsUnsafe(frame: frame)
+        let parsedMaps = items.compactMap { DicomRealWorldValueMap(dataSet: $0.dataSet) }
+        let maps = parsedMaps.removingDuplicates()
         var diagnostics: [DicomQuantitativeDiagnostic] = []
 
         let isPETLike = dataSet.string(for: .modality)?.uppercased() == "PT" ||
@@ -572,10 +734,24 @@ extension DCMDecoder {
             suvMetadata = nil
         }
 
-        if !parseQuantitativeSequenceItemsUnsafe(for: .realWorldValueMappingSequence).isEmpty && maps.isEmpty {
+        if parsedMaps.count != items.count {
             diagnostics.append(DicomQuantitativeDiagnostic(
                 code: "invalid_real_world_value_mapping",
-                message: "Real World Value Mapping Sequence is present but no complete mapping item could be parsed.",
+                message: "Real World Value Mapping Sequence contains an incomplete mapping item.",
+                tag: DicomTag.realWorldValueMappingSequence.rawValue
+            ))
+        }
+        if maps.contains(where: { !$0.declaresMappedRange }) {
+            diagnostics.append(.init(
+                code: "real_world_value_mapping_without_range",
+                message: "A linear real-world mapping has no First/Last Value Mapped; it is applied to every stored value.",
+                tag: DicomTag.realWorldValueMappingSequence.rawValue
+            ))
+        }
+        if maps.contains(where: { $0.declaresMappedRange && $0.physicalRange == nil }) {
+            diagnostics.append(.init(
+                code: "non_finite_real_world_value_mapping",
+                message: "A real-world mapping contains non-finite values or overflows its physical range.",
                 tag: DicomTag.realWorldValueMappingSequence.rawValue
             ))
         }
@@ -587,14 +763,24 @@ extension DCMDecoder {
         )
     }
 
-    private func makeRealWorldValueMapsUnsafe() -> [DicomRealWorldValueMap] {
+    private func realWorldValueItemsUnsafe(frame: Int?) -> [DicomSequenceItem] {
         var items = parseQuantitativeSequenceItemsUnsafe(for: .realWorldValueMappingSequence)
         let sharedItems = parseQuantitativeSequenceItemsUnsafe(for: .sharedFunctionalGroupsSequence)
         let perFrameItems = parseQuantitativeSequenceItemsUnsafe(for: .perFrameFunctionalGroupsSequence)
+        if let frame {
+            if perFrameItems.indices.contains(frame),
+               perFrameItems[frame].dataSet[.realWorldValueMappingSequence] != nil {
+                return perFrameItems[frame].dataSet.sequenceItems(for: .realWorldValueMappingSequence)
+            }
+            if let shared = sharedItems.first, shared.dataSet[.realWorldValueMappingSequence] != nil {
+                return shared.dataSet.sequenceItems(for: .realWorldValueMappingSequence)
+            }
+            return items
+        }
         items.append(contentsOf: (sharedItems + perFrameItems).flatMap {
             $0.dataSet.sequenceItems(for: .realWorldValueMappingSequence)
         })
-        return items.compactMap { DicomRealWorldValueMap(dataSet: $0.dataSet) }.removingDuplicates()
+        return items
     }
 
     private func parseQuantitativeSequenceItemsUnsafe(for tag: DicomTag) -> [DicomSequenceItem] {

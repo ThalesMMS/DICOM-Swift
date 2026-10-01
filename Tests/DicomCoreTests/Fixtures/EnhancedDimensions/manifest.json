@@ -1,0 +1,314 @@
+[
+  {
+    "frame": 0,
+    "coordinates": [
+      1,
+      1,
+      2,
+      1
+    ],
+    "z": 0.0,
+    "intercept": -950.0,
+    "window": 821.0,
+    "center_sample": 1767
+  },
+  {
+    "frame": 1,
+    "coordinates": [
+      2,
+      3,
+      2,
+      2
+    ],
+    "z": 5.0,
+    "intercept": -940.0,
+    "window": 822.0,
+    "center_sample": 2307
+  },
+  {
+    "frame": 2,
+    "coordinates": [
+      1,
+      3,
+      2,
+      2
+    ],
+    "z": 5.0,
+    "intercept": -940.0,
+    "window": 822.0,
+    "center_sample": 1807
+  },
+  {
+    "frame": 3,
+    "coordinates": [
+      1,
+      2,
+      2,
+      2
+    ],
+    "z": 2.5,
+    "intercept": -940.0,
+    "window": 822.0,
+    "center_sample": 1802
+  },
+  {
+    "frame": 4,
+    "coordinates": [
+      2,
+      2,
+      2,
+      2
+    ],
+    "z": 2.5,
+    "intercept": -940.0,
+    "window": 822.0,
+    "center_sample": 2302
+  },
+  {
+    "frame": 5,
+    "coordinates": [
+      1,
+      1,
+      1,
+      2
+    ],
+    "z": 0.0,
+    "intercept": -960.0,
+    "window": 812.0,
+    "center_sample": 1697
+  },
+  {
+    "frame": 6,
+    "coordinates": [
+      2,
+      1,
+      1,
+      2
+    ],
+    "z": 0.0,
+    "intercept": -960.0,
+    "window": 812.0,
+    "center_sample": 2197
+  },
+  {
+    "frame": 7,
+    "coordinates": [
+      2,
+      1,
+      1,
+      1
+    ],
+    "z": 0.0,
+    "intercept": -970.0,
+    "window": 811.0,
+    "center_sample": 2167
+  },
+  {
+    "frame": 8,
+    "coordinates": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "z": 0.0,
+    "intercept": -970.0,
+    "window": 811.0,
+    "center_sample": 1667
+  },
+  {
+    "frame": 9,
+    "coordinates": [
+      2,
+      2,
+      2,
+      1
+    ],
+    "z": 2.5,
+    "intercept": -950.0,
+    "window": 821.0,
+    "center_sample": 2272
+  },
+  {
+    "frame": 10,
+    "coordinates": [
+      1,
+      3,
+      1,
+      2
+    ],
+    "z": 5.0,
+    "intercept": -960.0,
+    "window": 812.0,
+    "center_sample": 1707
+  },
+  {
+    "frame": 11,
+    "coordinates": [
+      2,
+      1,
+      2,
+      2
+    ],
+    "z": 0.0,
+    "intercept": -940.0,
+    "window": 822.0,
+    "center_sample": 2297
+  },
+  {
+    "frame": 12,
+    "coordinates": [
+      2,
+      3,
+      2,
+      1
+    ],
+    "z": 5.0,
+    "intercept": -950.0,
+    "window": 821.0,
+    "center_sample": 2277
+  },
+  {
+    "frame": 13,
+    "coordinates": [
+      2,
+      2,
+      1,
+      1
+    ],
+    "z": 2.5,
+    "intercept": -970.0,
+    "window": 811.0,
+    "center_sample": 2172
+  },
+  {
+    "frame": 14,
+    "coordinates": [
+      1,
+      2,
+      1,
+      2
+    ],
+    "z": 2.5,
+    "intercept": -960.0,
+    "window": 812.0,
+    "center_sample": 1702
+  },
+  {
+    "frame": 15,
+    "coordinates": [
+      1,
+      3,
+      2,
+      1
+    ],
+    "z": 5.0,
+    "intercept": -950.0,
+    "window": 821.0,
+    "center_sample": 1777
+  },
+  {
+    "frame": 16,
+    "coordinates": [
+      1,
+      1,
+      2,
+      2
+    ],
+    "z": 0.0,
+    "intercept": -940.0,
+    "window": 822.0,
+    "center_sample": 1797
+  },
+  {
+    "frame": 17,
+    "coordinates": [
+      2,
+      1,
+      2,
+      1
+    ],
+    "z": 0.0,
+    "intercept": -950.0,
+    "window": 821.0,
+    "center_sample": 2267
+  },
+  {
+    "frame": 18,
+    "coordinates": [
+      2,
+      3,
+      1,
+      2
+    ],
+    "z": 5.0,
+    "intercept": -960.0,
+    "window": 812.0,
+    "center_sample": 2207
+  },
+  {
+    "frame": 19,
+    "coordinates": [
+      1,
+      3,
+      1,
+      1
+    ],
+    "z": 5.0,
+    "intercept": -970.0,
+    "window": 811.0,
+    "center_sample": 1677
+  },
+  {
+    "frame": 20,
+    "coordinates": [
+      1,
+      2,
+      1,
+      1
+    ],
+    "z": 2.5,
+    "intercept": -970.0,
+    "window": 811.0,
+    "center_sample": 1672
+  },
+  {
+    "frame": 21,
+    "coordinates": [
+      2,
+      3,
+      1,
+      1
+    ],
+    "z": 5.0,
+    "intercept": -970.0,
+    "window": 811.0,
+    "center_sample": 2177
+  },
+  {
+    "frame": 22,
+    "coordinates": [
+      1,
+      2,
+      2,
+      1
+    ],
+    "z": 2.5,
+    "intercept": -950.0,
+    "window": 821.0,
+    "center_sample": 1772
+  },
+  {
+    "frame": 23,
+    "coordinates": [
+      2,
+      2,
+      1,
+      2
+    ],
+    "z": 2.5,
+    "intercept": -960.0,
+    "window": 812.0,
+    "center_sample": 2202
+  }
+]

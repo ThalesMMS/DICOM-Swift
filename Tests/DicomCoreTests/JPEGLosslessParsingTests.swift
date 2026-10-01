@@ -74,8 +74,8 @@ final class JPEGLosslessParsingTests: XCTestCase {
     }
 
     /// DRI markers are parsed (restart intervals decode since #1229); a
-    /// truncated DRI payload still fails typed.
-    func testMarkerParsingAcceptsDRIAndRejectsTruncatedPayload() throws {
+    /// malformed DRI payload lengths still fail typed.
+    func test_driParsing_acceptsValidAndRejectsMalformedPayloadLengths() throws {
         var jpegData = makeMinimalJPEGLosslessData(width: 2, height: 2)
         guard let sosIndex = markerIndex(0xDA, in: jpegData) else {
             XCTFail("Missing SOS marker in minimal JPEG Lossless data")
@@ -100,6 +100,18 @@ final class JPEGLosslessParsingTests: XCTestCase {
         }
         truncated.insert(contentsOf: [0xFF, JPEGMarker.dri.rawValue, 0x00, 0x02], at: truncatedSOS)
         assertInvalidDICOMFormat(reasonContains: "DRI", try JPEGLosslessDecoder().decode(data: truncated))
+
+        var oversized = makeMinimalJPEGLosslessData(width: 2, height: 2)
+        guard let oversizedSOS = markerIndex(0xDA, in: oversized) else {
+            XCTFail("Missing SOS marker in minimal JPEG Lossless data")
+            return
+        }
+        oversized.insert(
+            contentsOf: [0xFF, JPEGMarker.dri.rawValue, 0x00, 0x06, 0x00, 0x04],
+            at: oversizedSOS
+        )
+        oversized = Data(oversized.prefix(oversizedSOS + 6))
+        assertInvalidDICOMFormat(reasonContains: "DRI", try JPEGLosslessDecoder().decode(data: oversized))
     }
 
     func testDecodeRejectsRestartMarkerInEntropyData() throws {
@@ -137,18 +149,19 @@ final class JPEGLosslessParsingTests: XCTestCase {
     }
 
     func testSOF3ParsingInvalidPrecision() throws {
-        // Test that unsupported precision (e.g., 7-bit) is rejected
+        // T.81 lossless allows 2...16-bit samples; 1 and 17 are rejected.
+        for precision: UInt8 in [0, 1, 17] {
+            var jpegData = makeMinimalJPEGLosslessData(width: 2, height: 2)
+            guard let sof3Index = markerIndex(0xC3, in: jpegData) else {
+                XCTFail("Missing SOF3 marker in minimal JPEG Lossless data")
+                return
+            }
+            jpegData[sof3Index + 4] = precision
 
-        var jpegData = makeMinimalJPEGLosslessData(width: 2, height: 2)
-        guard let sof3Index = markerIndex(0xC3, in: jpegData) else {
-            XCTFail("Missing SOF3 marker in minimal JPEG Lossless data")
-            return
+            let decoder = JPEGLosslessDecoder()
+
+            assertInvalidDICOMFormat(reasonContains: "Unsupported SOF3 precision", try decoder.decode(data: jpegData))
         }
-        jpegData[sof3Index + 4] = 7
-
-        let decoder = JPEGLosslessDecoder()
-
-        assertInvalidDICOMFormat(reasonContains: "Unsupported SOF3 precision", try decoder.decode(data: jpegData))
     }
 
     func testSOF3ParsingTruncatedPayload() throws {
@@ -190,7 +203,8 @@ final class JPEGLosslessParsingTests: XCTestCase {
         }
     }
 
-    func testDecodeRejectsSSSSCategoryAbovePrecision() throws {
+    func testDecodeRejectsSSSSCategoryAboveSixteen() throws {
+        // Categories above the precision are legitimate (predictors 4...7 can predict out of range); above 16 is not.
         var jpegData = makeMinimalJPEGLosslessData(width: 1, height: 1, precision: 12)
         guard let dhtIndex = markerIndex(0xC4, in: jpegData) else {
             XCTFail("Missing DHT marker in minimal JPEG Lossless data")
@@ -198,11 +212,11 @@ final class JPEGLosslessParsingTests: XCTestCase {
         }
 
         let symbolValueIndex = dhtIndex + 2 + 2 + 1 + 16
-        jpegData[symbolValueIndex] = 13
+        jpegData[symbolValueIndex] = 17
 
         let decoder = JPEGLosslessDecoder()
 
-        assertInvalidDICOMFormat(reasonContains: "exceeds sample precision", try decoder.decode(data: jpegData))
+        assertInvalidDICOMFormat(reasonContains: "exceeds the maximum difference category 16", try decoder.decode(data: jpegData))
     }
 
     // MARK: - SOS Parsing Tests

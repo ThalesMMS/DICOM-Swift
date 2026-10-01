@@ -6,6 +6,7 @@ import Network
 public enum DicomStorageSCPError: Error, Equatable, Sendable {
     case associationRequestExpected
     case calledAETitleNotRecognized(String)
+    case callingAETitleNotRecognized(String)
     case missingCommandDataSet(UInt16)
     case missingPresentationContext(UInt8)
     case malformedStorageCommitmentRequest
@@ -18,6 +19,8 @@ extension DicomStorageSCPError: LocalizedError {
             return "Expected an A-ASSOCIATE-RQ PDU before Storage SCP commands."
         case .calledAETitleNotRecognized(let value):
             return "Called AE title \(value) is not recognized by this Storage SCP."
+        case .callingAETitleNotRecognized(let value):
+            return "Calling AE title \(value) is not allowed by this Storage SCP."
         case .missingCommandDataSet(let command):
             return String(format: "DIMSE command 0x%04X requires a dataset.", command)
         case .missingPresentationContext(let id):
@@ -48,13 +51,34 @@ public enum DicomStorageSOPClassUIDs {
         secondaryCaptureImageStorage,
         positronEmissionTomographyImageStorage,
         DicomSegmentationBuilder.segmentationStorageSOPClassUID,
+        DicomSegmentationBuilder.labelMapSegmentationStorageSOPClassUID,
+        DicomSurfaceSegmentation.storageSOPClassUID,
         DicomRTStructureSet.storageSOPClassUID,
         DicomRTDoseVolume.storageSOPClassUID,
         DicomRTPlan.storageSOPClassUID,
+        DicomSpatialRegistrationDocument.storageSOPClassUID,
         DicomParametricMap.storageSOPClassUID,
-        DicomSecondaryCaptureImage.storageSOPClassUID,
-        DicomGrayscalePresentationState.storageSOPClassUID
-    ]).union(DicomSRDocument.structuredReportSOPClassUIDs)
+        DicomSecondaryCaptureImage.storageSOPClassUID
+    ])
+    .union(DicomGrayscalePresentationState.supportedStorageSOPClassUIDs)
+    .union(DicomSRDocument.structuredReportSOPClassUIDs)
+    .union(DicomWaveform.supportedStorageSOPClassUIDs)
+
+    /// Whether objects of `abstractSyntaxUID` may carry encapsulated Pixel Data: the Storage SOP Classes under
+    /// `1.2.840.10008.5.1.4.1.1` and private SOP Classes. Query, retrieve, verification, print and workflow contexts
+    /// carry commands and identifiers only.
+    public static func mayCarryEncapsulatedPixelData(_ abstractSyntaxUID: String) -> Bool {
+        abstractSyntaxUID.hasPrefix("1.2.840.10008.5.1.4.1.1.") || !abstractSyntaxUID.hasPrefix("1.2.840.10008.")
+    }
+
+    /// The syntaxes a context for `abstractSyntaxUID` may use: all of `syntaxes`, or, when its objects carry no
+    /// encapsulated Pixel Data, the native ones among them (Explicit and Implicit VR Little Endian when none is).
+    public static func transferSyntaxes(_ syntaxes: [DicomTransferSyntax],
+                                        forAbstractSyntax abstractSyntaxUID: String) -> [DicomTransferSyntax] {
+        guard !mayCarryEncapsulatedPixelData(abstractSyntaxUID) else { return syntaxes }
+        let native = syntaxes.filter { !$0.registryEntry.isEncapsulated }
+        return native.isEmpty ? [.explicitVRLittleEndian, .implicitVRLittleEndian] : native
+    }
 }
 
 public struct DicomStorageSCPConfiguration: Equatable, Sendable {
@@ -66,8 +90,16 @@ public struct DicomStorageSCPConfiguration: Equatable, Sendable {
     public var timeout: TimeInterval
     public var acceptAnyCalledAETitle: Bool
     public var acceptOnlyIntranet: Bool
+    public var allowedCallingAETitles: Set<String>
     public var enableStorageCommitment: Bool
     public var tls: DicomTLSConfiguration
+    public var maximumConcurrentAssociations: Int
+    public var maximumInFlightStoreRequests: Int
+    public var maximumStagedBytes: Int64
+    public var maximumObjectsPerAssociation: Int
+    public var maximumBytesPerAssociation: Int64
+    public var maximumConnectionsPerPeer: Int
+    public var dataSetParseLimits: DicomDataSetParseLimits
 
     public init(aeTitle: String,
                 port: UInt16 = 11112,
@@ -77,8 +109,16 @@ public struct DicomStorageSCPConfiguration: Equatable, Sendable {
                 timeout: TimeInterval = 10,
                 acceptAnyCalledAETitle: Bool = false,
                 acceptOnlyIntranet: Bool = false,
+                allowedCallingAETitles: Set<String> = [],
                 enableStorageCommitment: Bool = true,
-                tls: DicomTLSConfiguration = .disabled) {
+                tls: DicomTLSConfiguration = .disabled,
+                maximumConcurrentAssociations: Int = 4,
+                maximumInFlightStoreRequests: Int = 4,
+                maximumStagedBytes: Int64 = 512 * 1_024 * 1_024,
+                maximumObjectsPerAssociation: Int = 1_000,
+                maximumBytesPerAssociation: Int64 = 2 * 1_024 * 1_024 * 1_024,
+                maximumConnectionsPerPeer: Int = 2,
+                dataSetParseLimits: DicomDataSetParseLimits = .default) {
         self.aeTitle = aeTitle
         self.port = port
         self.supportedStorageSOPClassUIDs = supportedStorageSOPClassUIDs
@@ -87,8 +127,16 @@ public struct DicomStorageSCPConfiguration: Equatable, Sendable {
         self.timeout = timeout
         self.acceptAnyCalledAETitle = acceptAnyCalledAETitle
         self.acceptOnlyIntranet = acceptOnlyIntranet
+        self.allowedCallingAETitles = allowedCallingAETitles
         self.enableStorageCommitment = enableStorageCommitment
         self.tls = tls
+        self.maximumConcurrentAssociations = max(1, maximumConcurrentAssociations)
+        self.maximumInFlightStoreRequests = max(1, maximumInFlightStoreRequests)
+        self.maximumStagedBytes = max(1, maximumStagedBytes)
+        self.maximumObjectsPerAssociation = max(1, maximumObjectsPerAssociation)
+        self.maximumBytesPerAssociation = max(1, maximumBytesPerAssociation)
+        self.maximumConnectionsPerPeer = max(1, maximumConnectionsPerPeer)
+        self.dataSetParseLimits = dataSetParseLimits
     }
 }
 
@@ -166,22 +214,32 @@ public struct DicomStorageReceivedInstance: Equatable, Sendable {
     public var transferSyntax: DicomTransferSyntax
     /// Metadata-only parsed dataset. Pixel Data remains available in `rawDataSetData`.
     public var dataSet: DicomDataSet {
-        didSet { rawDataSetData = nil }
+        didSet { rawDataSetData = nil; part10FileURL = nil }
     }
     public var rawDataSetData: Data?
+    /// The object as received, already written as a Part 10 file (preamble, File Meta, then the dataset bytes as
+    /// they arrived), when the receiver wrote it to disk instead of holding it (issue #2793); `rawDataSetData` is
+    /// then a mapped view of that file. A store may move the file; the receiver removes what is left of it.
+    public var part10FileURL: URL?
     public var receivedAt: Date
+    /// The C-MOVE this object answers, from Move Originator AE Title and Message ID (0000,1030/1031), when it
+    /// arrived as a C-MOVE sub-operation (issue #2817).
+    public var moveOriginatorAETitle: String?
+    public var moveOriginatorMessageID: UInt16?
 
     public init(sopClassUID: String,
                 sopInstanceUID: String,
                 transferSyntax: DicomTransferSyntax,
                 dataSet: DicomDataSet,
                 rawDataSetData: Data? = nil,
+                part10FileURL: URL? = nil,
                 receivedAt: Date = Date()) {
         self.sopClassUID = sopClassUID
         self.sopInstanceUID = sopInstanceUID
         self.transferSyntax = transferSyntax
         self.dataSet = dataSet
         self.rawDataSetData = rawDataSetData
+        self.part10FileURL = part10FileURL
         self.receivedAt = receivedAt
     }
 }
@@ -192,62 +250,61 @@ public struct DicomStoredInstance: Equatable, Sendable {
     public var transferSyntax: DicomTransferSyntax
     public var fileURL: URL
     public var storedAt: Date
+    public var isConflict: Bool
 
     public init(sopClassUID: String,
                 sopInstanceUID: String,
                 transferSyntax: DicomTransferSyntax,
                 fileURL: URL,
-                storedAt: Date = Date()) {
+                storedAt: Date = Date(),
+                isConflict: Bool = false) {
         self.sopClassUID = sopClassUID
         self.sopInstanceUID = sopInstanceUID
         self.transferSyntax = transferSyntax
         self.fileURL = fileURL
         self.storedAt = storedAt
+        self.isConflict = isConflict
     }
 }
 
-public protocol DicomStorageInstanceStoring: AnyObject {
+/// Implementations may be invoked concurrently by independent associations.
+public protocol DicomStorageInstanceStoring: AnyObject, Sendable {
     func store(_ instance: DicomStorageReceivedInstance) throws -> DicomStoredInstance
+    /// Where the receiver writes each incoming object as a Part 10 file, handed over in `part10FileURL`, instead of
+    /// holding it in memory (issue #2793); nil keeps objects in memory.
+    var receivedFileDirectory: URL? { get }
+}
+
+public extension DicomStorageInstanceStoring {
+    var receivedFileDirectory: URL? { nil }
 }
 
 public final class DicomFileStorageCache: DicomStorageInstanceStoring {
     public let directoryURL: URL
 
+    public let ingest: DicomIngestCoordinator
+
     public init(directoryURL: URL) throws {
         self.directoryURL = directoryURL
-        try FileManager.default.createDirectory(at: directoryURL,
-                                                withIntermediateDirectories: true)
+        let fs = DicomLocalIngestFileSystem()
+        try fs.createDirectory(directoryURL)
+        let journal = try DicomJSONLIngestJournal(path: directoryURL.appendingPathComponent(".ingest/journal.jsonl"))
+        let registrar = try DicomJSONLIngestRegistrar(path: directoryURL.appendingPathComponent(".ingest/registry.jsonl"))
+        ingest = DicomIngestCoordinator(root: directoryURL, journal: journal, registrar: registrar,
+                                        capacity: DicomFileStoragePreflight(directoryURL: directoryURL, reserveBytes: 0))
     }
 
     public func store(_ instance: DicomStorageReceivedInstance) throws -> DicomStoredInstance {
-        let fileURL = directoryURL.appendingPathComponent(Self.fileName(for: instance.sopInstanceUID))
-        if let rawDataSetData = instance.rawDataSetData {
-            try DicomDataSetWriter.validateWriteSupport(
-                for: instance.dataSet,
-                transferSyntax: instance.transferSyntax
-            )
-            let part10Data = try DicomDataSetWriter.part10Data(
-                fromEncodedDataSet: rawDataSetData,
-                transferSyntax: instance.transferSyntax,
-                mediaStorageSOPClassUID: instance.sopClassUID,
-                mediaStorageSOPInstanceUID: instance.sopInstanceUID
-            )
-            try part10Data.write(to: fileURL, options: [.atomic])
-        } else {
-            try DicomDataSetWriter.write(
-                instance.dataSet,
-                to: fileURL,
-                options: DicomPart10WriterOptions(
-                    transferSyntax: instance.transferSyntax,
-                    mediaStorageSOPClassUID: instance.sopClassUID,
-                    mediaStorageSOPInstanceUID: instance.sopInstanceUID
-                )
-            )
-        }
-        return DicomStoredInstance(sopClassUID: instance.sopClassUID,
-                                   sopInstanceUID: instance.sopInstanceUID,
-                                   transferSyntax: instance.transferSyntax,
-                                   fileURL: fileURL)
+        let result = try DicomIngestBlockingResult.run { [ingest] in try await ingest.ingest(instance) }
+        return DicomStoredInstance(sopClassUID: instance.sopClassUID, sopInstanceUID: instance.sopInstanceUID,
+                                   transferSyntax: instance.transferSyntax, fileURL: result.record.path,
+                                   isConflict: result.record.isConflict)
+    }
+
+    public var receivedFileDirectory: URL? { ingest.receivedFileDirectory }
+
+    public func recoverPendingIngests() async throws -> DicomIngestRecoveryReport {
+        try await DicomIngestRecovery.replay(journal: ingest.journal, fileSystem: ingest.fileSystem, registrar: ingest.registrar)
     }
 
     public static func fileName(for sopInstanceUID: String) -> String {
@@ -274,15 +331,18 @@ public struct DicomStorageCommitmentReference: Codable, Equatable, Sendable {
     public var sopInstanceUID: String
     public var status: DicomStorageCommitmentReferenceStatus
     public var failureReason: String?
+    public var failureReasonCode: UInt16?
 
     public init(sopClassUID: String,
                 sopInstanceUID: String,
                 status: DicomStorageCommitmentReferenceStatus = .committed,
-                failureReason: String? = nil) {
+                failureReason: String? = nil,
+                failureReasonCode: UInt16? = nil) {
         self.sopClassUID = sopClassUID
         self.sopInstanceUID = sopInstanceUID
         self.status = status
         self.failureReason = failureReason
+        self.failureReasonCode = failureReasonCode
     }
 }
 
@@ -300,7 +360,9 @@ public struct DicomStorageCommitmentReport: Codable, Equatable, Sendable {
     }
 }
 
-public final class DicomStorageCommitmentTracker {
+/// Mutable tracking state is serialized by `lock`.
+public final class DicomStorageCommitmentTracker: @unchecked Sendable {
+    private static let referencedSOPNotStoredReason = "Referenced SOP instance is not stored."
     private var storedKeys: Set<String> = []
     private var reportsByTransactionUID: [String: DicomStorageCommitmentReport] = [:]
     private let lock = NSLock()
@@ -325,7 +387,8 @@ public final class DicomStorageCommitmentTracker {
                 return DicomStorageCommitmentReference(sopClassUID: reference.sopClassUID,
                                                        sopInstanceUID: reference.sopInstanceUID,
                                                        status: .failed,
-                                                       failureReason: "Referenced SOP instance is not stored.")
+                                                       failureReason: Self.referencedSOPNotStoredReason,
+                                                       failureReasonCode: 0x0112)
             }
             return DicomStorageCommitmentReference(sopClassUID: reference.sopClassUID,
                                                    sopInstanceUID: reference.sopInstanceUID,
@@ -363,7 +426,8 @@ public final class DicomStorageCommitmentTracker {
         let references = dataSet.sequenceItems(for: StorageCommitmentTags.referencedSOPSequence).compactMap { item in
             reference(from: item.dataSet, status: .committed)
         }
-        guard !references.isEmpty else {
+        let identities = references.map { "\($0.sopClassUID)|\($0.sopInstanceUID)" }
+        guard !references.isEmpty, Set(identities).count == identities.count else {
             throw DicomStorageSCPError.malformedStorageCommitmentRequest
         }
         return (transactionUID, references)
@@ -418,10 +482,21 @@ public final class DicomStorageCommitmentTracker {
     }
 
     private static func referenceItem(_ reference: DicomStorageCommitmentReference) -> DicomSequenceItem {
-        DicomSequenceItem(dataSet: DicomDataSet(elements: [
+        var elements = [
             string(DicomTag.referencedSOPClassUID.rawValue, vr: .UI, reference.sopClassUID),
             string(DicomTag.referencedSOPInstanceUID.rawValue, vr: .UI, reference.sopInstanceUID)
-        ]))
+        ]
+        let failureReasonCode = reference.failureReasonCode ?? (reference.status == .failed ? 0x0110 : nil)
+        if let failureReasonCode {
+            elements.append(
+                DicomDataElement(
+                    tag: StorageCommitmentTags.failureReason,
+                    vr: .US,
+                    value: .unsignedIntegers([UInt(failureReasonCode)])
+                )
+            )
+        }
+        return DicomSequenceItem(dataSet: DicomDataSet(elements: elements))
     }
 
     private static func reference(from dataSet: DicomDataSet,
@@ -430,9 +505,38 @@ public final class DicomStorageCommitmentTracker {
               let sopInstanceUID = dataSet.string(for: .referencedSOPInstanceUID) else {
             return nil
         }
+        let failureReasonCode = dataSet
+            .element(for: StorageCommitmentTags.failureReason)?
+            .intValue
+            .flatMap(UInt16.init(exactly:))
         return DicomStorageCommitmentReference(sopClassUID: sopClassUID,
                                                sopInstanceUID: sopInstanceUID,
-                                               status: status)
+                                               status: status,
+                                               failureReason: failureReasonCode == 0x0112
+                                                   ? referencedSOPNotStoredReason
+                                                   : nil,
+                                               failureReasonCode: failureReasonCode)
+    }
+}
+
+public struct DicomStorageCommitmentPersistence: Sendable {
+    public typealias StoredInstanceRecorder = @Sendable (DicomStoredInstance) throws -> Void
+    public typealias ReportPreparer = @Sendable (
+        _ transactionUID: String,
+        _ requestingAETitle: String,
+        _ respondingAETitle: String,
+        _ references: [DicomStorageCommitmentReference]
+    ) throws -> DicomStorageCommitmentReport
+
+    public let recordStoredInstance: StoredInstanceRecorder
+    public let prepareReport: ReportPreparer
+
+    public init(
+        recordStoredInstance: @escaping StoredInstanceRecorder,
+        prepareReport: @escaping ReportPreparer
+    ) {
+        self.recordStoredInstance = recordStoredInstance
+        self.prepareReport = prepareReport
     }
 }
 
@@ -441,8 +545,15 @@ public enum DicomStorageSCPProgress: Equatable, Sendable {
     case instanceReceived(sopClassUID: String, sopInstanceUID: String)
     case instanceStored(DicomStoredInstance)
     case storeFailed(sopInstanceUID: String?, errorDescription: String)
-    case storageCommitmentReported(DicomStorageCommitmentReport)
+    case storageCommitmentPending(
+        report: DicomStorageCommitmentReport,
+        requestingAETitle: String,
+        respondingAETitle: String
+    )
     case released
+    case pressure(DicomStorageSCPPressureReason)
+    case metrics(DicomStorageSCPMetrics)
+    case listenerFault(DicomStorageSCPListenerFault)
 }
 
 public struct DicomStorageSCPAssociationResult: Equatable, Sendable {
@@ -456,17 +567,46 @@ public struct DicomStorageSCPAssociationResult: Equatable, Sendable {
     }
 }
 
-public final class DicomStorageSCPService {
+public final class DicomStorageSCPService: Sendable {
     public let configuration: DicomStorageSCPConfiguration
     public let storage: DicomStorageInstanceStoring
+    public let ingest: DicomIngestCoordinator?
+    public let durabilityPolicy: DicomDurabilityPolicy
     public let commitmentTracker: DicomStorageCommitmentTracker
+    private let storagePreflight: any DicomStoragePreflightChecking
+    private let commitmentPersistence: DicomStorageCommitmentPersistence?
+    private let commitmentResultHandler: (@Sendable (DicomStorageCommitmentReport) throws -> Void)?
+    private let userIdentityAuthenticator: (any DicomUserIdentityAuthenticating)?
+    let resourceGovernor: DicomStorageSCPResourceGovernor
 
     public init(configuration: DicomStorageSCPConfiguration,
                 storage: DicomStorageInstanceStoring,
-                commitmentTracker: DicomStorageCommitmentTracker = DicomStorageCommitmentTracker()) {
+                ingest: DicomIngestCoordinator? = nil,
+                durabilityPolicy: DicomDurabilityPolicy = .init(),
+                commitmentTracker: DicomStorageCommitmentTracker = DicomStorageCommitmentTracker(),
+                commitmentPersistence: DicomStorageCommitmentPersistence? = nil,
+                storagePreflight: any DicomStoragePreflightChecking = NoopDicomStoragePreflight(),
+                resourceGovernor: DicomStorageSCPResourceGovernor? = nil,
+                userIdentityAuthenticator: (any DicomUserIdentityAuthenticating)? = nil,
+                commitmentResultHandler: (@Sendable (DicomStorageCommitmentReport) throws -> Void)? = nil) {
+        self.commitmentResultHandler = commitmentResultHandler
+        self.userIdentityAuthenticator = userIdentityAuthenticator
         self.configuration = configuration
         self.storage = storage
+        self.ingest = ingest
+        self.durabilityPolicy = durabilityPolicy
         self.commitmentTracker = commitmentTracker
+        self.commitmentPersistence = commitmentPersistence
+        self.storagePreflight = storagePreflight
+        self.resourceGovernor = resourceGovernor ?? DicomStorageSCPResourceGovernor(configuration: configuration)
+    }
+
+    func withIngest(_ ingest: DicomIngestCoordinator, policy: DicomDurabilityPolicy,
+                    resourceGovernor: DicomStorageSCPResourceGovernor? = nil) -> DicomStorageSCPService {
+        DicomStorageSCPService(configuration: configuration, storage: storage, ingest: ingest, durabilityPolicy: policy,
+            commitmentTracker: commitmentTracker, commitmentPersistence: commitmentPersistence,
+            storagePreflight: storagePreflight, resourceGovernor: resourceGovernor ?? self.resourceGovernor,
+            userIdentityAuthenticator: userIdentityAuthenticator, commitmentResultHandler: commitmentResultHandler)
     }
 
     public func handleAssociation(using transport: DicomAssociationTransport,
@@ -476,19 +616,47 @@ public final class DicomStorageSCPService {
             throw DicomStorageSCPError.associationRequestExpected
         }
         try validateCalledAETitle(request.calledAETitle, transport: transport)
+        try validateCallingAETitle(request.callingAETitle, transport: transport)
 
-        let accept = DicomAssociationNegotiator.accept(
+        var accept = DicomAssociationNegotiator.accept(
             request,
             supportedAbstractSyntaxUIDs: supportedAbstractSyntaxUIDs,
-            preferredTransferSyntaxes: configuration.transferSyntaxes
+            preferredTransferSyntaxes: configuration.transferSyntaxes,
+            maximumPDULength: configuration.maximumPDULength,
+            supportedSCUAbstractSyntaxUIDs: commitmentResultHandler == nil ? []
+                : [DicomNetworkUID.storageCommitmentPushModelSOPClass]
         )
-        try transport.writePDU(DicomPDUCodec.encode(.associationAccept(accept)))
+        if let authenticator = userIdentityAuthenticator {
+            do {
+                guard let identity = request.userIdentity else { throw CocoaError(.fileReadNoPermission) }
+                let response = try authenticator.authenticate(identity)
+                if identity.positiveResponseRequested {
+                    accept.userIdentityServerResponse = response ?? DicomUserIdentityServerResponse(data: Data())
+                }
+            } catch {
+                let rejection = DicomAssociationReject(result: .rejectedPermanent,
+                                                       source: .serviceUser, reason: .noReason)
+                try transport.writePDU(DicomPDUCodec.encode(.associationReject(rejection)))
+                throw DicomNetworkError.associationRejected(rejection)
+            }
+        }
+        let encodedAccept: Data
+        do {
+            encodedAccept = try DicomPDUCodec.encode(.associationAccept(accept))
+        } catch {
+            let rejection = DicomAssociationReject(result: .rejectedPermanent, source: .serviceUser, reason: .noReason)
+            try transport.writePDU(DicomPDUCodec.encode(.associationReject(rejection)))
+            throw DicomNetworkError.associationRejected(rejection)
+        }
+        try transport.writePDU(encodedAccept)
         let association = DicomAssociation(request: request, accept: accept)
         progress?(.associationAccepted(callingAETitle: request.callingAETitle))
 
         let reader = DicomDIMSEMessageReader()
         var storedInstances: [DicomStoredInstance] = []
         var commitmentReports: [DicomStorageCommitmentReport] = []
+        var receivedObjectCount = 0
+        var receivedByteCount: Int64 = 0
 
         while true {
             switch try reader.readNext(from: transport) {
@@ -514,17 +682,29 @@ public final class DicomStorageSCPService {
                                                     association: association,
                                                     transport: transport,
                                                     reader: reader,
+                                                    receivedObjectCount: &receivedObjectCount,
+                                                    receivedByteCount: &receivedByteCount,
                                                     progress: progress) {
                         storedInstances.append(stored)
                     }
+                case DicomDIMSECommandField.nEventReportRQ:
+                    try handleCommitmentResult(command: command, contextID: message.presentationContextID,
+                                               association: association, transport: transport, reader: reader)
                 case DicomDIMSECommandField.nActionRQ:
-                    let report = try handleStorageCommitment(command: command,
-                                                             commandContextID: message.presentationContextID,
-                                                             association: association,
-                                                             transport: transport,
-                                                             reader: reader)
-                    commitmentReports.append(report)
-                    progress?(.storageCommitmentReported(report))
+                    if let report = try handleStorageCommitment(command: command,
+                                                                requestingAETitle: request.callingAETitle,
+                                                                respondingAETitle: request.calledAETitle,
+                                                                commandContextID: message.presentationContextID,
+                                                                association: association,
+                                                                transport: transport,
+                                                                reader: reader) {
+                        commitmentReports.append(report)
+                        progress?(.storageCommitmentPending(
+                            report: report,
+                            requestingAETitle: request.callingAETitle,
+                            respondingAETitle: request.calledAETitle
+                        ))
+                    }
                 default:
                     throw DicomNetworkError.unexpectedDIMSECommand(expected: DicomDIMSECommandField.cStoreRQ,
                                                                    actual: command.commandField)
@@ -536,7 +716,7 @@ public final class DicomStorageSCPService {
     private var supportedAbstractSyntaxUIDs: Set<String> {
         var supported = configuration.supportedStorageSOPClassUIDs
         supported.insert(DicomNetworkUID.verificationSOPClass)
-        if configuration.enableStorageCommitment {
+        if configuration.enableStorageCommitment || commitmentResultHandler != nil {
             supported.insert(DicomNetworkUID.storageCommitmentPushModelSOPClass)
         }
         return supported
@@ -572,19 +752,160 @@ public final class DicomStorageSCPService {
         }
     }
 
+    private func validateCallingAETitle(_ callingAETitle: String,
+                                        transport: DicomAssociationTransport) throws {
+        let normalized = callingAETitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard configuration.allowedCallingAETitles.isEmpty ||
+                configuration.allowedCallingAETitles.contains(normalized) else {
+            let reject = DicomAssociationReject(result: .rejectedPermanent,
+                                                source: .serviceUser,
+                                                reason: .callingAENotRecognized)
+            try transport.writePDU(DicomPDUCodec.encode(.associationReject(reject)))
+            throw DicomStorageSCPError.callingAETitleNotRecognized(callingAETitle)
+        }
+    }
+
+    // The composable acceptor delegates to the unchanged storage admission/persistence path.
+    func handleDelegatedStore(command: DicomDIMSECommandSet, contextID: UInt8,
+                              association: DicomAssociation, transport: DicomAssociationTransport,
+                              reader: DicomDIMSEMessageReader, receivedObjectCount: inout Int,
+                              receivedByteCount: inout Int64,
+                              progress: (@Sendable (DicomStorageSCPProgress) -> Void)? = nil,
+                              authorize: (@Sendable (DicomDataSet) throws -> Void)? = nil) throws {
+        _ = try handleStore(command: command, commandContextID: contextID, association: association,
+            transport: transport, reader: reader, receivedObjectCount: &receivedObjectCount,
+            receivedByteCount: &receivedByteCount, progress: progress, authorize: authorize)
+    }
+
     private func handleStore(command: DicomDIMSECommandSet,
                              commandContextID: UInt8,
                              association: DicomAssociation,
                              transport: DicomAssociationTransport,
                              reader: DicomDIMSEMessageReader,
-                             progress: (@Sendable (DicomStorageSCPProgress) -> Void)?) throws -> DicomStoredInstance? {
-        let payload = try reader.readMessage(from: transport)
+                             receivedObjectCount: inout Int,
+                             receivedByteCount: inout Int64,
+                             progress: (@Sendable (DicomStorageSCPProgress) -> Void)?,
+                             authorize: (@Sendable (DicomDataSet) throws -> Void)? = nil) throws -> DicomStoredInstance? {
+        guard receivedObjectCount < configuration.maximumObjectsPerAssociation else {
+            try discardStorePayload(reader: reader, transport: transport)
+            try refuseStore(command: command, reason: .associationObjectLimit,
+                            error: DicomStorageSCPAdmissionError.refused(.associationObjectLimit),
+                            presentationContextID: commandContextID, association: association,
+                            transport: transport, progress: progress)
+            return nil
+        }
+        guard receivedByteCount < configuration.maximumBytesPerAssociation else {
+            try discardStorePayload(reader: reader, transport: transport)
+            try refuseStore(command: command, reason: .associationByteLimit,
+                            error: DicomStorageSCPAdmissionError.refused(.associationByteLimit),
+                            presentationContextID: commandContextID, association: association,
+                            transport: transport, progress: progress)
+            return nil
+        }
+        guard resourceGovernor.beginStore() == nil else {
+            try discardStorePayload(reader: reader, transport: transport)
+            try refuseStore(command: command, reason: .storeRequestLimit,
+                            error: DicomStorageSCPAdmissionError.refused(.storeRequestLimit),
+                            presentationContextID: commandContextID, association: association,
+                            transport: transport, progress: progress)
+            return nil
+        }
+        var stagedBytes: Int64 = 0
+        defer {
+            resourceGovernor.releaseStagedBytes(stagedBytes)
+            resourceGovernor.endStore()
+            progress?(.metrics(resourceGovernor.snapshot()))
+        }
+        let remainingBytes = configuration.maximumBytesPerAssociation - receivedByteCount
+        // Issue #2793: with a directory to receive into, the dataset goes to disk as it arrives and no memory is
+        // staged for it; the object's budget is then the disk's.
+        let receivedFile = receivedPart10File(command: command, contextID: commandContextID, association: association)
+        defer { receivedFile?.remove() }
+        let payload: DicomDIMSEMessage
+        let payloadBytes: Int64
+        do {
+            if let receivedFile {
+                var received: Int64 = 0
+                payload = try reader.readMessage(from: transport, maximumDataLength: remainingBytes, sink: { fragment in
+                    do {
+                        try self.resourceGovernor.appendReceivedFragment(fragment, to: receivedFile,
+                                                                         preflight: self.storagePreflight)
+                    } catch {
+                        throw DicomStorageSCPAdmissionError.insufficientStorage(requiredBytes: received + Int64(fragment.count))
+                    }
+                    received += Int64(fragment.count)
+                })
+                payloadBytes = received
+            } else {
+                payload = try reader.readMessage(
+                    from: transport,
+                    maximumDataLength: remainingBytes,
+                    reserveData: resourceGovernor.reserveStagedBytes,
+                    releaseData: resourceGovernor.releaseStagedBytes
+                )
+                stagedBytes = Int64(payload.data.count)
+                payloadBytes = stagedBytes
+            }
+        } catch let error as DicomStorageSCPAdmissionError {
+            let reason: DicomStorageSCPPressureReason
+            switch error {
+            case .messageTooLarge:
+                reason = .associationByteLimit
+            case .refused(let pressureReason):
+                reason = pressureReason
+            case .insufficientStorage:
+                reason = .insufficientStorage
+            }
+            try refuseStore(command: command, reason: reason, error: error,
+                            presentationContextID: commandContextID, association: association,
+                            transport: transport, progress: progress)
+            return nil
+        }
         guard !payload.isCommand else {
             throw DicomStorageSCPError.missingCommandDataSet(command.commandField)
         }
+        progress?(.metrics(resourceGovernor.snapshot()))
+        do {
+            // Disk-backed fragments already consumed their capacity; only the reserve remains to be checked.
+            try storagePreflight.checkStorageAvailability(requiredBytes: receivedFile == nil ? payloadBytes : 0)
+        } catch {
+            try refuseStore(command: command, reason: .insufficientStorage, error: error,
+                            presentationContextID: commandContextID, association: association,
+                            transport: transport, progress: progress)
+            return nil
+        }
+        receivedObjectCount += 1
+        receivedByteCount += payloadBytes
         let context = try acceptedContext(id: payload.presentationContextID, association: association)
         let transferSyntax = context.transferSyntax ?? .explicitVRLittleEndian
-        let dataSet = try DicomDataSetParser.dataSet(from: payload.data, transferSyntax: transferSyntax)
+        // The File Meta was written for the command's context: the dataset must have come on it.
+        guard receivedFile == nil || payload.presentationContextID == commandContextID else {
+            throw DicomStorageSCPError.missingPresentationContext(payload.presentationContextID)
+        }
+        let dataSetData = try receivedFile?.finish() ?? payload.data
+        let dataSet: DicomDataSet
+        do {
+            dataSet = try DicomDataSetParser.dataSet(
+                from: dataSetData,
+                transferSyntax: transferSyntax,
+                limits: configuration.dataSetParseLimits
+            )
+        } catch let error as DicomDataSetParseError {
+            resourceGovernor.recordFailure()
+            try sendStoreResponse(
+                command: command,
+                status: 0xC000,
+                errorComment: error.localizedDescription,
+                presentationContextID: commandContextID,
+                association: association,
+                transport: transport
+            )
+            progress?(.storeFailed(
+                sopInstanceUID: command.affectedSOPInstanceUID,
+                errorDescription: error.localizedDescription
+            ))
+            return nil
+        }
         let sopClassUID = command.affectedSOPClassUID ??
             dataSet.string(for: .sopClassUID) ??
             DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID
@@ -593,15 +914,41 @@ public final class DicomStorageSCPService {
             DicomDataSetWriter.makeUID()
         progress?(.instanceReceived(sopClassUID: sopClassUID, sopInstanceUID: sopInstanceUID))
 
-        let received = DicomStorageReceivedInstance(sopClassUID: sopClassUID,
+        var receiving = DicomStorageReceivedInstance(sopClassUID: sopClassUID,
                                                     sopInstanceUID: sopInstanceUID,
                                                     transferSyntax: transferSyntax,
                                                     dataSet: dataSet,
-                                                    rawDataSetData: payload.data)
+                                                    rawDataSetData: dataSetData,
+                                                    part10FileURL: receivedFile?.url)
+        receiving.moveOriginatorAETitle = command.moveOriginatorAETitle
+        receiving.moveOriginatorMessageID = command.moveOriginatorMessageID
+        let received = receiving
         let stored: DicomStoredInstance
         do {
-            stored = try storage.store(received)
+            try authorize?(dataSet)
+            if let ingest {
+                let result = try DicomIngestBlockingResult.run { try await ingest.ingest(received) }
+                try durabilityPolicy.validate(result.durability)
+                stored = .init(sopClassUID: sopClassUID, sopInstanceUID: sopInstanceUID,
+                               transferSyntax: transferSyntax, fileURL: result.record.path,
+                               isConflict: result.record.isConflict)
+            } else { stored = try storage.store(received) }
         } catch {
+            resourceGovernor.recordFailure()
+            try sendStoreResponse(command: command,
+                                  status: (error as? DicomIngestError)?.storageStatus ?? 0xC000,
+                                  errorComment: error.localizedDescription,
+                                  presentationContextID: commandContextID,
+                                  association: association,
+                                  transport: transport)
+            progress?(.storeFailed(sopInstanceUID: sopInstanceUID,
+                                   errorDescription: error.localizedDescription))
+            return nil
+        }
+        do {
+            try commitmentPersistence?.recordStoredInstance(stored)
+        } catch {
+            resourceGovernor.recordFailure()
             try sendStoreResponse(command: command,
                                   status: 0xC000,
                                   errorComment: error.localizedDescription,
@@ -613,8 +960,9 @@ public final class DicomStorageSCPService {
             return nil
         }
         commitmentTracker.recordStoredInstance(stored)
+        // A retained conflict must tell the peer that its bytes did not replace the original (issue #2529).
         try sendStoreResponse(command: command,
-                              status: 0,
+                              status: stored.isConflict ? 0xB000 : 0,
                               errorComment: nil,
                               presentationContextID: commandContextID,
                               association: association,
@@ -623,34 +971,170 @@ public final class DicomStorageSCPService {
         return stored
     }
 
+    /// The file to receive the command's dataset into, when the storage offers a directory and the command names
+    /// the object it carries. An object whose File Meta cannot be written, such as one with a malformed UID, is
+    /// received in memory as before.
+    private func receivedPart10File(command: DicomDIMSECommandSet, contextID: UInt8,
+                                    association: DicomAssociation) -> DicomReceivedPart10File? {
+        guard let directory = ingest?.receivedFileDirectory ?? storage.receivedFileDirectory,
+              let sopClassUID = command.affectedSOPClassUID, !sopClassUID.isEmpty,
+              let sopInstanceUID = command.affectedSOPInstanceUID, !sopInstanceUID.isEmpty,
+              let context = try? acceptedContext(id: contextID, association: association) else { return nil }
+        return try? DicomReceivedPart10File(directory: directory, sopClassUID: sopClassUID,
+                                            sopInstanceUID: sopInstanceUID,
+                                            transferSyntax: context.transferSyntax ?? .explicitVRLittleEndian)
+    }
+
+    private func discardStorePayload(
+        reader: DicomDIMSEMessageReader,
+        transport: DicomAssociationTransport
+    ) throws {
+        do {
+            _ = try reader.readMessage(from: transport, maximumDataLength: 0)
+        } catch DicomStorageSCPAdmissionError.messageTooLarge {
+            return
+        }
+    }
+
+    private func refuseStore(
+        command: DicomDIMSECommandSet,
+        reason: DicomStorageSCPPressureReason,
+        error: any Error,
+        presentationContextID: UInt8,
+        association: DicomAssociation,
+        transport: DicomAssociationTransport,
+        progress: (@Sendable (DicomStorageSCPProgress) -> Void)?
+    ) throws {
+        resourceGovernor.recordFailure()
+        try sendStoreResponse(command: command, status: 0xA700,
+                              errorComment: error.localizedDescription,
+                              presentationContextID: presentationContextID,
+                              association: association, transport: transport)
+        progress?(.pressure(reason))
+        progress?(.storeFailed(sopInstanceUID: command.affectedSOPInstanceUID,
+                               errorDescription: error.localizedDescription))
+        progress?(.metrics(resourceGovernor.snapshot()))
+    }
+
+    private func handleCommitmentResult(command: DicomDIMSECommandSet, contextID: UInt8,
+                                        association: DicomAssociation, transport: DicomAssociationTransport,
+                                        reader: DicomDIMSEMessageReader) throws {
+        let context = try acceptedContext(id: contextID, association: association)
+        guard command.commandDataSetType != DicomDIMSECommandDataSetType.noDataSet else {
+            throw DicomStorageSCPError.missingCommandDataSet(command.commandField)
+        }
+        let payload = try reader.readMessage(from: transport)
+        guard !payload.isCommand, payload.presentationContextID == contextID else {
+            throw DicomNetworkError.malformedCommandSet("Invalid commitment report dataset framing.")
+        }
+        var status: UInt16 = 0
+        do {
+            guard let handler = commitmentResultHandler,
+                  context.abstractSyntaxUID == DicomNetworkUID.storageCommitmentPushModelSOPClass,
+                  command.affectedSOPClassUID == context.abstractSyntaxUID,
+                  command.affectedSOPInstanceUID == DicomNetworkUID.storageCommitmentPushModelSOPInstance,
+                  command.eventTypeID == 1 || command.eventTypeID == 2 else {
+                throw DicomStorageSCPError.malformedStorageCommitmentRequest
+            }
+            let dataSet = try DicomDataSetParser.dataSet(from: payload.data,
+                transferSyntax: context.transferSyntax ?? .explicitVRLittleEndian, limits: configuration.dataSetParseLimits)
+            let report = try DicomStorageCommitmentTracker.parseEventReportDataSet(dataSet)
+            guard command.eventTypeID == 2 || report.references.allSatisfy({ $0.status == .committed }) else {
+                throw DicomStorageSCPError.malformedStorageCommitmentRequest
+            }
+            try handler(report)
+        } catch { status = 0x0110 }
+        let response = DicomDIMSECommandSet(affectedSOPClassUID: command.affectedSOPClassUID,
+            commandField: DicomDIMSECommandField.nEventReportRSP, messageIDBeingRespondedTo: command.messageID,
+            commandDataSetType: DicomDIMSECommandDataSetType.noDataSet, status: status,
+            affectedSOPInstanceUID: command.affectedSOPInstanceUID, eventTypeID: command.eventTypeID)
+        try sendCommand(response, presentationContextID: contextID, association: association, transport: transport)
+    }
+
     private func handleStorageCommitment(command: DicomDIMSECommandSet,
+                                         requestingAETitle: String,
+                                         respondingAETitle: String,
                                          commandContextID: UInt8,
                                          association: DicomAssociation,
                                          transport: DicomAssociationTransport,
-                                         reader: DicomDIMSEMessageReader) throws -> DicomStorageCommitmentReport {
+                                         reader: DicomDIMSEMessageReader) throws -> DicomStorageCommitmentReport? {
         let payload = try reader.readMessage(from: transport)
         guard !payload.isCommand else {
             throw DicomStorageSCPError.missingCommandDataSet(command.commandField)
         }
         let context = try acceptedContext(id: payload.presentationContextID, association: association)
         let transferSyntax = context.transferSyntax ?? .explicitVRLittleEndian
-        let dataSet = try DicomDataSetParser.dataSet(from: payload.data, transferSyntax: transferSyntax)
+        let dataSet: DicomDataSet
+        do {
+            dataSet = try DicomDataSetParser.dataSet(
+                from: payload.data,
+                transferSyntax: transferSyntax,
+                limits: configuration.dataSetParseLimits
+            )
+        } catch is DicomDataSetParseError {
+            resourceGovernor.recordFailure()
+            try sendStorageCommitmentActionResponse(
+                command: command,
+                status: 0x0110,
+                presentationContextID: commandContextID,
+                association: association,
+                transport: transport
+            )
+            return nil
+        }
         let (transactionUID, references) = try DicomStorageCommitmentTracker.parseActionDataSet(dataSet)
-        let report = commitmentTracker.evaluate(transactionUID: transactionUID, references: references)
+        let report: DicomStorageCommitmentReport
+        do {
+            if let commitmentPersistence {
+                report = try commitmentPersistence.prepareReport(
+                    transactionUID,
+                    requestingAETitle,
+                    respondingAETitle,
+                    references
+                )
+            } else {
+                report = commitmentTracker.evaluate(transactionUID: transactionUID, references: references)
+            }
+        } catch {
+            try sendStorageCommitmentActionResponse(
+                command: command,
+                status: 0x0110,
+                presentationContextID: commandContextID,
+                association: association,
+                transport: transport
+            )
+            throw error
+        }
+        try sendStorageCommitmentActionResponse(
+            command: command,
+            status: 0,
+            presentationContextID: commandContextID,
+            association: association,
+            transport: transport
+        )
+        return report
+    }
+
+    private func sendStorageCommitmentActionResponse(
+        command: DicomDIMSECommandSet,
+        status: UInt16,
+        presentationContextID: UInt8,
+        association: DicomAssociation,
+        transport: DicomAssociationTransport
+    ) throws {
         let response = DicomDIMSECommandSet(
             affectedSOPClassUID: DicomNetworkUID.storageCommitmentPushModelSOPClass,
             commandField: DicomDIMSECommandField.nActionRSP,
             messageIDBeingRespondedTo: command.messageID,
             commandDataSetType: DicomDIMSECommandDataSetType.noDataSet,
-            status: 0,
+            status: status,
             affectedSOPInstanceUID: DicomNetworkUID.storageCommitmentPushModelSOPInstance,
             actionTypeID: command.actionTypeID
         )
         try sendCommand(response,
-                        presentationContextID: commandContextID,
+                        presentationContextID: presentationContextID,
                         association: association,
                         transport: transport)
-        return report
     }
 
     private func sendStoreResponse(command: DicomDIMSECommandSet,
@@ -875,94 +1359,29 @@ public final class DicomStoreAndForwardQueue {
 #if canImport(Network)
 public final class DicomStorageSCPServer: @unchecked Sendable {
     public let service: DicomStorageSCPService
-    private let listener: NWListener
-    private let queue = DispatchQueue(label: "DicomStorageSCPServer")
-    private let cancellationSemaphore = DispatchSemaphore(value: 0)
-    private let lifecycleLock = NSLock()
-    private var didStart = false
-    private let tlsContext: DicomAppliedTLSContext?
+    private let server: DicomDIMSEServer
 
     public init(service: DicomStorageSCPService) throws {
         self.service = service
-        guard let port = NWEndpoint.Port(rawValue: service.configuration.port) else {
-            throw DicomNetworkError.networkUnavailable("Invalid Storage SCP port \(service.configuration.port).")
-        }
-        let prepared = try DicomTLSOptionsFactory.preparedParameters(for: service.configuration.tls, role: .server)
-        self.tlsContext = prepared.tlsContext
-        self.listener = try NWListener(using: prepared.parameters, on: port)
+        self.server = DicomDIMSEServer(legacyStorageService: service)
+        try server.prepareListener()
     }
 
-    var listeningPort: UInt16? {
-        listener.port?.rawValue
-    }
+    public var listeningPort: UInt16? { server.listeningPort }
+    public var metrics: DicomStorageSCPMetrics { server.metrics }
 
     public func start(progress: (@Sendable (DicomStorageSCPProgress) -> Void)? = nil) throws {
-        let semaphore = DispatchSemaphore(value: 0)
-        let cancellationSemaphore = cancellationSemaphore
-        var startupError: Error?
-        listener.newConnectionHandler = { [service] connection in
-            guard DicomStorageSCPPeerAccess.allows(
-                connection.endpoint,
-                acceptOnlyIntranet: service.configuration.acceptOnlyIntranet
-            ) else {
-                connection.cancel()
-                return
-            }
-            let transport = DicomTCPAssociationTransport(acceptedConnection: connection,
-                                                         timeout: service.configuration.timeout,
-                                                         maximumIncomingPDUSize: service.configuration.maximumPDULength)
-            transport.startAcceptedConnection()
-            DispatchQueue.global(qos: .userInitiated).async {
-                _ = try? service.handleAssociation(using: transport, progress: progress)
-                transport.close()
-            }
-        }
-        listener.stateUpdateHandler = { state in
-            switch state {
-            case .ready:
-                semaphore.signal()
-            case .failed(let error):
-                startupError = error
-                semaphore.signal()
-            case .cancelled:
-                cancellationSemaphore.signal()
-            default:
-                break
-            }
-        }
-        lifecycleLock.withLock {
-            didStart = true
-        }
-        listener.start(queue: queue)
-        guard semaphore.wait(timeout: .now() + service.configuration.timeout) == .success else {
-            throw DicomNetworkError.networkTimeout("starting Storage SCP listener")
-        }
-        if let startupError {
-            throw startupError
-        }
+        try server.start(progress: progress)
     }
 
-    public func stop() async {
-        let shouldWaitForCancellation = lifecycleLock.withLock { didStart }
-        listener.cancel()
-        guard shouldWaitForCancellation else { return }
-        guard case .cancelled = listener.state else {
-            let cancellationSemaphore = cancellationSemaphore
-            let timeout = service.configuration.timeout
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                DispatchQueue.global(qos: .utility).async {
-                    _ = cancellationSemaphore.wait(timeout: .now() + timeout)
-                    continuation.resume()
-                }
-            }
-            return
-        }
-    }
+    public func stop() async { await server.stop() }
 }
+
 #endif
 
 private enum StorageCommitmentTags {
     static let transactionUID = 0x0008_1195
+    static let failureReason = 0x0008_1197
     static let failedSOPSequence = 0x0008_1198
     static let referencedSOPSequence = DicomTag.referencedSOPSequence.rawValue
 }

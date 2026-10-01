@@ -4,7 +4,7 @@ import XCTest
 import simd
 
 final class DicomJPIPProgressiveStreamTests: XCTestCase {
-    func testReferencedPixelDataObjectLoadsWithoutLocalPixelData() throws {
+    func test_referencedPixelDataObject_loadsWithoutLocalPixelData() throws {
         let url = try makeTemporaryFileURL()
         defer { try? FileManager.default.removeItem(at: url) }
 
@@ -19,7 +19,44 @@ final class DicomJPIPProgressiveStreamTests: XCTestCase {
         XCTAssertEqual(reference.makeVolumeRequest().resource, .volume)
     }
 
-    func testJPIPClientYieldsProgressiveVolumeUpdatesInOrder() async throws {
+    func test_referencedPixelData_validatesFrameRequests() throws {
+        let reference = try DicomJPIPReferencedPixelData(
+            transferSyntax: .jpipHTJ2KReferenced,
+            pixelDataProviderURL: try XCTUnwrap(URL(string: "https://pacs.example.test/jpip?target=frames.jph")),
+            numberOfFrames: 3
+        )
+
+        XCTAssertEqual(try reference.makeFrameRequest(index: 2).resource, .frame(index: 2))
+        XCTAssertThrowsError(try reference.makeFrameRequest(index: 3)) { error in
+            XCTAssertEqual(
+                error as? DicomJPIPTransportError,
+                .frameIndexOutOfRange(index: 3, frameCount: 3)
+            )
+        }
+    }
+
+    func test_JPIPClient_rejectsAmbiguousMultiFrameVolumeDecode() async throws {
+        let reference = try DicomJPIPReferencedPixelData(
+            transferSyntax: .jpipReferenced,
+            pixelDataProviderURL: try XCTUnwrap(URL(string: "https://pacs.example.test/jpip?target=frames.jp2")),
+            numberOfFrames: 2
+        )
+        let client = DicomJPIPClient(transport: FakeJPIPTransport(payloads: []))
+        var iterator = client.volumeUpdates(for: reference, decode: { _ in
+            throw CancellationError()
+        }).makeAsyncIterator()
+
+        do {
+            _ = try await iterator.next()
+            XCTFail("Expected an explicit multi-frame request error")
+        } catch let error as DicomJPIPTransportError {
+            XCTAssertEqual(error, .multiFrameVolumeRequiresFrameRequests(frameCount: 2))
+        } catch {
+            XCTFail("Expected DicomJPIPTransportError, got \(error)")
+        }
+    }
+
+    func test_JPIPClient_yieldsProgressiveVolumeUpdatesInOrder() async throws {
         let request = DicomJPIPRequest(
             pixelDataProviderURL: try XCTUnwrap(URL(string: "https://pacs.example.test/jpip?target=volume.jp2")),
             resource: .volume
@@ -47,7 +84,7 @@ final class DicomJPIPProgressiveStreamTests: XCTestCase {
         XCTAssertEqual(try firstVoxelValue(in: try XCTUnwrap(received.last?.volume)), 30)
     }
 
-    func testJPIPClientCancelsTransportWhenConsumerIsCancelled() async throws {
+    func test_JPIPClient_cancelsTransportWhenConsumerIsCancelled() async throws {
         let request = DicomJPIPRequest(
             pixelDataProviderURL: try XCTUnwrap(URL(string: "https://pacs.example.test/jpip?target=volume.jp2")),
             resource: .volume
@@ -65,7 +102,7 @@ final class DicomJPIPProgressiveStreamTests: XCTestCase {
             )
         }
         let client = DicomJPIPClient(
-            transport: FakeJPIPTransport(payloads: payloads, delayNanoseconds: 5_000_000, probe: probe)
+            transport: FakeJPIPTransport(payloads: payloads, delayNanoseconds: 100_000_000, probe: probe)
         )
         let stream = client.volumeUpdates(for: request, decode: { payload in
             try await Self.decodeSyntheticVolume(payload)
@@ -86,7 +123,50 @@ final class DicomJPIPProgressiveStreamTests: XCTestCase {
         XCTAssertTrue(didTerminate)
     }
 
-    func testJPIPPerformanceReportSeparatesPreviewFinalAndByteAccounting() async throws {
+    func test_JPIPClient_propagatesCancellationIntoCooperativeDecoder() async throws {
+        let request = DicomJPIPRequest(
+            pixelDataProviderURL: try XCTUnwrap(URL(string: "https://pacs.example.test/jpip?target=volume.jp2")),
+            resource: .volume
+        )
+        let payload = makePayload(
+            index: 0,
+            quality: .final,
+            fraction: 1,
+            final: true,
+            voxelValue: 1
+        )
+        let probe = DecodeCancellationProbe()
+        let client = DicomJPIPClient(transport: FakeJPIPTransport(payloads: [payload]))
+        let task = Task {
+            var iterator = client.volumeUpdates(for: request, decode: { _ in
+                await probe.markStarted()
+                do {
+                    try await Task.sleep(for: .seconds(30))
+                } catch is CancellationError {
+                    await probe.markCancelled()
+                    throw CancellationError()
+                }
+                throw CancellationError()
+            }).makeAsyncIterator()
+            return try await iterator.next()
+        }
+        try await probe.waitUntilStarted()
+
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            XCTFail("Expected decoder cancellation")
+        } catch is CancellationError {
+            // Expected.
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+        let wasCancelled = await probe.wasCancelled()
+        XCTAssertTrue(wasCancelled)
+    }
+
+    func test_JPIPPerformanceReport_separatesPreviewFinalAndByteAccounting() async throws {
         let layerCount = 12
         let bytesPerLayer = 256
         let request = DicomJPIPRequest(
@@ -353,32 +433,44 @@ private struct FakeJPIPTransport: DicomJPIPTransport {
     var delayNanoseconds: UInt64 = 0
     var probe: TerminationProbe?
 
-    func payloads(for request: DicomJPIPRequest) -> AsyncThrowingStream<DicomJPIPLayerPayload, Error> {
-        AsyncThrowingStream { continuation in
-            let task = Task {
-                do {
-                    for payload in self.payloads {
-                        try Task.checkCancellation()
-                        if delayNanoseconds > 0 {
-                            try await Task.sleep(nanoseconds: delayNanoseconds)
-                        }
-                        continuation.yield(payload)
-                    }
-                    continuation.finish()
-                } catch is CancellationError {
-                    continuation.finish(throwing: CancellationError())
-                } catch {
-                    continuation.finish(throwing: error)
-                }
+    func payloads(for request: DicomJPIPRequest) -> DicomJPIPPayloadSequence {
+        let cursor = FakeJPIPPayloadCursor(
+            payloads: payloads,
+            delayNanoseconds: delayNanoseconds,
+            probe: probe
+        )
+        return DicomJPIPPayloadSequence(unfolding: {
+            try await cursor.next()
+        })
+    }
+}
+
+private actor FakeJPIPPayloadCursor {
+    private let payloads: [DicomJPIPLayerPayload]
+    private let delayNanoseconds: UInt64
+    private let probe: TerminationProbe?
+    private var index = 0
+
+    init(payloads: [DicomJPIPLayerPayload], delayNanoseconds: UInt64, probe: TerminationProbe?) {
+        self.payloads = payloads
+        self.delayNanoseconds = delayNanoseconds
+        self.probe = probe
+    }
+
+    func next() async throws -> DicomJPIPLayerPayload? {
+        do {
+            try Task.checkCancellation()
+            guard index < payloads.count else { return nil }
+            if delayNanoseconds > 0 {
+                try await Task.sleep(nanoseconds: delayNanoseconds)
             }
-            continuation.onTermination = { @Sendable _ in
-                task.cancel()
-                if let probe {
-                    Task {
-                        await probe.markTerminated()
-                    }
-                }
+            defer { index += 1 }
+            return payloads[index]
+        } catch is CancellationError {
+            if let probe {
+                await probe.markTerminated()
             }
+            throw CancellationError()
         }
     }
 }
@@ -398,5 +490,30 @@ private actor TerminationProbe {
             try? await Task.sleep(nanoseconds: 1_000_000)
         }
         return terminated
+    }
+}
+
+private actor DecodeCancellationProbe {
+    private var started = false
+    private var cancelled = false
+
+    func markStarted() {
+        started = true
+    }
+
+    func markCancelled() {
+        cancelled = true
+    }
+
+    func wasCancelled() -> Bool {
+        cancelled
+    }
+
+    func waitUntilStarted() async throws {
+        for _ in 0..<500 {
+            if started { return }
+            try await Task.sleep(for: .milliseconds(2))
+        }
+        XCTFail("Timed out waiting for decode to start")
     }
 }

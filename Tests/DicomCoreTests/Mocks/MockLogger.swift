@@ -18,7 +18,8 @@ import Foundation
 /// Mock implementation of LoggerProtocol for testing.
 /// Captures all logged messages in memory for test verification.
 /// Thread-safe and supports concurrent logging from multiple threads.
-public final class MockLogger: LoggerProtocol {
+/// All mutable entries are serialized by `queue`.
+public final class MockLogger: LoggerProtocol, @unchecked Sendable {
 
     // MARK: - Types
 

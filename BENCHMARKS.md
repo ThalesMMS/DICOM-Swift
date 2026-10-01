@@ -15,6 +15,7 @@ Comprehensive benchmark results and methodology for the Swift DICOM Decoder libr
   - [Metal vs vDSP Comparison](#metal-vs-vdsp-comparison)
 - [Performance Characteristics](#performance-characteristics)
 - [Reproducing Benchmarks](#reproducing-benchmarks)
+  - [JLISwift JPEG Lossless Qualification](#jliswift-jpeg-lossless-qualification)
 - [Interpreting Results](#interpreting-results)
 - [Regression Detection](#regression-detection)
 - [Clinical Performance Budgets](#clinical-performance-budgets)
@@ -117,7 +118,7 @@ The checked-in benchmark reports in this repository are point-in-time measuremen
 | **Reference Hardware** | Apple Silicon Mac |
 | **Expected CPU** | Apple M-series |
 | **Processor Cores** | 8+ logical cores |
-| **Swift Version** | 6.0+ toolchain |
+| **Swift Version** | 6.2+ toolchain; Swift 6 language mode |
 | **Xcode Version** | 26.0+ |
 | **Metal Support** | Metal 3.0+ |
 
@@ -277,6 +278,49 @@ Peak throughput comparison:
 ---
 
 ## Reproducing Benchmarks
+
+### Decoded-frame Data materialization
+
+Run the complete Release-only matrix twice in isolated processes:
+
+```bash
+./Scripts/benchmark_decoded_frame_materialization.sh
+```
+
+It covers native, RLE, JPEG Lossless, JPEG-LS, and JPEG 2000 paths; gray8,
+signed/unsigned gray16, RGB8, and multiframe iteration. Reports are emitted as
+JSON, CSV, and Markdown under
+`.build/clinical-performance/decoded-frame-materialization/`. The benchmark
+separates codec decode from `Data`-to-array materialization where the backend
+has a Data-backed boundary and labels legacy fused stages explicitly. See the
+current decision rule and same-host evidence in
+`DISTRIBUTION.md`.
+
+### JLISwift JPEG Lossless Qualification
+
+JLISwift v0.5.0 is pinned only in `DicomCoreTests` and is not a runtime backend.
+Its test-only SOF3/SV1 qualification has a DEFER decision. The opt-in Release
+launcher runs the exact candidate twice in isolated processes:
+
+```bash
+./Scripts/benchmark_jliswift_qualification.sh
+```
+
+The harness compares JLISwift encode/decode with the native DICOM-Swift decode
+on one synthetic SV1 input and emits JSON, CSV, and Markdown reports under
+`.build/jliswift-qualification/`. The qualification report records the two-run
+Release measurements, copy costs, memory accounting, functional GDCM evidence,
+and unavailable native/GDCM encode comparators as not applicable.
+
+Each release rerun must compare JLISwift and the native JPEG Lossless decoder on
+identical applicable inputs. It must record encode/decode wall time, throughput,
+peak resident memory with its accounting method, encoded size, warmup and
+iteration counts, toolchain, OS, hardware, and the exact candidate commit.
+Different hosts or inputs must not be combined into one adoption comparison.
+
+The complete scope, packaging boundary, license blocker, and adopt/defer/reject
+rule live in the
+[JLISwift JPEG Lossless qualification report](DISTRIBUTION.md).
 
 ### Running Full Benchmark Suite
 
@@ -485,8 +529,9 @@ swift test --filter ClinicalPerformanceReporterTests
 Budget failures are visible even without a historical baseline. Values at or
 above 90% of a configured budget are warnings; values above the budget are
 failures. Same-host relative deltas warn at 10% and fail at 20%; mismatched
-mode, fixture, build, tier, or startup scope is never compared. The integrated
-runner is `../Tools/Scripts/Performance/run_clinical_performance_gates.sh`.
+mode, fixture, build, tier, or startup scope is never compared. Application
+integration runners add their own tiers; they are outside the standalone
+package checks described in [Distribution](DISTRIBUTION.md).
 
 ---
 

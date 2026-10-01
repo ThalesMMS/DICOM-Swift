@@ -1,12 +1,27 @@
 # DICOM Conformance Statement
 
+## Optional LDAP authentication
+
+`DicomLDAPAuthenticationService` and `dicomtool ldap` provide optional LDAPv3
+simple bind, exact user lookup and direct group membership search. LDAPS uses
+the existing TLS 1.2+ factory with certificate and hostname validation. Explicit
+numeric-loopback plaintext exists for tests; there is no TLS downgrade or
+unverified-certificate option. Only completed, bounded searches and a nonempty
+successful user bind can produce an identity. Explicit injected mappings turn
+groups into scopes/roles, and the existing injected `DicomAuthorizing` decides
+each requested operation. Authentication and decisions use existing audit events.
+Credentials are supplied transiently, outside configuration and process arguments.
+This is an independent RFC 4511/4513/4515 implementation, not incorporated Mayam
+source. SASL, StartTLS, paging, referrals, nested groups and complete AD support
+are outside this profile. It does not replace the host's local principal.
+
 Comprehensive DICOM conformance documentation detailing supported transfer syntaxes, SOP classes, and implementation capabilities.
 
 ## Overview
 
 This DICOM Conformance Statement describes the capabilities and limitations of the DicomCore library (version 1.2.0) in accordance with DICOM Part 2: Conformance. DicomCore is a Swift DICOM file library for iOS, visionOS, and macOS 26+ that parses DICOM medical imaging files, extracts metadata, provides pixel data access with optional GPU-accelerated image processing, writes controlled Part 10 datasets, and exposes transport-injected DICOMweb service helpers covered by package tests.
 
-**Implementation Type:** DICOM File Decoder/Writer Library with transport-injected DICOMweb helpers and JPIP progressive pixel streaming
+**Implementation Type:** DICOM File Decoder/Writer Library with transport-injected DICOMweb helpers and bounded stateless JPIP progressive pixel streaming
 
 **Primary Use Case:** Local DICOM file parsing, metadata extraction, media-directory import, dataset writing, image processing, scoped DICOMweb client/server helper tests, and progressive JPIP pixel update integration for iOS and macOS applications
 
@@ -29,7 +44,7 @@ DICOM File(s) → DCMDecoder → Metadata Extraction
 **Key Characteristics:**
 - **Local file access by default** - no production PACS server, persistent archive, TLS termination, authorization policy, or audit trail is implemented by the package
 - **Scoped DICOMweb helpers** - QIDO-RS, WADO-RS, WADO-URI, STOW-RS, BulkDataURI, auth-header, pagination, multipart, and stable-error behavior are described by ``DicomWebConformanceMatrix``
-- **JPIP referenced pixel data** - metadata parsing recognizes Pixel Data Provider URL and streams progressive updates through caller-provided transport
+- **JPIP referenced pixel data** - metadata parsing recognizes Pixel Data Provider URL and the HTTPS-first stateless transport requests bounded cumulative classic JPEG 2000 or HTJ2K image entities with origin policy, authorization, cancellation, and pull backpressure
 - **Controlled write operations** - Part 10 dataset writing and DICOMDIR writing for native and deflated local media workflows
 - **Native image frame access** - optimized for CT/MR single-frame images and uncompressed Enhanced Multi-frame metadata/frame workflows
 - **Modality-agnostic parsing** - reads any valid DICOM file format
@@ -62,10 +77,10 @@ DicomCore provides the following functional capabilities:
 | **Waveform Objects** | Build and parse ECG/related temporal signal objects with channel samples, sampling frequency, units, and waveform references | ✅ Synthetic ECG |
 | **Video Objects** | Build and parse Video Endoscopic/Microscopic/Photographic objects, preserving MPEG-2/H.264/H.265 streams and timing metadata for player handoff | ✅ Synthetic video |
 | **JPEG 2000 Part 2 Volume Documents** | Decode multi-component component collections into `DicomSeriesVolume` buffers with geometry metadata | ⚠️ Best-Effort OpenJPEG runtime |
-| **JPIP Progressive Pixel Data** | Recognize referenced pixel URLs and expose ordered progressive volume update streams with cancellation/backpressure | ⚠️ Transport-injected client |
+| **JPIP Progressive Pixel Data** | Recognize `.94/.95/.204/.205` referenced pixel URLs and expose bounded complete-entity updates with cancellation/backpressure | ⚠️ Stateless complete-entity profile |
 | **Transfer Syntax Conversion** | Plan safe conversion paths and execute qualified explicit-intent codec routes, including experimental JPEG XL | Planning API, typed guards, and `DicomTranscoder` |
 | **DICOMweb Service Helpers** | Serialize and test scoped QIDO-RS, WADO-RS, WADO-URI, STOW-RS, BulkDataURI, auth-header, pagination, multipart, and stable-error behavior | Scoped matrix |
-| **Production PACS Networking** | Persistent archive, full UPS, server-side rendered frames, JPIP proxying, authorization policy, PHI audit logging, TLS termination, and zero-copy large-payload streaming | ❌ Not Supported |
+| **Production PACS Networking** | Persistent archive, full UPS, JPIP proxying, authorization policy, PHI audit logging, TLS termination, and zero-copy large-payload streaming | ❌ Not Supported |
 | **DICOM File Creation** | Write native/Deflated Part 10 datasets, referenced JPIP metadata, DICOMDIR files, and caller-provided encapsulated pixel/video streams without recompression | ✅ Supported with scoped writer matrix |
 
 ### 1.3 DICOMweb Service Helper Matrix
@@ -79,21 +94,89 @@ server. The authoritative runtime matrix is
 | --- | --- | --- | --- | --- |
 | QIDO-RS | supported | study-level supported | `DicomWebClient`/`DicomWebServer` | Study search supports tested metadata filters plus `limit`/`offset` pagination. |
 | WADO-RS metadata | supported | supported | `DicomWebClient`/`DicomWebServer` | Client parses DICOM JSON; server emits DICOM JSON or XML. |
-| WADO-RS instance | supported | supported | `DicomWebClient`/`DicomWebServer` | Instance retrieval uses `multipart/related` `application/dicom` payloads. |
-| WADO-RS frame | transport-injected | stable 501 | Remote DICOMweb service or caller transport | Client serializes frame retrieval; in-memory server returns `DICOMWEB_FRAME_RETRIEVAL_UNSUPPORTED`. |
-| WADO-RS rendered frame | transport-injected | stable 501 | Remote DICOMweb service or caller renderer | Client serializes rendered-frame retrieval; in-memory server returns `DICOMWEB_RENDERED_FRAME_UNSUPPORTED`. |
+| WADO-RS instance | supported | supported | `DicomWebClient`/`DicomWebServer` | Instance retrieval labels the stored transfer syntax and uses exact entity/per-part lengths plus part `Content-Location`. |
+| WADO-RS frame | supported | supported | `DicomWebClient`/`DicomWebServer` | Strict ascending one-based frame lists return bounded native or compressed `multipart/related` representations. |
+| WADO-RS rendered frame | supported | supported | `DicomWebClient`/`DicomWebServer` | Native grayscale and color frames render as direct or multipart JPEG, PNG, or GIF representations. |
 | WADO-URI | supported | supported | `DicomWebClient`/`DicomWebServer` | Object retrieval is covered by HTTP serialization tests. |
-| STOW-RS | supported | supported for Part 10 payloads | `DicomWebClient`/`DicomWebServer` | Multipart boundaries and payload preservation are covered by tests. |
-| UPS-RS | deferred | stable 501 | Deferred P2 work | UPS routes return `DICOMWEB_UPS_DEFERRED`. |
+| STOW-RS | supported | supported for Part 10 payloads | `DicomWebClient`/`DicomWebServer` | Client part headers accept bare `application/dicom` plus an optional canonical ASCII transfer syntax UID. Part 10 File Meta Information supplies a missing UID or must match an explicit UID; the initializer default remains Explicit VR Little Endian, so other encodings pass their matching UID or `nil`. Opaque non-Part-10 data retains caller-owned labeling. The exact complete body is limited by `maximumSTOWRequestBodyBytes` before allocation or transport; the default is 128 MiB. Multipart boundaries and byte-exact payload preservation are covered by tests. |
+| UPS-RS | Worklist operations and reconnecting notification client | A1 engine-backed Worklist Service | `DicomWebServer`, `DicomWebHTTP` | PS3.18 chapter 11 transactions, JSON and multipart XML; RFC 6455 notification connections. |
 | BulkDataURI | transport-injected | unsupported | `DicomWebClient` or caller transport | DICOM JSON values are preserved; `retrieveBulkData` fetches absolute or relative URIs through the configured transport. |
-| JPIP | caller-supplied transport | unsupported | `DicomJPIPClient` with `DicomJPIPTransport` | JPIP progressive pixel delivery is not proxied through `DicomWebServer`. |
-| Multipart | supported | supported | `DicomWebMultipartParser` and STOW/WADO helpers | `multipart/related` parsing and emission are tested, including large payload preservation. |
+| JPIP | HTTPS-first stateless complete-entity transport | unsupported | `DicomJPIPHTTPTransport` and `DicomJPIPClient` | Exact-origin allowlisting, finite byte/layer limits, authorization port, same-origin redirects, pull backpressure, and cancellation are implemented; JPP/JPT parsing, sparse caching, reconstruction and HTTP channels are experimental opt-in paths with incomplete qualification; see the JPIP qualification note below. `DicomWebServer` serves JPIP under its configured service path when a `DicomJPIPServer` is injected. |
+| Multipart | supported | supported | `DicomWebMultipartParser` and STOW/WADO helpers | Emitters use exact entity/per-part lengths and WADO resource locations. Parsing validates declared lengths and tolerates legacy missing part length/location headers. `start`/`Content-ID` root selection is not implemented. The current PS3.18 audit is recorded in the repository's `../../../../DISTRIBUTION.md`. |
 | Authentication | caller headers | optional bearer token | Application security layer | No authorization policy, TLS termination, or PHI audit trail is implemented by the in-memory server. |
 | Pagination | `limit`/`offset` query items | `limit`/`offset` applied | `DicomWebQuery` and server QIDO | Server pagination is deterministic over the in-memory study list. |
-| Error semantics | stable typed errors | stable HTTP status and error-code headers | `DicomWebClientError` and `DicomWebServerErrorCode` | Unsupported routes use `501` plus `X-DICOMweb-Error-Code`; missing resources use HTTP status codes. |
-| Large payload streaming | Data-backed request bodies | Data-backed responses | Caller-provided transport for zero-copy streaming | The package preserves large multipart payloads, but true streaming is outside this helper API. |
+| Error semantics | stable typed errors | stable HTTP status and error-code headers | `DicomWebClientError` and `DicomWebServerErrorCode` | The default URLSession transport cancels its underlying request with the caller task. Frame routes use typed `400`, `404`, `406`, `413`, and `422`; UPS-RS uses transaction-specific status and Warning headers. |
+| Large payload streaming | bounded Data-backed request bodies | bounded Data-backed responses | Caller-provided transport for zero-copy streaming | STOW body, frame-list, frame-count, response-byte, and rendered-pixel budgets are configurable; true streaming is outside this helper API. |
 
-### 1.4 DIMSE and Storage SCP Helper Matrix
+Raw frame retrieval requires `Accept`. Byte-aligned native Pixel Data is returned
+Little Endian in one multipart part with requested frames concatenated in ascending
+order. JPEG, JPEG-LS, JPEG 2000, HTJ2K, JPEG XL, and RLE Lossless encapsulated
+representations are passed through without relabeling or transcoding, one part per
+frame. Native rendered retrieval accepts JPEG, PNG, or GIF and supports JPEG
+`quality`, a width/height `viewport`, and a center/width `window`. One-bit native
+repacking, compressed or video rendering, viewport cropping, and annotation burn-in
+are explicit exclusions. ``DicomWebServerConfiguration`` bounds frame-list length,
+frames per request, raw response bytes, rendered pixels, and rendered response bytes.
+
+#### Experimental JPIP databin client qualification
+
+Complete-entity negotiation remains the default: classic referenced syntaxes
+select `image/jp2`, while HTJ2K referenced syntaxes select `image/jph` or
+`image/jphc`. Dataset Deflate does not alter HTTP or codestream encoding.
+Explicit stream modes and configuration allow `image/jpp-stream` and
+`image/jpt-stream`; this is not a declaration of completed T.808 conformance.
+
+The incremental parser retains incomplete messages across chunks, recognizes
+EOR and enforces finite message/bin/response limits. The cache retains sparse
+ranges and completion lengths, rejects conflicting overlaps and mixed JPP/JPT
+representations, and reports useful/redundant databin bytes. Active-window
+protection derives overlapping precincts from the main header, including partial
+border overlaps; headers of the active codestream remain pinned. Cache imports
+parse model/need descriptors as negotiation metadata, never fabricated received
+bytes. Exports advertise only actual contiguous prefixes. `need` is stateless
+and mutually exclusive with `model`/`tpmodel`.
+
+`DicomJPIPWindow` exposes typed window and quality fields. `DicomJPIPSession`
+retains a channel/cache, reports first-preview/final timestamps and peak cache
+bytes, and closes via `cclose` alone. The request scheduler cancels superseded
+URLSession work, retaining parsed messages. An interrupted session reissues its
+window on the same channel; if the server returns completed EOR while bytes are
+still missing, a stateless repair advertises the actual cache and retains the
+channel. Peers such as OpenJPIP 1.5.2 must explicitly disable unsupported cache
+model fields (`supportsCacheModel: false`); their repair can retransmit data.
+
+JPT reconstruction preserves complete tile-parts. JPP reconstruction emits
+packets in progression order, using PLT lengths or extended-precinct packet
+boundaries where available and substituting empty packets for unavailable
+complete packets. Five progression orders have hermetic PLT first-layer and
+final pixel goldens. Class-0 precincts without packet boundaries preserve their
+contiguous bytes for decoder truncation; not every such partial stream is
+decodable. LRCP/RLCP with multiple layers requires packet boundaries. Tile
+COD/COC/POC overrides remain rejected with a typed error. CAP/CPF bytes are
+preserved; a hermetic HTJ2K JPT passthrough preserves the complete codestream and
+pixels, but lacks independent JPIP-server evidence.
+
+A stream payload is final only with EOR 1 or 2 and complete window coverage.
+Complete-entity finality retains its existing scheduling semantics.
+Sparse/unknown coverage fractions are byte-coverage estimates, not clinical
+quality measurements.
+
+The supplied OpenJPIP 1.5.2 qualification executes within 46 JPIP tests, with
+zero failures and one unrelated legacy reference-endpoint skip. Cumulative JPP
+updates 1/3/5, JPT updates 1/2/3/5, reduced resolution, and interruption/repair
+have passing pixel comparisons. JPP layer 2 has matching reconstructed bytes
+but remains undecodable in both client and oracle. The ROI client/oracle crops
+match; the server omits required lower-resolution precincts and their crop
+differs from the original. Original layer-limited decodes also differ from the
+server's partial quality behavior. These tool/tool discrepancies are explicit
+versioned expected failures, not waived client/oracle comparisons or proof of
+complete T.808 interoperability. Overlapping windows use 166260 then 3 response
+bytes. Reconnect retains 318950 useful bytes, replays 124195 bytes and reaches
+a matching final image. `stream`, cache-model peer negotiation and HTJ2K retain
+"pending independent evidence" status. See `DICOM-Swift/Scripts/interop/README.md`
+for the oracle procedure, fixtures, measured accounting and limitations.
+
+## 1.4 DIMSE and Storage SCP Helper Matrix
 
 The DIMSE surface is a package helper for tested SCU/SCP workflows and
 DICOM-Swift-parity validation, not a full managed PACS service. Applications still
@@ -107,9 +190,9 @@ remote archive qualification.
 | C-GET | Study Root retrieve SCU with C-STORE suboperation handling | `DicomDIMSEServiceSCU.get` | Per-instance delivery after the C-STORE response and collector compatibility are tested. |
 | C-MOVE | Study Root retrieve SCU | `DicomDIMSEServiceSCU.move` | Pending/completed suboperation progress and move destination AE title propagation are tested. |
 | C-STORE | Storage SCU and Storage SCP | `DicomDIMSEServiceSCU.store`, `DicomStorageSCPService`, `DicomStorageSCPServer` | Part 10 payload parsing, transfer-syntax mismatch rejection, file cache writes, and association handling are tested. |
-| Storage Commitment | Push-model tracking/report helpers | `DicomStorageCommitmentTracker` and `DicomStorageSCPService` | Commitment event report datasets and partial success reports are tested; production archive policy is caller-owned. |
+| Storage Commitment | Push Model SCP request handling and N-EVENT-REPORT SCU delivery | `DicomStorageSCPService`, `DicomStorageCommitmentPersistence`, and `DicomDIMSEServiceSCU.reportStorageCommitment` | The package supports caller-provided durable checkpoints before successful C-STORE/N-ACTION responses, per-reference failure reasons, Event Type 1/2 datasets, mandatory reverse-role negotiation, and response validation. Transaction storage, destination resolution, and retry policy remain caller-owned. |
 | MPPS | N-CREATE and N-SET SCU helpers | `DicomDIMSEServiceSCU.createMPPS` and `updateMPPS` | Modality worklist-derived create/update datasets are covered by package tests. |
-| Basic Grayscale Print | Basic Grayscale Print Management Meta SOP Class | `DicomPrintJob` and `DicomDIMSEServiceSCU.sendPrintJob` | Color print, Presentation LUT service, annotation boxes, printer configuration/status services, and storage commitment remain unsupported. A printer that grants fewer image boxes than the job requested fails the job with `DicomPrintManagementError.insufficientImageBoxes(requested:granted:)` before any N-SET; the SCU never invents image box SOP Instance UIDs. |
+| Basic Grayscale/Color Print | Basic Grayscale and Basic Color Print Management Meta, matching Image Box, and Printer SOP Classes | `DicomPrintJob` and `DicomDIMSEServiceSCU.sendPrintJob` | Auto proposes both modes and prefers color; explicit color never falls back to grayscale. Grayscale image boxes carry MONOCHROME2 and color image boxes carry color-by-plane RGB8 with Planar Configuration 1. The SCU optionally queries Printer Status with N-GET before and after film acceptance and confirms Printer N-EVENT-REPORT Event Types 1/2/3. Printers that reject or refuse this optional status path retain the print flow. Presentation LUT shape/table, optional Print Job monitoring with N-GET/N-EVENT-REPORT, Printer Configuration Retrieval, Annotation Box and per-film partial results are supported; storage commitment is a separate service. A printer that grants fewer image boxes than the job requested fails the job with `DicomPrintManagementError.insufficientImageBoxes(requested:granted:)` before any N-SET; the SCU never invents image box SOP Instance UIDs. |
 | TLS | Client and Storage SCP listener configuration | `DicomTLSConfiguration` and `DicomTLSOptionsFactory` | Certificate, private-key, trust-store, server-name, and the DICOM PS3.15 B.12 BCP 195 RFC 8996/9325 profile are tested where Network/Security are available. TLS 1.2 is the minimum; newer protocol and cipher negotiation remains system-managed. Retired serialized profile identifiers decode as B.12. |
 | User identity | Association user identity negotiation | `DicomUserIdentity` | User identity is rejected before association setup when TLS is disabled. |
 | Pooling/retry/cancellation | Association pooling, retry policy, circuit breaker, operation handle, progress, and audit log | `DicomDIMSEAssociationPool`, `DicomNetworkRetryPolicy`, `DicomNetworkCircuitBreaker`, `DicomDIMSEOperationHandle` | Cancellation avoids retries and circuit-breaker trips; pooling keys include node, AE titles, TLS, identity, transfer syntaxes, timeout, and bandwidth settings. |
@@ -129,16 +212,17 @@ and ``DicomVideoCodec``.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Overlay Plane | Pixel-bearing image instances using repeating groups 6000-601E | Overlay Rows, Columns, Type, Origin, Bits Allocated, and Bit Position; Overlay Data for standalone planes | Standalone OB/OW Overlay Data in native or encapsulated image instances; embedded planes require native 8/16/32-bit single-sample Pixel Data | Up to 16 planes; LSB-first continuous multi-frame bits; one-based and non-positive origins; Image Frame Origin alignment; single overlays apply to every image frame | Group, type, source, origin, dimensions, and bit position are preserved in the normalized result | Embedded overlays in compressed or multi-sample Pixel Data, malformed/truncated data, and overlay color without a Presentation State | Malformed or non-applicable planes are omitted from `overlayPlanes(forFrame:)` |
 | Image export | Native pixel-bearing image instances through `DCMDecoder` and `DicomImageExporter` | Pixel Data, Rows, Columns, Samples per Pixel, Photometric Interpretation, Bits Allocated, Bits Stored, High Bit, Pixel Representation | Native uncompressed Part 10 datasets addressable by `DicomPixelDataDescriptor` | `display8` exports PNG/JPEG/TIFF with resize and annotation burn-in; `native16Bit` exports unsigned single-sample TIFF only | Optional non-PHI sidecars preserve frame number, modality, dimensions, windowing, spacing, and transfer syntax context | Native 16-bit RGB, signed `native16Bit` TIFF, resize/annotations in `native16Bit` mode, compressed/video/referenced pixel export | `DicomImageExportError.unsupportedPixelMode` or `invalidPixelData` |
-| Secondary Capture | Secondary Capture Image Storage synthetic snapshots | Clinical export validation requires SOP Instance UID, Study Instance UID, Series Instance UID, Patient Name, Patient ID, Study ID, Study Date, Series Number, Instance Number, and the Image Pixel module | Explicit VR Little Endian Part 10 with native uncompressed Pixel Data | 8/16-bit unsigned MONOCHROME2 or 8-bit interleaved RGB with planar configuration 0 | Patient, study, series, instance, device, derivation, and source image references are preserved when supplied | Signed stored pixels, planar RGB, non-RGB three-sample payloads, unsupported bit depths, missing clinical context in strict export validation | `DicomSecondaryCaptureError.missingRequiredMetadata` or `unsupportedPixelLayout` |
-| Print management | Basic Grayscale Print Management Meta SOP Class with Basic Film Session, Basic Film Box, and Basic Grayscale Image Box | Film session copy/priority/medium/destination, film box layout/orientation/size, image box position, and grayscale 8-bit image pixel attributes | Negotiated DIMSE presentation context, defaulting to Explicit VR Little Endian when absent | Rendered RGB bitmaps and PNG snapshots are converted to 8-bit MONOCHROME2 Basic Grayscale Image Box payloads | Film session label, film box display settings, queue status, and returned image box SOP Instance UIDs are preserved | Color print, Presentation LUT service, annotation boxes, printer configuration/status services, storage commitment, and film boxes for which the printer grants fewer image boxes than the job requested | `DicomPrintManagementError.unsupportedService` or `insufficientImageBoxes(requested:granted:)` |
-| Waveform | 12-lead ECG, General ECG, Ambulatory ECG, General 32-bit ECG, Hemodynamic, Cardiac Electrophysiology, Arterial Pulse, and Respiratory Waveform Storage | Waveform Sequence, Number of Channels, Number of Samples, Sampling Frequency, Channel Definition Sequence, Waveform Bits Allocated, Waveform Sample Interpretation, and Waveform Data | Native dataset and Part 10 writing through `DicomDataSetWriter`; compressed waveform encodings are not implemented | SB, UB, SS, US, SL, and UL integer samples are interleaved by sample then channel with range checks | Channel labels, source concepts, units, sensitivity, filters, timing offsets, and source waveform references are preserved | Float/double samples, audio waveforms, vendor-specific packed encodings, inconsistent channel sample counts, and malformed payload lengths | `DicomWaveformError.unsupportedSampleInterpretation`, `sampleOutOfRange`, or `invalidWaveformData` |
-| Video | Video Endoscopic, Video Microscopic, and Video Photographic Image Storage | SOP Class UID, Rows, Columns, Number of Frames, timing metadata when available, transfer syntax UID, and encapsulated Pixel Data | MPEG-2, MPEG-4 AVC/H.264, and HEVC/H.265 DICOM video transfer syntaxes | Encoded streams and indexed encoded frame fragments are preserved for caller/player handoff; native frame decode and video encoding are not implemented | Codec, timing, frame rate, duration, source references, lossy compression method, and raw stream bytes are preserved | Non-video transfer syntaxes, native video frame decoding, video transcoding, and server-side DICOMweb rendered frames | `DicomVideoError.unsupportedTransferSyntax`, `nativeFrameDecodeUnsupported`, `transcodingUnsupported`, or `DICOMWEB_RENDERED_FRAME_UNSUPPORTED` |
+| Secondary Capture | Secondary Capture Image Storage synthetic snapshots | Clinical export validation requires SOP Instance UID, Study Instance UID, Series Instance UID, Patient Name, Patient ID, Study ID, Study Date, Series Number, Instance Number, and the Image Pixel module | Explicit VR Little Endian Part 10 with native uncompressed Pixel Data | 8/16-bit unsigned MONOCHROME2 or 8-bit interleaved RGB with planar configuration 0 | Patient, study, series, instance, device, derivation, and source image references are preserved when supplied; media-attachment authoring writes required Type 2 patient/study/manufacturer elements even when empty | Signed stored pixels, planar RGB, non-RGB three-sample payloads, unsupported bit depths, missing clinical context in strict export validation | `DicomSecondaryCaptureError.missingRequiredMetadata` or `unsupportedPixelLayout` |
+| Print management | Basic Grayscale and Color Print Management Meta SOP Classes with Basic Film Session, Basic Film Box, matching Image Box, Basic Annotation Box, and Printer | Film session copy/priority/medium/destination, film box layout/orientation/size, image box position, and grayscale or RGB 8-bit image pixel attributes | Negotiated DIMSE presentation context, defaulting to Explicit VR Little Endian when absent | Grayscale jobs send 8-bit MONOCHROME2; color jobs send color-by-plane RGB8 with Planar Configuration 1; automatic mode prefers color and falls back to grayscale | Film session label, film box display settings, queue status, and returned image box SOP Instance UIDs are preserved | Retired Print Image Overlay/Combined Print Image; film boxes for which the printer grants fewer image boxes than the highest requested position | `DicomPrintManagementError.unsupportedService`, `printModeNotNegotiated(_:)`, or `insufficientImageBoxes(requested:granted:)` |
+| Waveform | 12-lead ECG, General ECG, Ambulatory ECG, General 32-bit ECG, Hemodynamic, Cardiac Electrophysiology, Arterial Pulse, Respiratory, Multi-channel Respiratory, Routine Scalp EEG, EMG, EOG, Sleep EEG, Basic Voice Audio, and General Audio Waveform Storage | Waveform Sequence, Number of Channels, Number of Samples, Sampling Frequency, Channel Definition Sequence, Waveform Bits Allocated, Waveform Sample Interpretation, and Waveform Data | Native dataset and Part 10 writing through `DicomDataSetWriter`; compressed waveform encodings are not implemented | SB, UB, SS, US, SL, UL, MB, and AB samples are interleaved by sample then channel with range checks; Multi-channel Respiratory is constrained to SS or SL | Channel labels, source concepts, units, sensitivity, filters, timing offsets, display scale, and source waveform references are preserved | Float/double samples, vendor-specific packed encodings, inconsistent channel sample counts, malformed payload lengths, and non-SS/SL Multi-channel Respiratory samples | `DicomWaveformError.unsupportedSampleInterpretation`, `sampleOutOfRange`, or `invalidWaveformData` |
+| Video | Video Endoscopic, Video Microscopic, and Video Photographic Image Storage | SOP Class UID, Rows, Columns, Number of Frames, timing metadata when available, transfer syntax UID, and encapsulated Pixel Data | MPEG-2, MPEG-4 AVC/H.264, and HEVC/H.265 DICOM video transfer syntaxes | Encoded streams and indexed encoded frame fragments are preserved by default for caller handoff; forwarding callers can select stream-only retention; native frame decode and video encoding are not implemented | Codec, timing, frame rate, duration, source references, lossy compression method, and raw stream bytes are preserved; media-attachment authoring writes required Type 2 patient/study/manufacturer elements even when empty | Non-video transfer syntaxes, native video frame decoding, video transcoding, and server-side DICOMweb rendered frames | `DicomVideoError.unsupportedTransferSyntax`, `nativeFrameDecodeUnsupported`, `transcodingUnsupported`, or `DICOMWEB_RENDERED_FRAME_UNSUPPORTED` |
 
 ### 1.6 Sequencing of Real-World Activities
 
 `DicomSeriesLoader` declares its volume scope through
 ``DicomSeriesLoaderSupportMatrix``. The standard matrix accepts Bits Allocated
-8, 16, or 32; Bits Stored 8, 16, or 32; High Bit from the source metadata;
+8, 16, or 32; any Bits Stored up to Bits Allocated with High Bit = Bits Stored − 1
+(the unused high bits are masked and a signed sample's sign is its top stored bit);
 Pixel Representation 0 or 1; Samples per Pixel 1; MONOCHROME1 or MONOCHROME2;
 absent Planar Configuration; one frame per file; and native uncompressed or
 compressed pixel transfer syntaxes whose decode backend is active (compressed
@@ -147,7 +231,8 @@ rescale slope/intercept, VOI/window metadata, pixel spacing, orientation,
 origin, image instance metadata, and slice ordering by Image Position
 projection, then Instance Number, then localized filename. Compressed transfer
 syntaxes without an active decode backend, color/multi-sample data, explicit
-planar configuration, unsupported Bits Stored values, and multiframe images
+planar configuration, Bits Stored above Bits Allocated or not starting at bit 0, and
+multiframe images
 fail with typed errors carrying transfer syntax and pixel metadata.
 Enhanced CT/MR multiframe objects assemble through
 `DicomSeriesLoader.loadEnhancedMultiframeVolume(at:)`: Shared and Per-Frame
@@ -216,24 +301,27 @@ Use ``DicomTransferSyntaxRegistry`` to inspect encapsulation, fragmentation, dec
 | **JPEG Lossless, Non-Hierarchical (Process 14)** | 1.2.840.10008.1.2.4.57 | JPEG Lossless | decoded | Native `JPEGLosslessDecoder`; all selection values 0-7 |
 | **JPEG Baseline (Process 1)** | 1.2.840.10008.1.2.4.50 | JPEG Lossy | delegated | ImageIO for platform-supported 8-bit payloads |
 | **JPEG Extended (Process 2 & 4)** | 1.2.840.10008.1.2.4.51 | JPEG Lossy | decoded | Native 12-bit grayscale decode preserves precision; <=8-bit payloads delegate to ImageIO |
-| **JPEG-LS Lossless Image Compression** | 1.2.840.10008.1.2.4.80 | JPEG-LS | delegated | Async JLSwift 0.9.0 candidate with CharLS shadow/fallback; reversible JLSwift encode route for qualified shapes |
-| **JPEG-LS Lossy (Near-Lossless) Image Compression** | 1.2.840.10008.1.2.4.81 | JPEG-LS | delegated | Async JLSwift 0.9.0 candidate with CharLS shadow/fallback; encode requires explicit NEAR intent and records lossy metadata |
-| **JPEG 2000 Image Compression (Lossless Only)** | 1.2.840.10008.1.2.4.90 | JPEG 2000 | delegated | Decode: async J2KSwift candidate with OpenJPEG shadow/fallback. Encode: explicit reversible J2KSwift CPU route. |
-| **JPEG 2000 Image Compression** | 1.2.840.10008.1.2.4.91 | JPEG 2000 | delegated | Decode: async J2KSwift candidate with OpenJPEG shadow/fallback. Encode: explicit reversible/irreversible J2KSwift CPU route. |
-| **JPEG 2000 Part 2 Multi-component Image Compression (Lossless Only)** | 1.2.840.10008.1.2.4.92 | JPEG 2000 Part 2 | delegated | Preflighted OpenJPEG through `DicomJP3DVolumeDocument` |
-| **JPEG 2000 Part 2 Multi-component Image Compression** | 1.2.840.10008.1.2.4.93 | JPEG 2000 Part 2 | delegated | Preflighted OpenJPEG through `DicomJP3DVolumeDocument` |
-| **JPEG XL Lossless** | 1.2.840.10008.1.2.4.110 | JPEG XL | experimental | JXLSwift 1.4.0 reversible 8/16-bit grayscale and RGB8; disabled by default |
-| **JPEG XL JPEG Recompression** | 1.2.840.10008.1.2.4.111 | JPEG XL | experimental | Qualified JPEG Baseline reconstructs byte-for-byte; disabled by default |
-| **JPEG XL** | 1.2.840.10008.1.2.4.112 | JPEG XL | experimental | Explicit reversible or irreversible JXLSwift route; disabled by default |
-| **DICOM JPIP Referenced Transfer Syntax** | 1.2.840.10008.1.2.4.94 | JPIP referenced pixel data | streamed-only | Metadata and Pixel Data Provider URL; transport supplied by application |
-| **DICOM JPIP Referenced Deflate Transfer Syntax** | 1.2.840.10008.1.2.4.95 | JPIP referenced pixel data with dataset deflate | streamed-only | Dataset inflate plus Pixel Data Provider URL; transport supplied by application |
+| **JPEG-LS Lossless Image Compression** | 1.2.840.10008.1.2.4.80 | JPEG-LS | decoded | Own DicomJPEGLS codec (vendored JLSwift 0.9.1 core, ILV none/line/sample, restart lines) with CharLS fallback; reversible encode with interleave/restart options |
+| **JPEG-LS Lossy (Near-Lossless) Image Compression** | 1.2.840.10008.1.2.4.81 | JPEG-LS | decoded | Own DicomJPEGLS codec with CharLS fallback; encode requires an explicit NEAR, verifies the bound after signed normalisation and records lossy metadata |
+| **JPEG 2000 Image Compression (Lossless Only)** | 1.2.840.10008.1.2.4.90 | JPEG 2000 | decoded | Own DicomJPEG2000 codec (vendored J2KSwift 11.0.2 CPU core, exact against OpenJPEG on independent inputs, JP2/JPX/JPH unwrapped) with OpenJPEG fallback; explicit reversible encode route. |
+| **JPEG 2000 Image Compression** | 1.2.840.10008.1.2.4.91 | JPEG 2000 | decoded | Own DicomJPEG2000 codec (9/7 through the reference inverse, within 2 LSB of OpenJPEG) with OpenJPEG fallback; explicit reversible/irreversible encode route with loss provenance. |
+| **JPEG 2000 Part 2 Multi-component Image Compression (Lossless Only)** | 1.2.840.10008.1.2.4.92 | JPEG 2000 Part 2 | experimental | Own DicomJPEG2000 Annex J array-based collection codec (frames as components, one fragment per collection); no independent Part 2 decoder verified the objects |
+| **JPEG 2000 Part 2 Multi-component Image Compression** | 1.2.840.10008.1.2.4.93 | JPEG 2000 Part 2 | experimental | Own DicomJPEG2000 Annex J array-based collection codec with explicit reversible or irreversible intent; no independent Part 2 decoder verified the objects |
+| **JPEG XL Lossless** | 1.2.840.10008.1.2.4.110 | JPEG XL | experimental | Own DicomJPEGXL Modular lossless codec: Bits Stored 1–16 grayscale (signed or unsigned), RGB8 (colour above 8 bits at codec level only), ICC passthrough; exact against libjxl; disabled by default (#2332) |
+| **JPEG XL JPEG Recompression** | 1.2.840.10008.1.2.4.111 | JPEG XL | experimental | Qualified JPEG Baseline (.50/SOF0) and 8-bit Extended Huffman (.51/SOF1) reconstruct byte-for-byte; disabled by default |
+| **JPEG XL** | 1.2.840.10008.1.2.4.112 | JPEG XL | experimental | Reversible route on the own Modular codec (as .110); explicit irreversible VarDCT route on the own decoder and encoder; disabled by default |
+| **DICOM JPIP Referenced Transfer Syntax** | 1.2.840.10008.1.2.4.94 | JPIP referenced pixel data | streamed-only | Bounded stateless `image/jp2` complete entities |
+| **DICOM JPIP Referenced Deflate Transfer Syntax** | 1.2.840.10008.1.2.4.95 | JPIP referenced pixel data with dataset deflate | streamed-only | Dataset inflate plus bounded stateless `image/jp2` complete entities |
 | **MPEG-2 Video Transfer Syntaxes** | 1.2.840.10008.1.2.4.100-.101.1 | MPEG-2 video | streamed-only | Encoded stream exposed for player backend; native frame decode is not implemented |
 | **MPEG-4 AVC/H.264 Video Transfer Syntaxes** | 1.2.840.10008.1.2.4.102-.106.1 | H.264 video | streamed-only | Encoded stream exposed for player backend; native frame decode is not implemented |
 | **HEVC/H.265 Video Transfer Syntaxes** | 1.2.840.10008.1.2.4.107-.108 | HEVC video | streamed-only | Encoded stream exposed for player backend; native frame decode is not implemented |
-| **HTJ2K Image Compression (Lossless Only)** | 1.2.840.10008.1.2.4.201 | HTJ2K | delegated | Decode: OpenJPEG >= 2.5 production. Encode: explicit reversible J2KSwift CPU route. |
-| **HTJ2K Image Compression (Lossless RPCL)** | 1.2.840.10008.1.2.4.202 | HTJ2K | delegated | Decode: OpenJPEG >= 2.5 production. Encode: explicit reversible J2KSwift CPU RPCL route. |
-| **HTJ2K Image Compression** | 1.2.840.10008.1.2.4.203 | HTJ2K | delegated | Decode: OpenJPEG >= 2.5 production. Encode: explicit reversible/irreversible J2KSwift CPU route. |
-| **RLE Lossless** | 1.2.840.10008.1.2.5 | RLE | decoded | Native `DicomRLELosslessDecoder` |
+| **HTJ2K Image Compression (Lossless Only)** | 1.2.840.10008.1.2.4.201 | HTJ2K | delegated | Decode: synchronous uses preflighted OpenJPEG >= 2.5; asynchronous prefers the own DicomJPEG2000 HT decoder with OpenJPEG fallback. Encode: explicit reversible own route. |
+| **HTJ2K Image Compression (Lossless RPCL)** | 1.2.840.10008.1.2.4.202 | HTJ2K | delegated | Decode: synchronous uses preflighted OpenJPEG >= 2.5; asynchronous prefers the own DicomJPEG2000 HT decoder with OpenJPEG fallback; PS3.5 10.18.1 options validated. Encode: explicit reversible own route with RPCL, TLM and a <= 64-sample base resolution. |
+| **HTJ2K Image Compression** | 1.2.840.10008.1.2.4.203 | HTJ2K | delegated | Decode: synchronous uses preflighted OpenJPEG >= 2.5; asynchronous prefers the own DicomJPEG2000 HT decoder with OpenJPEG fallback. Encode: explicit reversible or irreversible own route; loss follows the intent, not the UID. |
+| **DICOM JPIP HTJ2K Referenced Transfer Syntax** | 1.2.840.10008.1.2.4.204 | JPIP referenced HTJ2K pixel data | streamed-only | Bounded stateless `image/jph` or `image/jphc` complete entities |
+| **DICOM JPIP HTJ2K Referenced Deflate Transfer Syntax** | 1.2.840.10008.1.2.4.205 | JPIP referenced HTJ2K pixel data with dataset deflate | streamed-only | Dataset inflate plus bounded stateless `image/jph` or `image/jphc` complete entities |
+| **RLE Lossless** | 1.2.840.10008.1.2.5 | RLE | decoded | Native `DicomRLELosslessDecoder` (8/16-bit grey, 8-bit RGB/YBR_FULL); own Annex G encoder for the same shapes |
+| **Deflated Image Frame Compression** | 1.2.840.10008.1.2.8.1 | Deflate per frame | decoded | Own `DicomDeflatedFrameCodec`: one raw DEFLATE fragment per frame inflated to the exact native frame length; native sources deflate verbatim at any Bits Allocated (#2335) |
 
 **Pixel Status Values:** `decoded`, `delegated`, `experimental`, `streamed-only`, `unsupported`, and `out-of-scope`.
 The same rows are available programmatically through
@@ -299,13 +387,27 @@ DicomCore can read files from any DICOM Image Storage SOP Class. The library is 
 | **Colon CAD SR Storage** | 1.2.840.10008.5.1.4.1.1.88.69 | CAD finding containers | ⚠️ Syntax and extraction only |
 | **Key Object Selection Document Storage** | 1.2.840.10008.5.1.4.1.1.88.59 | Key image/object references | ✅ Synthetic KOS + semantic references |
 | **Grayscale Softcopy Presentation State Storage** | 1.2.840.10008.5.1.4.1.1.11.1 | Image-relative graphic annotations | ✅ Synthetic GSPS |
+| **Color Softcopy Presentation State Storage** | 1.2.840.10008.5.1.4.1.1.11.2 | Color image presentation transforms | ✅ Synthetic Color PR |
+| **Pseudo-Color Softcopy Presentation State Storage** | 1.2.840.10008.5.1.4.1.1.11.3 | VOI followed by Palette Color LUT | ✅ Synthetic Pseudo-Color PR |
+| **Blending Softcopy Presentation State Storage** | 1.2.840.10008.5.1.4.1.1.11.4 | Underlying/superimposed series with relative opacity | ✅ Synthetic Blending PR |
 | **Encapsulated PDF Storage** | 1.2.840.10008.5.1.4.1.1.104.1 | Encapsulated PDF documents | ✅ Synthetic DOC |
 | **Encapsulated CDA Storage** | 1.2.840.10008.5.1.4.1.1.104.2 | Encapsulated CDA documents | ✅ Synthetic DOC |
 | **Encapsulated STL Storage** | 1.2.840.10008.5.1.4.1.1.104.3 | Encapsulated STL models | ✅ Synthetic DOC |
 | **12-lead ECG Waveform Storage** | 1.2.840.10008.5.1.4.1.1.9.1.1 | ECG temporal samples | ✅ Synthetic ECG |
 | **General ECG Waveform Storage** | 1.2.840.10008.5.1.4.1.1.9.1.2 | ECG temporal samples | ✅ Synthetic ECG |
 | **Ambulatory ECG Waveform Storage** | 1.2.840.10008.5.1.4.1.1.9.1.3 | Ambulatory ECG temporal samples | ✅ Synthetic ECG |
+| **General 32-bit ECG Waveform Storage** | 1.2.840.10008.5.1.4.1.1.9.1.4 | 32-bit ECG temporal samples | ✅ Synthetic ECG |
 | **Hemodynamic Waveform Storage** | 1.2.840.10008.5.1.4.1.1.9.2.1 | Hemodynamic temporal samples | ⚠️ Parser model |
+| **Cardiac Electrophysiology Waveform Storage** | 1.2.840.10008.5.1.4.1.1.9.3.1 | Electrophysiology temporal samples | ⚠️ Parser model |
+| **Basic Voice Audio Waveform Storage** | 1.2.840.10008.5.1.4.1.1.9.4.1 | Voice audio samples | ✅ Synthetic audio |
+| **General Audio Waveform Storage** | 1.2.840.10008.5.1.4.1.1.9.4.2 | Mono/stereo audio samples | ✅ Synthetic audio |
+| **Arterial Pulse Waveform Storage** | 1.2.840.10008.5.1.4.1.1.9.5.1 | Arterial pulse temporal samples | ⚠️ Parser model |
+| **Respiratory Waveform Storage** | 1.2.840.10008.5.1.4.1.1.9.6.1 | Respiratory temporal samples | ⚠️ Parser model |
+| **Multi-channel Respiratory Waveform Storage** | 1.2.840.10008.5.1.4.1.1.9.6.2 | Multi-channel respiratory temporal samples | ✅ Synthetic respiratory waveform |
+| **Routine Scalp Electroencephalogram Waveform Storage** | 1.2.840.10008.5.1.4.1.1.9.7.1 | EEG temporal samples | ✅ Synthetic EEG |
+| **Electromyogram Waveform Storage** | 1.2.840.10008.5.1.4.1.1.9.7.2 | EMG temporal samples | ✅ Synthetic EMG |
+| **Electrooculogram Waveform Storage** | 1.2.840.10008.5.1.4.1.1.9.7.3 | EOG temporal samples | ✅ Synthetic EOG |
+| **Sleep Electroencephalogram Waveform Storage** | 1.2.840.10008.5.1.4.1.1.9.7.4 | Sleep EEG temporal samples | ✅ Synthetic EEG |
 | **Video Endoscopic Image Storage** | 1.2.840.10008.5.1.4.1.1.77.1.1.1 | Encoded visible-light video stream | ✅ Synthetic video |
 | **Video Microscopic Image Storage** | 1.2.840.10008.5.1.4.1.1.77.1.2.1 | Encoded visible-light video stream | ✅ Synthetic video |
 | **Video Photographic Image Storage** | 1.2.840.10008.5.1.4.1.1.77.1.4.1 | Encoded visible-light video stream | ✅ Synthetic video |
@@ -378,6 +480,15 @@ including undefined-length items and nested undefined-length sequences. Item and
 sequence delimiter tags must use zero length; malformed nesting, missing
 delimiters, invalid item tags, and unexpected EOF produce parser errors.
 Undefined-length non-SQ element values remain unsupported.
+
+``DicomDataSetParser`` applies ``DicomDataSetParseLimits/default`` to the complete
+dataset tree. The inclusive default permits a sequence depth of 64, 1,000,000
+encoded element headers, and 500,000 sequence items. The root dataset has depth
+zero; element and item counts are cumulative across nested sequences. Callers
+can supply a custom ``DicomDataSetParseLimits`` value, and structural refusals
+produce ``DicomDataSetParseError``. ``DicomStorageSCPConfiguration`` applies the
+same default to C-STORE and Storage Commitment datasets unless configured with
+another budget.
 
 **Patient Module:**
 - Patient Name (0010,0010)
@@ -454,6 +565,8 @@ validation errors instead of partial semantic success.
 - Referenced Image Sequence (0008,1140)
 - Graphic Annotation Sequence (0070,0001)
 - Graphic Object Sequence (0070,0009)
+- Compound Graphic Sequence (0070,0209), including standard primitive geometry,
+  linked simple fallbacks, tick attributes, and text/line/fill style sequences
 - Graphic Layer Sequence (0070,0060)
 - Displayed Area Selection Sequence (0070,005A)
 - Presentation LUT Shape (2050,0020)
@@ -594,10 +707,10 @@ JPIP helper APIs with caller-configured endpoints and transports:
 
 | Security Aspect | Implementation |
 |-----------------|----------------|
-| **Network Security** | Caller-owned for configured DICOMweb, DIMSE, and JPIP transports; no TLS termination is implemented by the in-memory DICOMweb server |
+| **Network Security** | JPIP defaults to HTTPS, exact-origin allowlisting, ephemeral URLSession state, and a configurable redirect policy that rejects redirects by default and otherwise permits only bounded same-origin hops; DICOMweb/DIMSE deployment policy and server TLS termination remain caller-owned |
 | **File Access** | Application sandbox only, respects iOS/macOS file permissions |
 | **Data Encryption** | Files are read as-is; encryption/decryption is the caller's responsibility |
-| **Authentication** | DICOMweb client accepts caller headers and the in-memory server can require a bearer token; authorization policy remains caller-owned |
+| **Authentication** | JPIP obtains a complete Authorization value through an asynchronous origin-scoped provider and never puts it in the query; refresh and authorization policy remain caller-owned. DICOMweb client accepts caller headers and the in-memory server can require a bearer token. |
 | **Audit Trail** | None (logging is the caller's responsibility) |
 
 ### 6.2 Patient Privacy
@@ -616,6 +729,7 @@ JPIP helper APIs with caller-configured endpoints and transports:
 | **Buffer Overflows** | Swift's memory safety prevents buffer overflows |
 | **Integer Overflows** | Validated array sizing with overflow checks |
 | **Malformed Files** | Defensive parsing with typed error handling |
+| **Adversarial Dataset Structure** | Inclusive limits bound nested sequence depth, total element headers, and total sequence items before further allocation or recursion |
 | **Memory Exhaustion** | Memory mapping for large files (>10MB) |
 | **Decompression Bombs** | Pixel data size validation against declared dimensions |
 
@@ -629,8 +743,11 @@ DicomCore requires:
 - **Minimum iOS Version:** 26.0
 - **Minimum visionOS Version:** 26.0
 - **Minimum macOS Version:** 26.0
-- **Swift Version:** 6.2 toolchain
+- **Swift Toolchain:** 6.2 or later
+- **DICOM-Swift Language Mode:** Swift 6, with complete strict-concurrency checking
 - **Xcode Version:** 26.0 or later
+
+The package does not change the Swift language-mode setting of a consuming target.
 
 ### 7.2 Runtime Configuration
 
@@ -643,7 +760,8 @@ No runtime configuration files are required. Optional features:
 | **Tag Caching** | Enabled | Always enabled, not configurable |
 | **CharLS runtime path** | Auto-detect | Optional `DICOM_DECODER_CHARLS_LIBRARY_PATH` override |
 | **OpenJPEG runtime path** | Auto-detect | Optional `DICOM_DECODER_OPENJPEG_LIBRARY_PATH` override |
-| **JLSwift rollout** | `shadow` | `DICOM_JLSWIFT_MODE=disabled`, `shadow`, `preferred`, or `forced-for-tests` |
+| **JLSwift rollout** | `preferred` | `DICOM_JLSWIFT_MODE=disabled`, `shadow`, `preferred`, or `forced-for-tests` |
+| **J2KSwift rollout** | `preferred` | `DICOM_J2KSWIFT_MODE=disabled`, `shadow`, `preferred`, or `forced-for-tests` |
 | **JXLSwift rollout** | `disabled` | `DICOM_JXLSWIFT_MODE=disabled`, `experimental`, or `forced-for-tests` |
 
 ### 7.3 Framework Dependencies
@@ -656,7 +774,25 @@ DicomCore uses Apple-provided frameworks for its core pipeline:
 - **Accelerate (vDSP):** CPU-based image processing
 - **Metal:** GPU-based image processing (optional)
 
-Deflated Explicit VR Little Endian uses system zlib for raw deflate/inflate. JPEG-LS links JLSwift 0.9.0 behind the async compressed-frame adapter while CharLS remains the dynamically loaded production oracle and fallback. JLSwift defaults to shadow mode and is qualified for JPEG-LS UIDs .80/.81 on aligned 8–16-bit grayscale and RGB8; async encode supports reversible .80 and explicit-NEAR .81. JPEG 2000 decoding can use OpenJPEG when `DicomCodecRuntimePreflight.status(for: .openJPEG)` reports availability. CharLS and OpenJPEG remain SYSTEM dependencies loaded dynamically (default Homebrew//usr/local candidates, per-runtime `DICOM_DECODER_<RUNTIME>_LIBRARY_PATH` override) and are never bundled. J2KSwift 11.0.2 is a versioned SwiftPM dependency behind the JPEG 2000 adapter. Decode defaults to shadow mode and is qualified for JPEG 2000 UIDs .90/.91 while HTJ2K stays on OpenJPEG fallback. Encode is separately qualified on CPU for JPEG 2000 .90/.91 and HTJ2K .201-.203. The codec bridges return typed unsupported-transfer-syntax errors when runtimes are absent or incompatible. `DicomCodecCapabilities.backendStatuses()` reports backend availability, version, source, bit depths, operations, and deterministic unsupported reasons.
+Deflated Explicit VR Little Endian uses system zlib. JPEG, JPEG-LS, JPEG 2000
+and JPEG XL implementations live in internal DicomJPEG, DicomJPEGLS,
+DicomJPEG2000 and DicomJPEGXL targets, with original incorporated-source
+attribution in `ThirdPartyNotices.txt`. There is no Raster-Lab package dependency.
+Own JPEG/JPEG-LS/JPEG 2000 backends default to `preferred`; JPEG XL remains
+explicitly experimental and disabled by default. JPEG-LS .80/.81 covers aligned
+8–16-bit grayscale and RGB8, including qualified scan/restart profiles; encoding
+requires reversible or explicit NEAR intent. JPEG 2000 .90/.91 and HTJ2K
+.201–.203 use the own CPU backend within their qualified profiles, including
+explicit reversible/irreversible encoding and typed lossless-only restrictions.
+
+CharLS and OpenJPEG are optional dynamically loaded package adapters when
+`DicomCodecRuntimePreflight` reports availability. Their Homebrew, `/usr/local`
+and per-runtime override candidates are developer-installed dependencies, not
+bundled by DICOM-Swift or required by its qualified own routes. Isis separately
+ships the documented GDCM/OpenJPEG binary exception behind its own boundary.
+Unavailable or unsupported routes fail with typed diagnostics.
+`DicomCodecCapabilities.backendStatuses()` reports availability, source, bit
+depths and operations; `resolve` evaluates the actual requested profile.
 
 ---
 
@@ -668,12 +804,12 @@ Deflated Explicit VR Little Endian uses system zlib for raw deflate/inflate. JPE
 |------------|--------|------------|
 | **Encapsulated multi-frame images** | Frame indexing is supported; full decode depends on codec support for the transfer syntax | Extract frames with `getEncapsulatedFrame(_:)` and decode with a supported codec |
 | **JPEG Lossless Non-RGB Color and Separate-Scan Frames** | Native Process 14 decode handles restart intervals and single interleaved scans of 1 or 3 components; non-RGB photometric interpretations, >8-bit color, and separate-scan multicomponent streams are rejected with stable diagnostics | Convert to interleaved 8-bit RGB or grayscale Process 14, or use another validated backend |
-| **JPEG-LS Runtime Availability** | Default shadow decode requires CharLS; JLSwift is package-linked and available in preferred/forced modes for qualified shapes | Install/set CharLS, select `preferred`, or use a qualified native syntax |
+| **JPEG-LS Runtime Availability** | Qualified own async routes do not require CharLS; the synchronous legacy encoder and explicit fallback routes do | Use the qualified async route or explicitly provision the required fallback |
 | **JLSwift JPEG-LS shapes** | Grayscale below 8 Bits Stored, color above 8 Bits Stored, and non-RGB color are not qualified | Use CharLS through the synchronous path or convert to aligned 8–16-bit grayscale/RGB8 |
-| **Experimental JPEG XL shapes** | 10/12-bit, signed 8-bit, custom ICC, high-depth color, alpha, and oversized frames are not qualified | Use aligned unsigned 8/16-bit or signed 16-bit grayscale, RGB8, or another qualified syntax |
-| **JPEG 2000 Runtime Availability** | JPEG 2000 >8-bit and Part 2 paths require `DicomCodecRuntimePreflight.status(for: .openJPEG)` to be available | Install OpenJPEG, set `DICOM_DECODER_OPENJPEG_LIBRARY_PATH`, or convert to a native supported syntax |
-| **HTJ2K Pixel Decode** | J2KSwift 11.0.2 remains shadow-only after a pinned OpenJPH parity mismatch; production decode uses preflighted OpenJPEG 2.5+ | Install OpenJPEG >= 2.5, disable J2KSwift shadowing, or convert to a supported transfer syntax |
-| **JPEG Hierarchical** | JPEG processes other than Process 14 unsupported | Convert to supported transfer syntax |
+| **Experimental JPEG XL shapes** | 24-bit containers, extra channels (alpha), XYB/lossy Modular, YCbCr, upsampled or patched frames and oversized frames are refused typed; Modular lossless covers Bits Stored 1–16 grayscale (either sign), RGB8 (colour above 8 bits at codec level only) and embedded ICC | Use another qualified syntax for those shapes |
+| **JPEG 2000 Runtime Availability** | Qualified Part 1/HTJ2K own routes include 8–16-bit samples without OpenJPEG; general Part 2 or other fallback-only profiles can require it | Query the descriptor-specific capability decision before execution |
+| **HTJ2K Pixel Decode** | Own .201–.203 CPU routes are qualified by #2330 for the declared sample/codestream profiles; unsupported shapes are not promoted | Consult HTJ2KCodec.md and the profile-specific capability result |
+| **JPEG Hierarchical** | Hierarchical JPEG processes remain unsupported | Convert to a qualified transfer syntax |
 | **Unsupported color combinations** | `DicomColorConversionError.unsupportedColorPath` reports photometric interpretation, sample count, planar layout, bit depth, and transfer syntax context | Convert through a supported transfer syntax/color layout |
 | **Undefined-length non-SQ** | Non-SQ undefined values inside sequences throw parser errors | Use explicit lengths |
 | **Incomplete PET SUV metadata** | SUV helpers return no physical value and report missing DICOM tags; GML passthrough to SUVbw also rejects an explicit non-BW SUV Type | Preserve Units, SUV Type, Patient Weight/Size/Sex, radiopharmaceutical dose, decay, and timing metadata |
@@ -683,14 +819,14 @@ Deflated Explicit VR Little Endian uses system zlib for raw deflate/inflate. JPE
 
 | Limitation | Impact |
 |------------|--------|
-| **No production DICOMweb/PACS stack** | DICOMweb helpers cover the tested matrix only; persistent storage, full UPS, server-side rendered frames, JPIP proxying, authorization policy, PHI audit logging, TLS termination, and zero-copy streaming are caller-owned or unsupported |
+| **No production DICOMweb/PACS stack** | DICOMweb helpers cover the tested matrix only; persistent storage, full UPS, JPIP proxying, authorization policy, PHI audit logging, TLS termination, and zero-copy streaming are caller-owned or unsupported |
 | **Limited Writing Scope** | General dataset writing is limited to native/Deflated datasets, JPIP metadata references, DICOMDIR media records, and caller-provided encapsulated payload passthrough; pixel recompression is not implemented |
 | **Limited Structured Report Semantics** | Semantic validation is scoped to Enhanced/Comprehensive SR TID 1500 and KOS references; other SR SOP classes/templates parse syntactically and return stable validation errors for semantic use |
 | **Limited Secondary Capture Pixel Inputs** | SC writing supports native unsigned monochrome and interleaved RGB pixel payloads, including CGImage snapshots converted to RGB8 |
 | **Limited Encapsulated Document Scope** | Document object writing is limited to Encapsulated PDF, CDA, and STL Part 10 datasets; embedded document contents are preserved but not rendered or semantically parsed |
 | **Limited Waveform Sample Scope** | Waveform writing/parsing covers linear 8/16/32-bit integer sample interpretations and exposes temporal samples without converting them to image volumes |
 | **Limited Video Scope** | Video writing/parsing encapsulates and exposes caller-provided MPEG-2/H.264/H.265 streams with metadata; native video decoding is delegated to the application/player backend |
-| **Limited Presentation State Scope** | GSPS graphic annotations are parsed/built for object exchange; display application of GSPS transforms remains caller-owned |
+| **Limited Presentation State Scope** | The four Softcopy Presentation State IODs (Grayscale, Color, Pseudo-Color, Blending) are parsed/built for object exchange, including Modality LUT/rescale, tabular Presentation LUT, plain/segmented palettes, ICC and blending items; `DicomDisplayTransformProfile` evaluates the scalar display transform (PS3.3 LINEAR window, truncating quantization), while composition of graphics, shutters and blending remains caller-owned |
 
 ### 8.3 Backlog Alignment
 
@@ -710,6 +846,8 @@ Remaining limitations in this conformance statement are explicitly scoped:
   ``DicomSRSupportMatrix`` and ``DicomSRSemanticValidator``.
 - Export, print, waveform, and video limitations are exposed through
   ``DicomExportSupportMatrix/packageDefault`` and typed unsupported-path errors.
+- SwiftUI preview mocks and sample data are documented as preview-only support
+  API and are not clinical/runtime decoder surfaces.
 - Isis-level decoder parity documentation was closed separately in issue #1064;
   package documentation reconciliation is covered by issue #1077.
 - MTK rendering and viewer workflow limitations are outside DICOM-Swift
@@ -828,6 +966,17 @@ DicomCore is provided as a software development library for creating application
 
 ### Safe Part 10 Rewrite and Anonymization
 
+`DicomPart10Rewriter` is the generic metadata-rewrite primitive. It accepts
+typed top-level element replacements and recursive exact UI-value mappings,
+rejects file-meta, group-length, Pixel Data, SOP Class, and pixel-structure
+edits, and never falls back when the source transfer syntax is missing or
+unknown. Before returning, it reopens the output and verifies the transfer
+syntax, UID values by dataset path and multiplicity, SOP Class, exact edited
+VR/value pairs, and the complete Pixel Data value. Native values include their
+declared bytes; encapsulated values include the Basic Offset Table, item
+headers, fragments, and sequence delimiter. Deflated files preserve the
+inflated Pixel Data value, not the zlib bitstream or whole-file bytes.
+
 `DicomAnonymizer` (issue #1236) rewrites Part 10 files under a
 `DicomRewritePolicy` of per-tag keep/remove/replace/remapUID actions plus
 private-tag and Overlay Plane switches. Rules apply recursively inside sequence items. The
@@ -886,10 +1035,12 @@ output:
   stored-value reconstruction and the Photometric Interpretation tag is
   preserved.
 - **JPEG-LS encoding** is available through the async explicit-intent path:
-  JLSwift 0.9.0 writes lossless .80 for reversible intent and near-lossless
-  .81 only for an explicit NEAR value. Aligned 8–16-bit grayscale and RGB8
-  encode per frame through the shared encapsulation path. The synchronous
-  compatibility route remains CharLS lossless.
+  the own DicomJPEGLS codec writes lossless .80 for reversible intent (or
+  ``DicomEncodingIntent/jpegLS(options:)`` with interleave and restart lines) and
+  near-lossless .81 only for an explicit NEAR value, verified after signed
+  normalisation. Aligned 8–16-bit grayscale and RGB8 encode per frame through
+  the shared encapsulation path. The synchronous compatibility route remains
+  CharLS lossless.
 - **JPEG 2000/HTJ2K encoding** is exposed by async overloads that require a
   ``DicomEncodingIntent``. J2KSwift CPU writes .90/.91 and .201-.203 for
   aligned 8/16-bit grayscale (1-16 Bits Stored, signed or unsigned) and
@@ -901,11 +1052,12 @@ output:
 - Irreversible output records lossy status, method, ratio, DERIVED semantics,
   derivation description, and a new SOP Instance UID in both the dataset and
   File Meta Information. Reversible output preserves any existing lossy
-  history. JPEG 2000 Part 2 .92/.93 and ambiguous color/bit layouts stay
+  history. JPEG 2000 Part 2 .92/.93 use the experimental own Annex J collection
+  codec for qualified decode/encode shapes; ambiguous color/bit layouts stay
   typed unsupported.
 - **JPEG XL encoding** is experimental and disabled by default. With
   `DICOM_JXLSWIFT_MODE=experimental`, async overloads write reversible .110,
-  reversible or explicit irreversible .112, and reversible JPEG Baseline
+  reversible or explicit irreversible .112, and reversible JPEG Baseline / 8-bit Extended Huffman
   recompression .111. `.111` verifies byte-identical reconstruction and
   preserves SOP/lossy history; irreversible `.112` records `ISO_18181_1` and
   derives a new SOP Instance UID.
@@ -972,18 +1124,21 @@ Complete list of DICOM Transfer Syntax UIDs mentioned in this document:
 | 1.2.840.10008.1.2.4.81 | JPEG-LS Lossy Near-Lossless Image Compression | async JLSwift candidate/CharLS fallback; explicit-NEAR CPU encode/transcode |
 | 1.2.840.10008.1.2.4.90 | JPEG 2000 Image Compression (Lossless Only) | async decode candidate/fallback; reversible CPU encode/transcode |
 | 1.2.840.10008.1.2.4.91 | JPEG 2000 Image Compression | async decode candidate/fallback; reversible or irreversible CPU encode/transcode |
-| 1.2.840.10008.1.2.4.92 | JPEG 2000 Part 2 Multi-component Image Compression (Lossless Only) | delegated OpenJPEG volume document |
-| 1.2.840.10008.1.2.4.93 | JPEG 2000 Part 2 Multi-component Image Compression | delegated OpenJPEG volume document |
-| 1.2.840.10008.1.2.4.110 | JPEG XL Lossless | experimental JXLSwift reversible decode/encode; disabled by default |
-| 1.2.840.10008.1.2.4.111 | JPEG XL JPEG Recompression | experimental byte-identical JPEG Baseline bridge; disabled by default |
-| 1.2.840.10008.1.2.4.112 | JPEG XL | experimental reversible/irreversible decode/encode; disabled by default |
+| 1.2.840.10008.1.2.4.92 | JPEG 2000 Part 2 Multi-component Image Compression (Lossless Only) | experimental own Annex J collection codec |
+| 1.2.840.10008.1.2.4.93 | JPEG 2000 Part 2 Multi-component Image Compression | experimental own Annex J collection codec |
+| 1.2.840.10008.1.2.4.110 | JPEG XL Lossless | experimental own Modular lossless decode/encode (libjxl-exact); disabled by default |
+| 1.2.840.10008.1.2.4.111 | JPEG XL JPEG Recompression | experimental byte-identical JPEG Baseline (.50/SOF0) and 8-bit Extended Huffman (.51/SOF1) bridge; disabled by default |
+| 1.2.840.10008.1.2.4.112 | JPEG XL | experimental reversible (own Modular) / irreversible (VarDCT) decode/encode; disabled by default |
 | 1.2.840.10008.1.2.4.94 | JPIP Referenced Transfer Syntax | streamed-only |
 | 1.2.840.10008.1.2.4.95 | JPIP Referenced Deflate Transfer Syntax | streamed-only |
 | 1.2.840.10008.1.2.4.100-.108 | MPEG-2/H.264/HEVC video families | streamed-only |
 | 1.2.840.10008.1.2.4.201 | HTJ2K Image Compression (Lossless Only) | OpenJPEG decode; reversible CPU encode/transcode |
 | 1.2.840.10008.1.2.4.202 | HTJ2K Image Compression (Lossless RPCL) | OpenJPEG decode; reversible CPU RPCL encode/transcode |
 | 1.2.840.10008.1.2.4.203 | HTJ2K Image Compression | OpenJPEG decode; reversible or irreversible CPU encode/transcode |
-| 1.2.840.10008.1.2.5 | RLE Lossless | decoded native |
+| 1.2.840.10008.1.2.4.204 | JPIP HTJ2K Referenced Transfer Syntax | streamed-only stateless complete-entity profile |
+| 1.2.840.10008.1.2.4.205 | JPIP HTJ2K Referenced Deflate Transfer Syntax | streamed-only stateless complete-entity profile |
+| 1.2.840.10008.1.2.5 | RLE Lossless | decoded native; own encoder |
+| 1.2.840.10008.1.2.8.1 | Deflated Image Frame Compression | decoded and encoded natively (own frame deflate) |
 
 ---
 
@@ -1068,3 +1223,603 @@ Commonly used DICOM tags with group/element numbers and VR (Value Representation
 - ``DCMDecoder``
 - ``DCMWindowingProcessor``
 - ``DicomSeriesLoader``
+
+## DIMSE Unified Procedure Step — Lot A1 (PS3.4 2026c CC.4)
+
+`DicomUnifiedProcedureStepService` supplies transport-neutral state management with
+an injected atomic store. `DicomDIMSEServer` accepts Push, Pull, Watch, Event and
+Query contexts when that service is installed. Push supports N-CREATE, N-GET and
+Request Cancel; Pull supports C-FIND, N-GET, N-SET and Change State; Watch supports
+C-FIND, N-GET, Request Cancel and subscription actions; Query supports C-FIND.
+The Event context delivers N-EVENT-REPORT on a new association. Incoming Event
+reports require a service event receiver. DIMSE-N command SOP Class UIDs and stored
+instances use Push; C-FIND commands use the negotiated Pull/Watch/Query UID.
+The transport-neutral engine also backs the UPS-RS Worklist Service described below.
+
+Creation accepts SCHEDULED, rejects duplicate instance UIDs, keeps the Transaction
+UID empty, sets Modification DateTime, and supplies the configured default Worklist
+Label when empty. No automatic subscription is made for the creating AE. Existing
+global and filtered global subscriptions apply to newly created instances.
+The engine enforces the explicit N-CREATE/N-SET table rows; embedded macro content
+is supplied by the caller according to the UPS IOD. N-SET replaces whole sequences,
+rejects prohibited attributes, and updates Modification DateTime. State changes
+use N-ACTION, never N-SET. Transaction UID is the sole ownership token: the first
+claim wins independently of calling AE or IP. N-GET and C-FIND never reveal it.
+Final-state writes are refused. No post-final reconciliation/coercion is performed.
+
+COMPLETED requires the Final State R/P/RC values and CANCELED requires R/X/RC.
+The table's explicit exception permits an existing Output Information Sequence
+with zero items. Cancellation DateTime is filled by the SCP when missing. Host
+knowledge for RC “if known” attributes is represented by `knownFinalStateTags`;
+non-ASCII text requires Specific Character Set. A scheduled cancellation request
+records IN PROGRESS then CANCELED events, supplies a discontinuation reason if
+needed, and commits the canceled record before delivering either event. An
+in-progress cancel request reports the requesting calling AE to subscribers;
+performer policy can accept, refuse (C313), or report unreachable performer (C312).
+
+Subscriptions are per Receiving AE, with optional deletion locks. Specific
+instructions override global subscriptions. Global unsubscribe removes all that
+AE's locks and subscriptions; suspend stops future global subscriptions while
+preserving existing instance subscriptions. Filtered subscriptions use the same
+`DicomQueryMatcher` as worklist search. Unknown receiving destinations return C308;
+no event sink returns C315. Host policy may refuse a deletion lock with B301 while
+accepting the subscription. The toolkit does not autonomously remove locks.
+Final-state instances remain retrievable while locked; the default memory store
+retains them indefinitely. `purgeEligible` is true only for an unlocked final-state
+record; persistent hosts define retention beyond that minimum.
+
+Events 1–5 describe state/readiness, cancel request, progress, SCP lifecycle and
+assignment. The Event table's assigned human fields are extracted from Scheduled
+Human Performers. After global-with-lock subscribe the SCP sends a current-state
+report for every existing matching UPS, following CC.2.4.3 even for an already
+subscribed instance; subscription state itself follows CC.2.3. Start reports use
+host fallback AEs plus stored subscribers, with WARM/COLD START list flags.
+Snapshot/restore preserves both lists and ownership tokens. Every delivery attempt
+is observed; returning successfully requires the peer's 0000 response. Failed
+reports are not retried and do not undo committed state, subscriptions or locks.
+
+C-FIND ignores priority and supports the table's matching and return keys, using
+worklist search rather than query/retrieve hierarchy. Requests without Matching
+Keys produce no matches; responses contain requested keys and character encoding
+metadata. Optional unsupported return keys produce FF01; supported keys produce
+FF00. C-CANCEL terminates with FE00. Fuzzy matching is unsupported. The existing
+`DicomQueryMatcher` compares PN literally and case-sensitively; it has no
+case-insensitive PN option. Matching uses decoded string values and DT offsets
+encoded in the values; separate Timezone Offset From UTC matching context is not
+implemented by that matcher. Those limitations are not changed by Lot A1.
+
+The SCU invokes creation, search (Pull/Watch/Query), get/set, state changes,
+cancellation and subscriptions explicitly at the caller's request. It does not
+autonomously choose state transitions or retrieve input/output objects. Optional
+matching and return keys and character encoding are supplied by the caller in the
+identifier. It returns response statuses, warnings, datasets and pending statuses.
+
+## Instance Availability Notification (PS3.4 2026c R.3.4)
+
+IAN SCU sends N-CREATE; the SCP validates then delegates to an injected receiver.
+The builder exposes only the R.3.2.1.1 attributes: Specific Character Set,
+Referenced Performed Procedure Step Sequence (SOP Class/Instance and Performed
+Workitem Code Sequence), Study Instance UID, and Referenced Series Sequence with
+Series Instance UID and Referenced SOP Sequence. Each referenced instance contains
+SOP Class/Instance UID, Instance Availability and Retrieve AE Title, with optional
+Retrieve Location UID, Retrieve URI, Retrieve URL and Storage Media File-Set ID/UID.
+The validator rejects additional attributes, including patient context, at each
+supported sequence level. The workitem-code builder supports Code Value, Coding
+Scheme Designator and Code Meaning (validator also accepts Coding Scheme Version).
+
+ONLINE, NEARLINE, OFFLINE and UNAVAILABLE are per-instance values. The toolkit
+makes no assertion of study completeness, durability or retrievability. The host
+product must document the meaning, latency, notification trigger/frequency and
+retrieval capabilities for each value, and how received notifications affect its
+workflow. Referenced procedure steps identify the related performed work, but
+neither the SCU nor the SCP implicitly creates or updates MPPS or UPS instances.
+
+
+## UPS-RS Worklist Service and notifications (PS3.18 2026c)
+
+`DicomWebServer` is an origin server when initialized with `unifiedProcedureSteps`.
+`DicomWebClient` is a user agent. The supplied service owns the A1 state machine,
+store, cancellation policy, deletion locks, subscriptions and event observer.
+`/ups` is not a resource (404). All paths below are relative to `servicePath` and
+use the same configured authentication as the other DICOMweb routes.
+
+| Transaction | Method and resource | Success | Failure statuses |
+| --- | --- | --- | --- |
+| Create | POST /workitems?workitem={uid} | 201, Location | 400 invalid attributes, 409 duplicate, 415 media type |
+| Retrieve | GET /workitems/{uid} | 200, Content-Location | 404 unknown, 406 negotiation, 410 deleted |
+| Update | POST /workitems/{uid}?transaction-uid={uid} | 200 | 400 final state, transaction UID or attributes; 404, 409 inconsistent state, 410 |
+| Change State | PUT /workitems/{uid}/state | 200 | 400 invalid or incorrect/missing transaction UID; 404, 409 inconsistent state/final requirements, 410 |
+| Request Cancellation | POST /workitems/{uid}/cancelrequest | 202 | 400 syntax, 404, 409 C311/C312/C313 |
+| Search | GET /workitems | 200, including an empty JSON array | 400 parameters, 406 negotiation, 413 configured result limit |
+| Subscribe | POST /workitems/{uid}/subscribers/{ae} | 201, WebSocket Content-Location | 400 syntax, 403 policy, 404 unknown |
+| Unsubscribe | DELETE /workitems/{uid}/subscribers/{ae} | 200 | 400 syntax, 404 no subscription |
+| Suspend | POST /workitems/{globalUID}/subscribers/{ae}/suspend | 200 | 400 syntax, 404 no subscription |
+| Open Notification Connection | GET /subscribers/{requester}, Upgrade: websocket | 101 | 400 handshake |
+
+The worklist UID is `1.2.840.10008.5.1.4.34.5`; the filtered worklist UID appends
+`.1`. Filtered subscriptions require comma-separated `filter=attribute=value`
+matching keys. Suspension stops subscriptions to future workitems and retains
+existing per-workitem subscriptions. Subscription authorization is injected through
+`authorizeWorklistSubscription`; filtered subscription support can be disabled;
+A1 `grantDeletionLock` controls whether requested locks are granted.
+
+Create, Retrieve, Update and action payloads use `application/dicom+json` or a
+single `application/dicom+xml` part in `multipart/related`. BulkDataURI references
+are not accepted. Create rejects an SOP Instance UID in the payload; if `workitem`
+is absent, `DicomDataSetWriter.makeUID()` supplies it. This follows 11.4.1.4 and
+resolves the contradictory wording in 11.4.1.1 in favor of UID generation. The
+HTTP adapter additionally checks explicit N-CREATE Type 2 presence, while A1
+performs attribute and state validation. Optional top-level Update attributes
+outside the transcribed UPS table are ignored with an explicit Warning.
+
+Search uses `DicomQueryMatcher`, numeric tags and transcribed UPS keywords,
+Type 1/2 return keys, `includefield`, matching keys, `offset` and `limit`. Matching
+is literal. Results exceeding `maximumSearchResults` return 413; the user agent
+can supply paging or narrow the query. Retrieve and Search never expose the
+Transaction UID. Stores that implement `DicomUnifiedProcedureStepDeletionReporting`
+can distinguish 410 from 404; the A1 in-memory store has no tombstone support.
+
+Warning values use the exact `299 <service>: <message>` strings from chapter 11:
+created/updated with modifications, unsupported optional attributes, missing or
+incorrect Transaction UID, inconsistent state, already CANCELED/COMPLETED,
+ungranted deletion lock, unsupported filtered subscriptions, literal fuzzy matching,
+and a target URI that does not reference a claimed workitem. B304 and B306 retain
+the transaction's success HTTP status. Change State follows the explicit payload
+requirements of 11.7.1.4 despite the overview table's "none" entry, and returns no
+success payload as required by 11.7.3.3.
+
+`DicomWebNotificationHub` and `DicomWebNotificationEventSink` adapt A1 events to
+connected HTTP subscribers. The server installs this sink only when A1 has no
+sink; applications already supplying a DIMSE sink must supply a transport-routing
+sink that dispatches HTTP subscribers through `DicomWebNotificationEventSink`.
+The same hub must be passed to the server and event sink. Multiple connections
+per AE receive the same reports. No disconnected events are retained or retried.
+The A1 observer records success, `noConnection`, or `writeFailure` through its
+existing outcome and error-description fields. A successful write is transport
+acceptance, not an application acknowledgment or exactly-once delivery guarantee.
+
+The notification URL is `ws(s)://authority/<service>/subscribers/{requester}`.
+The HTTP listener requires WebSocket version 13 and a 16-byte base64 key; it
+computes Sec-WebSocket-Accept with SHA-1 and the RFC 6455 GUID. Origin and the
+DICOM JSON Content-Type are required. When a subprotocol is offered, `dicom` is
+selected; unsupported offers are rejected. Without an offered protocol no protocol
+header is sent, following RFC 6455's prohibition on selecting an unoffered protocol
+(the PS3.18 response table marks this header mandatory while making the request
+header optional). Upgrade responses contain no HTTP chunk framing. Masked incoming
+frames are unmasked, ping is answered with pong, close is acknowledged, protocol
+errors close with 1002, oversized frames/messages with 1009, and listener shutdown
+sends 1001 and waits for connection tasks. The default frame/message bound is 1 MiB.
+
+Each server text frame contains one DICOM JSON object: Affected SOP Class UID
+`00000002 = 1.2.840.10008.5.1.4.34.6.4`, Message ID `00000110`, Affected SOP Instance
+UID `00001000`, Event Type ID `00001002`, followed by A1 event attributes. Reports
+cover state, cancellation request, progress, SCP status and assignment. The
+`requester` parameter is included in HTTP-generated state reports via Requesting AE;
+for cancellation without a requester the implementation uses `DICOMWEB`.
+
+`DicomWebNotificationClient` uses `URLSessionWebSocketTask`, accepts a connection
+factory for tests, and emits connected/event/gap signals. Reconnects use bounded
+exponential backoff; every reconnect emits a gap and the consumer must retrieve
+current state and re-subscribe when an initial report is needed. It pings idle
+connections with a timeout and cancels the connection when its stream is canceled.
+The default budget is five reconnects, 0.5–30 second backoff, a 20 second ping
+interval and a 10 second ping timeout.
+
+The independent `ups_rs_probe.py` witness uses `requests` and `websockets==17.1`.
+Its Swift harness asserts all transaction results, event sequence and disconnected
+observer outcomes; the in-process tests exercise status/Warning mappings, media
+negotiation, subscription policies, deletion knowledge and client reconnect gaps.
+
+## Optional Print SCP and shared CPU film compositor (Lot A2)
+
+`DicomDIMSEServer(configuration:print:printProvider:)` enables printing only when
+an explicit `DicomPrintSCPConfiguration` is supplied. `DicomPrintSCPProviding`
+injects the output, text rasterizer, optional printer-status stream and job-created
+callback. No application target is required to enable this service. Capabilities
+use the existing `DicomPrintPeerCapabilities` model. Grayscale and Color Print
+Management Meta contexts accept component Film Session, Film Box, Image Box and
+Printer SOP Class UIDs. Individual classes and optional Annotation Box,
+Presentation LUT, Print Job and Printer Configuration Retrieval are negotiated
+only when configured.
+
+Each association owns one Film Session, ordered Film Boxes, generated image and
+annotation instance UIDs, and LUTs. N-SET targets the last Film Box or its boxes.
+Image UIDs have fixed, one-based slot positions in the returned sequence. Only
+the last Film Box can be explicitly deleted; session deletion cascades. LUT
+deletion fails while working films or outstanding jobs reference it. A job keeps
+an immutable hierarchy/LUT snapshot and its original priority through terminal
+confirmation, including when its working Film Box or Session is deleted.
+
+Image ingress accepts unsigned MONOCHROME1/2 with 8-bit or 12-bit stored values,
+and RGB8 with planar configuration 1. Empty image sequences erase pixels.
+An incremental PDV admission scanner reads Rows, Columns, Samples per Pixel and
+Bits Allocated before forwarding Pixel Data to the message accumulator. It
+supports fragmented explicit/implicit little-endian headers, caps header metadata,
+and drains rejected messages without retaining their pixels. Per-image, film and
+session raw-byte budgets return 0213; a separate resident raster budget returns
+C605. The output raster budget is checked before CPU allocation. Queue admission
+is shared across associations and returns C601/C602 when full.
+
+N-ACTION snapshots and composes the selected hierarchy, returns the Print Job
+reference at (2100,0500) when negotiated, and prints collated copies. Job events
+are Pending (1), Printing (2), Done (3) or Failure (4), exclusively on the creating
+association. Done follows output-provider success. Terminal instances are removed
+after the event response confirms success. `DicomPrintJobControl.cancel()` causes
+Failure with the implementation-specific Execution Status Info `CANCELLED`;
+`completedFilmIndices` records partial output. Release/abort cancels by default;
+`keepJobsOnRelease` retains output work without sending events to a closed peer.
+Printer Warning/Failure streams fan out to associations using the printer. N-GET
+serves configured attributes and status; configuration retrieval reports installed
+media, layouts, box dimensions, printer spacing, resolutions, defaults and limits.
+
+`DicomFilmCompositor.compose(_:)` consumes `DicomFilmDescription` and returns
+`DicomComposedFilm` (8-bit grayscale or RGB, geometry, raw-raster SHA-256 and fit
+information). STANDARD is row-major; ROW partitions rows and COL partitions
+columns, with integer boundaries covering the complete sheet without overlap.
+SLIDE, SUPERSLIDE and CUSTOM require a configured STANDARD grid. The physical
+size table covers 8INX10IN, 8_5INX11IN, 10INX12IN, 10INX14IN, 11INX14IN,
+11INX17IN, 14INX14IN, 14INX17IN, 24CMX24CM, 24CMX30CM, A4 and A3.
+
+REPLICATE, BILINEAR and CUBIC select nearest, bilinear and bicubic interpolation;
+NONE preserves source scale. Images preserve physical aspect ratio using image
+and printer spacing. Requested Image Size sets physical width; otherwise images
+fit their slots. Oversized images demagnify by default (B604), crop for CROP
+(B609), or decimate for DECIMATE (B60A). FAIL and NONE with DECIMATE refuse
+oversized images (C603). Smoothing is recorded without changing samples. Numeric
+optical densities are bounded to the configured rendering range; LIN OD uses
+PS3.14's inverse GSDF/JND mapping, illumination and reflected ambient light.
+IDENTITY and validated 256/4096-entry, 10–16-bit LUT tables produce P-values;
+native 12-bit grayscale indices are preserved. Polarity, border/empty density,
+trim, image density ranges and annotation bands participate in composition.
+
+Identification is explicitly enabled in the description/SCP configuration. A
+single-study film uses a film label only when Study Instance UID and label agree
+for every image. Mixed studies and same-name/different-UID inputs use per-image
+labels. Missing identification or failed/blank text rasterization throws. The
+shipped `DicomCoreTextPrintRasterizer` implements `DicomPrintTextRasterizing`;
+there is no silent empty-band fallback. Output paths and CLI film records contain
+job UIDs, indices and hashes, never patient identity.
+
+`DicomPrintPreview.compose(job:)` uses the same compositor and A1 wire models.
+Automatic mode needs a resolved mode for pre-association preview. Peer-dependent
+Requested Image Size/Decimate behavior requires the same printer configuration;
+annotation geometry, output width and identification settings must also match.
+`DicomFilm.init(snapshotPNGData:layout:)` adds snapshot ingestion without changing
+the existing `DicomPrintJob` snapshot initializer. File output writes atomic PNGs
+and can publish an atomic multi-page PDF after its final page. Raster output is
+bounded by count and bytes. Physical printer integrations implement
+`DicomPrintOutputProviding`; provider success must mean output confirmation.
+
+### A2 status evidence and qualification limits
+
+Hermetic tests in `DicomDIMSEServerPrintTests` map the following behavior:
+
+| Status | Test (name after `test_`) |
+| --- | --- |
+| B600, 0120, 0106, 0110, 0118, 0112 | `sessionStatuses_missingInvalidDuplicateMemoryAndUnsupportedClass` |
+| B601, B602, B603, C600, C616 | `emptyHierarchyAndCollationStatuses` |
+| B604, B609, B60A, C603, 0107 | `imageFitStatuses_andLastFilmRestriction` |
+| B604, B609, B60A at Session/Film N-ACTION | `actionFitWarnings_sessionAndFilmB604B609B60A` |
+| B605 Film Box/Image Box | `densityClamping_filmAndImageB605` |
+| C601, C602 | `fullQueue_sessionC601_andFilmC602` |
+| C605, 0213 | `imageAndFilmResourceLimits_returnTypedStatuses`, `declaredPixelSize_andResidentLimit_stopBeforePixels`, `rejectedPDV_doesNotReachMessageAccumulator` |
+| 0110 referenced LUT, 0211, 0112 | `lutValidationAndReferencedDeletion_andUnsupportedOperation` |
+| Output confirmation and retained hierarchy | `outputConfirmation_blocksDone_andDeletionRetainsJobSnapshot` |
+| Release cancellation, partial output and keep-jobs policy | `releaseMidJob_cancelsWithPartialResult_unlessKeepJobsConfigured` |
+| Printer notification fanout | `printerWarning_isBroadcastToEveryUsingAssociation` |
+| C613 response injection only | `injectedCombinedPrintFailure_sessionFilmAndImageC613` |
+| B605 LUT response injection only | `injectedLUTB605_stillCreatesInstance` |
+
+The last two rows are deliberately not semantic conformance claims. C613 concerns
+a Combined Print Image mechanism whose overlay modules are retired and whose
+SOP classes are not enabled here. The supplied LUT N-CREATE attribute table
+contains shape/table, but its B605 status row refers to density attributes carried
+by Film/Image Box. Natural LUT-CREATE B605 and Combined Print Image composition
+remain qualification questions; fault injection does not resolve them.
+
+`DicomPrintLoopbackTests` compares every received sheet byte and SHA-256 against
+A1 preview for grayscale/color, STANDARD/ROW/COL, mixed studies and same-name,
+different-UID cases. `DicomPrintSCPPynetdicomTests` uses an independent SCU for
+layouts, color, annotation, LUT, configuration, job events, deletes, refused
+operations, insufficient boxes, unknown attributes and cancellation/provider
+failure. The independent tests require the configured Python environment.
+
+## JPIP origin server (T.808, Lot A2)
+
+`DicomJPIPServer` accepts transport-neutral `DicomWebHTTPRequest` values and returns
+pull-driven `DicomWebHTTPStreamedResponse` bodies. Enable the optional `/jpip` GET
+route with `DicomWebServer(jpip:)`; its existing authentication runs before JPIP
+routing. Alternatively, pass `server.handle` through `DicomWebHTTPListener(handler:)`.
+Standalone deployments can inject the same `DicomWebAuthenticating` policy.
+
+`DicomJPIPTargetProviding` supplies one or more codestreams under a caller-supplied
+byte budget. `DicomJPIPDirectoryTargetProvider` accepts J2K/JPHC, JP2/JPH containers,
+and Part 10 encapsulated JPEG 2000 frames using the existing frame parser. Paths
+must resolve beneath the configured directory. Target identifiers hash the ordered,
+length-delimited codestreams; DICOM identity fields are neither identifiers nor CLI
+output. `stream` is one-based in requests and zero-based in databin messages.
+
+`DicomJPIPCodestreamIndexer` uses PLT when present. Without PLT,
+`DicomJ2KPacketHeaderReader` measures inline Tier-2 headers using persistent inclusion
+and zero-bitplane tag-trees, coding-pass counts, Lblock and segment lengths, including
+SOP/EPH. LRCP, RLCP, RPCL, PCRL and CPRL map to the same precinct identities with their
+respective packet ordering. The index retains source byte ranges and cumulative
+per-layer ends; no pixel decode is part of indexing. COC and POC are parsed for index
+geometry/order. Packed PPM/PPT headers and coding-order changes in later tile-parts
+are rejected. CAP-marked HTJ2K requires PLT for JPP; without it the origin offers JPT
+only, preserving opaque tile-parts. Index construction bounds target bytes, packets,
+precincts and code-block allocations.
+
+For JPP, the origin sends the main header, tile headers and precinct packet prefixes
+in resolution/layer order. It consolidates tile headers and supplies a PLT from the
+measured index when the source lacks one. This keeps class-0 precinct messages
+usable by the OpenJPIP transcoders; the shared message writer also supports extended
+classes and Aux. ROI selection includes wavelet support around the requested region.
+`JPIP-fsiz`, `JPIP-rsiz`, `JPIP-roff`, `JPIP-layers`, `JPIP-comps` and `JPIP-stream`
+acknowledge served windows. JPT sends whole selected tile-parts and acknowledges their
+full encoded resolution, components and layers rather than claiming packet-level
+quality truncation.
+
+Cache negotiation accepts explicit/implicit `model`, `need`, and tile-part `tpmodel`
+descriptors. Channel state retains byte extents, not pixel data. `cnew=http` allocates
+a random 16-hex channel; `cid` continues it, `cclose` releases it, and idle expiry is
+configurable. A newer request invalidates the preceding response generation on the
+same channel. The consumer pulls one bounded message at a time, with no unbounded
+producer queue. Target-cache invalidation is explicit via `invalidateTargets()`;
+directory hosts replacing files should invalidate after the replacement.
+
+| EOR | Meaning | Enforcement |
+| --- | --- | --- |
+| 1 | Image done | Full selected image data is available in the negotiated cache model |
+| 2 | Window done | Selected region/resolution/layers or metadata set is served |
+| 3 | Window superseded | Channel generation changed or expired before the next pull |
+| 4 | Byte limit | Request `len` exhausted, reserving three bytes for EOR |
+| 6 | Session limit | Per-channel byte budget exhausted |
+| 7 | Response limit | Configured response budget exhausted |
+
+Malformed requests return 400, unsupported media types 415, missing targets 404,
+resource limits 413, and malformed/unsupported codestreams 422. Error responses
+contain no `JPIP-*` headers. `len` below three bytes is rejected because it cannot
+hold EOR. Unknown optional fields are ignored; required unknown fields are rejected.
+`wait` and `srate` are scheduling hints only. Metadata selection returns an empty set;
+raw media delivery and subtarget extraction are unsupported.
+
+`dicomtool jpip serve --dir DIR --port N [--max-response-bytes N] [--bearer TOKEN]`
+starts a loopback listener. `jpip fetch URL --window fsiz=W,H,roff=X,Y,rsiz=W,H,layers=N
+--out FILE.j2k [--session] [--type jpp|jpt] [--dump-messages]` uses the A1 transport
+and reconstruction. `jpip index FILE` prints an identity-free JSON index summary;
+`jpip inspect STREAM.jpp` prints message coordinates, lengths, completion and EOR.
+
+Independent tests require `DICOM_JPIP_OPENJPIP_BIN`, the adjacent OpenJPEG 2.5.4
+binaries and `DICOM_SWIFT_PYNETDICOM_PYTHON` with `requests`. Full windows and JPT
+must transcode and decode independently. The documented OpenJPIP 1.5.2/2.5.4
+layer-prefix divergence ("segment too long") uses scoped expected failures only
+around the transcoder result. Layer-N and ROI goldens instead compare A1
+reconstruction decoded by both the toolkit runtime and `opj_decompress` against
+`opj_decompress -l N` of the source, with crop comparisons for ROI. Those pixel
+assertions are never expected failures. A1 expected-failure sites remain unchanged.
+A1 reconstruction still rejects COC/POC and tile coding overrides; indexing those
+markers does not qualify those layouts for A1 pixel reconstruction.
+
+## Archive representations (Lot A)
+
+`DicomRepresentationSet` models exactly one received/imported original, lossless
+alternate encodings of that same SOP Instance, and explicitly authorized lossy
+derivatives with distinct SOP Instance UIDs. Original means archive lineage; it
+is not a claim that Image Type is ORIGINAL or that the received image has never
+undergone lossy compression. The fingerprint is SHA-256 of complete Part 10
+bytes. Receiving a DIMSE dataset does not preserve a sender's Part 10 file header.
+
+The set validates source fingerprints, SOP identity, lossless-equivalent geometry
+and inherited loss history. Different Part 10 hashes under one SOP Instance UID
+are separate representations. Conflict classification is conservative by default;
+`equivalentEncoding` requires a caller-supplied verified comparison of decoded
+pixels AND non-encoding attributes, with lossless source histories. Conflict
+resolution returns bytes and a retention instruction, without mutating a store.
+Replacing requires a nonempty authorization. Keeping conflicting content under a
+new identity preserves prior attributes in Original Attributes Sequence and adds
+source-image and derivation records; this is not a new lossy compression step.
+It never silently overwrites the original.
+
+Selection never returns a transfer syntax outside peer acceptance. Its order is:
+stored original, stored lossless equivalent, authorized stored lossy derivative,
+then generation (lossless before lossy). Within each group, estimated bytes and
+generation working-set cost precede the fixed syntax rank and content hash.
+Peer preference-list ordering does not override this archive policy; permutations
+of equally eligible syntax lists give identical decisions. A peer can explicitly
+reject all lossy-history objects, including already-lossy originals. Merely
+accepting a lossy transfer syntax does not authorize substituting a derivative.
+`.lossyDerivedAllowed` requires a nonempty authorization value.
+
+The fixed syntax rank is Explicit LE, Implicit LE, Explicit BE, dataset deflate,
+JPEG 2000 Lossless, HTJ2K Lossless, HTJ2K Lossless RPCL, JPEG-LS Lossless,
+JPEG Lossless First Order, JPEG Lossless, RLE, deflated frames, JPEG XL Lossless,
+JPEG 2000 Part 2 Lossless, JPEG-LS Near-Lossless, JPEG Baseline, JPEG Extended,
+JPEG 2000, HTJ2K, JPEG XL, JPEG XL JPEG Recompression, JPEG 2000 Part 2.
+Unlisted syntaxes follow in lexical UID order. Rank does not qualify a codec.
+
+`DicomRepresentationGenerator` performs transcoder preflight, plan and execution,
+then decoded verification when preflight supports it (exact pixels for reversible
+operations, shape for lossy operations). Lossless generation retains the SOP UID,
+Image Type and any pre-existing Original Attributes Sequence. Lossy execution
+uses the existing transcoder's `applyLossyMetadata`: a new SOP UID, DERIVED Image
+Type, Source Image Sequence, Derivation Description, and appended 0028,2112/2114
+history, with 0028,2110 remaining `01`. For sources with existing compression
+ratios, the archive generator selects the existing buffered executor: the current
+streaming ratio patch targets the first DS value rather than the appended value.
+This avoids overwriting prior history without changing transcoder internals;
+such generation materializes the whole output in memory. Codec identity is resolved through the
+capability registry; native dataset writing uses the caller's toolkit version.
+Unknown linked-backend versions use that toolkit version, not an invented runtime
+version. The archive mechanism does not add SCP coercions. PS3.4 B.4 restrictions
+and Warning responses remain the responsibility of a receiving SCP.
+
+A generator actor belongs to one sink, configuration hash, toolkit version and
+codec environment. Concurrent requests with the same source hash, target syntax
+and typed-parameter hash share one execution and publication. Cancelling one
+waiter returns typed `cancelled` only to it; removing the last waiter cancels the
+shared task. Completed bytes and descriptors go to the injected store. Its atomic
+publication checks the derivative limit and source fingerprint. An invalidation
+revision prevents an older in-flight task from publishing after invalidation.
+`DicomInMemoryRepresentationStore` has no disk, catalog or settings dependency;
+it keeps stale descriptors visible as `.unavailable(.stale)`. Hosts call
+`invalidateStale` with current source/configuration/codec keys and implement the
+same validation and invalidation-revision contract in persistent sinks.
+
+The C-STORE overload with a resolver proposes stored alternate syntaxes and sends
+accepted stored bytes before invoking the existing rescue transcoder. It returns
+`DicomRepresentationStoreOutcome`, containing the legacy outcome and a decision.
+The legacy-policy bridge maps `asReceived` to `originalOnly`; `lossless` and `any`
+to `losslessEquivalents`. Use the explicit loss-policy overload to authorize stored
+lossy derivatives. The old rescue-transcoder seam generates only lossless
+same-identity output in this overload; use the archive generator to create and
+store authorized lossy derivatives. C-GET/C-MOVE's convenience initializer and
+WADO-RS expose only stored same-identity equivalents, since a derivative is a
+different SOP resource. WADO-RS tests each stored syntax against Accept and prefers
+an acceptable stored object before considering a transcode. Without a resolver,
+existing DIMSE and DICOMweb behavior is unchanged.
+
+Decisions contain only source/representation UIDs, content hashes, transfer syntax,
+cost figures, a policy snapshot hash and typed reason codes. They do not copy
+patient attributes, locators, authorization text or arbitrary error descriptions.
+The chosen representation is an audit projection, resolved back through the set's
+UID and hash. Cost estimates are injected; default zero costs mean unspecified,
+not measured zero-byte payloads. Reasons are `originalAccepted`, `storedEquivalent`,
+`authorizedStoredDerivative`, `generationRequired`, `syntaxNotAccepted`,
+`policyExcluded`, `lossyNotAuthorized`, `peerRejectsLossy`, `stale`, `unavailable`,
+`generationDisabled`, `codecUnavailable`, and `higherCostOrRank`.
+
+## Durable ingestion and integrity (Lot A, #2356)
+
+`DicomIngestCoordinator` accepts original Part 10 bytes or a received DIMSE
+instance. It validates the encoded dataset, SOP identity and transfer syntax.
+Part 10 input remains byte-for-byte unchanged. A raw encoded DIMSE dataset is
+wrapped in generated file meta without re-encoding its dataset. This mechanism
+adds no coercion and does not transcode; hosts that coerce attributes must apply
+PS3.4 B.4 and return the applicable Warning status.
+
+The stages are `received`, `validated`, `staged`, `checksummed`, `published`, and
+`registered`. Each stage appends an `intent` before its effect and a `done` after
+completion. Staging uses `.ingest/<ingestID>.part`, file synchronization, and
+synchronization of the staging directory. SHA-256 is computed over the staged
+bytes. Publication uses an atomic, non-replacing rename on Darwin, followed by
+synchronization of both affected directories on all platforms. Darwin attempts
+`F_FULLFSYNC` and falls back to `fsync` when unsupported; other platforms use
+`fsync`. The non-Darwin publication fallback is an exclusive hard link followed
+by unlink, so replay may encounter both names. Neither method replaces an
+existing destination. All paths must belong to the same filesystem.
+
+The first available name is `<safe SOP UID>.dcm`, then
+`<safe SOP UID>~<sha8>.dcm`; a further UUID suffix handles occupied hash-prefix
+names. Same-UID, different-byte arrivals go to `.conflicts/`. Identical-content
+classification requires a known SHA-256 and re-verification of the prior file
+before discarding the incoming temporary. UIDs alone and unknown hashes never
+establish equality. The registrar exposes the archive classification through
+`DicomRepresentationConflict`; originals and conflicts are separate records.
+
+Every coordinator sharing a registrar uses its `DicomIngestGate` across
+classification, publication and registration. Registrar implementations must
+serialize writes, make registration idempotent by ingest ID, preserve earlier
+records and report transaction-time conflicts. The JSONL registrar and journal
+require one owner per file in a process; they are not a multiprocess database.
+Hosts must prevent independent owners of the same registry and run replay before
+admitting new work after restart. Files in pre-existing inboxes without records
+are preserved by exclusive publication and can be reconciled with the integrity
+primitives. Lot A does not migrate an Isis catalog or infer hashes for old rows.
+
+`DicomJSONLIngestJournal` and `DicomJSONLIngestRegistrar` append a JSON object
+followed by LF, then synchronize the file and parent directory. Journal objects
+contain `ingestID`, `stage`, `phase`, `root`, `temporaryPath`, optional `finalPath`,
+`checksum`, SOP Class/Instance UIDs, transfer-syntax UID, optional conflict hash,
+optional disposition and `timestamp` (Foundation Codable date representation).
+Each entry repeats the complete recovery metadata; it contains no patient
+attributes. The supplied root must itself be free of patient attributes.
+A torn unterminated tail is ignored. Before the next append it is delimited and
+followed by `{"discardedTail":true}`; malformed interior records without that
+marker fail closed. A terminal disposition records duplicate disposal, partial
+staging disposal, or quarantine. Registry lines contain `DicomIngestRecord`.
+
+| Last durable journal state | Replay decision |
+| --- | --- |
+| Received/validated or staged intent without done | Remove only the untrusted temporary, journal disposal |
+| Staged done / checksum intent | Rehash and reopen the temporary, then continue |
+| Checksummed done | Verify bytes and identity, classify and publish exclusively |
+| Published intent, matching final exists | Reopen, synchronize directories, continue registration |
+| Published intent, temporary exists | Verify it and finish publication; if another arrival took the final name, reclassify without touching that arrival |
+| Published intent, neither path exists | Report loss |
+| Published done without registered done | Reverify and re-register idempotently; registrar conflict is quarantined and registered as conflict |
+| Published bytes fail verification | Preserve bytes; quarantine a known published arrival, report failure for an ambiguous destination |
+| Registration failed with unknown state | Preserve the object in `.quarantine/<ingestID>.dcm`, retaining journal evidence for host reconciliation |
+| Quarantine move interrupted | Complete the journaled move, never delete the original |
+| Registered done | No action |
+
+A simulated `DicomIngestCrash` stops compensation and subsequent filesystem
+effects. Other failures preserve recoverable journal state. ENOSPC maps to
+`diskFull(required:available:)`, EACCES/EPERM to `permissionDenied(path:)`.
+Incomplete staged files never become normal published objects. Failure of a
+post-registration journal append does not move a confirmed registered file.
+Cancellation is observed before staging; once staging starts, the transaction
+finishes or leaves replayable evidence rather than deleting an uncertain original.
+
+Durability is ordered: `receivedInMemory < fileSynced < publishedAndRegistered
+< retentionConfirmed`. The in-memory journal or registrar caps results at
+`fileSynced`. The JSONL implementations establish `publishedAndRegistered` after
+the file, directories and registration are synchronized. Neither implementation
+claims a backup or retention guarantee. `retentionConfirmed` requires an injected
+host registrar/evidence provider that actually establishes safekeeping under its
+retention and retrieval contract. Filesystem barriers are OS guarantees, not
+qualification of every storage controller's power-loss behavior.
+
+`DicomStorageSCPService` and `DicomDIMSEServer` accept an optional coordinator and
+`DicomDurabilityPolicy`. With that injection C-STORE-RSP follows successful
+ingest and satisfaction of the policy (default `publishedAndRegistered`): `0000`
+for new or identical canonical bytes, `B000` for bytes retained as a conflict
+(issue #2529). The file-cache provider also propagates that conflict warning
+without coordinator injection. The original remains the retrievable object. Disk
+full returns `A700`; other ingest failures or insufficient durability return
+`C000`. The `instanceStored` callback still follows the response and optional
+stored-reference persistence. `DicomFileStorageCache` now uses the JSONL ingest
+core and exposes `recoverPendingIngests()`. Without a coordinator injected into
+the service, its original provider-return/reference-persistence response contract
+remains; that legacy contract does not assert catalog durability or retention.
+
+Storage Commitment accepts `DicomCommitmentEvidenceProviding` either directly on
+the server or through the commitment provider's optional `evidenceProvider` hook.
+N-ACTION success acknowledges preparation of the request, not successful commitment
+of its references. Before N-EVENT-REPORT, including redelivery of pending reports,
+the server filters successful references using current evidence. Missing files
+or registrations yield Failed SOP Sequence reason `0112`; checksum mismatch,
+evidence errors and insufficient durability yield `0110`. The default evidence
+policy requires `retentionConfirmed`. In accordance with PS3.4 J.3, a reference is
+reported committed only after the injected contract establishes safekeeping.
+Without an evidence provider the prior reference-only path remains explicitly
+weaker: a remembered reference does not prove file presence, checksum, retention,
+or retrieval availability. Hosts must supply the stronger evidence for those claims.
+
+`DicomWebStorageResult.durability` is optional for source compatibility. A declared
+level below `publishedAndRegistered` adds Warning Reason `B000` and HTTP 202 to the
+Store Instances Response. An absent level preserves the legacy provider contract;
+it is not evidence of persistence. `DicomWebInMemoryStorage` preserves same-UID
+originals, treats identical bytes as duplicates, and records different bytes in
+`conflictingInstances()` with Warning Reason `B000`, no Failure Reason, and HTTP
+202 (issue #2529). Both STOW and C-STORE accept retained divergent bytes with a
+warning while leaving the original retrievable. The `dicomtool web` directory
+provider preserves the exact incoming bytes under
+`.conflicts/<hex-encoded-UID>~<full-content-SHA256>.dcm` and excludes conflicts from
+its canonical index on restart. The STOW CLI exits 0 for fully accepted batches,
+including warnings, 2 for accepted plus refused instances, and 1 for all-failed
+batches. Conflict expiration and size limits are outside this policy change.
+The in-memory provider's legacy initializer leaves the durability field absent; `reportsDurability: true` declares `receivedInMemory` and
+warns for all accepted objects. Neither mode asserts durable archival storage.
+
+`DicomArchiveIntegrityScanner` compares streaming SHA-256 values with recorded
+hashes and optionally reopens Part 10 identity. It reports missing, mismatched,
+unparseable, identity-mismatched, unrecorded, temporary and conflict files without
+patient attributes. Unknown recorded hashes are findings, not successful checks.
+The caller supplies the complete file inventory; it must exclude journal/registry
+metadata. The local hash reader uses bounded chunks; optional parse/reopen still
+materializes the object. `DicomArchiveOrphanClassifier` returns a quarantine or
+preservation plan, allowing deletion only after explicit per-path confirmation
+of a duplicate. `DicomDerivativeRepairPlanner` returns regenerate/invalidate
+plans from verified source hashes. These primitives perform no repairs or deletions
+and never invalidate the durability of an original because a derivative failed.

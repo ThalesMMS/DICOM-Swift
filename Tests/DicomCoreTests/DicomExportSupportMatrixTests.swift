@@ -20,13 +20,14 @@ final class DicomExportSupportMatrixTests: XCTestCase {
         XCTAssertTrue(secondaryCapture.typedFailure.contains("DicomSecondaryCaptureError"))
 
         let print = try XCTUnwrap(matrix.row(feature: "Print management"))
-        XCTAssertTrue(print.supportedIODs.contains("Basic Grayscale Print Management"))
+        XCTAssertTrue(print.supportedIODs.contains("Basic Grayscale and Color Print Management"))
+        XCTAssertTrue(print.payloadRules.contains("interleaved RGB8"))
         XCTAssertTrue(print.unsupportedCases.contains("Presentation LUT"))
-        XCTAssertTrue(print.unsupportedCases.contains("Color print"))
+        XCTAssertFalse(print.unsupportedCases.contains("Color print"))
 
         let waveform = try XCTUnwrap(matrix.row(feature: "Waveform"))
         XCTAssertTrue(waveform.supportedIODs.contains("12-lead ECG"))
-        XCTAssertTrue(waveform.payloadRules.contains("SB, UB, SS, US, SL, and UL"))
+        XCTAssertTrue(waveform.payloadRules.contains("SB, UB, SS, US, SL, UL, MB, and AB"))
 
         let video = try XCTUnwrap(matrix.row(feature: "Video"))
         XCTAssertTrue(video.transferSyntaxes.contains("MPEG-2"))

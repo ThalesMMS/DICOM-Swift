@@ -12,7 +12,8 @@ extension DCMDecoder {
                 perFrameItems: perFrameItems,
                 declaredFrameCount: max(1, nImages),
                 dimensionOrganizationItems: dimensionOrganizationItems,
-                dimensionIndexItems: dimensionIndexItems
+                dimensionIndexItems: dimensionIndexItems,
+                littleEndian: littleEndian
             )
         }
     }
@@ -36,7 +37,9 @@ extension DCMDecoder {
             valueLength: metadata.elementLength,
             littleEndian: littleEndian,
             explicitVR: syntax.isExplicitVR,
-            characterSet: activeCharacterSet
+            characterSet: activeCharacterSet,
+            valueLengthLimit: Self.voiLUTValueLengthLimit,
+            parentContext: contextualVRContextUnsafe(), parentSequenceTag: tag.rawValue
         )) ?? []
     }
 }

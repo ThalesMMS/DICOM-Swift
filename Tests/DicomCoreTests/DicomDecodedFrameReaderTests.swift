@@ -158,12 +158,13 @@ final class DicomDecodedFrameReaderTests: XCTestCase {
         )
         let reader = try Self.reader(for: file)
 
+        // #2331: Part 2 objects are component collections; a fragment that is not a codestream is a typed
+        // encapsulation error, and the disabled rollout stays a typed unsupported-syntax error.
         XCTAssertThrowsError(try reader.frame(at: 0)) { error in
-            guard case DicomDecodedFrameReader.ReadError.unsupportedTransferSyntax(let uid, let diagnostics) = error else {
-                return XCTFail("expected unsupportedTransferSyntax, got \(error)")
+            guard case DicomDecodedFrameReader.ReadError.unusableEncapsulation(let diagnostics) = error else {
+                return XCTFail("expected unusableEncapsulation, got \(error)")
             }
-            XCTAssertEqual(uid, DicomTransferSyntax.jpeg2000Part2MulticomponentLossless.rawValue)
-            XCTAssertTrue(diagnostics.contains { $0.contains("multi-component volume") })
+            XCTAssertTrue(diagnostics.contains { $0.contains("component collection 0") }, "\(diagnostics)")
         }
     }
 
@@ -315,5 +316,156 @@ final class DicomDecodedFrameReaderTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+    }
+}
+
+// MARK: - Explicit VR Big Endian 8-bit samples (own-provider corpus parity, 2026-09-12)
+
+extension DicomDecodedFrameReaderTests {
+    /// An OW Pixel Data element under Explicit VR Big Endian holds 16-bit words (PS3.5 §7.6.1.1.1), so
+    /// 8-bit samples are byte-swapped in pairs on disk. The reader restores raster order on every native
+    /// path; an odd frame length keeps the word pairing across frames and the missing pad byte reads as zero.
+    func testBigEndianOWEightBitRGBSamplesAreWordSwappedBack() throws {
+        let samples: [UInt8] = (0..<27).map { UInt8($0 * 9 + 1) } // 3×3 RGB, odd length
+        let file = try Self.makeBigEndianEightBitFile(samples: [samples], width: 3, height: 3, samplesPerPixel: 3,
+                                                       photometric: "RGB", planar: 0, vr: .OW)
+        let reader = try Self.reader(for: file)
+        let typed = try reader.frame(at: 0)
+        guard case .rgb8(let interleaved) = typed.pixels else { return XCTFail("expected rgb8, got \(typed.pixels)") }
+        XCTAssertEqual(interleaved, samples)
+        let backed = try reader.dataBackedFrame(at: 0)
+        XCTAssertEqual(Array(backed.pixels.data), samples)
+        XCTAssertEqual(Array(try backed.copyingToArrayBackedFrame().storedSampleData()), samples)
+        let decoder = try DCMDecoder(data: file)
+        XCTAssertEqual(decoder.pixelDataVR, .OW)
+        XCTAssertTrue(decoder.nativeEightBitSamplesAreWordSwapped)
+        XCTAssertEqual(Array(decoder.getFrame(0)?.data ?? Data()), samples)
+        XCTAssertEqual(Array(try decoder.displayRGBPixelBuffer(frame: 0).rgbData), samples)
+    }
+
+    func testBigEndianOWPlanarRGBAndTwoOddFramesKeepTheWordPairing() throws {
+        // Planar configuration 1: the swap applies to the planar bytes, the reader then interleaves.
+        let pixels = 5 // 5×1, odd plane and frame lengths (15 bytes per frame)
+        let frame0 = (0..<15).map { UInt8(10 + $0) }, frame1 = (0..<15).map { UInt8(100 + $0) }
+        let file = try Self.makeBigEndianEightBitFile(samples: [frame0, frame1], width: pixels, height: 1, samplesPerPixel: 3,
+                                                       photometric: "RGB", planar: 1, vr: .OW)
+        let reader = try Self.reader(for: file)
+        XCTAssertEqual(reader.frameCount, 2)
+        for (index, planes) in [frame0, frame1].enumerated() {
+            let expected = (0..<pixels).flatMap { [planes[$0], planes[pixels + $0], planes[2 * pixels + $0]] }
+            let backed = try reader.dataBackedFrame(at: index)
+            XCTAssertEqual(Array(backed.pixels.data), expected, "frame \(index)")
+            guard case .rgb8(let interleaved) = try reader.frame(at: index).pixels else { return XCTFail("rgb8") }
+            XCTAssertEqual(interleaved, expected, "frame \(index)")
+        }
+    }
+
+    func testBigEndianOWEightBitGrayAndOBSamplesFollowTheValueRepresentation() throws {
+        let gray: [UInt8] = (0..<12).map { UInt8($0 * 20) }
+        let grayFile = try Self.makeBigEndianEightBitFile(samples: [gray], width: 4, height: 3, samplesPerPixel: 1,
+                                                           photometric: "MONOCHROME2", planar: nil, vr: .OW)
+        guard case .gray8(let grayPixels) = try Self.reader(for: grayFile).frame(at: 0).pixels else { return XCTFail("gray8") }
+        XCTAssertEqual(grayPixels, gray)
+        let decoder = try DCMDecoder(data: grayFile)
+        XCTAssertEqual(decoder.getPixels8(), gray, "the whole-buffer reader restores the word order too")
+
+        // OB is a byte stream: nothing is swapped whatever the transfer syntax.
+        let rgb: [UInt8] = (0..<27).map { UInt8($0 * 7) }
+        let obFile = try Self.makeBigEndianEightBitFile(samples: [rgb], width: 3, height: 3, samplesPerPixel: 3,
+                                                         photometric: "RGB", planar: 0, vr: .OB)
+        let obDecoder = try DCMDecoder(data: obFile)
+        XCTAssertEqual(obDecoder.pixelDataVR, .OB)
+        XCTAssertFalse(obDecoder.nativeEightBitSamplesAreWordSwapped)
+        guard case .rgb8(let obPixels) = try Self.reader(for: obFile).frame(at: 0).pixels else { return XCTFail("rgb8") }
+        XCTAssertEqual(obPixels, rgb)
+    }
+
+    /// The frame-addressed session reads the whole 16-bit words covering a frame, so a frame of odd length
+    /// whose first sample sits in the previous frame's last word is still delivered in raster order.
+    func testFrameAddressedSessionRestoresWordSwappedFramesOfOddLength() async throws {
+        let frame0 = (0..<15).map { UInt8(10 + $0) }, frame1 = (0..<15).map { UInt8(100 + $0) }
+        let file = try Self.makeBigEndianEightBitFile(samples: [frame0, frame1], width: 5, height: 1, samplesPerPixel: 3,
+                                                       photometric: "RGB", planar: 0, vr: .OW)
+        let session = try await DicomSourceFrameSession.open(source: DicomByteSource(data: file))
+        XCTAssertEqual(session.index.frameCount, 2)
+        XCTAssertEqual(try session.index.wordSwapLeadingBytes(forFrame: 0), 0)
+        XCTAssertEqual(try session.index.wordSwapLeadingBytes(forFrame: 1), 1, "frame 1 starts inside frame 0's last word")
+        let reader = try Self.reader(for: file)
+        for (index, expected) in [frame0, frame1].enumerated() {
+            let raw = try await session.frameData(at: index)
+            XCTAssertEqual(Array(raw), expected, "the raw consumer receives one reordered frame without neighboring samples")
+            let viaSession = try await session.dataBackedFrame(at: index)
+            let viaReader: DicomDataBackedDecodedFrame = try await reader.dataBackedFrame(at: index)
+            XCTAssertEqual(Array(viaSession.pixels.data), expected, "frame \(index) through the session")
+            XCTAssertEqual(Array(viaSession.pixels.data), Array(viaReader.pixels.data),
+                           "frame \(index): the session and the whole-file reader agree")
+        }
+        var streamed: [[UInt8]] = []
+        for try await element in try session.frames() {
+            streamed.append(Array(element.data))
+        }
+        XCTAssertEqual(streamed, [frame0, frame1])
+        await session.close()
+    }
+
+    func testNativeFrameDataSwapsWordsRelativeToThePixelDataStart() {
+        let descriptor = DicomPixelDataDescriptor(rows: 1, columns: 3, numberOfFrames: 2, bitsAllocated: 8, bitsStored: 8, highBit: 7,
+                                                  pixelRepresentation: 0, samplesPerPixel: 1, planarConfiguration: nil,
+                                                  photometricInterpretation: "MONOCHROME2", pixelDataOffset: 1,
+                                                  eightBitSamplesAreWordSwapped: true)!
+        // Value bytes (from offset 1): b a d c f e → samples a b c | d e f; the pad byte after f is absent.
+        let data = Data([0xFF, 0x0B, 0x0A, 0x0D, 0x0C, 0x0F, 0x0E])
+        XCTAssertEqual(Array(descriptor.nativeFrameData(in: data, frame: 0) ?? Data()), [0x0A, 0x0B, 0x0C])
+        XCTAssertEqual(Array(descriptor.nativeFrameData(in: data, frame: 1) ?? Data()), [0x0D, 0x0E, 0x0F])
+        let truncated = Data([0xFF, 0x0B, 0x0A, 0x0D, 0x0C, 0x0F])
+        XCTAssertNil(descriptor.nativeFrameData(in: truncated, frame: 1), "a frame outside the data is refused")
+        let single = DicomPixelDataDescriptor(rows: 1, columns: 3, numberOfFrames: 1, bitsAllocated: 8, bitsStored: 8, highBit: 7,
+                                              pixelRepresentation: 0, samplesPerPixel: 1, planarConfiguration: nil,
+                                              photometricInterpretation: "MONOCHROME2", pixelDataOffset: 0,
+                                              eightBitSamplesAreWordSwapped: true)!
+        XCTAssertEqual(Array(single.nativeFrameData(in: Data([0x0B, 0x0A, 0x0C]), frame: 0) ?? Data()), [0x0A, 0x0B, 0x00],
+                       "a missing pad byte reads as zero")
+        XCTAssertFalse(DicomPixelDataDescriptor(rows: 1, columns: 1, numberOfFrames: 1, bitsAllocated: 16, bitsStored: 16, highBit: 15,
+                                                pixelRepresentation: 0, samplesPerPixel: 1, planarConfiguration: nil,
+                                                photometricInterpretation: "MONOCHROME2", pixelDataOffset: 0,
+                                                eightBitSamplesAreWordSwapped: true)!.eightBitSamplesAreWordSwapped,
+                       "the flag only applies to 8-bit samples")
+    }
+
+    /// Writes the object under Explicit VR Big Endian with the samples laid out as the file would carry them:
+    /// OW pairs are swapped on disk (the writer copies binary values verbatim), OB bytes are not.
+    private static func makeBigEndianEightBitFile(samples: [[UInt8]], width: Int, height: Int, samplesPerPixel: Int,
+                                                  photometric: String, planar: Int?, vr: DicomVR) throws -> Data {
+        var raster = samples.flatMap { $0 }
+        if raster.count % 2 != 0 { raster.append(0) }
+        var onDisk = raster
+        if vr == .OW { for pair in stride(from: 0, to: onDisk.count, by: 2) { onDisk.swapAt(pair, pair + 1) } }
+        var elements: [DicomDataElement] = [
+            DicomDataElement(tag: DicomTag.sopClassUID.rawValue, vr: .UI,
+                             value: .strings([DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID])),
+            DicomDataElement(tag: DicomTag.sopInstanceUID.rawValue, vr: .UI, value: .strings(["2.25.20260912"])),
+            DicomDataElement(tag: DicomTag.patientName.rawValue, vr: .PN, value: .strings(["PARITY^BIGENDIAN"])),
+            DicomDataElement(tag: DicomTag.patientID.rawValue, vr: .LO, value: .strings(["PARITY-BE"])),
+            DicomDataElement(tag: DicomTag.studyInstanceUID.rawValue, vr: .UI, value: .strings(["2.25.20260912.1"])),
+            DicomDataElement(tag: DicomTag.seriesInstanceUID.rawValue, vr: .UI, value: .strings(["2.25.20260912.2"])),
+            DicomDataElement(tag: DicomTag.modality.rawValue, vr: .CS, value: .strings(["OT"])),
+            DicomDataElement(tag: DicomTag.samplesPerPixel.rawValue, vr: .US, value: .unsignedIntegers([UInt(samplesPerPixel)])),
+            DicomDataElement(tag: DicomTag.photometricInterpretation.rawValue, vr: .CS, value: .strings([photometric])),
+            DicomDataElement(tag: DicomTag.rows.rawValue, vr: .US, value: .unsignedIntegers([UInt(height)])),
+            DicomDataElement(tag: DicomTag.columns.rawValue, vr: .US, value: .unsignedIntegers([UInt(width)])),
+            DicomDataElement(tag: DicomTag.bitsAllocated.rawValue, vr: .US, value: .unsignedIntegers([8])),
+            DicomDataElement(tag: DicomTag.bitsStored.rawValue, vr: .US, value: .unsignedIntegers([8])),
+            DicomDataElement(tag: DicomTag.highBit.rawValue, vr: .US, value: .unsignedIntegers([7])),
+            DicomDataElement(tag: DicomTag.pixelRepresentation.rawValue, vr: .US, value: .unsignedIntegers([0]))
+        ]
+        if let planar { elements.append(DicomDataElement(tag: DicomTag.planarConfiguration.rawValue, vr: .US, value: .unsignedIntegers([UInt(planar)]))) }
+        if samples.count > 1 { elements.append(DicomDataElement(tag: DicomTag.numberOfFrames.rawValue, vr: .IS, value: .strings(["\(samples.count)"]))) }
+        elements.append(DicomDataElement(tag: DicomTag.pixelData.rawValue, vr: vr, value: .bytes(Data(onDisk))))
+        return try DicomDataSetWriter.part10Data(
+            from: DicomDataSet(elements: elements),
+            options: DicomPart10WriterOptions(transferSyntax: .explicitVRBigEndian,
+                                              mediaStorageSOPClassUID: DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID,
+                                              mediaStorageSOPInstanceUID: "2.25.20260912")
+        )
     }
 }

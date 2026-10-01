@@ -114,6 +114,7 @@ final class DicomRTObjectsTests: XCTestCase {
             us(.rows, 2),
             us(.columns, 2),
             ds(.pixelSpacing, ["1.25", "1.5"]),
+            ds(.sliceThickness, ["2.5"]),
             ds(.imagePositionPatient, ["10", "20", "30"]),
             ds(.imageOrientationPatient, ["1", "0", "0", "0", "1", "0"]),
             us(.bitsAllocated, 16),
@@ -138,6 +139,7 @@ final class DicomRTObjectsTests: XCTestCase {
         XCTAssertEqual(dose.imagePositionPatient, SIMD3<Double>(10, 20, 30))
         XCTAssertEqual(dose.imageOrientationPatient?.normal, SIMD3<Double>(0, 0, 1))
         XCTAssertEqual(dose.gridFrameOffsetVector, [0, 2.5])
+        XCTAssertEqual(dose.sliceThickness, 2.5)
         XCTAssertEqual(dose.storedValues, storedValues.map(UInt32.init))
         assertEqual(dose.doseValues, [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8], accuracy: 1e-12)
     }
@@ -151,6 +153,36 @@ final class DicomRTObjectsTests: XCTestCase {
             string(.rtPlanName, vr: .LO, "Reference plan"),
             string(.rtPlanDescription, vr: .ST, "Synthetic inspection plan"),
             string(.rtPlanGeometry, vr: .CS, "PATIENT"),
+            sequence(.referencedStructureSetSequence, [
+                DicomDataSet(elements: [
+                    string(.referencedSOPClassUID, vr: .UI, DicomRTStructureSet.storageSOPClassUID),
+                    string(.referencedSOPInstanceUID, vr: .UI, "2.25.3100")
+                ])
+            ]),
+            sequence(.referencedDoseSequence, [
+                DicomDataSet(elements: [
+                    string(.referencedSOPClassUID, vr: .UI, DicomRTDoseVolume.storageSOPClassUID),
+                    string(.referencedSOPInstanceUID, vr: .UI, "2.25.3200")
+                ])
+            ]),
+            sequence(.referencedRTPlanSequence, [
+                DicomDataSet(elements: [
+                    string(.referencedSOPClassUID, vr: .UI, DicomRTPlan.storageSOPClassUID),
+                    string(.referencedSOPInstanceUID, vr: .UI, "2.25.3300"),
+                    string(.rtPlanRelationship, vr: .CS, "PREDECESSOR")
+                ])
+            ]),
+            sequence(.patientSetupSequence, [
+                DicomDataSet(elements: [
+                    sequence(.referencedSetupImageSequence, [
+                        DicomDataSet(elements: [
+                            string(.referencedSOPClassUID, vr: .UI, "1.2.840.10008.5.1.4.1.1.481.1"),
+                            string(.referencedSOPInstanceUID, vr: .UI, "2.25.3400"),
+                            isValues(.referencedFrameNumber, [2])
+                        ])
+                    ])
+                ])
+            ]),
             sequence(.beamSequence, [
                 DicomDataSet(elements: [
                     isValue(.beamNumber, 1),
@@ -162,6 +194,12 @@ final class DicomRTObjectsTests: XCTestCase {
                     string(.primaryDosimeterUnit, vr: .CS, "MU"),
                     ds(.sourceAxisDistance, ["1000"]),
                     isValue(.numberOfControlPoints, 2),
+                    sequence(.referencedReferenceImageSequence, [
+                        DicomDataSet(elements: [
+                            string(.referencedSOPClassUID, vr: .UI, "1.2.840.10008.5.1.4.1.1.481.1"),
+                            string(.referencedSOPInstanceUID, vr: .UI, "2.25.3500")
+                        ])
+                    ]),
                     sequence(.controlPointSequence, [
                         DicomDataSet(elements: [
                             isValue(.controlPointIndex, 0),
@@ -202,6 +240,131 @@ final class DicomRTObjectsTests: XCTestCase {
         XCTAssertEqual(plan.beams[0].controlPoints[0].isocenterPosition, SIMD3<Double>(1, 2, 3))
         XCTAssertEqual(plan.beams[0].controlPoints[1].gantryAngle, 45)
         XCTAssertEqual(plan.beams[0].controlPoints[1].cumulativeMetersetWeight, 1)
+        XCTAssertEqual(plan.beamSequenceItemCount, 1)
+        XCTAssertEqual(plan.beams[0].controlPointSequenceItemCount, 2)
+        XCTAssertEqual(plan.objectReferences.map(\.kind), [.structureSet, .dose, .plan])
+        XCTAssertEqual(plan.objectReferences.map(\.sopInstanceUID), ["2.25.3100", "2.25.3200", "2.25.3300"])
+        XCTAssertEqual(plan.objectReferences.last?.relationship, "PREDECESSOR")
+        XCTAssertEqual(plan.setupImageReferences.first?.referencedSOPInstanceUID, "2.25.3400")
+        XCTAssertEqual(plan.setupImageReferences.first?.referencedFrameNumbers, [2])
+        XCTAssertEqual(plan.beams[0].referenceImageReferences.first?.referencedSOPInstanceUID, "2.25.3500")
+    }
+
+    func testRTPlanPreservesRecognizedIncompleteObjectForDiagnostics() throws {
+        let dataSet = DicomDataSet(elements: [
+            string(.sopClassUID, vr: .UI, DicomRTPlan.storageSOPClassUID),
+            string(.sopInstanceUID, vr: .UI, "2.25.3600"),
+            string(.modality, vr: .CS, "RTPLAN"),
+            sequence(.beamSequence, [
+                DicomDataSet(elements: [
+                    string(.beamName, vr: .LO, "Missing beam number")
+                ])
+            ]),
+            sequence(.referencedStructureSetSequence, [
+                DicomDataSet(elements: [
+                    string(.referencedSOPClassUID, vr: .UI, DicomRTStructureSet.storageSOPClassUID)
+                ])
+            ])
+        ])
+
+        let decoder = try open(dataSet: dataSet, sopClassUID: DicomRTPlan.storageSOPClassUID)
+        let plan = try XCTUnwrap(decoder.rtPlan)
+
+        XCTAssertEqual(plan.sopInstanceUID, "2.25.3600")
+        XCTAssertNil(plan.label)
+        XCTAssertNil(plan.geometry)
+        XCTAssertTrue(plan.beams.isEmpty)
+        XCTAssertEqual(plan.beamSequenceItemCount, 1)
+        XCTAssertEqual(plan.objectReferences.count, 1)
+        XCTAssertNil(plan.objectReferences[0].sopInstanceUID)
+    }
+
+    func testSpatialRegistrationParsesOrderedMatricesAndSourceReferences() throws {
+        let firstMatrix = [
+            "1", "0", "0", "10",
+            "0", "1", "0", "0",
+            "0", "0", "1", "0",
+            "0", "0", "0", "1"
+        ]
+        let secondMatrix = [
+            "0", "-1", "0", "0",
+            "1", "0", "0", "0",
+            "0", "0", "1", "0",
+            "0", "0", "0", "1"
+        ]
+        let dataSet = DicomDataSet(elements: [
+            string(.sopClassUID, vr: .UI, DicomSpatialRegistrationDocument.storageSOPClassUID),
+            string(.sopInstanceUID, vr: .UI, "2.25.4001"),
+            string(.frameOfReferenceUID, vr: .UI, "2.25.4002"),
+            sequence(.registrationSequence, [
+                DicomDataSet(elements: [
+                    string(.frameOfReferenceUID, vr: .UI, "2.25.4003"),
+                    sequence(.referencedImageSequence, [
+                        DicomDataSet(elements: [
+                            string(.referencedSOPInstanceUID, vr: .UI, "2.25.4004")
+                        ])
+                    ]),
+                    sequence(.matrixRegistrationSequence, [
+                        DicomDataSet(elements: [
+                            sequence(.matrixSequence, [
+                                DicomDataSet(elements: [
+                                    string(.frameOfReferenceTransformationMatrixType, vr: .CS, "RIGID"),
+                                    ds(.frameOfReferenceTransformationMatrix, firstMatrix)
+                                ]),
+                                DicomDataSet(elements: [
+                                    string(.frameOfReferenceTransformationMatrixType, vr: .CS, "RIGID"),
+                                    ds(.frameOfReferenceTransformationMatrix, secondMatrix)
+                                ])
+                            ])
+                        ])
+                    ])
+                ])
+            ])
+        ])
+
+        let decoder = try open(
+            dataSet: dataSet,
+            sopClassUID: DicomSpatialRegistrationDocument.storageSOPClassUID
+        )
+        let registration = try XCTUnwrap(decoder.spatialRegistration)
+
+        XCTAssertEqual(registration.sopInstanceUID, "2.25.4001")
+        XCTAssertEqual(registration.registeredFrameOfReferenceUID, "2.25.4002")
+        XCTAssertEqual(registration.registrations.count, 1)
+        XCTAssertEqual(registration.registrations[0].sourceFrameOfReferenceUID, "2.25.4003")
+        XCTAssertEqual(registration.registrations[0].referencedSOPInstanceUIDs, ["2.25.4004"])
+        XCTAssertEqual(registration.registrations[0].matrices.map(\.type), ["RIGID", "RIGID"])
+        XCTAssertEqual(registration.registrations[0].matrices[0].rowMajorValues, firstMatrix.compactMap(Double.init))
+        XCTAssertEqual(registration.registrations[0].matrices[1].rowMajorValues, secondMatrix.compactMap(Double.init))
+    }
+
+    func testSpatialRegistrationRejectsMalformedMatrix() throws {
+        let dataSet = DicomDataSet(elements: [
+            string(.sopClassUID, vr: .UI, DicomSpatialRegistrationDocument.storageSOPClassUID),
+            string(.frameOfReferenceUID, vr: .UI, "2.25.4100"),
+            sequence(.registrationSequence, [
+                DicomDataSet(elements: [
+                    string(.frameOfReferenceUID, vr: .UI, "2.25.4101"),
+                    sequence(.matrixRegistrationSequence, [
+                        DicomDataSet(elements: [
+                            sequence(.matrixSequence, [
+                                DicomDataSet(elements: [
+                                    string(.frameOfReferenceTransformationMatrixType, vr: .CS, "RIGID"),
+                                    ds(.frameOfReferenceTransformationMatrix, ["1", "0", "0"])
+                                ])
+                            ])
+                        ])
+                    ])
+                ])
+            ])
+        ])
+
+        let decoder = try open(
+            dataSet: dataSet,
+            sopClassUID: DicomSpatialRegistrationDocument.storageSOPClassUID
+        )
+
+        XCTAssertNil(decoder.spatialRegistration)
     }
 
     private func open(dataSet: DicomDataSet, sopClassUID: String) throws -> DCMDecoder {

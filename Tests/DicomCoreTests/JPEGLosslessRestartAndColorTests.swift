@@ -28,7 +28,7 @@ final class JPEGLosslessRestartAndColorTests: XCTestCase {
             height: height,
             precision: 12,
             selectionValue: 1,
-            restartInterval: 8 // restarts mid-row and at row boundaries
+            restartInterval: width
         )
 
         let result = try JPEGLosslessDecoder().decode(data: stream)
@@ -50,7 +50,7 @@ final class JPEGLosslessRestartAndColorTests: XCTestCase {
             planes: [samples], width: width, height: height, precision: 12
         ))
         let restarted = try JPEGLosslessDecoder().decode(data: makeJPEGLosslessStream(
-            planes: [samples], width: width, height: height, precision: 12, restartInterval: 4
+            planes: [samples], width: width, height: height, precision: 12, restartInterval: width
         ))
         XCTAssertEqual(plain.pixels, restarted.pixels)
         XCTAssertEqual(restarted.pixels.map(Int.init), samples)
@@ -63,7 +63,7 @@ final class JPEGLosslessRestartAndColorTests: XCTestCase {
             width: width,
             height: height,
             precision: 12,
-            restartInterval: 4
+            restartInterval: width
         )
         // Corrupt the first restart marker (RST0 -> RST3) after the scan header.
         guard let sosRange = stream.range(of: Data([0xFF, 0xDA])),
@@ -88,7 +88,7 @@ final class JPEGLosslessRestartAndColorTests: XCTestCase {
             width: width,
             height: height,
             precision: 12,
-            restartInterval: 4
+            restartInterval: width
         )
         // Truncate right after the first restart marker so the second
         // interval's data (and any further marker) is missing.
@@ -203,18 +203,23 @@ final class JPEGLosslessRestartAndColorTests: XCTestCase {
     // MARK: - Rejected color shapes (typed, fully named)
 
     func testAmbiguousColorShapesAreRejectedWithFullContext() {
+        // Issue #2821: YBR_FULL and YBR_FULL_422 components come out as coded; a partial-range YBR does not.
+        XCTAssertEqual(DicomCompressedPixelBackendResolver.resolve(
+            transferSyntax: .jpegLosslessFirstOrder, requestedBitDepth: 8, samplesPerPixel: 3,
+            photometricInterpretation: "YBR_FULL", bitsStored: 8
+        ).backend, .nativeJPEGLossless)
         let ybr = DicomCompressedPixelBackendResolver.resolve(
             transferSyntax: .jpegLosslessFirstOrder,
             requestedBitDepth: 8,
             samplesPerPixel: 3,
-            photometricInterpretation: "YBR_FULL",
+            photometricInterpretation: "YBR_PARTIAL_422",
             bitsStored: 8
         )
         XCTAssertEqual(ybr.backend, .unsupported)
         let ybrDiagnostic = ybr.diagnostics.joined(separator: " ")
         XCTAssertTrue(ybrDiagnostic.contains("multi-component"), ybrDiagnostic)
         XCTAssertTrue(ybrDiagnostic.contains(DicomTransferSyntax.jpegLosslessFirstOrder.rawValue), ybrDiagnostic)
-        XCTAssertTrue(ybrDiagnostic.contains("Photometric Interpretation=YBR_FULL"), ybrDiagnostic)
+        XCTAssertTrue(ybrDiagnostic.contains("Photometric Interpretation=YBR_PARTIAL_422"), ybrDiagnostic)
         XCTAssertTrue(ybrDiagnostic.contains("Samples Per Pixel=3"), ybrDiagnostic)
 
         let sixteenBitColor = DicomCompressedPixelBackendResolver.resolve(

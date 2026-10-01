@@ -10,14 +10,22 @@ enum DicomJLSwiftFrameDecoder {
 
     static func decode(
         _ request: DicomFrameDecodeRequest,
+        candidate: any DicomFrameCodecBackend = DicomJLSwiftBackend(),
         environment: [String: String] = ProcessInfo.processInfo.environment,
         report: @escaping TelemetryReporter = { _ in }
     ) async throws -> DicomCodecDecodedFrame? {
+        try Task.checkCancellation()
         let mode = DicomJLSwiftRolloutMode(environment: environment)
         guard mode != .disabled else { return nil }
 
-        let candidate = DicomJLSwiftBackend()
         let established = DicomCharLSFrameBackend(environment: environment)
+        let decision = DicomCodecCapabilities.resolve(request.capabilityRequest, environment: environment)
+        guard decision.canExecute else {
+            throw DicomCodecSelectionError.unsupported(
+                transferSyntaxUID: request.descriptor.transferSyntaxUID,
+                reasons: [decision.reason ?? "No qualified decoder is available."]
+            )
+        }
         switch mode {
         case .disabled:
             return nil
@@ -31,79 +39,59 @@ enum DicomJLSwiftFrameDecoder {
                 mode: mode,
                 report: report
             )
-            Task.detached(priority: .utility) {
+            let retained = request.frameData.count.addingReportingOverflow(production.buffer.data.count)
+            let admission = await DicomShadowExecutor.schedule(
+                bytes: retained.overflow ? Int.max : retained.partialValue, environment: environment
+            ) {
                 let start = DispatchTime.now().uptimeNanoseconds
                 do {
+                    try Task.checkCancellation()
                     let shadow = try await candidate.decode(request)
+                    try Task.checkCancellation()
+                    let matches = framesMatch(production, shadow)
+                    await DicomShadowExecutor.shared.record(matches ? .matched : .mismatched)
                     report(DicomJLSwiftDecodeTelemetry(
                         mode: mode,
                         backend: candidate.capabilities.identifier,
                         durationNanoseconds: elapsed(since: start),
                         width: shadow.width,
                         height: shadow.height,
-                        outcome: framesMatch(production, shadow) ? .matched : .mismatched
+                        outcome: matches ? .matched : .mismatched
                     ))
                 } catch {
+                    await DicomShadowExecutor.shared.record(error is CancellationError ? .cancelled : .failed)
                     report(DicomJLSwiftDecodeTelemetry(
                         mode: mode,
                         backend: candidate.capabilities.identifier,
                         durationNanoseconds: elapsed(since: start),
                         width: nil,
                         height: nil,
-                        outcome: .failed(error.localizedDescription)
+                        outcome: error is CancellationError ? .cancelled : .failed(error.localizedDescription)
                     ))
                 }
             }
+            if admission != .admitted {
+                report(DicomJLSwiftDecodeTelemetry(
+                    mode: mode, backend: candidate.capabilities.identifier, durationNanoseconds: 0,
+                    width: nil, height: nil, outcome: .skipped(admission.rawValue)
+                ))
+            }
+            try Task.checkCancellation()
             return production
         case .preferred:
-            if let reason = candidate.capabilities.unsupportedReason(for: request) {
-                return try await fallback(
-                    established,
-                    request: request,
-                    mode: mode,
-                    reason: reason,
-                    report: report
-                )
+            let backend: any DicomFrameCodecBackend = decision.backendIdentifier == candidate.capabilities.identifier.rawValue
+                ? candidate : established
+            let frame = try await timedDecode(backend, request: request, mode: mode, report: report)
+            if let reason = decision.fallbackReason {
+                report(DicomJLSwiftDecodeTelemetry(
+                    mode: mode, backend: backend.capabilities.identifier, durationNanoseconds: 0,
+                    width: frame.width, height: frame.height, outcome: .fellBack(reason)
+                ))
             }
-            do {
-                return try await timedDecode(candidate, request: request, mode: mode, report: report)
-            } catch {
-                return try await fallback(
-                    established,
-                    request: request,
-                    mode: mode,
-                    reason: error.localizedDescription,
-                    report: report
-                )
-            }
+            return frame
         case .forcedForTests:
             return try await timedDecode(candidate, request: request, mode: mode, report: report)
         }
-    }
-
-    private static func fallback(
-        _ backend: any DicomFrameCodecBackend,
-        request: DicomFrameDecodeRequest,
-        mode: DicomJLSwiftRolloutMode,
-        reason: String,
-        report: @escaping TelemetryReporter
-    ) async throws -> DicomCodecDecodedFrame {
-        guard backend.capabilities.unsupportedReason(for: request) == nil else {
-            throw DicomCodecSelectionError.unsupported(
-                transferSyntaxUID: request.descriptor.transferSyntaxUID,
-                reasons: [reason, backend.capabilities.unsupportedReason(for: request) ?? "CharLS unavailable"]
-            )
-        }
-        let frame = try await timedDecode(backend, request: request, mode: mode, report: report)
-        report(DicomJLSwiftDecodeTelemetry(
-            mode: mode,
-            backend: backend.capabilities.identifier,
-            durationNanoseconds: 0,
-            width: frame.width,
-            height: frame.height,
-            outcome: .fellBack(reason)
-        ))
-        return frame
     }
 
     private static func timedDecode(
@@ -114,7 +102,9 @@ enum DicomJLSwiftFrameDecoder {
     ) async throws -> DicomCodecDecodedFrame {
         let start = DispatchTime.now().uptimeNanoseconds
         do {
+            try Task.checkCancellation()
             let frame = try await backend.decode(request)
+            try Task.checkCancellation()
             report(DicomJLSwiftDecodeTelemetry(
                 mode: mode,
                 backend: backend.capabilities.identifier,
@@ -131,7 +121,7 @@ enum DicomJLSwiftFrameDecoder {
                 durationNanoseconds: elapsed(since: start),
                 width: nil,
                 height: nil,
-                outcome: .failed(error.localizedDescription)
+                outcome: error is CancellationError ? .cancelled : .failed(error.localizedDescription)
             ))
             throw error
         }

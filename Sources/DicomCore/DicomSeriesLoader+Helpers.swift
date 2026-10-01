@@ -262,6 +262,7 @@ extension DicomSeriesLoader {
             if pixelFormat.pixelRepresentation == 1,
                let concreteDecoder = decoder as? DCMDecoder,
                concreteDecoder.copyNativeSigned16Pixels(into: &buffer, expectedPixelCount: expectedPixelCount) {
+                maskNarrow16BitSamples(in: &buffer, count: expectedPixelCount, pixelFormat: pixelFormat)
                 return expectedPixelCount
             }
 
@@ -278,6 +279,7 @@ extension DicomSeriesLoader {
                     buffer[index] = Int16(bitPattern: pixels[index])
                 }
             }
+            maskNarrow16BitSamples(in: &buffer, count: expectedPixelCount, pixelFormat: pixelFormat)
         case 32:
             for index in 0..<expectedPixelCount {
                 guard let stored = decoder.storedPixelValue(at: index, frame: 0, sample: 0) else {
@@ -345,6 +347,7 @@ extension DicomSeriesLoader {
                     buffer[index] = Int16(bitPattern: pixels[index])
                 }
             }
+            maskNarrow16BitSamples(in: &buffer, count: expectedPixelCount, pixelFormat: pixelFormat)
         case .rgb8:
             throw DicomSeriesLoaderError.unsupportedPixelFormat(pixelFormat)
         }
@@ -365,6 +368,22 @@ extension DicomSeriesLoader {
             "32-bit \(representation) DICOM pixel values outside Int16 range were quantized while loading "
             + "\(url.lastPathComponent). DicomSeriesLoader outputs Int16 voxels, so saturated values are lossy."
         )
+    }
+
+    /// The 16-bit paths hold each sample's whole word; with fewer bits stored (issue #2781) the bits above
+    /// them may carry anything, and a signed sample's sign is its top stored bit.
+    private func maskNarrow16BitSamples(
+        in buffer: inout [Int16],
+        count: Int,
+        pixelFormat: DicomSeriesLoaderPixelFormat
+    ) {
+        guard pixelFormat.bitsStored < 16 else { return }
+        for index in 0..<count {
+            buffer[index] = Int16(truncatingIfNeeded: normalizedStoredValue(
+                Int(UInt16(bitPattern: buffer[index])),
+                pixelFormat: pixelFormat
+            ))
+        }
     }
 
     private func normalizedStoredValue(

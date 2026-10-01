@@ -10,7 +10,7 @@ import DicomCore
 
 // MARK: - Validation Abstraction
 
-protocol DICOMValidating {
+protocol DICOMValidating: Sendable {
     func validateDICOMFile(_ filename: String) -> (isValid: Bool, issues: [String])
 }
 
@@ -22,7 +22,7 @@ extension DCMDecoder: DICOMValidating {}
 ///
 /// ## Overview
 ///
-/// ``ValidateCommand`` performs comprehensive validation checks on DICOM files including:
+/// The legacy mode performs basic compatibility checks on DICOM files including:
 /// - File format and structure validation
 /// - Required metadata presence
 /// - Image dimensions and pixel data integrity
@@ -67,14 +67,14 @@ struct ValidateCommand: ParsableCommand {
         commandName: "validate",
         abstract: "Validate DICOM file conformance",
         discussion: """
-            Performs comprehensive validation checks on a DICOM file and reports
-            any conformance issues or warnings.
+            Performs basic compatibility checks on a DICOM file. Use --composed
+            for original Part 10 evidence separated into validation layers.
 
-            Validates file structure, required metadata, image properties, and
-            pixel data accessibility. Returns exit code 0 if validation passes,
-            or non-zero if validation fails.
+            Composed mode returns exit 1 for a failed layer and exit 2 when evidence
+            is incomplete. A successful codec or legacy check does not establish
+            complete IOD conformance.
 
-            Supports both human-readable text output and JSON output for automation.
+            Supports human-readable text and JSON output for automation.
             """
     )
 
@@ -94,8 +94,70 @@ struct ValidateCommand: ParsableCommand {
     )
     var format: OutputFormat = .text
 
-    /// Factory used to create validators, overridable in tests.
-    static var makeValidator: () -> any DICOMValidating = { DCMDecoder() }
+    @Flag(name: .long, help: "Compose original Part 10 evidence by layer. Exit 2 means incomplete, 1 means failed; no PHI in the report.")
+    var composed = false
+
+    @Option(name: .long, help: """
+        External fact for composed mode as name=yes|no, repeatable. Names: animal, non-bipedal, \
+        paired-body-part, temporally-related-series, calibrated-image, rescale-hu, cardiac-gating, requested-procedure, \
+        predecessor-content, identical-documents, equivalent-cda, observation-time-differs, root-template, \
+        sar-capable, gradient-output-capable, operating-mode-regulated, us-staged-protocol, contrast-media-used, \
+        non-square-pixels, subject-is-specimen, frame-retrieve-response. Unstated facts stay undetermined.
+        """)
+    var fact: [String] = []
+
+    static let factNames = ["animal", "non-bipedal", "paired-body-part", "temporally-related-series", "calibrated-image",
+                            "rescale-hu", "cardiac-gating", "requested-procedure", "predecessor-content", "identical-documents",
+                            "equivalent-cda", "observation-time-differs", "root-template", "sar-capable",
+                            "gradient-output-capable", "operating-mode-regulated", "us-staged-protocol",
+                            "contrast-media-used", "non-square-pixels", "subject-is-specimen", "frame-retrieve-response"]
+
+    static func imageConditions(from facts: [String]) throws -> DicomCompositeImageModules.Conditions {
+        var truths: [String: DicomAttributeRule.Truth] = [:]
+        for fact in facts {
+            let parts = fact.split(separator: "=", maxSplits: 1).map(String.init)
+            guard parts.count == 2, factNames.contains(parts[0]), ["yes", "no"].contains(parts[1]) else {
+                throw ValidationError("Unknown fact '\(fact)'; expected one of \(factNames.joined(separator: ", ")) with yes or no")
+            }
+            truths[parts[0]] = parts[1] == "yes" ? .satisfied : .unsatisfied
+        }
+        return .init(nonHumanPatient: truths["animal"] ?? .undetermined,
+                     nonBipedalAnatomy: truths["non-bipedal"] ?? .undetermined,
+                     pairedBodyPart: truths["paired-body-part"] ?? .undetermined,
+                     temporallyRelatedSeries: truths["temporally-related-series"] ?? .undetermined,
+                     calibratedImage: truths["calibrated-image"] ?? .undetermined,
+                     rescaleUnitsAreHU: truths["rescale-hu"] ?? .undetermined,
+                     cardiacGating: truths["cardiac-gating"] ?? .undetermined,
+                     fulfilsRequestedProcedure: truths["requested-procedure"] ?? .undetermined,
+                     includesOtherDocumentContent: truths["predecessor-content"] ?? .undetermined,
+                     identicalDocumentsStored: truths["identical-documents"] ?? .undetermined,
+                     equivalentCDADocument: truths["equivalent-cda"] ?? .undetermined,
+                     observationTimeDiffers: truths["observation-time-differs"] ?? .undetermined,
+                     rootTemplateUsed: truths["root-template"] ?? .undetermined,
+                     sarCapable: truths["sar-capable"] ?? .undetermined,
+                     gradientOutputCapable: truths["gradient-output-capable"] ?? .undetermined,
+                     operatingModeRegulated: truths["operating-mode-regulated"] ?? .undetermined,
+                     ultrasoundStagedProtocol: truths["us-staged-protocol"] ?? .undetermined,
+                     contrastMediaUsed: truths["contrast-media-used"] ?? .undetermined,
+                     nonSquarePixels: truths["non-square-pixels"] ?? .undetermined,
+                     imagingSubjectIsSpecimen: truths["subject-is-specimen"] ?? .undetermined,
+                     frameLevelRetrieveResponse: truths["frame-retrieve-response"] ?? .undetermined)
+    }
+
+    typealias ValidatorFactory = @Sendable () -> any DICOMValidating
+
+    private static let defaultValidatorFactory: ValidatorFactory = { DCMDecoder() }
+    private static let validatorFactory = LockedValue<ValidatorFactory>(defaultValidatorFactory)
+
+    /// Replaces the validator factory for a scoped test and returns the previous value.
+    @discardableResult
+    static func replaceValidatorFactory(_ factory: @escaping ValidatorFactory) -> ValidatorFactory {
+        validatorFactory.replace(with: factory)
+    }
+
+    static func resetValidatorFactory() {
+        validatorFactory.replace(with: defaultValidatorFactory)
+    }
 
     // MARK: - Execution
 
@@ -112,8 +174,25 @@ struct ValidateCommand: ParsableCommand {
             )
         }
 
+        if composed {
+            let report = try DicomCodecWorkflowEngine().validateInstance(Data(contentsOf: fileURL, options: .mappedIfSafe),
+                                                                         imageConditions: Self.imageConditions(from: fact))
+            if format == .json {
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
+                print(String(decoding: try encoder.encode(report), as: UTF8.self))
+            } else {
+                for layer in DicomValidationReport.Layer.allCases { print("\(layer.rawValue): \(report[layer].rawValue)") }
+                for diagnostic in report.diagnostics { print("\(diagnostic.severity.rawValue) \(diagnostic.code.rawValue) \(diagnostic.path)") }
+            }
+            let outcome = report.outcome(requiring: Set(DicomValidationReport.Layer.allCases.filter { $0 != .operation }))
+            if outcome == .failed { throw ExitCode.failure }
+            if outcome != .passed { throw ExitCode(2) }
+            return
+        }
+
         // Perform validation using DCMDecoder
-        let validationResult = Self.makeValidator().validateDICOMFile(fileURL.path)
+        let validationResult = Self.validatorFactory.value().validateDICOMFile(fileURL.path)
 
         // Separate errors and warnings.
         // Classification is heuristic-based (message text) until upstream

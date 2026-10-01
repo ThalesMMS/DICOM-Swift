@@ -3,6 +3,7 @@
 
 import argparse
 import csv
+import hashlib
 import json
 import platform
 import re
@@ -64,28 +65,39 @@ def load_jsonl(path):
         case_id = record.get("caseID")
         if not case_id:
             raise ValueError(f"{candidate}:{line_number}: missing caseID")
+        if case_id in records:
+            raise ValueError(f"{candidate}:{line_number}: duplicate caseID {case_id}")
+        if record.get("result") not in RESULT_RANK:
+            raise ValueError(f"{candidate}:{line_number}: invalid result for {case_id}")
         records[case_id] = record
     return records
 
 
 def result_for_identifier(identifier, test_results):
     matches = []
-    for alternative in identifier.split("|"):
-        parts = alternative.rsplit(".", 1)
+    missing = []
+    for required in identifier.split("|"):
+        parts = required.rsplit(".", 1)
         class_name = parts[0]
         method_name = parts[1] if len(parts) == 2 else None
-        matches.extend(
+        selected = [
             item
             for item in test_results
             if item["class"] == class_name
             and (method_name is None or item["method"] == method_name)
-        )
+        ]
+        matches.extend(selected)
+        if not selected:
+            missing.append(required)
     if not matches:
-        return {"result": "missing", "durationSeconds": 0.0}
+        return {"result": "missing", "durationSeconds": 0.0, "missingTestIdentifiers": missing}
     worst = max(matches, key=lambda item: RESULT_RANK[item["result"]])["result"]
+    if missing and worst == "passed":
+        worst = "missing"
     return {
         "result": worst,
         "durationSeconds": round(sum(item["durationSeconds"] for item in matches), 6),
+        "missingTestIdentifiers": missing,
     }
 
 
@@ -114,7 +126,7 @@ def oracle_version(oracle_id, oracle_by_id, preflight_by_id):
 
 
 def fixture_record(fixture):
-    return {
+    record = {
         key: fixture[key]
         for key in (
             "id",
@@ -132,6 +144,11 @@ def fixture_record(fixture):
             "frames",
         )
     }
+    for key in ("rows", "columns", "components", "bitsAllocated", "highBit", "planarConfiguration",
+                "geometry", "independentExpectedResults"):
+        if key in fixture:
+            record[key] = fixture[key]
+    return record
 
 
 def build_report(args):
@@ -139,6 +156,9 @@ def build_report(args):
     preflight = load_json(args.preflight, [])
     interop = load_jsonl(args.interop_results)
     test_results = parse_test_log(args.test_log)
+    unknown = set(interop) - {item["id"] for item in manifest["cases"]}
+    if unknown:
+        raise ValueError(f"unknown caseID in interop evidence: {', '.join(sorted(unknown))}")
     fixture_by_id = {fixture["id"]: fixture for fixture in manifest["fixtures"]}
     oracle_by_id = {oracle["id"]: oracle for oracle in manifest["oracles"]}
     preflight_by_id = {entry["id"]: entry for entry in preflight}
@@ -150,12 +170,23 @@ def build_report(args):
         "platform": platform.platform(),
         "architecture": platform.machine(),
         "pythonVersion": platform.python_version(),
+        "evidenceSHA256": {
+            name: hashlib.sha256(Path(path).read_bytes()).hexdigest()
+            for name, path in (
+                ("manifest", args.manifest), ("preflight", args.preflight),
+                ("testLog", args.test_log), ("interop", args.interop_results),
+            ) if path and Path(path).is_file()
+        },
     }
     cases = []
     for item in manifest["cases"]:
-        outcome = interop.get(item["id"]) or result_for_identifier(
-            item["testIdentifier"], test_results
-        )
+        local_outcome = result_for_identifier(item["testIdentifier"], test_results)
+        external_outcome = interop.get(item["id"])
+        if external_outcome and local_outcome["result"] in ("passed", "failed", "mismatched") and (
+            external_outcome["result"] != local_outcome["result"]
+        ):
+            raise ValueError(f"conflicting evidence for caseID {item['id']}")
+        outcome = external_outcome or local_outcome
         result = outcome.get("result", "missing")
         verdict = item["supportVerdict"]
         if result not in (item["expectedResult"], "passed"):
@@ -173,10 +204,16 @@ def build_report(args):
                 or oracle_version(item["decoderID"], oracle_by_id, preflight_by_id),
                 "backendID": item["backendID"],
                 "comparison": item["comparison"],
-                "metadataValidation": outcome.get("metadataValidation", "covered-by-test"),
+                "executionTier": item.get("executionTier", "existing-conformance"),
+                "metadataValidation": outcome.get(
+                    "metadataValidation", "covered-by-test" if result == "passed" else "not-executed"
+                ),
                 "expectedResult": item["expectedResult"],
                 "result": result,
                 "failureLocation": outcome.get("failureLocation"),
+                "firstDifference": outcome.get("firstDifference"),
+                "metrics": outcome.get("metrics"),
+                "missingTestIdentifiers": outcome.get("missingTestIdentifiers", []),
                 "durationSeconds": outcome.get("durationSeconds", 0.0),
                 "peakRSSBytes": outcome.get("peakRSSBytes"),
                 "requiredGates": item["requiredGates"],
@@ -185,6 +222,19 @@ def build_report(args):
             }
         )
 
+    case_by_id = {item["caseID"]: item for item in cases}
+    backends = []
+    for backend in manifest["backends"]:
+        evidence = [case_by_id[case_id] for case_id in backend["caseIDs"]]
+        verdict = backend["verdict"]
+        if any(item["result"] in ("failed", "mismatched") for item in evidence):
+            verdict = "unsupported"
+        elif verdict == "qualified" and (
+            not evidence or any(item["result"] != "passed" for item in evidence)
+        ):
+            verdict = "out-of-scope"
+        backends.append({**backend, "declaredVerdict": backend["verdict"], "verdict": verdict})
+
     return {
         "schemaVersion": 1,
         "manifestVersion": manifest["version"],
@@ -192,7 +242,7 @@ def build_report(args):
         "environment": environment,
         "policy": manifest["policy"],
         "gaps": [entry for entry in manifest["coverage"] if entry["status"] == "gap"],
-        "backends": manifest["backends"],
+        "backends": backends,
         "preflight": preflight,
         "cases": cases,
     }
@@ -215,10 +265,14 @@ def write_csv(report, output_dir):
         "decoderVersion",
         "backendID",
         "comparison",
+        "executionTier",
         "metadataValidation",
         "expectedResult",
         "result",
         "failureLocation",
+        "firstDifference",
+        "metrics",
+        "missingTestIdentifiers",
         "durationSeconds",
         "peakRSSBytes",
         "requiredGates",
@@ -234,6 +288,8 @@ def write_csv(report, output_dir):
                 fixture["sha256"] for fixture in item["fixtures"]
             )
             row["requiredGates"] = ";".join(item["requiredGates"])
+            for key in ("firstDifference", "metrics", "missingTestIdentifiers"):
+                row[key] = json.dumps(item[key], sort_keys=True)
             writer.writerow(row)
 
 
@@ -256,6 +312,13 @@ def write_markdown(report, output_dir):
             f"| {item['caseID']} | {item['backendID']} | {item['comparison']} | "
             f"{item['result']} | {item['supportVerdict']} | {item['durationSeconds']} |"
         )
+    for item in report["cases"]:
+        if item["firstDifference"]:
+            lines.extend(["", f"First difference for `{item['caseID']}`: "
+                          f"`{json.dumps(item['firstDifference'], sort_keys=True)}`", ""])
+        if item["metrics"]:
+            lines.extend(["", f"Metrics for `{item['caseID']}`: "
+                          f"`{json.dumps(item['metrics'], sort_keys=True)}`", ""])
     lines.extend(["", "## Capability gaps", ""])
     if not report["gaps"]:
         lines.append("No declared gaps.")
@@ -281,6 +344,9 @@ def write_markdown(report, output_dir):
 
 def enforce_required(report):
     failures = []
+    for capability in report["preflight"]:
+        if capability.get("required") and capability.get("status") != "available":
+            failures.append(f"required capability {capability['id']}: {capability.get('status', 'missing')}")
     for item in report["cases"]:
         if report["environment"]["gate"] not in item["requiredGates"]:
             continue

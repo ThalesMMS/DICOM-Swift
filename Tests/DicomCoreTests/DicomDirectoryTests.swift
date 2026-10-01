@@ -14,7 +14,7 @@ final class DicomDirectoryTests: XCTestCase {
             + explicitStringElement(
                 tag: DicomTag.patientName.rawValue,
                 vr: "PN",
-                value: characterSet.encode(patientName)
+                value: try XCTUnwrap(characterSet.encode(patientName))
             )
         let item = tagData(0xFFFE_E000) + uint32Data(UInt32(record.count)) + record
         let sequence = explicitLongElement(tag: 0x0004_1220, vr: "SQ", value: item)

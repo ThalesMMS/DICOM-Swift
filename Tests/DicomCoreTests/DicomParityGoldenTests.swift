@@ -97,7 +97,9 @@ final class DicomParityGoldenTests: XCTestCase {
         XCTAssertEqual(parsed.frames[0].geometry?.imagePositionPatient, SIMD3<Double>(1, 2, 0))
         XCTAssertEqual(parsed.frames[1].geometry?.imagePositionPatient, SIMD3<Double>(1, 2, 1.2))
         XCTAssertEqual(parsed.frames[0].geometry?.pixelMeasures?.pixelSpacing, SIMD2<Double>(0.6, 0.7))
-        XCTAssertEqual(parsed.frames[0].geometry?.sourceImageReferences, [sourceReference])
+        // Since #2346 the parser also keeps the derivation/purpose codes the builder writes; compare identities.
+        XCTAssertEqual(parsed.frames[0].geometry?.sourceImageReferences.map { DicomSourceImageReferenceIdentity($0) },
+                       [DicomSourceImageReferenceIdentity(sourceReference)])
         XCTAssertEqual(labelmap.frameIndexes, [0, 1])
         XCTAssertEqual(labelmap.voxels, [7, 0, 7, 0, 7, 0, 7, 0, 7, 0, 7, 0, 7, 0, 7, 0, 7, 0])
         XCTAssertEqual(Self.sha256Hex(Self.littleEndianData(labelmap.voxels)), "b0d9fe9eb6f1465ff49a07bb3dda5771933bbea82255182360ae0a28eeb973cb")
@@ -152,7 +154,6 @@ final class DicomParityGoldenTests: XCTestCase {
         let document = DicomSRDocument(
             sopClassUID: DicomSRDocument.comprehensiveSRStorageSOPClassUID,
             sopInstanceUID: "2.25.28014",
-            contentLabel: "QA02",
             completionFlag: "COMPLETE",
             verificationFlag: "UNVERIFIED",
             templateIdentifier: "1500",

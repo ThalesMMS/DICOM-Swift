@@ -5,12 +5,9 @@ extension DCMWindowingProcessor {
 
     /// Returns preset window/level values corresponding to a given
     /// medical preset, using the type-safe ``WindowSettings`` struct.
-    /// If the preset is ``custom`` the full dynamic range is returned.
+    /// If the preset is `.custom`, the default 4096-wide window centered at 0 is returned.
     /// These values correspond to standard Hounsfield Unit ranges used
     /// in radiology.
-    ///
-    /// - Parameter preset: The anatomical preset.
-    /// - Returns: Window settings with center and width values.
     ///
     /// ## Usage Example
     /// ```swift
@@ -23,6 +20,7 @@ extension DCMWindowingProcessor {
     ///         width: settings.width
     ///     )
     /// }
+    /// ```
     /// Maps a `MedicalPreset` to the recommended window center and width for image display.
     /// - Parameter preset: The medical preset whose windowing values are requested.
     /// - Returns: A `WindowSettings` containing the `center` and `width` appropriate for the given preset; for `.custom` this returns center `0.0` and width `4096.0`.
@@ -70,10 +68,6 @@ extension DCMWindowingProcessor {
         return WindowSettings(center: center, width: width)
     }
 
-    /// Suggests appropriate presets based on modality and body part
-    /// - Parameters:
-    ///   - modality: DICOM modality code (e.g., "CT", "MR", "MG")
-    ///   - bodyPart: Optional body part examined
     /// Suggests an ordered list of medical window/level presets appropriate for the given imaging modality and optional body part.
     /// - Parameters:
     ///   - modality: Imaging modality code (e.g., `"CT"`, `"MR"`, `"MG"`, `"PT"`); comparison is case-insensitive.

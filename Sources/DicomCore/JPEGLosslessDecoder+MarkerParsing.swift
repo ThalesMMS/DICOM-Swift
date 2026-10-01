@@ -63,7 +63,13 @@ extension JPEGLosslessDecoder {
             let payloadEnd = payloadStart + payloadLength
 
             guard payloadEnd <= endIndex else {
-                throw DICOMError.invalidDICOMFormat(reason: "Marker 0xFF\(String(markerType, radix: 16)) payload extends beyond data (needs \(payloadLength) bytes, \(endIndex - payloadStart) available)")
+                let markerName = markerType == JPEGMarker.dri.rawValue
+                    ? "DRI marker"
+                    : "Marker 0xFF\(String(markerType, radix: 16))"
+                throw DICOMError.invalidDICOMFormat(
+                    reason: "\(markerName) payload extends beyond data "
+                        + "(needs \(payloadLength) bytes, \(endIndex - payloadStart) available)"
+                )
             }
 
             // Parse marker payload
@@ -75,8 +81,10 @@ extension JPEGLosslessDecoder {
                 try parseDHT(data: data, offset: payloadStart, length: payloadLength)
 
             case JPEGMarker.dri.rawValue:
-                guard payloadLength >= 2 else {
-                    throw DICOMError.invalidDICOMFormat(reason: "DRI marker payload too short (\(payloadLength) bytes)")
+                guard payloadLength == 2 else {
+                    throw DICOMError.invalidDICOMFormat(
+                        reason: "DRI marker payload must be exactly 2 bytes, found \(payloadLength)"
+                    )
                 }
                 restartInterval = Int(data[payloadStart]) << 8 | Int(data[payloadStart + 1])
 
@@ -125,8 +133,8 @@ extension JPEGLosslessDecoder {
         }
 
         // Validate precision
-        guard precision == 8 || precision == 12 || precision == 16 else {
-            throw DICOMError.invalidDICOMFormat(reason: "Unsupported SOF3 precision: \(precision) bits (expected 8, 12, or 16)")
+        guard (2...16).contains(precision) else {
+            throw DICOMError.invalidDICOMFormat(reason: "Unsupported SOF3 precision: \(precision) bits (T.81 lossless allows 2...16)")
         }
 
         // Parse component specifications
@@ -344,8 +352,13 @@ extension JPEGLosslessDecoder {
             throw DICOMError.invalidDICOMFormat(reason: "SOS Se (end spectral) must be 0 for lossless mode, found \(sos.endSpectral)")
         }
 
-        guard sos.successiveApproximationHigh == 0, sos.successiveApproximationLow == 0 else {
-            throw DICOMError.invalidDICOMFormat(reason: "SOS Ah/Al (successive approximation) must be 0 for lossless mode")
+        guard sos.successiveApproximationHigh == 0 else {
+            throw DICOMError.invalidDICOMFormat(reason: "SOS Ah (successive approximation high) must be 0 for lossless mode")
+        }
+        guard Int(sos.successiveApproximationLow) < sof3.precision else {
+            throw DICOMError.invalidDICOMFormat(
+                reason: "SOS Al (point transform) \(sos.successiveApproximationLow) must be below the sample precision \(sof3.precision)"
+            )
         }
 
         // Validate selection value (predictor ID)

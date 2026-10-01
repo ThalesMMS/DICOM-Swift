@@ -26,7 +26,9 @@ final class ClinicalCodecConformanceManifestTests: XCTestCase {
         "negative.truncated-codestream-fragment", "negative.inconsistent-frame-offsets",
         "negative.malformed-marker-box-bin", "negative.decompression-bomb-dimensions",
         "negative.integer-overflow-boundary", "negative.unsupported-component-precision-color",
-        "negative.corrupt-derived-artifact"
+        "negative.corrupt-derived-artifact", "negative.nonzero-data-start", "negative.frame-order",
+        "negative.remote-origin", "negative.cancelled-transport", "negative.duplicate-evidence",
+        "negative.partial-test-evidence", "negative.malformed-network-response"
     ]
 
     func test_manifestEnumeratesEveryRequiredCategoryAndKeepsGapsVisible() throws {
@@ -99,6 +101,40 @@ final class ClinicalCodecConformanceManifestTests: XCTestCase {
         }
     }
 
+    func test_independentExpectations_pinCompleteFramesGeometryAndOracleArtifact() throws {
+        let manifest = try loadManifest()
+        let independent = manifest.fixtures.filter { $0.independentExpectedResults != nil }
+        XCTAssertEqual(independent.count, 6)
+        for fixture in independent {
+            let expected = try XCTUnwrap(fixture.independentExpectedResults)
+            XCTAssertEqual(expected.oracleID, "pydicom")
+            let url = packageRoot().appendingPathComponent(expected.artifactPath).standardizedFileURL
+            XCTAssertTrue(url.path.hasPrefix(packageRoot().path + "/"))
+            let data = try Data(contentsOf: url)
+            XCTAssertEqual(SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined(), expected.artifactSHA256)
+            let artifact = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            let records = try XCTUnwrap(artifact["fixtures"] as? [[String: Any]])
+            let record = try XCTUnwrap(records.first { $0["id"] as? String == expected.fixtureID })
+            XCTAssertEqual(record["sha256"] as? String, fixture.sha256)
+            let rows = try XCTUnwrap(fixture.rows)
+            let columns = try XCTUnwrap(fixture.columns)
+            let components = try XCTUnwrap(fixture.components)
+            XCTAssertGreaterThan(rows, 0)
+            XCTAssertGreaterThan(columns, 0)
+            XCTAssertTrue([1, 3].contains(components))
+            for key in ["storedSamples", "displaySamples"] {
+                let frames = try XCTUnwrap(record[key] as? [[Int]])
+                XCTAssertEqual(frames.count, fixture.frames)
+                XCTAssertTrue(frames.allSatisfy { $0.count == rows * columns * components })
+            }
+            let geometry = try XCTUnwrap(record["geometry"] as? [String: [Double]])
+            XCTAssertEqual(geometry["pixelSpacing"]?.count, 2)
+            XCTAssertEqual(geometry["position"]?.count, 3)
+            XCTAssertEqual(geometry["orientation"]?.count, 6)
+            XCTAssertTrue(geometry.values.flatMap { $0 }.allSatisfy(\.isFinite))
+        }
+    }
+
     func test_casesBindCommandsTestsExpectedResultsAndKnownVerdicts() throws {
         let manifest = try loadManifest()
         let fixtureIDs = Set(manifest.fixtures.map(\.id))
@@ -116,15 +152,7 @@ final class ClinicalCodecConformanceManifestTests: XCTestCase {
             XCTAssertFalse(item.requiredGates.isEmpty, item.id)
             XCTAssertTrue(allowedExpectedResults.contains(item.expectedResult), item.id)
             XCTAssertTrue(allowedVerdicts.contains(item.supportVerdict), item.id)
-            if item.testPath.hasPrefix("../") {
-                let localGates: Set<String> = ["quick", "fixture", "runtime", "release"]
-                XCTAssertTrue(Set(item.requiredGates).isDisjoint(with: localGates), item.id)
-            } else {
-                XCTAssertTrue(
-                    FileManager.default.fileExists(atPath: packageRoot().appendingPathComponent(item.testPath).path),
-                    item.id
-                )
-            }
+            XCTAssertTrue(FileManager.default.fileExists(atPath: packageRoot().appendingPathComponent(item.testPath).path), item.id)
         }
 
         XCTAssertFalse(manifest.commands.fixture.isEmpty)
@@ -243,6 +271,17 @@ private struct ClinicalCodecConformanceManifest: Decodable {
         let bitsStored: Int
         let signed: Bool
         let frames: Int
+        let rows: Int?
+        let columns: Int?
+        let components: Int?
+        let independentExpectedResults: IndependentExpectedResults?
+    }
+
+    struct IndependentExpectedResults: Decodable {
+        let oracleID: String
+        let artifactPath: String
+        let artifactSHA256: String
+        let fixtureID: String
     }
 
     struct Oracle: Decodable {

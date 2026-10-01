@@ -70,6 +70,118 @@ public struct DicomLookupTable: Equatable, Sendable {
     }
 }
 
+/// Why one VOI LUT Sequence item was rejected (issue #1865 phase A). The
+/// silent profile path simply drops such items; this names the defect so a
+/// caller can log or surface it without failing the whole decode.
+public enum DicomVOILUTValidationError: Error, Equatable, Sendable {
+    /// The item carries no LUT Descriptor (0028,3002).
+    case missingDescriptor
+    /// The descriptor has fewer than three values, a negative entry count,
+    /// or a non-positive bit depth.
+    case malformedDescriptor([Int])
+    /// Bits per entry outside the 8...16 range this build can apply.
+    case unsupportedBitsPerEntry(Int)
+    /// The item carries no LUT Data (0028,3006), or it parsed to nothing.
+    case emptyData
+    /// LUT Data holds fewer entries than the descriptor declares.
+    case entryCountShortfall(declared: Int, actual: Int)
+}
+
+enum DicomVOILUTValidator {
+    static func validate(
+        items: [DicomSequenceItem],
+        littleEndian: Bool
+    ) -> (accepted: [DicomLookupTable], rejected: [DicomVOILUTValidationError]) {
+        var accepted: [DicomLookupTable] = []
+        var rejected: [DicomVOILUTValidationError] = []
+        for item in items {
+            do {
+                accepted.append(try table(from: item.dataSet, littleEndian: littleEndian))
+            } catch let error as DicomVOILUTValidationError {
+                rejected.append(error)
+            } catch {
+                rejected.append(.emptyData)
+            }
+        }
+        return (accepted, rejected)
+    }
+
+    private static func table(
+        from dataSet: DicomDataSet,
+        littleEndian: Bool
+    ) throws -> DicomLookupTable {
+        guard let descriptorValues = dataSet.element(for: .lutDescriptor)?.intValues else {
+            throw DicomVOILUTValidationError.missingDescriptor
+        }
+        guard descriptorValues.count >= 3,
+              let descriptor = DicomLUTDescriptor(
+                storedEntryCount: descriptorValues[0],
+                firstMappedValue: descriptorValues[1],
+                bitsPerEntry: descriptorValues[2]
+              ) else {
+            throw DicomVOILUTValidationError.malformedDescriptor(descriptorValues)
+        }
+        guard (8...16).contains(descriptor.bitsPerEntry) else {
+            throw DicomVOILUTValidationError.unsupportedBitsPerEntry(descriptor.bitsPerEntry)
+        }
+        guard let element = dataSet.element(for: .lutData) else {
+            throw DicomVOILUTValidationError.emptyData
+        }
+        let data = values(from: element, descriptor: descriptor, littleEndian: littleEndian)
+        guard !data.isEmpty else {
+            throw DicomVOILUTValidationError.emptyData
+        }
+        guard data.count >= descriptor.entryCount else {
+            throw DicomVOILUTValidationError.entryCountShortfall(
+                declared: descriptor.entryCount,
+                actual: data.count
+            )
+        }
+        return DicomLookupTable(
+            descriptor: descriptor,
+            explanation: dataSet.string(for: .lutExplanation)?.nilIfBlank,
+            lutType: nil,
+            data: data
+        )
+    }
+
+    static func values(
+        from element: DicomDataElement,
+        descriptor: DicomLUTDescriptor,
+        littleEndian: Bool
+    ) -> [UInt16] {
+        let entryLimit = descriptor.entryCount
+        switch element.value {
+        case .unsignedIntegers(let values):
+            return values.lazy.prefix(entryLimit).compactMap(UInt16.init(exactly:))
+        case .signedIntegers(let values):
+            return values.lazy.prefix(entryLimit).map { UInt16(truncatingIfNeeded: $0) }
+        case .bytes(let data):
+            if descriptor.bitsPerEntry == 8 {
+                if data.count >= entryLimit * MemoryLayout<UInt16>.size {
+                    let lowByteOffset = littleEndian ? 0 : 1
+                    let highByteOffset = littleEndian ? 1 : 0
+                    let usesOneWordPerEntry = (0..<entryLimit).allSatisfy {
+                        data[$0 * MemoryLayout<UInt16>.size + highByteOffset] == 0
+                    }
+                    if usesOneWordPerEntry {
+                        return (0..<entryLimit).map {
+                            UInt16(data[$0 * MemoryLayout<UInt16>.size + lowByteOffset])
+                        }
+                    }
+                }
+                return data.lazy.prefix(entryLimit).map(UInt16.init)
+            }
+            return Data(data.prefix(entryLimit * MemoryLayout<UInt16>.size))
+                .readUInt16Values(littleEndian: littleEndian)
+        default:
+            return element.stringValues.lazy.prefix(entryLimit).compactMap {
+                UInt16($0.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+        }
+    }
+}
+
 public enum DicomDisplayWindowSource: Equatable, Hashable, Sendable {
     case dicom(index: Int)
     case preset(MedicalPreset)
@@ -103,6 +215,7 @@ public struct DicomDisplayTransformProfile: Equatable, Sendable {
     public let modalityLUTs: [DicomLookupTable]
     public let windows: [DicomDisplayWindow]
     public let voiLUTs: [DicomLookupTable]
+    public let presentationLUT: DicomLookupTable?
     public let presentationLUTShape: DicomPresentationLUTShape?
     public let photometricInterpretation: String
     public let suggestedPresets: [MedicalPreset]
@@ -114,7 +227,9 @@ public struct DicomDisplayTransformProfile: Equatable, Sendable {
                 voiLUTs: [DicomLookupTable] = [],
                 presentationLUTShape: DicomPresentationLUTShape? = nil,
                 photometricInterpretation: String = "MONOCHROME2",
-                suggestedPresets: [MedicalPreset] = []) {
+                suggestedPresets: [MedicalPreset] = [],
+                presentationLUT: DicomLookupTable? = nil) {
+        self.presentationLUT = presentationLUT
         self.rescaleParameters = rescaleParameters
         self.rescaleType = rescaleType
         self.modalityLUTs = modalityLUTs
@@ -181,19 +296,25 @@ public struct DicomDisplayTransformProfile: Equatable, Sendable {
         }
 
         guard let normalized else { return nil }
-        let presented = isPresentationInverted ? 1.0 - normalized : normalized
-        let byteValue = Int((min(max(presented, 0.0), 1.0) * 255.0).rounded())
-        return UInt8(max(0, min(255, byteValue)))
+        if let lut = presentationLUT {
+            guard !lut.data.isEmpty else { return nil }
+            let lastIndex = Double(lut.data.count - 1)
+            let scaled = min(max(normalized, 0), 1) * lastIndex
+            let index = Int((isMonochrome1 ? lastIndex - scaled : scaled).rounded())
+            let maximum = (1 << min(lut.descriptor.bitsPerEntry, 16)) - 1
+            return UInt8((min(Int(lut.data[index]), maximum) * 255) / maximum)
+        }
+        let byte = UInt8(Int(min(max(normalized, 0.0), 1.0) * 255.0))
+        return isPresentationInverted ? 255 - byte : byte
     }
 
     private static func normalizedWindowValue(_ value: Double, settings: WindowSettings) -> Double? {
         guard value.isFinite, settings.width > 0 else { return nil }
-        let lower = settings.center - settings.width / 2.0
-        let upper = settings.center + settings.width / 2.0
-        guard upper > lower else { return nil }
-        if value <= lower { return 0.0 }
-        if value >= upper { return 1.0 }
-        return (value - lower) / (upper - lower)
+        if settings.width <= 1 {
+            return value <= settings.center - 0.5 ? 0 : 1
+        }
+        let lower = settings.center - 0.5 - (settings.width - 1) / 2
+        return min(max((value - lower) / (settings.width - 1), 0), 1)
     }
 }
 
@@ -202,6 +323,25 @@ extension DCMDecoder {
         synchronized {
             makeDisplayTransformProfileUnsafe()
         }
+    }
+
+    /// The VOI LUT Sequence (0028,3010), item by item, with a typed reason
+    /// for every rejected item (issue #1865 phase A). Accepted tables are the
+    /// ones `displayTransformProfile.voiLUTs` keeps; the rejections are what
+    /// that silent path drops.
+    public func validatedVOILookupTables() -> (accepted: [DicomLookupTable],
+                                               rejected: [DicomVOILUTValidationError]) {
+        synchronized {
+            validatedVOILookupTablesUnsafe()
+        }
+    }
+
+    private func validatedVOILookupTablesUnsafe() -> (accepted: [DicomLookupTable],
+                                                       rejected: [DicomVOILUTValidationError]) {
+        DicomVOILUTValidator.validate(
+            items: parseDisplaySequenceItemsUnsafe(for: .voiLUTSequence),
+            littleEndian: littleEndian
+        )
     }
 
     public func storedPixelValue(at pixelIndex: Int, frame: Int = 0, sample: Int = 0) -> Int? {
@@ -213,6 +353,26 @@ extension DCMDecoder {
                 sample: sample,
                 descriptor: descriptor
             )
+        }
+    }
+
+    /// Stored pixel values of one frame/sample read under a single lock acquisition. Callers that walk every pixel
+    /// (display rendering, export, statistics) must use this instead of `storedPixelValue(at:)` per pixel, which
+    /// pays the synchronisation cost per sample (measured at ~3 s for a 512x512 frame in #2367).
+    /// Returns nil before allocating when the Int buffer exceeds the output byte budget (256 MiB by default).
+    public func storedPixelValues(frame: Int = 0, sample: Int = 0, maximumOutputBytes: Int = 256 * 1_024 * 1_024) -> [Int]? {
+        synchronized {
+            guard let descriptor = pixelDataDescriptor else { return nil }
+            let pixelsPerFrame = descriptor.rows * descriptor.columns
+            guard (0..<descriptor.numberOfFrames).contains(frame),
+                  (0..<descriptor.samplesPerPixel).contains(sample), maximumOutputBytes >= 0,
+                  pixelsPerFrame <= maximumOutputBytes / MemoryLayout<Int>.stride else { return nil }
+            var values = [Int](repeating: 0, count: pixelsPerFrame)
+            for pixelIndex in 0..<pixelsPerFrame {
+                guard let value = storedPixelValueUnsafe(at: pixelIndex, frame: frame, sample: sample, descriptor: descriptor) else { return nil }
+                values[pixelIndex] = value
+            }
+            return values
         }
     }
 
@@ -278,18 +438,20 @@ extension DCMDecoder {
         let photometric = photometricInterpretation.isEmpty ? "MONOCHROME2" : photometricInterpretation
         let modality = dataSet.string(for: .modality) ?? info(for: .modality)
         let bodyPart = dataSet.string(for: .bodyPartExamined) ?? info(for: .bodyPartExamined)
+        let validatedVOILUTs = validatedVOILookupTablesUnsafe().accepted
 
         return DicomDisplayTransformProfile(
             rescaleParameters: rescaleParametersV2,
             rescaleType: dataSet.string(for: .rescaleType)?.nilIfBlank,
             modalityLUTs: makeLookupTablesUnsafe(sequenceTag: .modalityLUTSequence, typeTag: .modalityLUTType),
             windows: makeDisplayWindowsUnsafe(dataSet: dataSet),
-            voiLUTs: makeLookupTablesUnsafe(sequenceTag: .voiLUTSequence, typeTag: nil),
+            voiLUTs: validatedVOILUTs,
             presentationLUTShape: DicomPresentationLUTShape(
                 dicomValue: dataSet.string(for: .presentationLUTShape) ?? info(for: .presentationLUTShape)
             ),
             photometricInterpretation: photometric,
-            suggestedPresets: DCMWindowingProcessor.suggestPresets(for: modality, bodyPart: bodyPart.nilIfBlank)
+            suggestedPresets: DCMWindowingProcessor.suggestPresets(for: modality, bodyPart: bodyPart.nilIfBlank),
+            presentationLUT: makeLookupTablesUnsafe(sequenceTag: .presentationLUTSequence, typeTag: nil).first
         )
     }
 
@@ -337,49 +499,72 @@ extension DCMDecoder {
         }
 
         let syntax = DicomTransferSyntax(uid: transferSyntaxUID) ?? .explicitVRLittleEndian
+        let valueLengthLimit: DicomSequenceValueParser.ValueLengthLimit?
+        if tag == .voiLUTSequence {
+            valueLengthLimit = Self.voiLUTValueLengthLimit
+        } else {
+            valueLengthLimit = nil
+        }
         return (try? DicomSequenceValueParser.parseItems(
             in: dicomData,
             valueOffset: metadata.offset,
             valueLength: metadata.elementLength,
             littleEndian: littleEndian,
             explicitVR: syntax.isExplicitVR,
-            characterSet: activeCharacterSet
+            characterSet: activeCharacterSet,
+            valueLengthLimit: valueLengthLimit,
+            parentContext: contextualVRContextUnsafe(), parentSequenceTag: tag.rawValue
         )) ?? []
     }
 
-    private func lookupTable(from dataSet: DicomDataSet,
-                             typeTag: DicomTag?) -> DicomLookupTable? {
-        guard let descriptorValues = dataSet.element(for: .lutDescriptor)?.intValues,
+    static func voiLUTValueLengthLimit(
+        tag: Int,
+        vr: DicomVR,
+        precedingElements: [DicomDataElement]
+    ) -> Int? {
+        guard tag == DicomTag.lutData.rawValue,
+              let descriptorValues = precedingElements.last(where: {
+                  $0.tag == DicomTag.lutDescriptor.rawValue
+              })?.intValues,
               descriptorValues.count >= 3,
               let descriptor = DicomLUTDescriptor(
-                storedEntryCount: descriptorValues[0],
-                firstMappedValue: descriptorValues[1],
-                bitsPerEntry: descriptorValues[2]
-              ),
-              let lutData = dataSet.element(for: .lutData).map({ lutDataValues(from: $0) }),
-              !lutData.isEmpty else {
+                  storedEntryCount: descriptorValues[0],
+                  firstMappedValue: descriptorValues[1],
+                  bitsPerEntry: descriptorValues[2]
+              ) else {
             return nil
         }
+        guard (8...16).contains(descriptor.bitsPerEntry) else { return 0 }
 
-        return DicomLookupTable(
-            descriptor: descriptor,
-            explanation: dataSet.string(for: .lutExplanation)?.nilIfBlank,
-            lutType: typeTag.flatMap { dataSet.string(for: $0)?.nilIfBlank },
-            data: lutData
-        )
+        let bytesPerEntry: Int
+        switch vr {
+        case .US, .SS:
+            bytesPerEntry = MemoryLayout<UInt16>.size
+        case .UL, .SL:
+            bytesPerEntry = MemoryLayout<UInt32>.size
+        case .OW:
+            // Standard 8-bit OW data uses one byte per entry, but the DICOM
+            // compatibility note explicitly permits detecting legacy writers
+            // that allocated one word per entry from the Value Length.
+            bytesPerEntry = MemoryLayout<UInt16>.size
+        case .OB, .OV, .UN:
+            bytesPerEntry = descriptor.bitsPerEntry == 8 ? 1 : MemoryLayout<UInt16>.size
+        default:
+            return nil
+        }
+        return descriptor.entryCount * bytesPerEntry
     }
 
-    private func lutDataValues(from element: DicomDataElement) -> [UInt16] {
-        switch element.value {
-        case .unsignedIntegers(let values):
-            return values.compactMap(UInt16.init(exactly:))
-        case .signedIntegers(let values):
-            return values.map { UInt16(truncatingIfNeeded: $0) }
-        case .bytes(let data):
-            return data.readUInt16Values(littleEndian: littleEndian)
-        default:
-            return element.stringValues.compactMap { UInt16($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
-        }
+    func lookupTable(from dataSet: DicomDataSet,
+                             typeTag: DicomTag?) -> DicomLookupTable? {
+        DicomLookupTableParser.lookupTable(from: dataSet, typeTag: typeTag, littleEndian: littleEndian)
+    }
+
+    private func lutDataValues(
+        from element: DicomDataElement,
+        descriptor: DicomLUTDescriptor? = nil
+    ) -> [UInt16] {
+        DicomLookupTableParser.lutDataValues(from: element, descriptor: descriptor, littleEndian: littleEndian)
     }
 
     private func storedPixelValueUnsafe(at pixelIndex: Int,
@@ -471,5 +656,63 @@ private extension String {
     var nilIfBlank: String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "\0")))
         return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+/// LUT item parsing shared by the decoder's display-transform profile and the presentation-state parsers
+/// (issue #2396: per-item Modality LUTs of Blending states).
+enum DicomLookupTableParser {
+    static func lookupTable(from dataSet: DicomDataSet,
+                            typeTag: DicomTag?,
+                            littleEndian: Bool) -> DicomLookupTable? {
+        guard let descriptorValues = dataSet.element(for: .lutDescriptor)?.intValues,
+              descriptorValues.count >= 3,
+              let descriptor = DicomLUTDescriptor(
+                storedEntryCount: descriptorValues[0],
+                firstMappedValue: descriptorValues[1],
+                bitsPerEntry: descriptorValues[2]
+              ),
+              let lutData = dataSet.element(for: .lutData).map({ lutDataValues(from: $0, descriptor: descriptor, littleEndian: littleEndian) }),
+              !lutData.isEmpty else {
+            return nil
+        }
+
+        return DicomLookupTable(
+            descriptor: descriptor,
+            explanation: dataSet.string(for: .lutExplanation)?.nilIfBlank,
+            lutType: typeTag.flatMap { dataSet.string(for: $0)?.nilIfBlank },
+            data: lutData
+        )
+    }
+
+
+    static func lutDataValues(
+        from element: DicomDataElement,
+        descriptor: DicomLUTDescriptor? = nil,
+        littleEndian: Bool
+    ) -> [UInt16] {
+        let entryLimit = descriptor?.entryCount ?? .max
+        switch element.value {
+        case .unsignedIntegers(let values):
+            return values.lazy.prefix(entryLimit).compactMap(UInt16.init(exactly:))
+        case .signedIntegers(let values):
+            return values.lazy.prefix(entryLimit).map { UInt16(truncatingIfNeeded: $0) }
+        case .bytes(let data):
+            if descriptor?.bitsPerEntry == 8 {
+                if data.count >= entryLimit * 2 {
+                    let words = Data(data.prefix(entryLimit * 2)).readUInt16Values(littleEndian: littleEndian)
+                    if words.allSatisfy({ $0 <= 255 }) { return words }
+                }
+                return data.lazy.prefix(entryLimit).map(UInt16.init)
+            }
+            let boundedData = descriptor.map {
+                Data(data.prefix($0.entryCount * MemoryLayout<UInt16>.size))
+            } ?? data
+            return boundedData.readUInt16Values(littleEndian: littleEndian)
+        default:
+            return element.stringValues.lazy.prefix(entryLimit).compactMap {
+                UInt16($0.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+        }
     }
 }

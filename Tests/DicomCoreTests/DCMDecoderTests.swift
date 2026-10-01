@@ -133,6 +133,7 @@ final class DCMDecoderTests: XCTestCase {
 
     // MARK: - Thread Safety Tests
 
+    @MainActor
     func testConcurrentAccess() {
         let decoder = DCMDecoder()
         let expectation = self.expectation(description: "Concurrent access")
@@ -152,6 +153,7 @@ final class DCMDecoderTests: XCTestCase {
         waitForExpectations(timeout: 5.0, handler: nil)
     }
 
+    @MainActor
     func testConcurrentInfoAccess() {
         let decoder = DCMDecoder()
         let expectation = self.expectation(description: "Concurrent info access")

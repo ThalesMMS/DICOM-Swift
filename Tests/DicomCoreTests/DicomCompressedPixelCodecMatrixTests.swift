@@ -23,14 +23,15 @@ final class DicomCompressedPixelCodecMatrixTests: XCTestCase {
         XCTAssertEqual(matrixBySyntax[.jpegLSNearLossless]?.status, .delegated)
         XCTAssertEqual(matrixBySyntax[.jpeg2000Lossless]?.status, .delegated)
         XCTAssertEqual(matrixBySyntax[.jpeg2000]?.status, .delegated)
-        XCTAssertEqual(matrixBySyntax[.jpeg2000Part2MulticomponentLossless]?.status, .delegated)
-        XCTAssertEqual(matrixBySyntax[.jpeg2000Part2Multicomponent]?.status, .delegated)
+        XCTAssertEqual(matrixBySyntax[.jpeg2000Part2MulticomponentLossless]?.status, .experimental)
+        XCTAssertEqual(matrixBySyntax[.jpeg2000Part2Multicomponent]?.status, .experimental)
         XCTAssertEqual(matrixBySyntax[.jpipReferenced]?.status, .streamedOnly)
         XCTAssertEqual(matrixBySyntax[.jpipReferencedDeflate]?.status, .streamedOnly)
         XCTAssertEqual(matrixBySyntax[.htj2kLossless]?.status, .delegated)
         XCTAssertEqual(matrixBySyntax[.htj2kLosslessRPCL]?.status, .delegated)
         XCTAssertEqual(matrixBySyntax[.htj2k]?.status, .delegated)
         XCTAssertEqual(matrixBySyntax[.rleLossless]?.status, .decoded)
+        XCTAssertEqual(matrixBySyntax[.deflatedImageFrameCompression]?.status, .decoded)
 
         for syntax in videoTransferSyntaxes {
             XCTAssertEqual(matrixBySyntax[syntax]?.status, .streamedOnly, "\(syntax) should be streamed-only")
@@ -148,7 +149,7 @@ final class DicomCompressedPixelCodecMatrixTests: XCTestCase {
             samplesPerPixel: 3,
             photometricInterpretation: "MONOCHROME2",
             expectedTexts: [
-                "multi-component volume",
+                "Annex J collections",
                 "Photometric Interpretation=MONOCHROME2",
                 "Samples Per Pixel=3"
             ]

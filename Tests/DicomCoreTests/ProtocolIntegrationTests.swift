@@ -11,22 +11,26 @@ final class ProtocolIntegrationTests: XCTestCase {
     // MARK: - Helpers
 
     /// Creates a decoder factory for StudyDataService that returns real DCMDecoder instances
-    private func makeRealDecoderFactory() -> (String) throws -> DicomDecoderProtocol {
+    private func makeRealDecoderFactory() -> @Sendable (String) throws -> DicomDecoderProtocol {
         return { path in try DCMDecoder(contentsOfFile: path) }
     }
 
     /// Creates a decoder factory for StudyDataService that returns mock instances
-    private func makeMockDecoderFactory(mock: MockDicomDecoder) -> (String) throws -> DicomDecoderProtocol {
+    private func makeMockDecoderFactory(
+        mock: MockDicomDecoder
+    ) -> @Sendable (String) throws -> DicomDecoderProtocol {
         return { _ in mock }
     }
 
     /// Creates a decoder factory for DicomSeriesLoader that returns real DCMDecoder instances
-    private func makeRealSeriesLoaderFactory() -> (String) throws -> DicomDecoderProtocol {
+    private func makeRealSeriesLoaderFactory() -> @Sendable (String) throws -> DicomDecoderProtocol {
         return { path in try DCMDecoder(contentsOfFile: path) }
     }
 
     /// Creates a decoder factory for DicomSeriesLoader that returns mock instances
-    private func makeMockSeriesLoaderFactory(mock: MockDicomDecoder) -> (String) throws -> DicomDecoderProtocol {
+    private func makeMockSeriesLoaderFactory(
+        mock: MockDicomDecoder
+    ) -> @Sendable (String) throws -> DicomDecoderProtocol {
         return { _ in mock }
     }
 
@@ -251,12 +255,15 @@ final class ProtocolIntegrationTests: XCTestCase {
     }
 
     func testFactoryProducingDifferentImplementations() async {
-        var useReal = true
+        let useReal = DicomTestLockedValue(true)
 
         // Factory that alternates between real and mock implementations
-        let alternatingFactory: (String) throws -> DicomDecoderProtocol = { path in
-            defer { useReal.toggle() }
-            if useReal {
+        let alternatingFactory: @Sendable (String) throws -> DicomDecoderProtocol = { path in
+            let shouldUseReal = useReal.withValue { value in
+                defer { value.toggle() }
+                return value
+            }
+            if shouldUseReal {
                 return try DCMDecoder(contentsOfFile: path)
             } else {
                 let mock = MockDicomDecoder()

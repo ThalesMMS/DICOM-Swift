@@ -22,6 +22,9 @@ public enum DicomSeriesLoaderError: Error {
     /// No valid DICOM files found in the specified directory
     case noDicomFiles
 
+    /// The host allocator returned storage with an unexpected byte count.
+    case invalidVoxelAllocationLength(expected: Int, actual: Int)
+
     /// Image has unsupported samples per pixel (only grayscale supported)
     /// - Parameter Int: The actual samples per pixel value
     case unsupportedSamplesPerPixel(Int)
@@ -167,7 +170,8 @@ public struct DicomSeriesLoaderSupportMatrix: Equatable, Sendable {
     /// Supported Bits Allocated values.
     public let supportedBitsAllocated: Set<Int>
 
-    /// Supported Bits Stored values.
+    /// Supported Bits Stored values; a format must also store no more bits than it allocates, from bit 0
+    /// (High Bit = Bits Stored − 1).
     public let supportedBitsStored: Set<Int>
 
     /// Supported Pixel Representation values.
@@ -212,7 +216,8 @@ public struct DicomSeriesLoaderSupportMatrix: Equatable, Sendable {
     /// backend; syntaxes without a backend fail typed per slice.
     public static let standard = DicomSeriesLoaderSupportMatrix(
         supportedBitsAllocated: [8, 16, 32],
-        supportedBitsStored: [8, 16, 32],
+        // Issue #2781: any width up to the allocation — 10, 12 and 14 bits are most CT and MR.
+        supportedBitsStored: Set(1...32),
         supportedPixelRepresentations: [0, 1],
         supportedSamplesPerPixel: [1],
         supportedPhotometricInterpretations: ["MONOCHROME1", "MONOCHROME2"],
@@ -235,6 +240,8 @@ public struct DicomSeriesLoaderSupportMatrix: Equatable, Sendable {
     public func supports(_ format: DicomSeriesLoaderPixelFormat) -> Bool {
         guard supportedBitsAllocated.contains(format.bitsAllocated),
               supportedBitsStored.contains(format.bitsStored),
+              format.bitsStored <= format.bitsAllocated,
+              format.highBit == format.bitsStored - 1,
               supportedPixelRepresentations.contains(format.pixelRepresentation),
               supportedSamplesPerPixel.contains(format.samplesPerPixel),
               supportedPhotometricInterpretations.contains(format.photometricInterpretation),
@@ -350,6 +357,9 @@ public struct DicomSeriesVolume: Sendable {
     /// Per-slice Frame VOI values in the same order as the assembled voxel buffer.
     public let sliceVOIs: [DicomFrameVOI?]
 
+    /// Original Enhanced object/frame identities, in voxel slice order.
+    public let enhancedFrameReferences: [DicomEnhancedFrameCollection.Reference]
+
     public init(voxels: Data,
                 width: Int,
                 height: Int,
@@ -373,7 +383,8 @@ public struct DicomSeriesVolume: Sendable {
                 quantitativeValueProfile: DicomQuantitativeValueProfile = .empty,
                 imageInstances: [DicomSeriesImageInstance] = [],
                 sliceRescaleParameters: [DicomSliceRescaleParameters] = [],
-                sliceVOIs: [DicomFrameVOI?] = []) {
+                sliceVOIs: [DicomFrameVOI?] = [],
+                enhancedFrameReferences: [DicomEnhancedFrameCollection.Reference] = []) {
         self.voxels = voxels
         self.width = width
         self.height = height
@@ -398,6 +409,7 @@ public struct DicomSeriesVolume: Sendable {
         self.imageInstances = imageInstances
         self.sliceRescaleParameters = sliceRescaleParameters
         self.sliceVOIs = sliceVOIs
+        self.enhancedFrameReferences = enhancedFrameReferences
     }
 }
 
@@ -596,12 +608,11 @@ public struct DicomFileResult: Sendable {
 /// ### Creating a Loader
 ///
 /// - ``init()``
-/// - ``init(decoderFactory:)``
 ///
 /// ### Loading Series
 ///
-/// - ``loadSeries(in:progress:)``
-/// - ``loadSeries(in:progress:)-6zq7v``
+/// - ``loadSeries(in:progress:)-17egi``
+/// - ``loadSeries(in:progress:)-7i914``
 /// - ``loadSeriesWithProgress(in:)``
 /// - ``ProgressHandler``
 ///
@@ -614,7 +625,7 @@ public struct DicomFileResult: Sendable {
 ///
 /// - ``DicomSeriesLoaderError``
 ///
-public final class DicomSeriesLoader: DicomSeriesLoaderProtocol {
+public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
     /// Progress callback invoked during volume assembly.
     ///
     /// - Parameters:
@@ -622,18 +633,27 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol {
     ///   - sliceCount: Number of slices copied so far
     ///   - intermediateData: Reserved for future use (currently nil)
     ///   - volume: Partial volume descriptor with metadata
-    public typealias ProgressHandler = (Double, Int, Data?, DicomSeriesVolume) -> Void
+    public typealias ProgressHandler = @Sendable (Double, Int, Data?, DicomSeriesVolume) -> Void
 
     // MARK: - Properties
 
-    let decoderFactory: (String) throws -> DicomDecoderProtocol
+    let decoderFactory: @Sendable (String) throws -> DicomDecoderProtocol
     let logger: LoggerProtocol
+    let allocateVoxelData: @Sendable (Int) throws -> Data
 
     // MARK: - Initialization
 
     /// Required protocol initializer - uses default DCMDecoder.
     public convenience init() {
         self.init(decoderFactory: { path in try DCMDecoder(contentsOfFile: path) })
+    }
+
+    /// Host allocation boundary for the final CPU volume. The allocator must return
+    /// zero-initialized storage of exactly the requested length and retain its accounting.
+    public convenience init(allocateVoxelData: @escaping @Sendable (Int) throws -> Data) {
+        self.init(decoderFactory: { path in try DCMDecoder(contentsOfFile: path) },
+                  logger: DicomLogger.make(subsystem: "com.dicomcore", category: "series-loader"),
+                  allocateVoxelData: allocateVoxelData)
     }
 
     /// Required protocol initializer with injected logging.
@@ -644,7 +664,7 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol {
 
     /// Dependency injection initializer for testing and customization.
     /// - Parameter decoderFactory: Factory closure that creates DicomDecoderProtocol instances from a file path
-    public convenience init(decoderFactory: @escaping (String) throws -> DicomDecoderProtocol) {
+    public convenience init(decoderFactory: @escaping @Sendable (String) throws -> DicomDecoderProtocol) {
         self.init(decoderFactory: decoderFactory,
                   logger: DicomLogger.make(subsystem: "com.dicomcore", category: "series-loader"))
     }
@@ -653,16 +673,24 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol {
     /// - Parameters:
     ///   - decoderFactory: Factory closure that creates DicomDecoderProtocol instances from a file path.
     ///   - logger: Logger used for diagnostics emitted during series loading.
-    public init(decoderFactory: @escaping (String) throws -> DicomDecoderProtocol,
-                logger: LoggerProtocol) {
+    public init(decoderFactory: @escaping @Sendable (String) throws -> DicomDecoderProtocol,
+                logger: LoggerProtocol,
+                allocateVoxelData: @escaping @Sendable (Int) throws -> Data = { Data(count: $0) }) {
         self.decoderFactory = decoderFactory
         self.logger = logger
+        self.allocateVoxelData = { byteCount in
+            let data = try allocateVoxelData(byteCount)
+            guard data.count == byteCount else {
+                throw DicomSeriesLoaderError.invalidVoxelAllocationLength(expected: byteCount, actual: data.count)
+            }
+            return data
+        }
     }
 
     /// Backward-compatible dependency injection initializer.
     /// - Parameter decoderFactory: Factory closure that creates decoders without a path argument.
     @available(*, deprecated, message: "Use init(decoderFactory: (String) throws -> DicomDecoderProtocol) instead.")
-    public convenience init(decoderFactory: @escaping () -> DicomDecoderProtocol) {
+    public convenience init(decoderFactory: @escaping @Sendable () -> DicomDecoderProtocol) {
         self.init(decoderFactory: { path in
             let decoder = decoderFactory()
             decoder.setDicomFilename(path)
@@ -763,6 +791,8 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol {
                 hasWaveformSequence = false
             }
             if DicomSRDocument.structuredReportSOPClassUIDs.contains(sopClassUID) ||
+                sopClassUID == DicomSpatialRegistrationDocument.storageSOPClassUID ||
+                DicomGrayscalePresentationState.supportedStorageSOPClassUIDs.contains(sopClassUID) ||
                 DicomEncapsulatedDocument.supportedStorageSOPClassUIDs.contains(sopClassUID) ||
                 DicomWaveform.supportedStorageSOPClassUIDs.contains(sopClassUID) ||
                 DicomVideo.supportedStorageSOPClassUIDs.contains(sopClassUID) ||
@@ -794,6 +824,11 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol {
                 }
 
                 origin = decoder.imagePosition
+                // Issue #2813: Secondary Capture, NM and US spacing follows their SOP Class's own attributes.
+                if let dataSet = (decoder as? DCMDecoder)?.dataSet,
+                   let geometry = DicomSOPClassGeometry(dataSet: dataSet, sopClassUID: sopClassUID) {
+                    spacing = geometry.spacing
+                }
                 rescaleSlope = decoder.rescaleParametersV2.slope
                 rescaleIntercept = decoder.rescaleParametersV2.intercept
                 pixelRepresentation = decoder.pixelRepresentationTagValue
@@ -932,7 +967,7 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol {
 
         let depth = slices.count
         let sliceVoxelCount = width * height
-        var voxelData = Data(count: sliceVoxelCount * depth * MemoryLayout<Int16>.size)
+        var voxelData = try allocateVoxelData(sliceVoxelCount * depth * MemoryLayout<Int16>.size)
 
         // Provide a lightweight volume descriptor for progress callbacks.
         let originForVolume = slices.first?.position ?? origin ?? SIMD3<Double>(repeating: 0)

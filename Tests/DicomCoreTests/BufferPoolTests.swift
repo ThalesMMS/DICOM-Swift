@@ -238,13 +238,25 @@ final class BufferPoolTests: XCTestCase {
         XCTAssertEqual(buffer.count, 262144, "Should round up to medium bucket")
     }
 
-    func testOversizedRequestUsesXLargeBucket() {
-        // Request larger than 2048×2048, should use xlarge bucket
+    /// Issue #2849: above the largest bucket the buffer is exact, never the
+    /// largest bucket's shorter one, and it does not return to the pool.
+    func testOversizedRequestGetsAnExactUnpooledBuffer() {
         let pool = BufferPool.shared
-        let buffer = pool.acquire(type: [UInt16].self, count: 5000 * 5000)
+        let count = 2964 * 2364
+        let buffer = pool.acquire(type: [Float].self, count: count)
+        XCTAssertEqual(buffer.count, count)
+        XCTAssertEqual(pool.acquireData(count: count).count, count)
+        pool.release(buffer)
+        XCTAssertEqual(pool.statistics.currentPoolSize, 0, "an oversized buffer is not pooled")
+    }
 
-        XCTAssertGreaterThanOrEqual(buffer.count, 2048 * 2048, "Should use xlarge bucket")
-        XCTAssertEqual(buffer.count, 4194304, "Should be xlarge bucket size")
+    /// Issue #2849: a buffer of no bucket's exact size is not pooled, so a
+    /// later request never receives one shorter than its bucket.
+    func testBufferOfNoBucketSizeIsNotPooled() {
+        let pool = BufferPool.shared
+        pool.release([UInt16](repeating: 0, count: 70_000))
+        XCTAssertEqual(pool.statistics.currentPoolSize, 0)
+        XCTAssertEqual(pool.acquire(type: [UInt16].self, count: 200_000).count, 262_144)
     }
 
     // MARK: - Type-Specific Pool Isolation Tests
@@ -625,6 +637,7 @@ final class BufferPoolTests: XCTestCase {
 
     // MARK: - Concurrent Access Tests
 
+    @MainActor
     func testConcurrentAcquireRelease() {
         let pool = BufferPool.shared
         let expectation = self.expectation(description: "Concurrent operations complete")
@@ -651,6 +664,7 @@ final class BufferPoolTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(stats.currentPoolSize, 0, "Pool size should be non-negative")
     }
 
+    @MainActor
     func testConcurrentStatisticsAccess() {
         let pool = BufferPool.shared
         let expectation = self.expectation(description: "Concurrent statistics access")
@@ -674,6 +688,7 @@ final class BufferPoolTests: XCTestCase {
         }
     }
 
+    @MainActor
     func testConcurrentClearOperations() {
         let pool = BufferPool.shared
         let expectation = self.expectation(description: "Concurrent clear operations")

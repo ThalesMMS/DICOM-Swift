@@ -2,6 +2,45 @@ import XCTest
 @testable import DicomCore
 
 final class DicomColorPixelDataTests: XCTestCase {
+    func test_decodedPaletteIndices_ignoreSourceByteOrder() throws {
+        let url = try makeTemporaryDICOM(
+            photometricInterpretation: "PALETTE COLOR", samplesPerPixel: 1, width: 3, height: 1,
+            bitsAllocated: 16, pixelBytes: [0, 0, 1, 0, 2, 0], paletteDescriptor: [3, 0, 16],
+            redPalette: [0, 32768, 65535], greenPalette: [65535, 0, 32768], bluePalette: [0, 65535, 32768])
+        defer { try? FileManager.default.removeItem(at: url) }
+        let decoder = try DCMDecoder(contentsOf: url)
+        let metadata = try DicomDecodedFrameReader(decoder: decoder).frame(at: 0).metadata
+        let frame = DicomDecodedFrame(index: 0, pixels: .gray16([0, 1, 2]), metadata: metadata)
+        let expected = try decoder.displayRGBPixelBuffer().rgbData
+        // Palette metadata is already parsed. A big-endian source still produces little-endian decoded samples.
+        decoder.littleEndian = false
+        XCTAssertEqual(try decoder.displayRGB8(decodedFrame: frame), expected)
+    }
+
+    func test_segmentedPaletteColor2x2_rendersExactRGBBytes() throws {
+        var data = Data(count: 128)
+        data.append(contentsOf: "DICM".utf8)
+        appendUS(&data, group: 0x0028, element: 0x0002, value: 1)
+        appendCS(&data, group: 0x0028, element: 0x0004, value: "PALETTE COLOR")
+        appendUS(&data, group: 0x0028, element: 0x0010, value: 2)
+        appendUS(&data, group: 0x0028, element: 0x0011, value: 2)
+        appendUS(&data, group: 0x0028, element: 0x0100, value: 8)
+        appendUS(&data, group: 0x0028, element: 0x0101, value: 8)
+        appendUS(&data, group: 0x0028, element: 0x0102, value: 7)
+        appendUS(&data, group: 0x0028, element: 0x0103, value: 0)
+        for tag: UInt16 in [0x1101, 0x1102, 0x1103] {
+            appendUSValues(&data, group: 0x0028, element: tag, values: [4, 0, 16])
+        }
+        appendOWValues(&data, group: 0x0028, element: 0x1221, values: [0, 1, 0, 1, 3, 65535])
+        appendOWValues(&data, group: 0x0028, element: 0x1222, values: [0, 1, 65535, 1, 3, 0])
+        appendOWValues(&data, group: 0x0028, element: 0x1223, values: [0, 2, 0, 65535, 2, 1, 0, 0])
+        appendBinary(&data, group: 0x7FE0, element: 0x0010, vr: "OB", bytes: [0, 1, 2, 3])
+        let buffer = try DCMDecoder(data: data).displayRGBPixelBuffer()
+        XCTAssertEqual(buffer.width, 2)
+        XCTAssertEqual(buffer.height, 2)
+        XCTAssertEqual(buffer.rgbData, Data([0, 255, 0, 85, 170, 255, 170, 85, 0, 255, 0, 255]))
+    }
+
     func testDisplayConversionMatrixDocumentsSupportedAndUnsupportedPhotometricRows() throws {
         let rows = Dictionary(
             uniqueKeysWithValues: DicomColorDisplayConversionMatrix.standard.map {

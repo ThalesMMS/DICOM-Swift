@@ -108,17 +108,20 @@ public struct DicomRenderedBitmap: Equatable, Sendable {
 public struct DicomImagePreprocessOptions: Sendable {
     public let frameIndex: Int
     public let displaySelection: DicomDisplaySelection?
+    public let displayTransformProfile: DicomDisplayTransformProfile?
     public let outputSize: DicomImageSize?
     public let annotations: [DicomAnnotationOverlay]
 
     public init(
         frameIndex: Int = 0,
         displaySelection: DicomDisplaySelection? = nil,
+        displayTransformProfile: DicomDisplayTransformProfile? = nil,
         outputSize: DicomImageSize? = nil,
         annotations: [DicomAnnotationOverlay] = []
     ) {
         self.frameIndex = frameIndex
         self.displaySelection = displaySelection
+        self.displayTransformProfile = displayTransformProfile
         self.outputSize = outputSize
         self.annotations = annotations
     }
@@ -190,23 +193,41 @@ public struct DicomImagePreprocessor {
         }
 
         let pixelsPerFrame = descriptor.rows * descriptor.columns
-        let profile = decoder.displayTransformProfile
+        let profile = options.displayTransformProfile ?? decoder.displayTransformProfile
         let selection = options.displaySelection
             ?? profile.defaultSelection
             ?? decoder.calculatePercentileWindow(lower: 0.01, upper: 0.99).map { .customWindow($0) }
 
+        // Issue #1906: at most 2^BitsStored distinct stored values exist, so
+        // the whole presentation chain — Modality LUT/rescale, VOI,
+        // presentation inversion, the UInt8 rounding — is evaluated once per
+        // value into a cached table instead of once per pixel. The table is
+        // built FROM `displayValue`, so it answers exactly what the scalar
+        // path would, nil included; the scalar path remains the fallback for
+        // configurations no table can represent.
+        let displayLUT = DicomDisplayLUTCache.shared.table(
+            profile: profile,
+            selection: selection,
+            bitsStored: descriptor.bitsStored,
+            isSigned: descriptor.pixelRepresentation == 1
+        )
+
         var rgb = Data()
         rgb.reserveCapacity(pixelsPerFrame * 3)
 
+        guard let storedValues = decoder.storedPixelValues(frame: options.frameIndex, sample: 0), storedValues.count == pixelsPerFrame else {
+            throw DicomImagePreprocessingError.displayTransformFailed(pixelIndex: 0)
+        }
         for pixelIndex in 0..<pixelsPerFrame {
-            guard let storedValue = decoder.storedPixelValue(
-                at: pixelIndex,
-                frame: options.frameIndex,
-                sample: 0
-            ), let displayValue = profile.displayValue(
-                forStoredPixelValue: Double(storedValue),
-                selection: selection
-            ) else {
+            let storedValue = storedValues[pixelIndex]
+            let displayValue: UInt8?
+            if let displayLUT {
+                displayValue = displayLUT.displayValue(forStoredPixelValue: storedValue)
+            } else {
+                displayValue = profile.displayValue(forStoredPixelValue: Double(storedValue),
+                                                    selection: selection)
+            }
+            guard let displayValue else {
                 throw DicomImagePreprocessingError.displayTransformFailed(pixelIndex: pixelIndex)
             }
             rgb.append(displayValue)

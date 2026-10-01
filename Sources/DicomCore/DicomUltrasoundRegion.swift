@@ -73,6 +73,11 @@ public struct DicomUltrasoundRegion: Equatable, Sendable {
     public let physicalUnitY: DicomUltrasoundPhysicalUnit
     public let physicalDeltaX: Double?
     public let physicalDeltaY: Double?
+    public let regionFlags: UInt32
+    public let referencePixelX0: Int
+    public let referencePixelY0: Int
+    public let referencePixelPhysicalValueX: Double
+    public let referencePixelPhysicalValueY: Double
 
     public init(
         minX0: Int,
@@ -84,7 +89,12 @@ public struct DicomUltrasoundRegion: Equatable, Sendable {
         physicalUnitX: DicomUltrasoundPhysicalUnit,
         physicalUnitY: DicomUltrasoundPhysicalUnit,
         physicalDeltaX: Double?,
-        physicalDeltaY: Double?
+        physicalDeltaY: Double?,
+        regionFlags: UInt32 = 0,
+        referencePixelX0: Int = 0,
+        referencePixelY0: Int = 0,
+        referencePixelPhysicalValueX: Double = 0,
+        referencePixelPhysicalValueY: Double = 0
     ) {
         self.minX0 = minX0
         self.minY0 = minY0
@@ -96,19 +106,56 @@ public struct DicomUltrasoundRegion: Equatable, Sendable {
         self.physicalUnitY = physicalUnitY
         self.physicalDeltaX = physicalDeltaX
         self.physicalDeltaY = physicalDeltaY
+        self.regionFlags = regionFlags
+        self.referencePixelX0 = referencePixelX0
+        self.referencePixelY0 = referencePixelY0
+        self.referencePixelPhysicalValueX = referencePixelPhysicalValueX
+        self.referencePixelPhysicalValueY = referencePixelPhysicalValueY
     }
 }
 
 public extension DCMDecoder {
     /// Returns valid entries from Sequence of Ultrasound Regions (0018,6011).
     func ultrasoundRegions() -> [DicomUltrasoundRegion] {
-        dataSet.sequenceItems(for: 0x00186011).compactMap { item in
-            Self.ultrasoundRegion(from: item.dataSet)
+        Self.ultrasoundRegions(in: dataSet)
+    }
+
+    /// Resolves frame-scoped regions without leaking metadata from a sibling frame.
+    func ultrasoundRegions(forFrame frameIndex: Int) -> [DicomUltrasoundRegion] {
+        guard frameIndex >= 0 else { return [] }
+        let perFrameItems = dataSet.sequenceItems(for: .perFrameFunctionalGroupsSequence)
+        if perFrameItems.indices.contains(frameIndex) {
+            let regions = Self.findUltrasoundRegions(in: perFrameItems[frameIndex].dataSet)
+            if !regions.isEmpty { return regions }
         }
+        if let shared = dataSet.sequenceItems(for: .sharedFunctionalGroupsSequence).first {
+            let regions = Self.findUltrasoundRegions(in: shared.dataSet)
+            if !regions.isEmpty { return regions }
+        }
+        return ultrasoundRegions()
     }
 }
 
-private extension DCMDecoder {
+extension DCMDecoder {
+    private static func ultrasoundRegions(in dataSet: DicomDataSet) -> [DicomUltrasoundRegion] {
+        dataSet.sequenceItems(for: 0x00186011).compactMap { item in
+            ultrasoundRegion(from: item.dataSet)
+        }
+    }
+
+    private static func findUltrasoundRegions(in dataSet: DicomDataSet, depth: Int = 0) -> [DicomUltrasoundRegion] {
+        let direct = ultrasoundRegions(in: dataSet)
+        guard direct.isEmpty, depth < 4 else { return direct }
+        for element in dataSet.elements {
+            for item in element.sequenceItems {
+                let nested = findUltrasoundRegions(in: item.dataSet, depth: depth + 1)
+                if !nested.isEmpty { return nested }
+            }
+        }
+        return []
+    }
+
+    /// Shared with the original-byte IOD validator; rendering and qualification use the same region bounds.
     static func ultrasoundRegion(from dataSet: DicomDataSet) -> DicomUltrasoundRegion? {
         guard let minX0 = dataSet.int(for: 0x00186018),
               let minY0 = dataSet.int(for: 0x0018601A),
@@ -131,7 +178,12 @@ private extension DCMDecoder {
             physicalUnitX: DicomUltrasoundPhysicalUnit(code: dataSet.int(for: 0x00186024) ?? 0),
             physicalUnitY: DicomUltrasoundPhysicalUnit(code: dataSet.int(for: 0x00186026) ?? 0),
             physicalDeltaX: dataSet.float(for: 0x0018602C),
-            physicalDeltaY: dataSet.float(for: 0x0018602E)
+            physicalDeltaY: dataSet.float(for: 0x0018602E),
+            regionFlags: UInt32(clamping: dataSet.int(for: 0x00186016) ?? 0),
+            referencePixelX0: dataSet.int(for: 0x00186020) ?? 0,
+            referencePixelY0: dataSet.int(for: 0x00186022) ?? 0,
+            referencePixelPhysicalValueX: dataSet.float(for: 0x00186028) ?? 0,
+            referencePixelPhysicalValueY: dataSet.float(for: 0x0018602A) ?? 0
         )
     }
 }

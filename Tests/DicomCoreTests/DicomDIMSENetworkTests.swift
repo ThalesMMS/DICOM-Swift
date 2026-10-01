@@ -3,6 +3,22 @@ import Foundation
 import XCTest
 
 final class DicomDIMSENetworkTests: XCTestCase {
+    func test_moveCommand_encodesElementsInTagOrder() throws {
+        let command = DicomDIMSECommandSet(commandField: 0x0021, messageID: 1,
+                                           moveDestination: "VIEWER", priority: 0)
+        let data = try command.encoded()
+        var tags: [UInt32] = []
+        var offset = 0
+        while offset < data.count {
+            let element = data.dicomInteger(at: offset + 2, as: UInt16.self, littleEndian: true)
+            tags.append(UInt32(element))
+            let length = data.dicomInteger(at: offset + 4, as: UInt32.self, littleEndian: true)
+            offset += 8 + Int(length)
+        }
+        XCTAssertEqual(tags, [0, 0x0100, 0x0110, 0x0600, 0x0700, 0x0800])
+        XCTAssertEqual(try DicomDIMSECommandSet.decode(data), command)
+    }
+
     func testAssociationRequestRoundTripPreservesPresentationContexts() throws {
         let request = DicomAssociationRequest(
             calledAETitle: "SERVER_AE",
@@ -313,5 +329,90 @@ private final class StaticResponseTransport: DicomAssociationTransport {
         }
         didRead = true
         return response
+    }
+}
+
+extension DicomDIMSENetworkTests {
+    func test_extendedNegotiation_roundTripsAndAcceptorLimitsCapabilities() throws {
+        let uid = DicomNetworkUID.studyRootQueryRetrieveFind
+        let extended = DicomSOPClassExtendedNegotiation(sopClassUID: uid, relationalQueries: true,
+                                                        dateTimeMatching: true, fuzzyPersonNameMatching: true)
+        let request = DicomAssociationRequest(calledAETitle: "SCP", callingAETitle: "SCU",
+            presentationContexts: [.init(id: 1, abstractSyntaxUID: uid, transferSyntaxes: [.explicitVRLittleEndian])],
+            maximumPDULength: 65536, roleSelections: [.init(sopClassUID: uid, scuRole: true, scpRole: true)],
+            asynchronousOperationsWindow: .init(maximumInvoked: 0, maximumPerformed: 4),
+            extendedNegotiations: [extended], commonExtendedNegotiations: [
+                .init(sopClassUID: uid, serviceClassUID: "1.2.840.10008.4.2", relatedGeneralSOPClassUIDs: [uid])
+            ])
+        XCTAssertEqual(try DicomPDUCodec.decode(DicomPDUCodec.encode(.associationRequest(request))), .associationRequest(request))
+        var accept = DicomAssociationNegotiator.accept(request, supportedAbstractSyntaxUIDs: [uid],
+            preferredTransferSyntaxes: [.explicitVRLittleEndian], maximumPDULength: 1024,
+            supportedAsynchronousOperationsWindow: .init(maximumInvoked: 4, maximumPerformed: 0),
+            supportedExtendedNegotiations: [.init(sopClassUID: uid, relationalQueries: true)])
+        XCTAssertEqual(accept.maximumPDULength, 1024)
+        XCTAssertEqual(accept.asynchronousOperationsWindow, .init(maximumInvoked: 4, maximumPerformed: 4))
+        XCTAssertEqual(accept.roleSelections, [.init(sopClassUID: uid, scuRole: true, scpRole: false)])
+        XCTAssertEqual(accept.extendedNegotiations.first?.serviceClassApplicationInformation, Data([1, 0, 0, 0, 0]))
+        accept.userIdentityServerResponse = .init(data: Data([0, 1, 255]))
+        XCTAssertEqual(try DicomPDUCodec.decode(DicomPDUCodec.encode(.associationAccept(accept))), .associationAccept(accept))
+    }
+
+    func test_duplicatePresentationContextIDs_areRejected() throws {
+        let context = DicomPresentationContextRequest(id: 1, abstractSyntaxUID: DicomNetworkUID.verificationSOPClass,
+                                                      transferSyntaxes: [.explicitVRLittleEndian])
+        let request = DicomAssociationRequest(calledAETitle: "SCP", callingAETitle: "SCU", presentationContexts: [context, context])
+        XCTAssertThrowsError(try DicomPDUCodec.encode(.associationRequest(request)))
+    }
+
+    func test_identityResponse_rejectsPayloadAndEnclosingItemOverflow() throws {
+        var accept = DicomAssociationAccept(calledAETitle: "SCP", callingAETitle: "SCU", presentationContexts: [
+            .init(id: 1, result: .acceptance, transferSyntaxUID: DicomTransferSyntax.explicitVRLittleEndian.rawValue)
+        ])
+        for count in [65_529, 65_534, 65_536] {
+            accept.userIdentityServerResponse = .init(data: Data(repeating: 1, count: count))
+            XCTAssertThrowsError(try DicomPDUCodec.encode(.associationAccept(accept))) { error in
+                XCTAssertEqual(error as? DicomNetworkError,
+                    .malformedCommandSet("User Identity response exceeds the association item length."))
+            }
+        }
+        accept.userIdentityServerResponse = .init(data: Data(repeating: 1, count: 60_000))
+        XCTAssertEqual(try DicomPDUCodec.decode(DicomPDUCodec.encode(.associationAccept(accept))), .associationAccept(accept))
+    }
+
+    func test_outstandingRegistry_pendingCancelledAndReusedIDsKeepCount() throws {
+        let registry = DicomDIMSEOutstandingOperations()
+        let request = DicomDIMSECommandSet(commandField: DicomDIMSECommandField.cFindRQ, messageID: 1)
+        try registry.register(request)
+        try registry.correlate(.init(commandField: DicomDIMSECommandField.cFindRSP,
+                                    messageIDBeingRespondedTo: 1, status: 0xFF00))
+        XCTAssertEqual(registry.outstandingCount, 1)
+        XCTAssertThrowsError(try registry.register(request))
+        let cancelled = DicomDIMSECommandSet(commandField: DicomDIMSECommandField.cFindRSP,
+                                            messageIDBeingRespondedTo: 1, status: 0xFE00)
+        try registry.correlate(cancelled)
+        XCTAssertEqual(registry.outstandingCount, 0)
+        XCTAssertThrowsError(try registry.correlate(cancelled))
+        XCTAssertEqual(registry.outstandingCount, 0)
+        try registry.register(request)
+        XCTAssertEqual(registry.outstandingCount, 1)
+    }
+
+    func test_outstandingRegistry_correlatesOutOfOrderAndRejectsMissingStatus() throws {
+        let registry = DicomDIMSEOutstandingOperations(window: .init(maximumInvoked: 4))
+        for id: UInt16 in 1...4 {
+            try registry.register(.init(commandField: DicomDIMSECommandField.cStoreRQ, messageID: id))
+        }
+        XCTAssertEqual(registry.outstandingCount, 4)
+        XCTAssertThrowsError(try registry.register(.init(commandField: DicomDIMSECommandField.cEchoRQ, messageID: 5)))
+        XCTAssertThrowsError(try registry.correlate(.init(commandField: DicomDIMSECommandField.cStoreRSP,
+                                                         messageIDBeingRespondedTo: 5, status: 0)))
+        XCTAssertThrowsError(try registry.correlate(.init(commandField: DicomDIMSECommandField.cStoreRSP,
+                                                         messageIDBeingRespondedTo: 4)))
+        for id: UInt16 in [4, 2, 1, 3] {
+            try registry.correlate(.init(commandField: DicomDIMSECommandField.cStoreRSP,
+                                         messageIDBeingRespondedTo: id, status: 0))
+        }
+        XCTAssertEqual(registry.outstandingCount, 0)
+        XCTAssertEqual(registry.state(for: 4), .final)
     }
 }

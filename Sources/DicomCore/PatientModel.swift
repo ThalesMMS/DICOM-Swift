@@ -54,17 +54,6 @@ import Foundation
 /// - ``sc``
 /// - ``unknown``
 ///
-/// ### Factory Methods
-///
-/// - ``from(string:)``
-///
-/// ### Display Properties
-///
-/// - ``displayName``
-/// - ``iconName``
-/// - ``rawStringValue``
-/// - ``associatedModality``
-///
 @objc public enum DICOMModality: Int, CaseIterable, Codable, Sendable {
     /// Computed Tomography
     case ct = 0
@@ -225,16 +214,6 @@ import Foundation
 /// - ``other``
 /// - ``unknown``
 ///
-/// ### Factory Methods
-///
-/// - ``from(string:)``
-///
-/// ### Display Properties
-///
-/// - ``displayName``
-/// - ``iconName``
-/// - ``rawStringValue``
-///
 @objc public enum PatientSex: Int, CaseIterable, Codable, Sendable {
     /// Male patient
     case male = 0
@@ -379,8 +358,7 @@ import Foundation
 ///
 /// ### Creating a Patient Model
 ///
-/// - ``init(patientName:patientID:studyInstanceUID:modality:)``
-/// - ``init(patientName:patientID:patientBirthDate:patientSex:patientAge:patientWeight:patientSize:studyInstanceUID:studyDate:studyTime:studyDescription:accessionNumber:referringPhysicianName:performingPhysicianName:institutionName:modality:bodyPartExamined:manufacturerModelName:protocolName:stationName:seriesNumber:acquisitionNumber:imageNumber:)``
+/// - ``init(patientName:patientID:patientBirthDate:patientSex:patientAge:patientWeight:patientSize:studyInstanceUID:studyDate:studyTime:studyDescription:accessionNumber:modality:bodyPartExamined:seriesDescription:institutionName:institutionAddress:stationName:numberOfImages:fileSize:createdAt:lastAccessedAt:)``
 ///
 /// ### Patient Demographics
 ///
@@ -404,21 +382,13 @@ import Foundation
 ///
 /// - ``modality``
 /// - ``bodyPartExamined``
-/// - ``seriesNumber``
-/// - ``acquisitionNumber``
-/// - ``imageNumber``
+/// - ``seriesDescription``
 ///
-/// ### Medical Personnel
-///
-/// - ``referringPhysicianName``
-/// - ``performingPhysicianName``
-///
-/// ### Equipment Information
+/// ### Institution Information
 ///
 /// - ``institutionName``
-/// - ``manufacturerModelName``
+/// - ``institutionAddress``
 /// - ``stationName``
-/// - ``protocolName``
 ///
 @objc(SwiftPatientModel)
 public final class PatientModel: NSObject, Codable, Identifiable, @unchecked Sendable {

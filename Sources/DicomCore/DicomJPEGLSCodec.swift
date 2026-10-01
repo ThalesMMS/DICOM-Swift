@@ -16,7 +16,11 @@ internal enum DicomJPEGLSCodec {
     }
 
     static func decode(_ data: Data) throws -> DecodedFrame {
-        let library = try CharLSLibrary.shared.require()
+        try decode(data, environment: ProcessInfo.processInfo.environment)
+    }
+
+    static func decode(_ data: Data, environment: [String: String]) throws -> DecodedFrame {
+        let library = try CharLSLibrary.library(for: environment).require()
         guard let decoder = library.decoderCreate() else {
             throw DICOMError.imageProcessingFailed(operation: "JPEG-LS decode", reason: "CharLS decoder allocation failed")
         }
@@ -132,7 +136,8 @@ internal enum DicomJPEGLSCodec {
         height: Int,
         bitsPerSample: Int,
         componentCount: Int = 1,
-        nearLossless: Int = 0
+        nearLossless: Int = 0,
+        interleaveMode: Int? = nil
     ) throws -> Data {
         try encode(
             bytes: bytes,
@@ -140,7 +145,9 @@ internal enum DicomJPEGLSCodec {
             height: height,
             bitsPerSample: bitsPerSample,
             componentCount: componentCount,
-            nearLossless: nearLossless
+            nearLossless: nearLossless,
+            interleaveMode: interleaveMode,
+            environment: ProcessInfo.processInfo.environment
         )
     }
 
@@ -154,7 +161,28 @@ internal enum DicomJPEGLSCodec {
         componentCount: Int = 1,
         nearLossless: Int = 0
     ) throws -> Data {
-        let library = try CharLSLibrary.shared.require()
+        try encode(
+            bytes: bytes,
+            width: width,
+            height: height,
+            bitsPerSample: bitsPerSample,
+            componentCount: componentCount,
+            nearLossless: nearLossless,
+            environment: ProcessInfo.processInfo.environment
+        )
+    }
+
+    static func encode(
+        bytes: Data,
+        width: Int,
+        height: Int,
+        bitsPerSample: Int,
+        componentCount: Int = 1,
+        nearLossless: Int = 0,
+        interleaveMode: Int? = nil,
+        environment: [String: String]
+    ) throws -> Data {
+        let library = try CharLSLibrary.library(for: environment).require()
         guard let encoder = library.encoderCreate() else {
             throw DICOMError.imageProcessingFailed(operation: "JPEG-LS encode", reason: "CharLS encoder allocation failed")
         }
@@ -173,7 +201,8 @@ internal enum DicomJPEGLSCodec {
             )
         }
         try library.check(library.encoderSetNearLossless(encoder, Int32(nearLossless)), operation: "set JPEG-LS NEAR parameter")
-        try library.check(library.encoderSetInterleaveMode(encoder, componentCount == 1 ? 0 : 2), operation: "set JPEG-LS interleave mode")
+        // CharLS expects the source samples in the interleave order it is told (0 = planes, 1 = lines, 2 = pixels).
+        try library.check(library.encoderSetInterleaveMode(encoder, Int32(interleaveMode ?? (componentCount == 1 ? 0 : 2))), operation: "set JPEG-LS interleave mode")
 
         var estimatedSize = 0
         try library.check(library.encoderGetEstimatedDestinationSize(encoder, &estimatedSize), operation: "estimate JPEG-LS size")
@@ -219,8 +248,15 @@ private struct CharLSFrameInfo {
     var componentCount: Int32 = 0
 }
 
-private final class CharLSLibrary {
+/// The dynamic-library handle and resolved function pointers are immutable after initialization.
+private final class CharLSLibrary: @unchecked Sendable {
     static let shared = CharLSLibrary()
+
+    static func library(for environment: [String: String]) -> CharLSLibrary {
+        environment == ProcessInfo.processInfo.environment
+            ? shared
+            : CharLSLibrary(environment: environment)
+    }
 
     typealias DecoderCreate = @convention(c) () -> OpaquePointer?
     typealias DecoderDestroy = @convention(c) (OpaquePointer?) -> Void
@@ -273,8 +309,12 @@ private final class CharLSLibrary {
         runtimeStatus.isAvailable && missingSymbols.isEmpty
     }
 
-    private init() {
-        let resolution = DicomCodecRuntimePreflight.resolve(for: .charLS, retainHandle: true)
+    private init(environment: [String: String] = ProcessInfo.processInfo.environment) {
+        let resolution = DicomCodecRuntimePreflight.resolve(
+            for: .charLS,
+            environment: environment,
+            retainHandle: true
+        )
         handle = resolution.handle
         runtimeStatus = resolution.status
         var unresolvedSymbols: [String] = []

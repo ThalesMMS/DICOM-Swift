@@ -105,9 +105,36 @@ struct InspectCommand: AsyncParsableCommand {
     )
     var tags: String?
 
-    /// Factory used to create decoders, overridable in tests.
-    static var makeDecoder: (String) async throws -> any DicomDecoderProtocol = { path in
+    @Flag(name: .long, help: "Read metadata through bounded byte ranges without loading Pixel Data")
+    var bounded = false
+
+    @Flag(name: .long, help: "Use anonymous mapped range buffers with --bounded; file reads are still counted as copies")
+    var mappedRanges = false
+
+    @Flag(name: .long, help: "Include byte-read, copy and latency metrics with --bounded")
+    var readMetrics = false
+
+    @Option(name: .long, help: "Maximum metadata bytes for --bounded (default: 33554432)")
+    var metadataByteLimit = 32 * 1024 * 1024
+
+    @Option(name: .long, help: "Metadata validation with --bounded: legacy, strict or recover (default: legacy)")
+    var readMode: MetadataReadMode = .legacy
+
+    typealias DecoderFactory = @Sendable (String) async throws -> any DicomDecoderProtocol
+
+    private static let defaultDecoderFactory: DecoderFactory = { path in
         try await DCMDecoder(contentsOfFile: path)
+    }
+    private static let decoderFactory = LockedValue<DecoderFactory>(defaultDecoderFactory)
+
+    /// Replaces the decoder factory for a scoped test and returns the previous value.
+    @discardableResult
+    static func replaceDecoderFactory(_ factory: @escaping DecoderFactory) -> DecoderFactory {
+        decoderFactory.replace(with: factory)
+    }
+
+    static func resetDecoderFactory() {
+        decoderFactory.replace(with: defaultDecoderFactory)
     }
 
     // MARK: - Execution
@@ -125,10 +152,19 @@ struct InspectCommand: AsyncParsableCommand {
             )
         }
 
+        if bounded {
+            let metadata = try await extractBoundedMetadata(from: fileURL)
+            print(try formatter.formatMetadata(metadata, title: "DICOM Metadata: \(fileURL.lastPathComponent)"))
+            return
+        }
+        guard !mappedRanges, !readMetrics, readMode == .legacy else {
+            throw ValidationError("--mapped-ranges, --read-metrics and validated --read-mode require --bounded")
+        }
+
         // Load DICOM file
         let decoder: any DicomDecoderProtocol
         do {
-            decoder = try await Self.makeDecoder(fileURL.path)
+            decoder = try await Self.decoderFactory.value(fileURL.path)
         } catch {
             throw CLIError.invalidDICOMFile(
                 path: file,
@@ -155,6 +191,84 @@ struct InspectCommand: AsyncParsableCommand {
     }
 
     // MARK: - Metadata Extraction
+
+    private func extractBoundedMetadata(from url: URL) async throws -> [String: String] {
+        guard metadataByteLimit > 0 else { throw ValidationError("--metadata-byte-limit must be positive") }
+        let start = ContinuousClock.now
+        let source = try await DicomByteSource.openFile(url, storage: mappedRanges ? .mappedSnapshot : .buffer)
+        do {
+            let parsed: DicomSourceMetadata
+            switch readMode {
+            case .legacy:
+                parsed = try await DicomSourceMetadata.readPart10(from: source, maximumMetadataBytes: metadataByteLimit)
+            case .strict, .recover:
+                parsed = try await DicomSourceMetadata.readPart10(from: source,
+                    mode: readMode == .strict ? .strict : .recover, maximumMetadataBytes: metadataByteLimit)
+            }
+            var output: [String: String] = [:]
+            let numericNames: [String: DicomTag] = ["Rows": .rows, "Columns": .columns,
+                                                   "BitsAllocated": .bitsAllocated, "SamplesPerPixel": .samplesPerPixel]
+            let names = Self.tagDisplayNameMap.merging(Dictionary(uniqueKeysWithValues: numericNames.map { ($0.value, $0.key) })) { first, _ in first }
+            if let tags {
+                for raw in tags.split(separator: ",") {
+                    let name = raw.trimmingCharacters(in: .whitespaces)
+                    guard let tag = names.first(where: { Self.normalizeTagName($0.value) == Self.normalizeTagName(name) })?.key else {
+                        throw ValidationError("Unknown DICOM tag name: \(name)")
+                    }
+                    output[name] = Self.redactedOutputTags.contains(tag) ? "(redacted)"
+                        : parsed.dataSet[tag]?.stringValues.joined(separator: "\\") ?? "(not present)"
+                }
+            } else {
+                let defaults: Set<String> = ["PatientName", "PatientSex", "PatientAge", "Modality", "StudyDate",
+                    "StudyDescription", "StudyInstanceUID", "SeriesDescription", "SeriesInstanceUID", "SeriesNumber",
+                    "Rows", "Columns", "BitsAllocated", "SamplesPerPixel", "PhotometricInterpretation",
+                    "WindowCenter", "WindowWidth", "RescaleSlope", "RescaleIntercept"]
+                for element in parsed.dataSet.elements {
+                    guard !Self.redactedOutputTags.contains(where: { $0.rawValue == element.tag }) else { continue }
+                    let name = names.first(where: { $0.key.rawValue == element.tag })?.value
+                        ?? String(format: "Tag_%08X", element.tag)
+                    guard all || defaults.contains(name) else { continue }
+                    switch element.value {
+                    case .bytes(let bytes): output[name] = "(\(bytes.count) bytes)"
+                    case .sequence(let items): output[name] = "(\(items.count) items)"
+                    default: output[name] = element.stringValues.joined(separator: "\\")
+                    }
+                }
+            }
+            if readMode != .legacy {
+                output["ReadMode"] = readMode.rawValue
+                for (scope, diagnostics) in [("FileMeta", parsed.fileMetaDiagnostics), ("DataSet", parsed.dataSetDiagnostics)] {
+                    output["Read\(scope)DiagnosticsCount"] = String(diagnostics.count)
+                    for (index, diagnostic) in diagnostics.enumerated() {
+                        output["Read\(scope)Diagnostic\(index)"] = String(format: "tag=%08X offset=%ld reason=%@",
+                            diagnostic.tag, diagnostic.offset, diagnostic.reason.rawValue)
+                        output["Read\(scope)Diagnostic\(index)Path"] = diagnostic.path.map { component in
+                            switch component {
+                            case .tag(let tag): return String(format: "tag:%08X", tag)
+                            case .item(let item): return "item:\(item)"
+                            case .frame(let frame): return "frame:\(frame)"
+                            }
+                        }.joined(separator: "/")
+                    }
+                }
+            }
+            if readMetrics {
+                let metrics = await source.metrics
+                let elapsed = start.duration(to: .now).components
+                output["ReadSourceBytes"] = String(source.count)
+                output["ReadReceivedBytes"] = String(metrics.receivedBytes)
+                output["ReadStorageCopiedBytes"] = String(metrics.storageCopiedBytes)
+                output["ReadMetadataCopiedBytes"] = String(parsed.metadataCopiedBytes)
+                output["ReadRequestCount"] = String(metrics.readCount)
+                output["ReadElapsedMilliseconds"] = String(Double(elapsed.seconds) * 1000 + Double(elapsed.attoseconds) / 1e15)
+            }
+            await source.close()
+            return output
+        } catch {
+            await source.close()
+            throw error
+        }
+    }
 
     /// Extracts default metadata tags commonly used in medical imaging workflows.
     private func extractDefaultMetadata(from decoder: any DicomDecoderProtocol) -> [String: String] {

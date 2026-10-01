@@ -48,7 +48,8 @@ final class CLISmokeTests: XCTestCase {
         }
 
         try process.run()
-        wait(for: [finished], timeout: 180)
+        // A clean build in the scratch path now compiles the vendored JPEG/JPEG-LS/JPEG 2000 cores as well (#2329).
+        wait(for: [finished], timeout: 900)
 
         if process.isRunning {
             process.terminate()
@@ -83,15 +84,14 @@ extension CLISmokeTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        let scratchPath = FileManager.default.temporaryDirectory
-            .appendingPathComponent("dicomtool-preflight-\(UUID().uuidString)")
+        let scratchDirectory = try DicomtoolPreflightScratchDirectory()
+        let scratchPath = scratchDirectory.url
         let stdoutURL = scratchPath.appendingPathComponent("stdout.txt")
         let stderrURL = scratchPath.appendingPathComponent("stderr.txt")
-        try FileManager.default.createDirectory(at: scratchPath, withIntermediateDirectories: true)
         _ = FileManager.default.createFile(atPath: stdoutURL.path, contents: nil)
         _ = FileManager.default.createFile(atPath: stderrURL.path, contents: nil)
         addTeardownBlock {
-            try? FileManager.default.removeItem(at: scratchPath)
+            try? scratchDirectory.remove()
         }
 
         let process = Process()
@@ -123,7 +123,7 @@ extension CLISmokeTests {
         }
 
         try process.run()
-        wait(for: [finished], timeout: 300)
+        wait(for: [finished], timeout: 900)
 
         if process.isRunning {
             process.terminate()

@@ -1,8 +1,10 @@
 import XCTest
 import simd
 @testable import DicomCore
+import DicomTestSupport
 
-final class DicomSeriesLoaderAsyncTests: XCTestCase {
+/// Child tasks only call stateless fixture helpers; the test case stores no shared mutable state.
+final class DicomSeriesLoaderAsyncTests: XCTestCase, @unchecked Sendable {
 
     private func makeTemporaryDirectory(prefix: String) throws -> URL {
         let directory = FileManager.default.temporaryDirectory
@@ -122,21 +124,23 @@ final class DicomSeriesLoaderAsyncTests: XCTestCase {
         try createFiles(in: directory, count: sliceCount)
 
         let loader = makeLoader(width: 256, height: 256, pixelValue: 100)
-        var progressCallCount = 0
-        var lastFraction = 0.0
+        let progress = DicomTestLockedValue((callCount: 0, lastFraction: 0.0))
 
         let volume = try await loader.loadSeries(in: directory) { fraction, slicesCopied, _, volumeInfo in
-            progressCallCount += 1
+            progress.withValue { state in
+                state.callCount += 1
+                state.lastFraction = fraction
+            }
             XCTAssertGreaterThanOrEqual(fraction, 0.0)
             XCTAssertLessThanOrEqual(fraction, 1.0)
             XCTAssertGreaterThan(slicesCopied, 0)
             XCTAssertNotNil(volumeInfo)
-            lastFraction = fraction
         }
 
-        XCTAssertGreaterThan(progressCallCount, 0)
+        let finalProgress = progress.value
+        XCTAssertGreaterThan(finalProgress.callCount, 0)
         XCTAssertEqual(volume.depth, sliceCount)
-        XCTAssertEqual(lastFraction, 1.0, accuracy: 0.01)
+        XCTAssertEqual(finalProgress.lastFraction, 1.0, accuracy: 0.01)
     }
 
     func testAsyncLoadSeriesMatchesSyncVersion() async throws {
@@ -259,14 +263,15 @@ final class DicomSeriesLoaderAsyncTests: XCTestCase {
         let sliceCount = 5
         try createFiles(in: directory, count: sliceCount)
 
-        var progressFractions: [Double] = []
-        var slicesCopiedValues: [Int] = []
+        let progressUpdates = DicomTestLockedValue<[(fraction: Double, slicesCopied: Int)]>([])
 
         let volume = try await makeLoader(width: 64, height: 64, pixelValue: 33).loadSeries(in: directory) { fraction, slicesCopied, _, _ in
-            progressFractions.append(fraction)
-            slicesCopiedValues.append(slicesCopied)
+            progressUpdates.withValue { $0.append((fraction, slicesCopied)) }
         }
 
+        let updates = progressUpdates.value
+        let progressFractions = updates.map(\.fraction)
+        let slicesCopiedValues = updates.map(\.slicesCopied)
         XCTAssertEqual(volume.depth, sliceCount)
         XCTAssertFalse(progressFractions.isEmpty)
         XCTAssertEqual(progressFractions.count, slicesCopiedValues.count)
@@ -557,20 +562,21 @@ final class DicomSeriesLoaderAsyncTests: XCTestCase {
         let sliceCount = 4
         try createFiles(in: directory, count: sliceCount)
 
-        var callbackProgressUpdates: [(fraction: Double, slicesCopied: Int)] = []
+        let callbackProgressUpdates = DicomTestLockedValue<[(fraction: Double, slicesCopied: Int)]>([])
         let callbackLoader = makeLoader(width: 128, height: 128, pixelValue: 75)
         _ = try await callbackLoader.loadSeries(in: directory) { fraction, slicesCopied, _, _ in
-            callbackProgressUpdates.append((fraction, slicesCopied))
+            callbackProgressUpdates.withValue { $0.append((fraction, slicesCopied)) }
         }
 
         let streamLoader = makeLoader(width: 128, height: 128, pixelValue: 75)
         let streamProgressUpdates = try await collectProgress(from: streamLoader.loadSeriesWithProgress(in: directory))
             .map { (fraction: $0.fractionComplete, slicesCopied: $0.slicesCopied) }
 
-        XCTAssertFalse(callbackProgressUpdates.isEmpty)
+        let callbackUpdates = callbackProgressUpdates.value
+        XCTAssertFalse(callbackUpdates.isEmpty)
         XCTAssertFalse(streamProgressUpdates.isEmpty)
 
-        if let callbackFinal = callbackProgressUpdates.last,
+        if let callbackFinal = callbackUpdates.last,
            let streamFinal = streamProgressUpdates.last {
             XCTAssertEqual(callbackFinal.fraction, streamFinal.fraction, accuracy: 0.01)
             XCTAssertEqual(callbackFinal.slicesCopied, streamFinal.slicesCopied)

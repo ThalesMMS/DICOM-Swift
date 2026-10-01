@@ -20,9 +20,9 @@ import XCTest
 final class ClinicalParityCuratedFixtureTests: XCTestCase {
     // MARK: - Fixture catalog
 
-    private struct CuratedFixture {
+    private struct CuratedFixture: Sendable {
         let relativePath: String
-        let makeData: () throws -> Data
+        let makeData: @Sendable () throws -> Data
     }
 
     private static let srTID1500Path = "Tests/DicomCoreTests/Fixtures/StructuredReports/sr_tid1500_measurement_report.dcm"
@@ -239,8 +239,6 @@ final class ClinicalParityCuratedFixtureTests: XCTestCase {
             sopClassUID: DicomSRDocument.enhancedSRStorageSOPClassUID,
             sopInstanceUID: "2.25.122400103",
             modality: "SR",
-            contentLabel: "PARITY TID1500",
-            contentDescription: "Synthetic TID1500 measurement report parity fixture",
             completionFlag: "COMPLETE",
             verificationFlag: "UNVERIFIED",
             templateIdentifier: "1500",
@@ -285,8 +283,6 @@ final class ClinicalParityCuratedFixtureTests: XCTestCase {
             sopClassUID: DicomSRDocument.keyObjectSelectionDocumentStorageSOPClassUID,
             sopInstanceUID: "2.25.122400106",
             modality: "KO",
-            contentLabel: "PARITY KOS",
-            contentDescription: "Synthetic key object selection parity fixture",
             root: DicomSRContentItem(
                 valueType: "CONTAINER",
                 conceptName: DicomCodedConcept(codeValue: "113000", codingSchemeDesignator: "DCM", codeMeaning: "Of Interest"),

@@ -371,7 +371,7 @@ public protocol DicomDecoderProtocol: AnyObject, Sendable {
     var nativeColorMetadata: DicomNativeColorMetadata { get }
 
     /// Returns a display-ready interleaved 8-bit RGB buffer for one frame.
-    /// - Parameter frame: Zero-based frame index.
+    /// The `frame` argument is a zero-based frame index.
     func displayRGBPixelBuffer(frame: Int) throws -> DicomDisplayPixelBuffer
 
     /// Parsed Enhanced Multi-frame Functional Groups, when present.
@@ -392,6 +392,9 @@ public protocol DicomDecoderProtocol: AnyObject, Sendable {
 
     /// Parsed RT Plan object, when the instance is RTPLAN.
     var rtPlan: DicomRTPlan? { get }
+
+    /// Parsed Spatial Registration Storage document, when present and structurally valid.
+    var spatialRegistration: DicomSpatialRegistrationDocument? { get }
 
     /// Parsed Parametric Map object, when the instance is Parametric Map Storage.
     var parametricMap: DicomParametricMap? { get }
@@ -652,6 +655,10 @@ public extension DicomDecoderProtocol {
     }
 
     var rtPlan: DicomRTPlan? {
+        nil
+    }
+
+    var spatialRegistration: DicomSpatialRegistrationDocument? {
         nil
     }
 

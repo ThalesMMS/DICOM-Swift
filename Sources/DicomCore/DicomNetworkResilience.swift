@@ -40,6 +40,9 @@ extension DicomTLSSecurityProfile: Codable {
 }
 
 public struct DicomTLSMaterial: Codable, Equatable, Sendable {
+    /// Process-only PKCS#12 identity and password; neither is serialized.
+    public var pkcs12Data: Data?
+    public var pkcs12Password: String?
     public var certificatePath: String?
     public var privateKeyPath: String?
     /// Process-only key material. Codable conformance intentionally excludes this value.
@@ -58,7 +61,11 @@ public struct DicomTLSMaterial: Codable, Equatable, Sendable {
                 privateKeyPath: String? = nil,
                 privateKeyData: Data? = nil,
                 trustStorePath: String? = nil,
-                trustedCertificatePaths: [String] = []) {
+                trustedCertificatePaths: [String] = [],
+                pkcs12Data: Data? = nil,
+                pkcs12Password: String? = nil) {
+        self.pkcs12Data = pkcs12Data
+        self.pkcs12Password = pkcs12Password
         self.certificatePath = certificatePath
         self.privateKeyPath = privateKeyPath
         self.privateKeyData = privateKeyData
@@ -71,6 +78,8 @@ public struct DicomTLSMaterial: Codable, Equatable, Sendable {
         certificatePath = try container.decodeIfPresent(String.self, forKey: .certificatePath)
         privateKeyPath = try container.decodeIfPresent(String.self, forKey: .privateKeyPath)
         privateKeyData = nil
+        pkcs12Data = nil
+        pkcs12Password = nil
         trustStorePath = try container.decodeIfPresent(String.self, forKey: .trustStorePath)
         trustedCertificatePaths = try container.decodeIfPresent(
             [String].self,
@@ -92,15 +101,21 @@ public struct DicomTLSConfiguration: Codable, Equatable, Sendable {
     public var serverName: String?
     public var material: DicomTLSMaterial?
     public var securityProfile: DicomTLSSecurityProfile
+    /// What a server asks of its callers' certificates. Nil keeps the older
+    /// rule: a server with trust anchors requires a certificate, one without
+    /// does not ask. Ignored by clients, which always verify the server.
+    public var clientCertificatePolicy: DicomTLSClientCertificatePolicy?
 
     public init(mode: DicomTLSMode = .disabled,
                 serverName: String? = nil,
                 material: DicomTLSMaterial? = nil,
-                securityProfile: DicomTLSSecurityProfile = .none) {
+                securityProfile: DicomTLSSecurityProfile = .none,
+                clientCertificatePolicy: DicomTLSClientCertificatePolicy? = nil) {
         self.mode = mode
         self.serverName = serverName
         self.material = material
         self.securityProfile = securityProfile
+        self.clientCertificatePolicy = clientCertificatePolicy
     }
 
     public static let disabled = DicomTLSConfiguration()
@@ -127,6 +142,7 @@ public final class DicomDIMSEOperationHandle: @unchecked Sendable {
     public func cancel() {
         let action: (() -> Void)?
         lock.lock()
+        guard !cancelled else { lock.unlock(); return }
         cancelled = true
         action = cancelAction
         lock.unlock()
@@ -174,10 +190,16 @@ public struct DicomDIMSEAssociationPoolKey: Codable, Equatable, Hashable, Sendab
         public var privateKeyPath: String?
         public var privateKeyDataLength: Int?
         public var privateKeyDataFingerprint: String?
+        public var pkcs12Fingerprint: String?
+        public var pkcs12PasswordFingerprint: String?
         public var trustStorePath: String?
         public var trustedCertificatePaths: [String]
 
         public init(material: DicomTLSMaterial?) {
+            pkcs12Fingerprint = material?.pkcs12Data.map(DicomDIMSEAssociationPoolKey.fingerprint)
+            pkcs12PasswordFingerprint = material?.pkcs12Password.map {
+                DicomDIMSEAssociationPoolKey.fingerprint(Data($0.utf8))
+            }
             certificatePath = material?.certificatePath
             privateKeyPath = material?.privateKeyPath
             privateKeyDataLength = material?.privateKeyData?.count
@@ -213,6 +235,7 @@ public struct DicomDIMSEAssociationPoolKey: Codable, Equatable, Hashable, Sendab
     public var port: UInt16
     public var calledAETitle: String
     public var callingAETitle: String
+    public var operationTimeouts: [TimeInterval]?
     public var timeout: TimeInterval
     public var maximumPDULength: UInt32
     public var transferSyntaxUIDs: [String]
@@ -230,6 +253,8 @@ public struct DicomDIMSEAssociationPoolKey: Codable, Equatable, Hashable, Sendab
         port = configuration.port
         calledAETitle = configuration.calledAETitle
         callingAETitle = configuration.callingAETitle
+        operationTimeouts = [configuration.connectTimeout, configuration.associationTimeout,
+                             configuration.dimseResponseTimeout, configuration.releaseTimeout, configuration.cancelTimeout]
         timeout = configuration.timeout
         maximumPDULength = configuration.maximumPDULength
         transferSyntaxUIDs = configuration.transferSyntaxes.map(\.rawValue)
@@ -270,6 +295,7 @@ public struct DicomDIMSEAssociationPoolKey: Codable, Equatable, Hashable, Sendab
             calledAETitle,
             callingAETitle,
             String(timeout),
+            operationTimeouts?.map { String($0) }.joined(separator: ",") ?? "",
             String(maximumPDULength),
             transferSyntaxUIDs.joined(separator: ","),
             tlsMode.rawValue,
@@ -278,6 +304,8 @@ public struct DicomDIMSEAssociationPoolKey: Codable, Equatable, Hashable, Sendab
             tlsMaterial.privateKeyPath ?? "",
             tlsMaterial.privateKeyDataLength.map(String.init) ?? "",
             tlsMaterial.privateKeyDataFingerprint ?? "",
+            tlsMaterial.pkcs12Fingerprint ?? "",
+            tlsMaterial.pkcs12PasswordFingerprint ?? "",
             tlsMaterial.trustStorePath ?? "",
             tlsMaterial.trustedCertificatePaths.joined(separator: ","),
             tlsSecurityProfile.rawValue,
@@ -365,34 +393,74 @@ final class DicomDIMSEPooledAssociationSession: @unchecked Sendable {
     let transport: DicomAssociationTransport
     let association: DicomAssociation
     let request: DicomAssociationRequest
+    private let releaseTimeout: TimeInterval
 
     init(
         key: DicomDIMSEAssociationPoolKey,
         transport: DicomAssociationTransport,
         association: DicomAssociation,
-        request: DicomAssociationRequest
+        request: DicomAssociationRequest,
+        releaseTimeout: TimeInterval
     ) {
         self.key = key
         self.transport = transport
         self.association = association
         self.request = request
+        self.releaseTimeout = releaseTimeout
     }
 
     var isOpen: Bool { transport.isOpen }
 
     func close(gracefully: Bool = false) {
         if gracefully, transport.isOpen {
-            do {
-                try transport.writePDU(DicomPDUCodec.encode(.releaseRequest))
+            try? release()
+        } else {
+            (transport as? DicomCancellableAssociationTransport)?.close()
+        }
+    }
+
+    func release() throws {
+        let deadline = DispatchTime.now() + max(0, releaseTimeout)
+        // Closing a cancellable transport interrupts a blocked read or write, including a partial PDU.
+        // The timer belongs to this retired session; it cannot close a later checkout's connection.
+        let timeout = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
+        timeout.setEventHandler { [self] in close() }
+        timeout.schedule(deadline: deadline)
+        timeout.resume()
+        defer {
+            timeout.cancel()
+            close()
+        }
+        do {
+            try transport.writePDU(DicomPDUCodec.encode(.releaseRequest))
+            for _ in 0..<64 {
+                guard DispatchTime.now() < deadline else {
+                    throw DicomNetworkError.networkTimeout("releasing association")
+                }
                 let response = try DicomPDUCodec.decode(transport.readPDU())
-                guard case .releaseResponse = response else {
+                guard DispatchTime.now() < deadline else {
+                    throw DicomNetworkError.networkTimeout("releasing association")
+                }
+                switch response {
+                case .releaseResponse:
+                    return
+                case .pData:
+                    continue
+                case .releaseRequest:
+                    try transport.writePDU(DicomPDUCodec.encode(.releaseResponse))
+                case .abort(let abort):
+                    throw DicomNetworkError.associationAborted(abort)
+                default:
                     throw DicomNetworkError.unsupportedPDU(response.type)
                 }
-            } catch {
-                // The transport is closed below even when the peer cannot complete A-RELEASE.
             }
+            throw DicomNetworkError.networkUnavailable("A-RELEASE response limit exceeded.")
+        } catch {
+            if DispatchTime.now() >= deadline {
+                throw DicomNetworkError.networkTimeout("releasing association")
+            }
+            throw error
         }
-        (transport as? DicomCancellableAssociationTransport)?.close()
     }
 }
 
@@ -475,11 +543,14 @@ final class DicomDIMSEAssociationLease: DicomCancellableAssociationTransport, @u
         }
     }
 
-    func finish(reusable: Bool, error: Error?) {
+    func finish(reusable: Bool, error: Error?) throws {
         let checkedOut = takeSession(cancelled: false)
         guard let checkedOut else { return }
         if reusable, checkedOut.isOpen {
             pool.recycleSession(checkedOut, configuration: configuration)
+        } else if error == nil {
+            // A completed operation that cannot share its association (C-MOVE, C-GET) ends with A-RELEASE.
+            try pool.releaseSession(checkedOut)
         } else {
             pool.discardSession(checkedOut, error: error)
         }
@@ -521,6 +592,9 @@ public final class DicomDIMSEAssociationPool: @unchecked Sendable {
 
     private let lock = NSLock()
     private var entriesByKey: [DicomDIMSEAssociationPoolKey: [Entry]] = [:]
+    /// Releases idle associations once they pass `policy.idleTimeout`, so a peer never drops them first.
+    private let idleSweepQueue = DispatchQueue(label: "DicomDIMSEAssociationPool.idleSweep", qos: .utility)
+    private var isIdleSweepScheduled = false
 
     public init(policy: DicomDIMSEAssociationPoolPolicy = DicomDIMSEAssociationPoolPolicy(),
                 logger: DicomDIMSEAssociationPoolLogging? = nil) {
@@ -572,7 +646,13 @@ public final class DicomDIMSEAssociationPool: @unchecked Sendable {
 
     @discardableResult
     public func closeExpiredIdle(now: Date = Date()) -> Int {
-        guard policy.idleTimeout > 0 else { return 0 }
+        let sessions = takeExpiredIdle(now: now)
+        sessions.forEach { $0.close(gracefully: true) }
+        return sessions.count
+    }
+
+    private func takeExpiredIdle(now: Date) -> [DicomDIMSEPooledAssociationSession] {
+        guard policy.idleTimeout > 0 else { return [] }
         lock.lock()
         var removedEntries: [Entry] = []
         for key in Array(entriesByKey.keys) {
@@ -594,8 +674,7 @@ public final class DicomDIMSEAssociationPool: @unchecked Sendable {
             }
         }
         lock.unlock()
-        removedEntries.forEach { $0.session.close(gracefully: true) }
-        return removedEntries.count
+        return removedEntries.map(\.session)
     }
 
     @discardableResult
@@ -638,7 +717,12 @@ public final class DicomDIMSEAssociationPool: @unchecked Sendable {
         transportFactory: () throws -> DicomAssociationTransport,
         now: Date = Date()
     ) throws -> DicomDIMSEPooledAssociationSession {
-        _ = closeExpiredIdle(now: now)
+        let expiredSessions = takeExpiredIdle(now: now)
+        if !expiredSessions.isEmpty {
+            idleSweepQueue.async {
+                expiredSessions.forEach { $0.close(gracefully: true) }
+            }
+        }
         let key = Self.key(for: configuration)
         lock.lock()
         var entries = entriesByKey[key] ?? []
@@ -690,7 +774,8 @@ public final class DicomDIMSEAssociationPool: @unchecked Sendable {
                 key: key,
                 transport: transport,
                 association: association,
-                request: request
+                request: request,
+                releaseTimeout: configuration.releaseTimeout
             )
         } catch {
             (openedTransport as? DicomCancellableAssociationTransport)?.close()
@@ -731,8 +816,42 @@ public final class DicomDIMSEAssociationPool: @unchecked Sendable {
         }
         entriesByKey[key] = entries
         recordLocked(kind: .recycled, key: key, idleCount: entries.count, now: now)
+        scheduleIdleSweepLocked(now: now)
         lock.unlock()
         overflow.forEach { $0.session.close(gracefully: true) }
+    }
+
+    func releaseSession(_ session: DicomDIMSEPooledAssociationSession, now: Date = Date()) throws {
+        do {
+            try session.release()
+        } catch {
+            discardSession(session, error: error, now: now)
+            throw error
+        }
+        lock.lock()
+        recordLocked(
+            kind: .closedExplicit,
+            key: session.key,
+            idleCount: entriesByKey[session.key]?.count ?? 0,
+            now: now,
+            reason: "operationComplete"
+        )
+        lock.unlock()
+    }
+
+    /// Wakes when the oldest idle association expires; the sweep keeps the pool alive while any is idle.
+    private func scheduleIdleSweepLocked(now: Date) {
+        guard policy.idleTimeout > 0, !isIdleSweepScheduled,
+              let oldest = entriesByKey.values.joined().map(\.lastUsed).min() else { return }
+        isIdleSweepScheduled = true
+        let delay = max(0, oldest.addingTimeInterval(policy.idleTimeout).timeIntervalSince(now)) + 0.05
+        idleSweepQueue.asyncAfter(deadline: .now() + delay) {
+            _ = self.closeExpiredIdle()
+            self.lock.lock()
+            self.isIdleSweepScheduled = false
+            self.scheduleIdleSweepLocked(now: Date())
+            self.lock.unlock()
+        }
     }
 
     func discardSession(
@@ -764,47 +883,6 @@ public final class DicomDIMSEAssociationPool: @unchecked Sendable {
             idleCount: idleCount,
             reason: reason
         ))
-    }
-}
-
-public enum DicomUserIdentityType: UInt8, Codable, Equatable, Hashable, Sendable {
-    case username = 1
-    case usernameAndPasscode = 2
-    case kerberos = 3
-    case saml = 4
-    case jwt = 5
-}
-
-public struct DicomUserIdentity: Codable, Equatable, Sendable {
-    public var type: DicomUserIdentityType
-    public var primaryField: Data
-    public var secondaryField: Data
-    public var positiveResponseRequested: Bool
-
-    public init(type: DicomUserIdentityType,
-                primaryField: Data,
-                secondaryField: Data = Data(),
-                positiveResponseRequested: Bool = false) {
-        self.type = type
-        self.primaryField = primaryField
-        self.secondaryField = secondaryField
-        self.positiveResponseRequested = positiveResponseRequested
-    }
-
-    public static func username(_ username: String,
-                                positiveResponseRequested: Bool = false) -> DicomUserIdentity {
-        DicomUserIdentity(type: .username,
-                          primaryField: Data(username.utf8),
-                          positiveResponseRequested: positiveResponseRequested)
-    }
-
-    public static func usernameAndPasscode(_ username: String,
-                                           passcode: String,
-                                           positiveResponseRequested: Bool = false) -> DicomUserIdentity {
-        DicomUserIdentity(type: .usernameAndPasscode,
-                          primaryField: Data(username.utf8),
-                          secondaryField: Data(passcode.utf8),
-                          positiveResponseRequested: positiveResponseRequested)
     }
 }
 
@@ -1029,4 +1107,54 @@ public final class DicomBandwidthLimitedTransport: DicomCancellableAssociationTr
             sleep(delay)
         }
     }
+}
+
+/// C-STORE replay is safe only for the same SOP Instance and representation. Retrieve replay may redeliver instances.
+public enum DicomDIMSEReplaySafety: Equatable, Sendable {
+    case requestNotSent
+    case idempotent
+    case outcomeUncertain
+
+    public static func classify(operation: DicomDIMSEOperation, requestWasSent: Bool) -> Self {
+        guard requestWasSent else { return .requestNotSent }
+        switch operation {
+        case .verification, .query, .modalityWorklist, .getRetrieve, .moveRetrieve, .store:
+            return .idempotent
+        case .mppsCreate, .mppsUpdate, .storageCommitmentReport, .storageCommitmentRequest, .printManagement, .workflowWrite:
+            return .outcomeUncertain
+        }
+    }
+}
+
+extension DicomNetworkRetryPolicy {
+    public func allowsReplay(_ safety: DicomDIMSEReplaySafety) -> Bool {
+        safety != .outcomeUncertain
+    }
+}
+
+/// Conservatively marks a request before socket submission, since a failed write may have sent a prefix.
+final class DicomDIMSEReplayTrackingTransport: DicomCancellableAssociationTransport {
+    let underlying: DicomAssociationTransport
+    private let lock = NSLock()
+    private var sent = false
+    var requestWasSent: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return sent
+    }
+    var isOpen: Bool { underlying.isOpen }
+
+    init(_ underlying: DicomAssociationTransport) { self.underlying = underlying }
+
+    func writePDU(_ data: Data) throws {
+        if data.first == DicomPDUType.pData.rawValue {
+            lock.lock()
+            sent = true
+            lock.unlock()
+        }
+        try underlying.writePDU(data)
+    }
+
+    func readPDU() throws -> Data { try underlying.readPDU() }
+    func close() { (underlying as? DicomCancellableAssociationTransport)?.close() }
 }

@@ -134,6 +134,23 @@ final class DicomDIMSEServiceSCUTests: XCTestCase {
             )
         }
     }
+
+    func test_associationRequestAboveNegotiatedLimit_isReadUpToControlCeiling() throws {
+        let length = try DicomTCPAssociationTransport.validatedPDUBodyLength(
+            from: Data([0x01, 0x00, 0x00, 0x00, 0x42, 0x68]),
+            maximumIncomingPDUSize: 16_384
+        )
+        XCTAssertEqual(length, 17_000)
+
+        let ceiling = DicomTCPAssociationTransport.maximumControlPDUSize
+        let oversized = UInt32(ceiling + 1)
+        let header = Data([0x01, 0x00]) + withUnsafeBytes(of: oversized.bigEndian) { Data($0) }
+        XCTAssertThrowsError(
+            try DicomTCPAssociationTransport.validatedPDUBodyLength(from: header, maximumIncomingPDUSize: 16_384)
+        ) { error in
+            XCTAssertEqual(error as? DicomNetworkError, .invalidPDULength(expected: ceiling, actual: ceiling + 1))
+        }
+    }
     #endif
 
     func testVerificationSCUSendsCEchoAndReportsSuccess() throws {
@@ -181,7 +198,8 @@ final class DicomDIMSEServiceSCUTests: XCTestCase {
     func testFindSCUDecodesISO2022ResponseIdentifier() throws {
         let patientName = "Yamada^Taro=山田^太郎"
         let response = DicomDataSet(elements: [
-            element(DicomTag.specificCharacterSet.rawValue, .CS, "ISO 2022 IR 87"),
+            DicomDataElement(tag: DicomTag.specificCharacterSet.rawValue, vr: .CS,
+                             value: .strings(["", "ISO 2022 IR 87"])),
             element(DicomTag.patientName.rawValue, .PN, patientName),
             element(DicomTag.studyInstanceUID.rawValue, .UI, "2.25.100")
         ])
@@ -260,6 +278,439 @@ final class DicomDIMSEServiceSCUTests: XCTestCase {
         XCTAssertNil(cGetRequest?.requestedSOPClassUID)
     }
 
+    // MARK: - C-GET SCP/SCU Role Selection (issue #1868)
+
+    /// The association request carries one role-selection item per returned
+    /// storage SOP Class, declaring this side SCP for the sub-operation
+    /// C-STOREs while it stays SCU for the C-GET itself.
+    func test_get_proposesSCPRoleForEveryReturnedStorageClass() throws {
+        let transport = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [
+            DicomNetworkUID.studyRootQueryRetrieveGet,
+            DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID
+        ])
+        let service = makeService()
+
+        _ = try service.get(identifier: retrieveIdentifier(), using: transport)
+
+        let request = try XCTUnwrap(transport.associationRequests.first)
+        XCTAssertEqual(request.roleSelections, [
+            DicomSCPSCURoleSelection(
+                sopClassUID: DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID,
+                scuRole: false,
+                scpRole: true
+            )
+        ])
+    }
+
+    /// A peer that explicitly denies the SCP role on every storage class
+    /// gets no C-GET request at all: the retrieved instances would have had
+    /// nowhere to arrive.
+    func test_get_whenThePeerDeniesEverySCPRole_refusesBeforeTheRequest() throws {
+        let transport = DIMSEScriptedTransport(
+            supportedAbstractSyntaxUIDs: [
+                DicomNetworkUID.studyRootQueryRetrieveGet,
+                DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID
+            ],
+            roleSelectionPolicy: .denySCP
+        )
+        let service = makeService()
+
+        XCTAssertThrowsError(try service.get(identifier: retrieveIdentifier(),
+                                             using: transport)) { error in
+            guard case DicomNetworkError.returnedStorageNotNegotiated? = error as? DicomNetworkError else {
+                return XCTFail("expected returnedStorageNotNegotiated, got \(error)")
+            }
+        }
+        XCTAssertFalse(transport.writtenCommands.contains {
+            $0.commandField == DicomDIMSECommandField.cGetRQ
+        }, "nothing was requested from a peer that will not send the instances back")
+    }
+
+    /// Without accepted Storage SCP roles, refuse before sending C-GET.
+    func test_get_whenThePeerIgnoresRoleSelection_refusesBeforeSending() throws {
+        let transport = DIMSEScriptedTransport(
+            supportedAbstractSyntaxUIDs: [
+                DicomNetworkUID.studyRootQueryRetrieveGet,
+                DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID
+            ],
+            roleSelectionPolicy: .ignore
+        )
+        let service = makeService()
+
+        XCTAssertThrowsError(try service.get(identifier: retrieveIdentifier(), using: transport)) { error in
+            guard case DicomNetworkError.returnedStorageNotNegotiated = error else {
+                return XCTFail("Expected missing returned-storage role, got \(error)")
+            }
+        }
+        XCTAssertFalse(transport.writtenCommands.contains { $0.commandField == DicomDIMSECommandField.cGetRQ })
+    }
+
+    /// A storage class whose presentation context the peer rejected is not
+    /// usable — but one surviving class is enough for the retrieve to run.
+    func test_get_withPartiallyAcceptedStorageClasses_proceedsOnTheSurvivors() throws {
+        let transport = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [
+            DicomNetworkUID.studyRootQueryRetrieveGet,
+            DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID
+            // "1.2.840.10008.5.1.4.1.1.2" (CT Image Storage) deliberately
+            // unsupported: its context is rejected.
+        ])
+        let service = makeService()
+
+        // The accepted class goes first so the scripted SCP's store
+        // sub-operation arrives on the accepted context.
+        let result = try service.get(
+            identifier: retrieveIdentifier(),
+            storageSOPClassUIDs: [
+                DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID,
+                "1.2.840.10008.5.1.4.1.1.2"
+            ],
+            using: transport
+        )
+        let request = try XCTUnwrap(transport.associationRequests.first)
+        let accept = try XCTUnwrap(transport.associationAccepts.first)
+        let ctContext = try XCTUnwrap(request.presentationContexts.first {
+            $0.abstractSyntaxUID == "1.2.840.10008.5.1.4.1.1.2"
+        })
+
+        XCTAssertEqual(
+            accept.presentationContexts.first { $0.id == ctContext.id }?.result,
+            .abstractSyntaxNotSupported
+        )
+        XCTAssertEqual(result.retrievedInstances.count, 1)
+        XCTAssertEqual(result.operation.status, 0)
+    }
+
+    /// Issue #2793: with a receive directory, a returned object is handed over as the Part 10 file it was
+    /// received into, holding the dataset as sent; the file is gone once the handler returns.
+    func test_get_withReceivedFileDirectory_handsOverTheFileTheObjectArrivedIn() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("isis-2793-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let transport = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [
+            DicomNetworkUID.studyRootQueryRetrieveGet,
+            DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID
+        ])
+        transport.storeSOPInstanceUID = "2.25.2793"
+        var configuration = makeConfiguration()
+        configuration.receivedFileDirectory = directory
+        var delivered: [(url: URL?, file: Data?, data: Data)] = []
+
+        _ = try DicomDIMSEServiceSCU(configuration: configuration).get(
+            identifier: retrieveIdentifier(),
+            storageSOPClassUIDs: [DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID],
+            using: transport,
+            onInstance: { instance in
+                delivered.append((instance.part10FileURL, instance.part10FileURL.flatMap { try? Data(contentsOf: $0) },
+                                  instance.data))
+            }
+        )
+
+        let sent = try DicomDataSetWriter.dataSetData(from: storageDataSet(), transferSyntax: .explicitVRLittleEndian)
+        let received = try XCTUnwrap(delivered.first)
+        let url = try XCTUnwrap(received.url)
+        let request = try DicomStoreRequest(part10Data: try XCTUnwrap(received.file))
+        XCTAssertEqual(request.dataSetData, sent)
+        XCTAssertEqual(request.sopInstanceUID, "2.25.2793")
+        XCTAssertEqual(received.data, sent, "the instance's data is the file's dataset")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    // MARK: - Query model fallback (issue #1867)
+
+    /// Both models ride in the one association request; a peer that accepts
+    /// both runs the query under Study Root, the preferred model.
+    func test_find_prefersStudyRootWhenBothModelsAreAccepted() throws {
+        let transport = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [
+            DicomNetworkUID.studyRootQueryRetrieveFind,
+            DicomNetworkUID.patientRootQueryRetrieveFind
+        ])
+        let service = makeService()
+
+        let result = try service.find(identifier: retrieveIdentifier(), using: transport)
+
+        XCTAssertEqual(result.operation.status, 0)
+        XCTAssertEqual(result.operation.negotiatedQueryModelUID,
+                       DicomNetworkUID.studyRootQueryRetrieveFind)
+        XCTAssertEqual(transport.writtenCommands.first?.affectedSOPClassUID,
+                       DicomNetworkUID.studyRootQueryRetrieveFind)
+        let request = try XCTUnwrap(transport.associationRequests.first)
+        XCTAssertEqual(request.presentationContexts.map(\.abstractSyntaxUID), [
+            DicomNetworkUID.studyRootQueryRetrieveFind,
+            DicomNetworkUID.patientRootQueryRetrieveFind
+        ], "both models are proposed, Study Root first")
+    }
+
+    /// A Patient-Root-only archive rejects the Study Root context; the same
+    /// association falls through to Patient Root, and the Study-Root-shaped
+    /// identifier gains the universal-match Patient ID key it was missing.
+    func test_find_fallsBackToPatientRootWhenStudyRootIsRejected() throws {
+        let transport = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [
+            DicomNetworkUID.patientRootQueryRetrieveFind
+        ])
+        let service = makeService()
+        let query = DicomDataSet(elements: [
+            element(0x0008_0052, .CS, "STUDY"),
+            element(DicomTag.patientName.rawValue, .PN, "DOE^JANE")
+        ])
+
+        let result = try service.find(identifier: query, using: transport)
+
+        XCTAssertEqual(result.operation.status, 0)
+        XCTAssertEqual(result.matches.count, 1)
+        XCTAssertEqual(result.operation.negotiatedQueryModelUID,
+                       DicomNetworkUID.patientRootQueryRetrieveFind)
+        XCTAssertEqual(transport.writtenCommands.first?.affectedSOPClassUID,
+                       DicomNetworkUID.patientRootQueryRetrieveFind)
+        XCTAssertEqual(transport.associationRequests.count, 1,
+                       "the fallback is a context choice, not a second association")
+        let sentIdentifier = try XCTUnwrap(transport.writtenDataSets.first)
+        XCTAssertTrue(sentIdentifier.contains(DicomTag.patientID))
+        XCTAssertEqual(sentIdentifier.string(for: .patientID) ?? "", "",
+                       "the added Patient ID key is universal-match, not a value")
+    }
+
+    /// An identifier that already names a patient keeps its Patient ID
+    /// untouched under the fallback.
+    func test_find_underPatientRoot_keepsAnExplicitPatientID() throws {
+        let transport = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [
+            DicomNetworkUID.patientRootQueryRetrieveFind
+        ])
+        let service = makeService()
+        let query = DicomDataSet(elements: [
+            element(0x0008_0052, .CS, "STUDY"),
+            element(DicomTag.patientID.rawValue, .LO, "PID-123")
+        ])
+
+        _ = try service.find(identifier: query, using: transport)
+
+        XCTAssertEqual(transport.writtenDataSets.first?.string(for: .patientID), "PID-123")
+    }
+
+    /// A peer that accepts neither model fails at negotiation itself:
+    /// nothing is queried, and there is no second association to retry on.
+    func test_find_whenNoModelIsAccepted_refusesWithoutQuerying() throws {
+        let transport = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [
+            DicomNetworkUID.verificationSOPClass
+        ])
+        let service = makeService()
+
+        XCTAssertThrowsError(try service.find(identifier: retrieveIdentifier(),
+                                              using: transport)) { error in
+            guard case DicomNetworkError.missingAcceptedPresentationContext? = error as? DicomNetworkError else {
+                return XCTFail("expected missingAcceptedPresentationContext, got \(error)")
+            }
+        }
+        XCTAssertFalse(transport.writtenCommands.contains {
+            $0.commandField == DicomDIMSECommandField.cFindRQ
+        })
+        XCTAssertEqual(transport.associationRequests.count, 1)
+    }
+
+    /// The retrieve services follow the same negotiation: a Patient-Root-only
+    /// peer still delivers its instances over C-GET.
+    func test_get_fallsBackToPatientRootWhenStudyRootIsRejected() throws {
+        let transport = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [
+            DicomNetworkUID.patientRootQueryRetrieveGet,
+            DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID
+        ])
+        let service = makeService()
+
+        let result = try service.get(identifier: retrieveIdentifier(), using: transport)
+
+        XCTAssertEqual(result.operation.status, 0)
+        XCTAssertEqual(result.retrievedInstances.count, 1)
+        XCTAssertEqual(result.operation.negotiatedQueryModelUID,
+                       DicomNetworkUID.patientRootQueryRetrieveGet)
+        let cGetRequest = transport.writtenCommands.first { $0.commandField == DicomDIMSECommandField.cGetRQ }
+        XCTAssertEqual(cGetRequest?.affectedSOPClassUID, DicomNetworkUID.patientRootQueryRetrieveGet)
+        XCTAssertTrue(transport.writtenDataSets.first?.contains(DicomTag.patientID) == true)
+    }
+
+    /// Preference order is per-operation: get also runs Study Root when the
+    /// peer accepts both models.
+    func test_get_prefersStudyRootWhenBothModelsAreAccepted() throws {
+        let transport = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [
+            DicomNetworkUID.studyRootQueryRetrieveGet,
+            DicomNetworkUID.patientRootQueryRetrieveGet,
+            DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID
+        ])
+        let service = makeService()
+
+        let result = try service.get(identifier: retrieveIdentifier(), using: transport)
+
+        XCTAssertEqual(result.operation.negotiatedQueryModelUID,
+                       DicomNetworkUID.studyRootQueryRetrieveGet)
+        XCTAssertEqual(result.retrievedInstances.count, 1)
+    }
+
+    func test_move_fallsBackToPatientRootWhenStudyRootIsRejected() throws {
+        let transport = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [
+            DicomNetworkUID.patientRootQueryRetrieveMove
+        ])
+        let service = makeService()
+
+        let result = try service.move(identifier: retrieveIdentifier(),
+                                      moveDestinationAETitle: "ISIS",
+                                      using: transport)
+
+        XCTAssertEqual(result.status, 0)
+        XCTAssertEqual(result.negotiatedQueryModelUID,
+                       DicomNetworkUID.patientRootQueryRetrieveMove)
+        let cMoveRequest = transport.writtenCommands.first { $0.commandField == DicomDIMSECommandField.cMoveRQ }
+        XCTAssertEqual(cMoveRequest?.affectedSOPClassUID, DicomNetworkUID.patientRootQueryRetrieveMove)
+    }
+
+    func test_move_prefersStudyRootWhenBothModelsAreAccepted() throws {
+        let transport = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [
+            DicomNetworkUID.studyRootQueryRetrieveMove,
+            DicomNetworkUID.patientRootQueryRetrieveMove
+        ])
+        let service = makeService()
+
+        let result = try service.move(identifier: retrieveIdentifier(),
+                                      moveDestinationAETitle: "ISIS",
+                                      using: transport)
+
+        XCTAssertEqual(result.negotiatedQueryModelUID,
+                       DicomNetworkUID.studyRootQueryRetrieveMove)
+    }
+
+    /// Live wire check against HOROS (127.0.0.1:4007): the dual-model
+    /// association is accepted and the query runs under Study Root, the
+    /// preferred model. Opt-in like the other live tests.
+    func test_liveHorosFind_withDualModelProposal_prefersStudyRoot() throws {
+        guard ProcessInfo.processInfo.environment["DICOM_SWIFT_LIVE_HOROS"] == "1" else {
+            throw XCTSkip("Set DICOM_SWIFT_LIVE_HOROS=1 when HOROS is listening on 127.0.0.1:4007.")
+        }
+        let configuration = DicomDIMSEConnectionConfiguration(
+            host: "127.0.0.1",
+            port: 4007,
+            calledAETitle: "HOROS",
+            callingAETitle: "ISIS",
+            timeout: 15
+        )
+        let service = DicomDIMSEServiceSCU(configuration: configuration)
+        let studyQuery = DicomDataSet(elements: [
+            element(0x0008_0052, .CS, "STUDY"),
+            element(DicomTag.studyInstanceUID.rawValue, .UI, "")
+        ])
+
+        let result = try service.find(identifier: studyQuery)
+
+        XCTAssertEqual(result.operation.negotiatedQueryModelUID,
+                       DicomNetworkUID.studyRootQueryRetrieveFind)
+        XCTAssertFalse(result.matches.isEmpty)
+    }
+
+    /// The wire form of the item (PS3.7 D.3.3.4): uid-length big-endian,
+    /// uid, scu-role byte, scp-role byte — round-tripped through the codec
+    /// in both the request and the accept.
+    func test_roleSelectionItems_roundTripThroughThePDUCodec() throws {
+        let roleSelection = DicomSCPSCURoleSelection(sopClassUID: "1.2.840.10008.5.1.4.1.1.7",
+                                                     scuRole: false,
+                                                     scpRole: true)
+        let request = DicomAssociationRequest(
+            calledAETitle: "CALLED",
+            callingAETitle: "CALLING",
+            presentationContexts: [
+                DicomPresentationContextRequest(id: 1,
+                                                abstractSyntaxUID: DicomNetworkUID.studyRootQueryRetrieveGet,
+                                                transferSyntaxes: [.explicitVRLittleEndian])
+            ],
+            roleSelections: [roleSelection]
+        )
+        let encodedRequest = try DicomPDUCodec.encode(.associationRequest(request))
+        guard case .associationRequest(let decodedRequest) = try DicomPDUCodec.decode(encodedRequest) else {
+            return XCTFail("expected an association request")
+        }
+        XCTAssertEqual(decodedRequest.roleSelections, [roleSelection])
+
+        // The raw sub-item: 0x54, reserved, length, then uid-length BE +
+        // uid + scu + scp.
+        let uid = Data(roleSelection.sopClassUID.utf8)
+        var expectedItem = Data([0x54, 0x00])
+        expectedItem.append(contentsOf: [UInt8((uid.count + 4) >> 8), UInt8((uid.count + 4) & 0xFF)])
+        expectedItem.append(contentsOf: [UInt8(uid.count >> 8), UInt8(uid.count & 0xFF)])
+        expectedItem.append(uid)
+        expectedItem.append(contentsOf: [0x00, 0x01])
+        XCTAssertNotNil(encodedRequest.range(of: expectedItem),
+                        "the PDU carries the exact PS3.7 D.3.3.4 item bytes")
+
+        let accept = DicomAssociationNegotiator.accept(
+            request,
+            supportedAbstractSyntaxUIDs: [DicomNetworkUID.studyRootQueryRetrieveGet,
+                                          "1.2.840.10008.5.1.4.1.1.7"],
+            preferredTransferSyntaxes: [.explicitVRLittleEndian],
+            supportedSCUAbstractSyntaxUIDs: ["1.2.840.10008.5.1.4.1.1.7"]
+        )
+        XCTAssertEqual(accept.roleSelections, [roleSelection], "the acceptor echoes supported proposals")
+        let encodedAccept = try DicomPDUCodec.encode(.associationAccept(accept))
+        guard case .associationAccept(let decodedAccept) = try DicomPDUCodec.decode(encodedAccept) else {
+            return XCTFail("expected an association accept")
+        }
+        XCTAssertEqual(decodedAccept.roleSelections, [roleSelection])
+    }
+
+    func test_negotiator_omitsRoleAnswersForUnsupportedClasses() {
+        let request = DicomAssociationRequest(
+            calledAETitle: "CALLED",
+            callingAETitle: "CALLING",
+            presentationContexts: [
+                DicomPresentationContextRequest(id: 1,
+                                                abstractSyntaxUID: DicomNetworkUID.studyRootQueryRetrieveGet,
+                                                transferSyntaxes: [.explicitVRLittleEndian])
+            ],
+            roleSelections: [
+                DicomSCPSCURoleSelection(sopClassUID: "1.2.840.10008.5.1.4.1.1.128",
+                                         scuRole: false,
+                                         scpRole: true)
+            ]
+        )
+        let accept = DicomAssociationNegotiator.accept(
+            request,
+            supportedAbstractSyntaxUIDs: [DicomNetworkUID.studyRootQueryRetrieveGet],
+            preferredTransferSyntaxes: [.explicitVRLittleEndian]
+        )
+        XCTAssertTrue(accept.roleSelections.isEmpty,
+                      "an unsupported SOP class gets no role answer — absence, not invention")
+    }
+
+    /// Live wire check against HOROS (127.0.0.1:4007): the association with
+    /// role-selection items must be accepted and the C-GET must still
+    /// deliver instances. Opt-in like the other live tests.
+    func test_liveHorosGetRetrieve_withRoleSelection_deliversInstances() throws {
+        guard ProcessInfo.processInfo.environment["DICOM_SWIFT_LIVE_HOROS"] == "1" else {
+            throw XCTSkip("Set DICOM_SWIFT_LIVE_HOROS=1 when HOROS is listening on 127.0.0.1:4007.")
+        }
+        let configuration = DicomDIMSEConnectionConfiguration(
+            host: "127.0.0.1",
+            port: 4007,
+            calledAETitle: "HOROS",
+            callingAETitle: "ISIS",
+            timeout: 15
+        )
+        let service = DicomDIMSEServiceSCU(configuration: configuration)
+        let studyQuery = DicomDataSet(elements: [
+            element(0x0008_0052, .CS, "STUDY"),
+            element(DicomTag.studyInstanceUID.rawValue, .UI, "")
+        ])
+        let studies = try service.find(identifier: studyQuery)
+        guard let studyUID = studies.matches.first?.string(for: .studyInstanceUID) else {
+            throw XCTSkip("HOROS returned no study to retrieve.")
+        }
+        let identifier = DicomDataSet(elements: [
+            element(0x0008_0052, .CS, "STUDY"),
+            element(DicomTag.studyInstanceUID.rawValue, .UI, studyUID)
+        ])
+        let result = try service.get(identifier: identifier,
+                                     storageSOPClassUIDs: [
+                                        "1.2.840.10008.5.1.4.1.1.2",
+                                        "1.2.840.10008.5.1.4.1.1.4",
+                                        "1.2.840.10008.5.1.4.1.1.7"
+                                     ])
+        XCTAssertFalse(result.retrievedInstances.isEmpty,
+                       "HOROS accepted the role-negotiated association and returned instances")
+    }
+
     func testGetSCUPreservesInstancesOnPartialSuccessWarning() throws {
         let transport = DIMSEScriptedTransport(
             supportedAbstractSyntaxUIDs: [
@@ -276,7 +727,7 @@ final class DicomDIMSEServiceSCUTests: XCTestCase {
         XCTAssertEqual(result.retrievedInstances.map(\.sopInstanceUID), ["2.25.instance"])
     }
 
-    func testGetSCUStreamsStoreSuboperationAfterAcknowledgingIt() throws {
+    func testGetSCUStreamsStoreSuboperationBeforeAcknowledgingIt() throws {
         let transport = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [
             DicomNetworkUID.studyRootQueryRetrieveGet,
             DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID
@@ -288,7 +739,7 @@ final class DicomDIMSEServiceSCUTests: XCTestCase {
             identifier: retrieveIdentifier(),
             using: transport,
             onInstance: { instance in
-                XCTAssertTrue(transport.writtenCommands.contains {
+                XCTAssertFalse(transport.writtenCommands.contains {
                     $0.commandField == DicomDIMSECommandField.cStoreRSP && $0.status == 0
                 })
                 XCTAssertEqual(instance.dataSet?.string(for: .patientName), "DOE^JANE")
@@ -393,6 +844,69 @@ final class DicomDIMSEServiceSCUTests: XCTestCase {
         XCTAssertNotNil(transport.writtenDataSets[0].element(for: DicomWorkflowTag.scheduledStepAttributesSequence))
     }
 
+    func testStorageCommitmentReportNegotiatesReverseRoleAndSendsPartialResult() throws {
+        let sopClassUID = DicomNetworkUID.storageCommitmentPushModelSOPClass
+        let transport = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [sopClassUID])
+        let service = makeService()
+        let report = DicomStorageCommitmentReport(
+            transactionUID: "2.25.commitment",
+            status: .partial,
+            references: [
+                DicomStorageCommitmentReference(
+                    sopClassUID: DicomStorageSOPClassUIDs.ctImageStorage,
+                    sopInstanceUID: "2.25.stored"
+                ),
+                DicomStorageCommitmentReference(
+                    sopClassUID: DicomStorageSOPClassUIDs.ctImageStorage,
+                    sopInstanceUID: "2.25.missing",
+                    status: .failed,
+                    failureReasonCode: 0x0112
+                )
+            ]
+        )
+
+        let result = try service.reportStorageCommitment(report, using: transport)
+
+        XCTAssertEqual(result.status, 0)
+        XCTAssertEqual(transport.associationRequests.first?.roleSelections, [
+            DicomSCPSCURoleSelection(sopClassUID: sopClassUID, scuRole: false, scpRole: true)
+        ])
+        XCTAssertEqual(transport.writtenCommands.map(\.commandField), [
+            DicomDIMSECommandField.nEventReportRQ
+        ])
+        XCTAssertEqual(transport.writtenCommands.first?.eventTypeID, 2)
+        let dataSet = try XCTUnwrap(transport.writtenDataSets.first)
+        XCTAssertEqual(dataSet.string(for: 0x0008_1195), "2.25.commitment")
+        XCTAssertEqual(dataSet.sequenceItems(for: 0x0008_1199).count, 1)
+        let failed = try XCTUnwrap(dataSet.sequenceItems(for: 0x0008_1198).first?.dataSet)
+        XCTAssertEqual(failed.string(for: .referencedSOPInstanceUID), "2.25.missing")
+        XCTAssertEqual(failed.element(for: 0x0008_1197)?.intValue, 0x0112)
+    }
+
+    func testStorageCommitmentReportRefusesWhenReverseRoleIsNotNegotiated() throws {
+        let sopClassUID = DicomNetworkUID.storageCommitmentPushModelSOPClass
+        let transport = DIMSEScriptedTransport(
+            supportedAbstractSyntaxUIDs: [sopClassUID],
+            roleSelectionPolicy: .ignore
+        )
+        let service = makeService()
+        let report = DicomStorageCommitmentReport(
+            transactionUID: "2.25.commitment",
+            status: .committed,
+            references: [
+                DicomStorageCommitmentReference(
+                    sopClassUID: DicomStorageSOPClassUIDs.ctImageStorage,
+                    sopInstanceUID: "2.25.stored"
+                )
+            ]
+        )
+
+        XCTAssertThrowsError(try service.reportStorageCommitment(report, using: transport)) { error in
+            XCTAssertEqual(error as? DicomNetworkError, .storageCommitmentRoleNotNegotiated)
+        }
+        XCTAssertTrue(transport.writtenCommands.isEmpty)
+    }
+
     func testPrintManagementCreatesFilmSessionImageBoxAndPrints() throws {
         let transport = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [
             DicomNetworkUID.basicGrayscalePrintManagementMetaSOPClass
@@ -410,14 +924,18 @@ final class DicomDIMSEServiceSCUTests: XCTestCase {
         XCTAssertEqual(result.operation.status, 0)
         XCTAssertEqual(result.imageBoxSOPInstanceUIDs, ["2.25.imagebox.1"])
         XCTAssertEqual(transport.writtenCommands.map(\.commandField), [
+            DicomDIMSECommandField.nGetRQ,
             DicomDIMSECommandField.nCreateRQ,
             DicomDIMSECommandField.nCreateRQ,
             DicomDIMSECommandField.nSetRQ,
-            DicomDIMSECommandField.nActionRQ
+            DicomDIMSECommandField.nActionRQ,
+            DicomDIMSECommandField.nGetRQ,
+            DicomDIMSECommandField.nDeleteRQ,
+            DicomDIMSECommandField.nDeleteRQ
         ])
         XCTAssertEqual(transport.writtenDataSets[0].string(for: DicomPrintTag.filmSessionLabel), "PRINT-1")
-        XCTAssertEqual(transport.writtenCommands[3].requestedSOPInstanceUID, job.filmBoxSOPInstanceUID)
-        XCTAssertEqual(transport.writtenCommands[3].actionTypeID, 1)
+        XCTAssertEqual(transport.writtenCommands[4].requestedSOPInstanceUID, job.filmBoxSOPInstanceUID)
+        XCTAssertEqual(transport.writtenCommands[4].actionTypeID, 1)
 
         let imageDataSet = transport.writtenDataSets[2]
             .sequenceItems(for: DicomPrintTag.basicGrayscaleImageSequence)
@@ -425,6 +943,224 @@ final class DicomDIMSEServiceSCUTests: XCTestCase {
         XCTAssertEqual(imageDataSet?.int(for: .rows), 1)
         XCTAssertEqual(imageDataSet?.int(for: .columns), 1)
         XCTAssertEqual(imageDataSet?.int(for: .bitsAllocated), 8)
+    }
+
+    func testPrintManagementColorModeNegotiatesColorAndSendsRGBImageBox() throws {
+        let transport = DIMSEScriptedTransport(
+            supportedAbstractSyntaxUIDs: [
+                DicomNetworkUID.basicColorPrintManagementMetaSOPClass
+            ],
+            printImageBoxSOPClassUID: DicomNetworkUID.basicColorImageBoxSOPClass
+        )
+        let service = makeService()
+        let bitmap = try DicomRenderedBitmap(
+            width: 2,
+            height: 1,
+            rgbData: Data([10, 20, 30, 200, 150, 100])
+        )
+        let job = try DicomPrintJob(
+            filmSession: DicomFilmSession(label: "COLOR"),
+            filmBox: DicomFilmBox(),
+            printMode: .color,
+            imageBoxes: [try DicomImageBox(bitmap: bitmap)]
+        )
+
+        let result = try service.sendPrintJob(job, using: transport)
+
+        XCTAssertEqual(result.operation.status, 0)
+        let proposedSOPClasses = Set(
+            try XCTUnwrap(transport.associationRequests.first).presentationContexts.map(\.abstractSyntaxUID)
+        )
+        XCTAssertTrue(proposedSOPClasses.contains(DicomNetworkUID.basicColorPrintManagementMetaSOPClass))
+        XCTAssertTrue(proposedSOPClasses.contains(DicomNetworkUID.basicColorImageBoxSOPClass))
+        XCTAssertFalse(proposedSOPClasses.contains(DicomNetworkUID.basicGrayscalePrintManagementMetaSOPClass))
+        XCTAssertFalse(proposedSOPClasses.contains(DicomNetworkUID.basicGrayscaleImageBoxSOPClass))
+
+        let setCommand = try XCTUnwrap(transport.writtenCommands.first {
+            $0.commandField == DicomDIMSECommandField.nSetRQ
+        })
+        XCTAssertEqual(setCommand.requestedSOPClassUID, DicomNetworkUID.basicColorImageBoxSOPClass)
+        let imageDataSet = try XCTUnwrap(
+            transport.writtenDataSets[2]
+                .sequenceItems(for: DicomPrintTag.basicColorImageSequence)
+                .first?.dataSet
+        )
+        XCTAssertEqual(imageDataSet.int(for: .samplesPerPixel), 3)
+        XCTAssertEqual(imageDataSet.string(for: .photometricInterpretation), "RGB")
+        // PS3.3 C.13.5: Basic Color Image Sequence is color-by-plane only.
+        XCTAssertEqual(imageDataSet.int(for: .planarConfiguration), 1)
+        let interleaved = [UInt8](bitmap.rgbData)
+        let pixelCount = interleaved.count / 3
+        var planar = Data(capacity: interleaved.count)
+        for channel in 0..<3 { for pixel in 0..<pixelCount { planar.append(interleaved[pixel * 3 + channel]) } }
+        XCTAssertNotNil(transport.writtenDataSetPayloads[2].range(of: planar))
+        XCTAssertNil(transport.writtenDataSetPayloads[2].range(of: bitmap.rgbData))
+    }
+
+    func testPrintManagementAutomaticModePrefersColorWhenBothModesAreAccepted() throws {
+        let transport = DIMSEScriptedTransport(
+            supportedAbstractSyntaxUIDs: [
+                DicomNetworkUID.basicColorPrintManagementMetaSOPClass,
+                DicomNetworkUID.basicGrayscalePrintManagementMetaSOPClass
+            ],
+            printImageBoxSOPClassUID: DicomNetworkUID.basicColorImageBoxSOPClass
+        )
+        let bitmap = try DicomRenderedBitmap(width: 1, height: 1, rgbData: Data([1, 2, 3]))
+        let job = try DicomPrintJob(
+            filmSession: DicomFilmSession(),
+            filmBox: DicomFilmBox(),
+            printMode: .automatic,
+            imageBoxes: [try DicomImageBox(bitmap: bitmap)]
+        )
+
+        _ = try makeService().sendPrintJob(job, using: transport)
+
+        XCTAssertEqual(
+            transport.writtenCommands.first(where: {
+                $0.commandField == DicomDIMSECommandField.nSetRQ
+            })?.requestedSOPClassUID,
+            DicomNetworkUID.basicColorImageBoxSOPClass
+        )
+        XCTAssertFalse(
+            transport.writtenDataSets[2]
+                .sequenceItems(for: DicomPrintTag.basicColorImageSequence)
+                .isEmpty
+        )
+    }
+
+    func testPrintManagementAutomaticModeFallsBackToGrayscale() throws {
+        let transport = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [
+            DicomNetworkUID.basicGrayscalePrintManagementMetaSOPClass
+        ])
+        let bitmap = try DicomRenderedBitmap(width: 1, height: 1, rgbData: Data([0x10, 0x20, 0x30]))
+        let job = try DicomPrintJob(
+            filmSession: DicomFilmSession(),
+            filmBox: DicomFilmBox(),
+            printMode: .automatic,
+            imageBoxes: [try DicomImageBox(bitmap: bitmap)]
+        )
+
+        _ = try makeService().sendPrintJob(job, using: transport)
+
+        let proposedSOPClasses = Set(
+            try XCTUnwrap(transport.associationRequests.first).presentationContexts.map(\.abstractSyntaxUID)
+        )
+        XCTAssertTrue(proposedSOPClasses.contains(DicomNetworkUID.basicColorPrintManagementMetaSOPClass))
+        XCTAssertTrue(proposedSOPClasses.contains(DicomNetworkUID.basicGrayscalePrintManagementMetaSOPClass))
+        XCTAssertEqual(
+            transport.writtenCommands.first(where: {
+                $0.commandField == DicomDIMSECommandField.nSetRQ
+            })?.requestedSOPClassUID,
+            DicomNetworkUID.basicGrayscaleImageBoxSOPClass
+        )
+        let imageDataSet = try XCTUnwrap(
+            transport.writtenDataSets[2]
+                .sequenceItems(for: DicomPrintTag.basicGrayscaleImageSequence)
+                .first?.dataSet
+        )
+        XCTAssertEqual(imageDataSet.int(for: .samplesPerPixel), 1)
+        XCTAssertEqual(imageDataSet.string(for: .photometricInterpretation), "MONOCHROME2")
+    }
+
+    func testPrintManagementExplicitColorNeverFallsBackToGrayscale() throws {
+        let transport = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [
+            DicomNetworkUID.basicGrayscalePrintManagementMetaSOPClass
+        ])
+        let bitmap = try DicomRenderedBitmap(width: 1, height: 1, rgbData: Data([1, 2, 3]))
+        let job = try DicomPrintJob(
+            filmSession: DicomFilmSession(),
+            filmBox: DicomFilmBox(),
+            printMode: .color,
+            imageBoxes: [try DicomImageBox(bitmap: bitmap)]
+        )
+
+        XCTAssertThrowsError(try makeService().sendPrintJob(job, using: transport)) { error in
+            XCTAssertEqual(error as? DicomPrintManagementError, .printModeNotNegotiated(.color))
+        }
+        XCTAssertTrue(transport.writtenCommands.isEmpty)
+    }
+
+    func testPrintManagementQueriesPrinterStatusAndAcknowledgesEvents() throws {
+        let transport = DIMSEScriptedTransport(
+            supportedAbstractSyntaxUIDs: [
+                DicomNetworkUID.basicGrayscalePrintManagementMetaSOPClass,
+                DicomNetworkUID.printerSOPClass
+            ],
+            printerStatusDataSets: [
+                printerStatusDataSet(state: "NORMAL", info: "NORMAL"),
+                printerStatusDataSet(state: "FAILURE", info: "SUPPLY EMPTY")
+            ],
+            printerEventTypeID: 3,
+            printerEventStatusInfo: "FILM JAM"
+        )
+        let service = makeService()
+        let bitmap = try DicomRenderedBitmap(width: 1,
+                                             height: 1,
+                                             rgbData: Data([0x10, 0x20, 0x30]))
+        let job = try DicomPrintJob(renderedBitmap: bitmap)
+
+        let result = try service.sendPrintJob(job, using: transport)
+
+        XCTAssertEqual(result.printerStatusReports, [
+            DicomPrinterStatusReport(state: .normal,
+                                     statusInfo: "NORMAL",
+                                     printerName: "DRY IMAGER",
+                                     source: .nGet),
+            DicomPrinterStatusReport(state: .failure,
+                                     statusInfo: "FILM JAM",
+                                     source: .nEventReport(eventTypeID: 3)),
+            DicomPrinterStatusReport(state: .failure,
+                                     statusInfo: "SUPPLY EMPTY",
+                                     printerName: "DRY IMAGER",
+                                     source: .nGet)
+        ])
+        XCTAssertEqual(transport.writtenCommands.map(\.commandField), [
+            DicomDIMSECommandField.nGetRQ,
+            DicomDIMSECommandField.nCreateRQ,
+            DicomDIMSECommandField.nCreateRQ,
+            DicomDIMSECommandField.nSetRQ,
+            DicomDIMSECommandField.nActionRQ,
+            DicomDIMSECommandField.nEventReportRSP,
+            DicomDIMSECommandField.nGetRQ,
+            DicomDIMSECommandField.nDeleteRQ,
+            DicomDIMSECommandField.nDeleteRQ
+        ])
+        XCTAssertEqual(
+            transport.writtenCommands.first(where: {
+                $0.commandField == DicomDIMSECommandField.nEventReportRSP
+            })?.messageIDBeingRespondedTo,
+            0x7100
+        )
+    }
+
+    func testPrintManagementContinuesWhenPrinterRefusesStatusQuery() throws {
+        let transport = DIMSEScriptedTransport(
+            supportedAbstractSyntaxUIDs: [
+                DicomNetworkUID.basicGrayscalePrintManagementMetaSOPClass,
+                DicomNetworkUID.printerSOPClass
+            ],
+            nGetResponseStatus: 0x0122
+        )
+        let service = makeService()
+        let bitmap = try DicomRenderedBitmap(width: 1,
+                                             height: 1,
+                                             rgbData: Data([0x10, 0x20, 0x30]))
+        let job = try DicomPrintJob(renderedBitmap: bitmap)
+
+        let result = try service.sendPrintJob(job, using: transport)
+
+        XCTAssertEqual(result.operation.status, 0)
+        XCTAssertTrue(result.printerStatusReports.isEmpty)
+        XCTAssertEqual(transport.writtenCommands.map(\.commandField), [
+            DicomDIMSECommandField.nGetRQ,
+            DicomDIMSECommandField.nCreateRQ,
+            DicomDIMSECommandField.nCreateRQ,
+            DicomDIMSECommandField.nSetRQ,
+            DicomDIMSECommandField.nActionRQ,
+            DicomDIMSECommandField.nGetRQ,
+            DicomDIMSECommandField.nDeleteRQ,
+            DicomDIMSECommandField.nDeleteRQ
+        ])
     }
 
     func test_printManagementWithImageBoxWarning_propagatesAcceptedWarning() throws {
@@ -495,9 +1231,12 @@ final class DicomDIMSEServiceSCUTests: XCTestCase {
         let bitmap = try DicomRenderedBitmap(width: 1,
                                              height: 1,
                                              rgbData: Data([0x10, 0x20, 0x30]))
+        // The layout holds the images (issue #1907 refuses an over-capacity
+        // job before any association) — the shortfall is the printer's:
+        // it grants a single box for a film that declared three.
         let job = try DicomPrintJob(
-            filmSession: DicomFilmSession(label: "PRINT-OVERFULL"),
-            filmBox: DicomFilmBox(imageDisplayFormat: "STANDARD\\1,1"),
+            filmSession: DicomFilmSession(label: "PRINT-SHORTFALL"),
+            filmBox: DicomFilmBox(imageDisplayFormat: "STANDARD\\2,2"),
             imageBoxes: [
                 try DicomImageBox(position: 1, bitmap: bitmap),
                 try DicomImageBox(position: 2, bitmap: bitmap),
@@ -513,10 +1252,230 @@ final class DicomDIMSEServiceSCUTests: XCTestCase {
         // The film session and film box were created; no image was set and no
         // film was printed.
         XCTAssertEqual(transport.writtenCommands.map(\.commandField), [
+            DicomDIMSECommandField.nGetRQ,
             DicomDIMSECommandField.nCreateRQ,
             DicomDIMSECommandField.nCreateRQ
         ])
         XCTAssertEqual(transport.releaseRequestCount, 1)
+    }
+
+    // MARK: - Basic Annotation Box (issue #1908)
+
+    private func annotationBitmap() throws -> DicomRenderedBitmap {
+        try DicomRenderedBitmap(width: 1, height: 1, rgbData: Data([0x10, 0x20, 0x30]))
+    }
+
+    private func annotatedJob(annotationTexts: [String] = ["DOE^JANE 2.25.9"],
+                              formatID: String? = "LABEL") throws -> DicomPrintJob {
+        try DicomPrintJob(
+            filmSession: DicomFilmSession(label: "ANNOTATED"),
+            filmBox: DicomFilmBox(imageDisplayFormat: "STANDARD\\1,1",
+                                  annotationDisplayFormatID: formatID),
+            imageBoxes: [try DicomImageBox(position: 1, bitmap: annotationBitmap())],
+            annotations: try annotationTexts.enumerated().map {
+                try DicomPrintAnnotation(position: $0.offset + 1, text: $0.element)
+            }
+        )
+    }
+
+    func test_annotatedPrint_negotiatesSetsAndPrints() throws {
+        let transport = DIMSEScriptedTransport(
+            supportedAbstractSyntaxUIDs: [
+                DicomNetworkUID.basicGrayscalePrintManagementMetaSOPClass,
+                DicomNetworkUID.basicAnnotationBoxSOPClass
+            ],
+            grantedAnnotationBoxCount: 2
+        )
+        let service = makeService()
+        let job = try annotatedJob(annotationTexts: ["DOE^JANE", "STUDY 2.25.9"])
+
+        let result = try service.sendPrintJob(job, using: transport)
+
+        // The annotation context was proposed alongside the meta class.
+        let proposedSyntaxes = Set(transport.associationRequests
+            .flatMap(\.presentationContexts)
+            .map(\.abstractSyntaxUID))
+        XCTAssertTrue(proposedSyntaxes.contains(DicomNetworkUID.basicAnnotationBoxSOPClass))
+
+        // Session create, film box create, image N-SET, two annotation
+        // N-SETs, then the print action — in that order.
+        XCTAssertEqual(transport.writtenCommands.map(\.commandField), [
+            DicomDIMSECommandField.nGetRQ,
+            DicomDIMSECommandField.nCreateRQ,
+            DicomDIMSECommandField.nCreateRQ,
+            DicomDIMSECommandField.nSetRQ,
+            DicomDIMSECommandField.nSetRQ,
+            DicomDIMSECommandField.nSetRQ,
+            DicomDIMSECommandField.nActionRQ,
+            DicomDIMSECommandField.nGetRQ,
+            DicomDIMSECommandField.nDeleteRQ,
+            DicomDIMSECommandField.nDeleteRQ
+        ])
+        // The UIDs came from the printer's response, none invented.
+        XCTAssertEqual(result.annotationBoxSOPInstanceUIDs,
+                       ["2.25.annotationbox.1", "2.25.annotationbox.2"])
+        let annotationSets = transport.writtenCommands.filter {
+            $0.commandField == DicomDIMSECommandField.nSetRQ
+                && $0.requestedSOPClassUID == DicomNetworkUID.basicAnnotationBoxSOPClass
+        }
+        XCTAssertEqual(annotationSets.map(\.requestedSOPInstanceUID),
+                       ["2.25.annotationbox.1", "2.25.annotationbox.2"])
+        // Each text went to its box with its position.
+        let annotationDataSets = transport.writtenDataSets.filter {
+            $0.string(for: DicomPrintTag.textString) != nil
+        }
+        XCTAssertEqual(annotationDataSets.count, 2)
+        XCTAssertEqual(annotationDataSets[0].string(for: DicomPrintTag.textString), "DOE^JANE")
+        XCTAssertEqual(annotationDataSets[1].string(for: DicomPrintTag.textString), "STUDY 2.25.9")
+        XCTAssertEqual(result.operation.status, 0)
+    }
+
+    func test_annotatedPrint_filmBoxCarriesTheFormatIDOnlyWhenRequested() throws {
+        let withFormat = DicomFilmBox(imageDisplayFormat: "STANDARD\\1,1",
+                                      annotationDisplayFormatID: "LABEL")
+        XCTAssertEqual(withFormat.dataSet(referencingFilmSessionUID: "2.25.1")
+            .string(for: DicomPrintTag.annotationDisplayFormatID), "LABEL")
+
+        let without = DicomFilmBox(imageDisplayFormat: "STANDARD\\1,1")
+        XCTAssertNil(without.dataSet(referencingFilmSessionUID: "2.25.1")
+            .string(for: DicomPrintTag.annotationDisplayFormatID))
+    }
+
+    /// No annotation context accepted → nothing is created, nothing printed.
+    /// The film must never quietly come out without its identification.
+    func test_annotatedPrint_withoutNegotiatedContext_refusesBeforeCreatingAnything() throws {
+        let transport = DIMSEScriptedTransport(
+            supportedAbstractSyntaxUIDs: [
+                DicomNetworkUID.basicGrayscalePrintManagementMetaSOPClass
+            ]
+        )
+        let service = makeService()
+        let job = try annotatedJob()
+
+        XCTAssertThrowsError(try service.sendPrintJob(job, using: transport)) { error in
+            XCTAssertEqual(error as? DicomPrintManagementError, .annotationBoxNotNegotiated)
+        }
+        XCTAssertTrue(transport.writtenCommands.isEmpty,
+                      "no film session or film box was created for a film that cannot be identified")
+    }
+
+    /// A refused Annotation Display Format surfaces as the film box create
+    /// failure it is. The SCU does not recreate the film box without
+    /// annotations — a generic create failure does not prove the format was
+    /// the cause, and retrying blind is the reference implementation's bug.
+    func test_annotatedPrint_refusedFilmBoxCreate_doesNotRecreateWithoutAnnotations() throws {
+        let transport = DIMSEScriptedTransport(
+            supportedAbstractSyntaxUIDs: [
+                DicomNetworkUID.basicGrayscalePrintManagementMetaSOPClass,
+                DicomNetworkUID.basicAnnotationBoxSOPClass
+            ],
+            grantedAnnotationBoxCount: 1,
+            nCreateResponseStatus: 0x0106
+        )
+        let service = makeService()
+        let job = try annotatedJob()
+
+        XCTAssertThrowsError(try service.sendPrintJob(job, using: transport)) { error in
+            guard case DicomNetworkError.dimseStatusFailure(let status)? = error as? DicomNetworkError else {
+                return XCTFail("expected a DIMSE status failure, got \(error)")
+            }
+            XCTAssertEqual(status, 0x0106)
+        }
+        // One successful session create, one failed film box create — and no
+        // second film box without annotations.
+        XCTAssertEqual(transport.writtenCommands.map(\.commandField), [
+            DicomDIMSECommandField.nGetRQ,
+            DicomDIMSECommandField.nCreateRQ,
+            DicomDIMSECommandField.nCreateRQ
+        ])
+    }
+
+    /// The response carries no Referenced Basic Annotation Box Sequence at
+    /// all: the boxes do not exist, no UID is invented, no N-SET goes out.
+    func test_annotatedPrint_missingAnnotationSequence_refusesWithBothCounts() throws {
+        let transport = DIMSEScriptedTransport(
+            supportedAbstractSyntaxUIDs: [
+                DicomNetworkUID.basicGrayscalePrintManagementMetaSOPClass,
+                DicomNetworkUID.basicAnnotationBoxSOPClass
+            ],
+            grantedAnnotationBoxCount: nil
+        )
+        let service = makeService()
+        let job = try annotatedJob()
+
+        XCTAssertThrowsError(try service.sendPrintJob(job, using: transport)) { error in
+            XCTAssertEqual(error as? DicomPrintManagementError,
+                           .insufficientAnnotationBoxes(requested: 1, granted: 0))
+        }
+        XCTAssertFalse(transport.writtenCommands.contains {
+            $0.commandField == DicomDIMSECommandField.nSetRQ
+        }, "no N-SET was sent for boxes that do not exist")
+    }
+
+    func test_annotatedPrint_insufficientAnnotationBoxes_reportsBothCounts() throws {
+        let transport = DIMSEScriptedTransport(
+            supportedAbstractSyntaxUIDs: [
+                DicomNetworkUID.basicGrayscalePrintManagementMetaSOPClass,
+                DicomNetworkUID.basicAnnotationBoxSOPClass
+            ],
+            grantedAnnotationBoxCount: 1
+        )
+        let service = makeService()
+        let job = try annotatedJob(annotationTexts: ["A", "B", "C"])
+
+        XCTAssertThrowsError(try service.sendPrintJob(job, using: transport)) { error in
+            XCTAssertEqual(error as? DicomPrintManagementError,
+                           .insufficientAnnotationBoxes(requested: 3, granted: 1))
+        }
+    }
+
+    /// A refused annotation N-SET stops the job before the print action:
+    /// printing would produce a film missing the identification it was
+    /// approved with.
+    func test_annotatedPrint_refusedAnnotationSet_neverPrintsTheFilm() throws {
+        let transport = DIMSEScriptedTransport(
+            supportedAbstractSyntaxUIDs: [
+                DicomNetworkUID.basicGrayscalePrintManagementMetaSOPClass,
+                DicomNetworkUID.basicAnnotationBoxSOPClass
+            ],
+            grantedAnnotationBoxCount: 1,
+            annotationNSetResponseStatus: 0x0112
+        )
+        let service = makeService()
+        let job = try annotatedJob()
+
+        XCTAssertThrowsError(try service.sendPrintJob(job, using: transport)) { error in
+            XCTAssertEqual(error as? DicomPrintManagementError,
+                           .annotationSetFailed(position: 1, status: 0x0112))
+        }
+        XCTAssertFalse(transport.writtenCommands.contains {
+            $0.commandField == DicomDIMSECommandField.nActionRQ
+        }, "the film's N-ACTION was never sent")
+    }
+
+    func test_annotationModelRefusesMalformedInput() throws {
+        XCTAssertThrowsError(try DicomPrintAnnotation(position: 0, text: "X"))
+        XCTAssertThrowsError(try DicomPrintAnnotation(position: 1, text: "   "))
+        XCTAssertThrowsError(try DicomPrintAnnotation(position: 1,
+                                                      text: String(repeating: "x", count: 65)))
+        // Annotations without a display format on the film box are refused
+        // at the job, before any association.
+        XCTAssertThrowsError(try annotatedJob(formatID: nil)) { error in
+            guard case DicomPrintManagementError.invalidAnnotation? = error as? DicomPrintManagementError else {
+                return XCTFail("expected invalidAnnotation, got \(error)")
+            }
+        }
+        // Duplicate positions are one text stomping another.
+        XCTAssertThrowsError(try DicomPrintJob(
+            filmSession: DicomFilmSession(),
+            filmBox: DicomFilmBox(imageDisplayFormat: "STANDARD\\1,1",
+                                  annotationDisplayFormatID: "LABEL"),
+            imageBoxes: [try DicomImageBox(position: 1, bitmap: annotationBitmap())],
+            annotations: [
+                try DicomPrintAnnotation(position: 1, text: "A"),
+                try DicomPrintAnnotation(position: 1, text: "B")
+            ]
+        ))
     }
 
     func test_printManagementWithInsufficientImageBoxes_doesNotRetry() throws {
@@ -537,9 +1496,12 @@ final class DicomDIMSEServiceSCUTests: XCTestCase {
         let bitmap = try DicomRenderedBitmap(width: 1,
                                              height: 1,
                                              rgbData: Data([0x10, 0x20, 0x30]))
+        // A valid two-image job on a two-slot film; the scripted printer
+        // still grants only one box (issue #1907 keeps over-capacity jobs
+        // from ever reaching the wire).
         let job = try DicomPrintJob(
-            filmSession: DicomFilmSession(label: "PRINT-OVERFULL"),
-            filmBox: DicomFilmBox(imageDisplayFormat: "STANDARD\\1,1"),
+            filmSession: DicomFilmSession(label: "PRINT-SHORTFALL"),
+            filmBox: DicomFilmBox(imageDisplayFormat: "STANDARD\\1,2"),
             imageBoxes: [
                 try DicomImageBox(position: 1, bitmap: bitmap),
                 try DicomImageBox(position: 2, bitmap: bitmap)
@@ -553,6 +1515,7 @@ final class DicomDIMSEServiceSCUTests: XCTestCase {
 
         XCTAssertEqual(transports.count, 1)
         XCTAssertEqual(transports[0].writtenCommands.map(\.commandField), [
+            DicomDIMSECommandField.nGetRQ,
             DicomDIMSECommandField.nCreateRQ,
             DicomDIMSECommandField.nCreateRQ
         ])
@@ -595,6 +1558,32 @@ final class DicomDIMSEServiceSCUTests: XCTestCase {
         XCTAssertEqual(
             request.dataSetData,
             try DicomDataSetWriter.dataSetData(from: dataSet, transferSyntax: transferSyntax)
+        )
+    }
+
+    func testStoreRequestFromSlicedPart10DataUsesLogicalByteOffsets() throws {
+        let sopInstanceUID = "2.25.1002"
+        let dataSet = writableStorageDataSet(sopInstanceUID: sopInstanceUID)
+        let part10Data = try DicomDataSetWriter.part10Data(
+            from: dataSet,
+            options: DicomPart10WriterOptions(
+                transferSyntax: .implicitVRLittleEndian,
+                mediaStorageSOPClassUID: DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID,
+                mediaStorageSOPInstanceUID: sopInstanceUID
+            )
+        )
+        var storage = Data(repeating: 0xA5, count: 150)
+        storage.append(part10Data)
+        let slicedPart10Data: Data = storage[150...]
+        XCTAssertEqual(slicedPart10Data.startIndex, 150)
+
+        let request = try DicomStoreRequest(part10Data: slicedPart10Data)
+
+        XCTAssertEqual(request.sopInstanceUID, sopInstanceUID)
+        XCTAssertEqual(request.transferSyntax, .implicitVRLittleEndian)
+        XCTAssertEqual(
+            request.dataSetData,
+            try DicomDataSetWriter.dataSetData(from: dataSet, transferSyntax: .implicitVRLittleEndian)
         )
     }
 
@@ -665,6 +1654,7 @@ final class DicomDIMSEServiceSCUTests: XCTestCase {
         )
         let request = try DicomStoreRequest(part10Data: part10Data)
         let transport = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [storageUID])
+        transport.maximumPDULength = maximumPDULength
         let service = DicomDIMSEServiceSCU(configuration: makeConfiguration(
             maximumPDULength: maximumPDULength
         ))
@@ -716,6 +1706,80 @@ final class DicomDIMSEServiceSCUTests: XCTestCase {
             DicomDIMSECommandField.cStoreRQ
         ])
         XCTAssertEqual(transport.writtenDataSetPayloads.first, request.dataSetData)
+    }
+
+    func testStoreSCUWhenStoredSyntaxIsRejectedReportsAcceptedLosslessAlternativeWithoutSending() throws {
+        let storageUID = DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID
+        let dataSet = writableStorageDataSet(sopInstanceUID: "2.25.1002")
+        let part10Data = try DicomDataSetWriter.part10Data(
+            from: dataSet,
+            options: DicomPart10WriterOptions(
+                transferSyntax: .implicitVRLittleEndian,
+                mediaStorageSOPClassUID: storageUID,
+                mediaStorageSOPInstanceUID: "2.25.1002"
+            )
+        )
+        var request = try DicomStoreRequest(part10Data: part10Data)
+        request.proposedTransferSyntaxes = [.implicitVRLittleEndian, .explicitVRLittleEndian]
+        let transport = DIMSEScriptedTransport(
+            supportedAbstractSyntaxUIDs: [storageUID],
+            preferredTransferSyntaxes: [.explicitVRLittleEndian]
+        )
+        let service = makeService()
+
+        XCTAssertThrowsError(try service.store(request: request, using: transport)) { error in
+            XCTAssertEqual(
+                error as? DicomNetworkError,
+                .transferSyntaxMismatch(
+                    expected: DicomTransferSyntax.implicitVRLittleEndian.rawValue,
+                    actual: DicomTransferSyntax.explicitVRLittleEndian.rawValue
+                )
+            )
+        }
+        XCTAssertEqual(
+            transport.associationRequests.first?.presentationContexts.map(\.transferSyntaxUIDs),
+            [
+                [DicomTransferSyntax.implicitVRLittleEndian.rawValue],
+                [DicomTransferSyntax.explicitVRLittleEndian.rawValue]
+            ]
+        )
+        XCTAssertTrue(transport.writtenCommands.isEmpty)
+        XCTAssertTrue(transport.writtenDataSetPayloads.isEmpty)
+    }
+
+    func testStoreSCUWhenNoProposedSyntaxIsAcceptedReportsTypedPresentationContextRefusal() throws {
+        let storageUID = DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID
+        let dataSet = writableStorageDataSet(sopInstanceUID: "2.25.1003")
+        let part10Data = try DicomDataSetWriter.part10Data(
+            from: dataSet,
+            options: DicomPart10WriterOptions(
+                transferSyntax: .implicitVRLittleEndian,
+                mediaStorageSOPClassUID: storageUID,
+                mediaStorageSOPInstanceUID: "2.25.1003"
+            )
+        )
+        var request = try DicomStoreRequest(part10Data: part10Data)
+        request.proposedTransferSyntaxes = [.implicitVRLittleEndian, .explicitVRLittleEndian]
+        let transport = DIMSEScriptedTransport(
+            supportedAbstractSyntaxUIDs: [storageUID],
+            preferredTransferSyntaxes: [.jpeg2000Lossless]
+        )
+        let service = makeService()
+
+        XCTAssertThrowsError(try service.store(request: request, using: transport)) { error in
+            XCTAssertEqual(
+                error as? DicomNetworkError,
+                .presentationContextRejected(
+                    abstractSyntaxUID: storageUID,
+                    result: .transferSyntaxNotSupported,
+                    proposedTransferSyntaxUIDs: [
+                        DicomTransferSyntax.implicitVRLittleEndian.rawValue,
+                        DicomTransferSyntax.explicitVRLittleEndian.rawValue
+                    ]
+                )
+            )
+        }
+        XCTAssertTrue(transport.writtenCommands.isEmpty)
     }
 
     func testAssociationTimeoutReachesCaller() throws {
@@ -1404,6 +2468,194 @@ final class DicomDIMSEServiceSCUTests: XCTestCase {
         XCTAssertEqual(pool.idleCount(for: configuration), 0)
         XCTAssertFalse(poolLog.events.contains { $0.kind == .recycled })
         XCTAssertFalse(poolLog.events.contains { $0.kind == .reused })
+        // Issue #2774: each finished retrieve ends with A-RELEASE, not a dropped connection.
+        XCTAssertTrue(factory.transports.allSatisfy { $0.releaseRequestCount == 1 && $0.closeCount >= 1 })
+        XCTAssertEqual(poolLog.events.filter { $0.reason == "operationComplete" }.count, 2)
+    }
+
+    func test_release_after64NonResponsePDUs_timesOutWithoutReadingFurther() throws {
+        for pdu: DicomPDU in [.pData([]), .releaseRequest] {
+            let transport = RecordingTransport(responses:
+                try (Array(repeating: pdu, count: 64) + [.releaseResponse]).map(DicomPDUCodec.encode)
+            )
+            let service = DicomDIMSEServiceSCU(configuration: makeConfiguration())
+            var released = false
+
+            XCTAssertThrowsError(try service.release(operation: .verification, using: transport, progress: {
+                if case .released = $0 { released = true }
+            })) { error in
+                XCTAssertEqual(error as? DicomNetworkError, .networkTimeout("releasing association"))
+            }
+
+            XCTAssertEqual(transport.readCount, 64)
+            XCTAssertFalse(released)
+            let expected: [DicomPDU] = [.releaseRequest]
+                + Array(repeating: .releaseResponse, count: pdu == .releaseRequest ? 64 : 0)
+            XCTAssertEqual(try transport.writtenPDUs.map(DicomPDUCodec.decode), expected)
+        }
+    }
+
+    func test_release_when64thPDUIsResponse_completesAfterHandlingEarlierPDUs() throws {
+        let pending: [DicomPDU] = (0..<63).map { $0.isMultiple(of: 2) ? .pData([]) : .releaseRequest }
+        let transport = RecordingTransport(responses: try (pending + [.releaseResponse]).map(DicomPDUCodec.encode))
+        let service = DicomDIMSEServiceSCU(configuration: makeConfiguration())
+        var released = false
+
+        try service.release(operation: .verification, using: transport, progress: {
+            if case .released = $0 { released = true }
+        })
+
+        XCTAssertEqual(transport.readCount, 64)
+        XCTAssertTrue(released)
+        XCTAssertEqual(try transport.writtenPDUs.map(DicomPDUCodec.decode),
+                       [.releaseRequest] + Array(repeating: .releaseResponse, count: 31))
+    }
+
+    func test_release_whenPeerAbortsOrSendsUnsupportedPDU_preservesTheError() throws {
+        let abort = DicomAbort(source: .serviceUser, reason: .reasonNotSpecified)
+        let rejection = DicomAssociationReject(result: .rejectedTransient, source: .serviceProviderACSE, reason: .noReason)
+        let cases: [(DicomPDU, DicomNetworkError)] = [
+            (.abort(abort), .associationAborted(abort)),
+            (.associationReject(rejection), .unsupportedPDU(.associationReject))
+        ]
+        for (pdu, expected) in cases {
+            let transport = RecordingTransport(responses: [try DicomPDUCodec.encode(pdu)])
+            let service = DicomDIMSEServiceSCU(configuration: makeConfiguration())
+            XCTAssertThrowsError(try service.release(operation: .verification, using: transport, progress: nil)) { error in
+                XCTAssertEqual(error as? DicomNetworkError, expected)
+            }
+            XCTAssertEqual(transport.readCount, 1)
+        }
+    }
+
+    func test_nonPooledRetrieve_releaseFailurePreservesTheFinalResultAndClosesTransport() throws {
+        for useGet in [true, false] {
+            let transport = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [
+                DicomNetworkUID.studyRootQueryRetrieveGet, DicomNetworkUID.studyRootQueryRetrieveMove,
+                DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID
+            ])
+            transport.acknowledgesRelease = false
+            let service = DicomDIMSEServiceSCU(configuration: makeConfiguration())
+            if useGet {
+                let result = try service.get(identifier: retrieveIdentifier(), using: transport)
+                XCTAssertEqual(result.operation.status, 0)
+                XCTAssertEqual(result.retrievedInstances.count, 1)
+            } else {
+                let result = try service.move(identifier: retrieveIdentifier(), moveDestinationAETitle: "ISIS",
+                                              using: transport)
+                XCTAssertEqual(result.status, 0)
+                XCTAssertEqual(result.completedSuboperations, 2)
+            }
+            XCTAssertEqual(transport.releaseRequestCount, 1, "deferred cleanup must not repeat the failed release")
+            XCTAssertFalse(transport.isOpen)
+        }
+    }
+
+    func test_retrieveRelease_deadlineInterruptsBothTricklingAndBlockedReads() throws {
+        for trickles in [true, false] {
+            var configuration = makeConfiguration()
+            configuration.releaseTimeout = 0.08
+            let transport = ReleaseStallingTransport(
+                supportedAbstractSyntaxUIDs: [DicomNetworkUID.studyRootQueryRetrieveGet,
+                                              DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID],
+                readDelay: trickles ? 0.03 : 2, returnsPData: trickles
+            )
+            let pool = DicomDIMSEAssociationPool(transportFactory: { _ in transport })
+            var completed = false
+            let start = Date()
+            let result = try pool.service(for: configuration).get(identifier: retrieveIdentifier(), progress: {
+                if case .completed = $0 { completed = true }
+            })
+            XCTAssertLessThan(Date().timeIntervalSince(start), 0.7, "one deadline covers every release read")
+            XCTAssertFalse(transport.isOpen)
+            XCTAssertEqual(result.operation.status, 0)
+            XCTAssertEqual(result.retrievedInstances.count, 1)
+            XCTAssertTrue(completed)
+            XCTAssertEqual(transport.releaseRequestCount, 1)
+        }
+    }
+
+    func test_checkout_doesNotWaitForAnExpiredAssociationsRelease() throws {
+        var configuration = makeConfiguration()
+        configuration.releaseTimeout = 2
+        let expired = ReleaseStallingTransport(supportedAbstractSyntaxUIDs: [DicomNetworkUID.verificationSOPClass],
+                                               readDelay: 1, returnsPData: false)
+        defer { expired.close() }
+        let pool = DicomDIMSEAssociationPool(policy: .init(idleTimeout: 60), transportFactory: { _ in expired })
+        _ = try pool.service(for: configuration).verify()
+        let request = try XCTUnwrap(expired.associationRequests.first)
+        let start = Date()
+        let fresh = try pool.checkoutSession(for: configuration, request: request, transportFactory: {
+            DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [DicomNetworkUID.verificationSOPClass])
+        }, now: Date().addingTimeInterval(120))
+        defer { pool.discardSession(fresh, error: nil) }
+        XCTAssertLessThan(Date().timeIntervalSince(start), 0.5)
+        XCTAssertTrue(fresh.isOpen)
+        XCTAssertEqual(expired.releaseStarted.wait(timeout: .now() + 1), .success)
+    }
+
+    func test_retrieveCompletion_waitsForReleaseResponseAfterUnreadPDUs() throws {
+        for useGet in [true, false] {
+            let configuration = makeConfiguration()
+            let poolLog = DicomInMemoryAssociationPoolLog()
+            let factory = ScriptedTransportFactory(supportedAbstractSyntaxUIDs: [
+                DicomNetworkUID.studyRootQueryRetrieveGet, DicomNetworkUID.studyRootQueryRetrieveMove,
+                DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID
+            ], trailingReleasePDUs: 3)
+            let pool = DicomDIMSEAssociationPool(logger: poolLog, transportFactory: factory.makeTransport)
+            var completed = false
+            let progress: (DicomDIMSEProgress) -> Void = { event in
+                guard case .completed = event else { return }
+                completed = true
+                XCTAssertEqual(factory.transports.first?.releaseResponseReadCount, 1)
+                XCTAssertEqual(poolLog.events.last?.reason, "operationComplete")
+            }
+            if useGet {
+                _ = try pool.service(for: configuration).get(identifier: retrieveIdentifier(), progress: progress)
+            } else {
+                _ = try pool.service(for: configuration).move(identifier: retrieveIdentifier(),
+                                                              moveDestinationAETitle: "ISIS", progress: progress)
+            }
+            XCTAssertTrue(completed)
+            XCTAssertEqual(factory.transports.first?.releaseRequestCount, 1)
+            XCTAssertEqual(pool.idleCount(for: configuration), 0)
+        }
+    }
+
+    func test_retrieveRelease_withoutAcknowledgementOrWithTooManyPDUs_preservesTheFinalResultWithoutRetry() throws {
+        for useGet in [true, false] {
+            for trailingPDUs in [0, 65] {
+                let configuration = makeConfiguration(retryPolicy: .init(maxAttempts: 3))
+                let poolLog = DicomInMemoryAssociationPoolLog()
+                let factory = ScriptedTransportFactory(supportedAbstractSyntaxUIDs: [
+                    DicomNetworkUID.studyRootQueryRetrieveGet, DicomNetworkUID.studyRootQueryRetrieveMove,
+                    DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID
+                ], trailingReleasePDUs: trailingPDUs, acknowledgesRelease: false)
+                let pool = DicomDIMSEAssociationPool(logger: poolLog, transportFactory: factory.makeTransport)
+                var completed = false
+                let progress: (DicomDIMSEProgress) -> Void = { event in
+                    guard case .completed = event else { return }
+                    completed = true
+                    XCTAssertFalse(factory.transports.first?.isOpen ?? true, "cleanup precedes completion")
+                }
+                if useGet {
+                    let result = try pool.service(for: configuration).get(identifier: retrieveIdentifier(), progress: progress)
+                    XCTAssertEqual(result.operation.status, 0)
+                    XCTAssertEqual(result.retrievedInstances.count, 1)
+                } else {
+                    let result = try pool.service(for: configuration).move(identifier: retrieveIdentifier(),
+                                                                          moveDestinationAETitle: "ISIS", progress: progress)
+                    XCTAssertEqual(result.status, 0)
+                    XCTAssertEqual(result.completedSuboperations, 2)
+                }
+                XCTAssertTrue(completed)
+                XCTAssertFalse(poolLog.events.contains { $0.reason == "operationComplete" })
+                XCTAssertEqual(factory.transports.count, 1, "a completed retrieve must not request the images again")
+                XCTAssertEqual(factory.transports.first?.releaseRequestCount, 1)
+                XCTAssertGreaterThanOrEqual(factory.transports.first?.closeCount ?? 0, 1)
+                XCTAssertEqual(pool.idleCount(for: configuration), 0)
+            }
+        }
     }
 
     func test_moveRetrieve_whenQueuedTwice_opensFreshAssociation() throws {
@@ -1426,6 +2678,38 @@ final class DicomDIMSEServiceSCUTests: XCTestCase {
         XCTAssertEqual(pool.idleCount(for: configuration), 0)
         XCTAssertFalse(poolLog.events.contains { $0.kind == .recycled })
         XCTAssertFalse(poolLog.events.contains { $0.kind == .reused })
+        // Issue #2774: each finished retrieve ends with A-RELEASE, not a dropped connection.
+        XCTAssertTrue(factory.transports.allSatisfy { $0.releaseRequestCount == 1 && $0.closeCount >= 1 })
+        XCTAssertEqual(poolLog.events.filter { $0.reason == "operationComplete" }.count, 2)
+    }
+
+    /// Issue #2774: an idle association is released by the pool itself once `idleTimeout` passes, before a
+    /// peer that drops inactive associations gets to it.
+    func test_idleAssociation_isReleasedWhenItsIdleTimeoutPasses() throws {
+        let configuration = makeConfiguration()
+        let poolLog = DicomInMemoryAssociationPoolLog()
+        let factory = ScriptedTransportFactory(supportedAbstractSyntaxUIDs: [
+            DicomNetworkUID.verificationSOPClass
+        ])
+        let pool = DicomDIMSEAssociationPool(policy: DicomDIMSEAssociationPoolPolicy(
+            maximumIdleServicesPerKey: 2,
+            idleTimeout: 0.2
+        ), logger: poolLog, transportFactory: factory.makeTransport)
+
+        _ = try pool.service(for: configuration).verify()
+        let transport = try XCTUnwrap(factory.transports.first)
+        XCTAssertEqual(transport.releaseRequestCount, 0, "kept for reuse while it is fresh")
+
+        let deadline = Date().addingTimeInterval(5)
+        while transport.isOpen, Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.02)
+        }
+        XCTAssertTrue(poolLog.events.contains { $0.kind == .closedIdle })
+        XCTAssertEqual(transport.releaseRequestCount, 1)
+        XCTAssertFalse(transport.isOpen)
+
+        _ = try pool.service(for: configuration).verify()
+        XCTAssertEqual(factory.transports.count, 2, "a later operation opens a fresh association")
     }
 
     func testAssociationPoolKeySeparatesNodeTLSIdentityAndDIMSEConfiguration() throws {
@@ -1602,21 +2886,41 @@ final class DicomDIMSEServiceSCUTests: XCTestCase {
         let studies = try pool.service(for: configuration).find(identifier: studyQuery)
         let studyUID = try XCTUnwrap(studies.matches.first?.string(for: .studyInstanceUID),
                                      "HOROS has no studies to retrieve.")
+        let imageQuery = DicomDataSet(elements: [
+            element(0x0008_0052, .CS, "IMAGE"),
+            element(DicomTag.studyInstanceUID.rawValue, .UI, studyUID),
+            element(DicomTag.seriesInstanceUID.rawValue, .UI, ""),
+            element(DicomTag.sopInstanceUID.rawValue, .UI, ""),
+            element(DicomTag.sopClassUID.rawValue, .UI, "")
+        ])
+        let images = try pool.service(for: configuration).find(identifier: imageQuery)
+        let storageSOPClassUIDs = Array(Set(images.matches.compactMap {
+            $0.string(for: .sopClassUID)
+        }.filter { !$0.isEmpty })).sorted()
+        XCTAssertFalse(storageSOPClassUIDs.isEmpty, "HOROS returned no storage SOP Classes.")
         let retrieve = DicomDataSet(elements: [
             element(0x0008_0052, .CS, "STUDY"),
             element(DicomTag.studyInstanceUID.rawValue, .UI, studyUID)
         ])
 
-        let first = try pool.service(for: configuration).get(identifier: retrieve)
-        let second = try pool.service(for: configuration).get(identifier: retrieve)
+        let first = try pool.service(for: configuration).get(
+            identifier: retrieve, storageSOPClassUIDs: storageSOPClassUIDs
+        )
+        let second = try pool.service(for: configuration).get(
+            identifier: retrieve, storageSOPClassUIDs: storageSOPClassUIDs
+        )
 
+        print("HOROS sequential GET: SOP Classes=\(storageSOPClassUIDs), "
+              + "statuses=\(first.operation.status),\(second.operation.status), "
+              + "instances=\(first.retrievedInstances.count),\(second.retrievedInstances.count)")
+        print("HOROS pool events: \(poolLog.events.map(\.kind))")
         XCTAssertGreaterThan(first.retrievedInstances.count, 0)
         XCTAssertEqual(second.retrievedInstances.count, first.retrievedInstances.count)
         XCTAssertEqual(second.operation.status, first.operation.status)
-        // One association for the C-FIND plus one per retrieve, and nothing ever handed back out:
+        // One association shared by both C-FINDs plus one per retrieve:
         // the C-FIND's idle entry stays in the pool, the two retrieve associations do not.
         XCTAssertEqual(poolLog.events.filter { $0.kind == .created }.count, 3)
-        XCTAssertEqual(poolLog.events.filter { $0.kind == .reused }.count, 0)
+        XCTAssertEqual(poolLog.events.filter { $0.kind == .reused }.count, 1)
     }
 
     // MARK: - Retrieve associations are never recycled (#1602)
@@ -1911,20 +3215,47 @@ private func worklistDataSet() -> DicomDataSet {
 /// The film box N-CREATE response, carrying one Referenced Image Box item per
 /// image box the printer actually created. `grantedImageBoxCount` is how a
 /// printer says "your film box asked for more than this layout holds".
-private func printFilmBoxResponseDataSet(grantedImageBoxCount: Int = 1) -> DicomDataSet {
-    DicomDataSet(elements: [
+private func printFilmBoxResponseDataSet(imageBoxSOPClassUID: String,
+                                         grantedImageBoxCount: Int = 1,
+                                         grantedAnnotationBoxCount: Int? = nil) -> DicomDataSet {
+    var elements = [
         DicomDataElement(tag: DicomPrintTag.referencedImageBoxSequence,
                          vr: .SQ,
                          value: .sequence((0..<max(0, grantedImageBoxCount)).map { index in
                             DicomSequenceItem(dataSet: DicomDataSet(elements: [
                                 element(DicomTag.referencedSOPClassUID.rawValue,
                                         .UI,
-                                        DicomNetworkUID.basicGrayscaleImageBoxSOPClass),
+                                        imageBoxSOPClassUID),
                                 element(DicomTag.referencedSOPInstanceUID.rawValue,
                                         .UI,
                                         "2.25.imagebox.\(index + 1)")
                             ]))
                          }))
+    ]
+    if let grantedAnnotationBoxCount {
+        elements.append(DicomDataElement(
+            tag: DicomPrintTag.referencedBasicAnnotationBoxSequence,
+            vr: .SQ,
+            value: .sequence((0..<max(0, grantedAnnotationBoxCount)).map { index in
+                DicomSequenceItem(dataSet: DicomDataSet(elements: [
+                    element(DicomTag.referencedSOPClassUID.rawValue,
+                            .UI,
+                            DicomNetworkUID.basicAnnotationBoxSOPClass),
+                    element(DicomTag.referencedSOPInstanceUID.rawValue,
+                            .UI,
+                            "2.25.annotationbox.\(index + 1)")
+                ]))
+            })
+        ))
+    }
+    return DicomDataSet(elements: elements)
+}
+
+private func printerStatusDataSet(state: String, info: String, name: String = "DRY IMAGER") -> DicomDataSet {
+    DicomDataSet(elements: [
+        element(DicomPrintTag.printerStatus, .CS, state),
+        element(DicomPrintTag.printerStatusInfo, .CS, info),
+        element(DicomPrintTag.printerName, .LO, name)
     ])
 }
 
@@ -1949,18 +3280,15 @@ private func performTLSHandshake(
     let listener = try NWListener(using: serverPrepared.parameters, on: .any)
     let listenerSemaphore = DispatchSemaphore(value: 0)
     let connectionSemaphore = DispatchSemaphore(value: 0)
-    var listenerError: Error?
-    var outcome = TLSHandshakeOutcome.timedOut
-    var acceptedConnections: [NWConnection] = []
-    let acceptedConnectionsLock = NSLock()
+    let listenerError = DicomTestLockedValue<(any Error)?>(nil)
+    let outcome = DicomTestLockedValue(TLSHandshakeOutcome.timedOut)
+    let acceptedConnections = DicomTestLockedValue<[NWConnection]>([])
 
     listener.newConnectionHandler = { connection in
-        acceptedConnectionsLock.lock()
-        acceptedConnections.append(connection)
-        acceptedConnectionsLock.unlock()
+        acceptedConnections.withValue { $0.append(connection) }
         connection.stateUpdateHandler = { state in
             if case .failed = state {
-                outcome = .failed
+                outcome.replace(with: .failed)
                 connectionSemaphore.signal()
             }
         }
@@ -1972,7 +3300,7 @@ private func performTLSHandshake(
         case .ready:
             listenerSemaphore.signal()
         case .failed(let error):
-            listenerError = error
+            listenerError.replace(with: error)
             listenerSemaphore.signal()
         default:
             break
@@ -1984,7 +3312,7 @@ private func performTLSHandshake(
         listener.cancel()
         return .timedOut
     }
-    if let listenerError {
+    if let listenerError = listenerError.value {
         listener.cancel()
         throw listenerError
     }
@@ -1997,10 +3325,10 @@ private func performTLSHandshake(
     connection.stateUpdateHandler = { state in
         switch state {
         case .ready:
-            outcome = .ready
+            outcome.replace(with: .ready)
             connectionSemaphore.signal()
         case .failed:
-            outcome = .failed
+            outcome.replace(with: .failed)
             connectionSemaphore.signal()
         default:
             break
@@ -2008,31 +3336,99 @@ private func performTLSHandshake(
     }
     connection.start(queue: queue)
     connection.send(content: Data([0x01]), completion: .contentProcessed { error in
-        outcome = error == nil ? .ready : .failed
+        outcome.replace(with: error == nil ? .ready : .failed)
         connectionSemaphore.signal()
     })
 
     if connectionSemaphore.wait(timeout: .now() + 5) != .success {
-        outcome = .timedOut
+        outcome.replace(with: .timedOut)
     }
     connection.cancel()
-    acceptedConnectionsLock.lock()
-    acceptedConnections.forEach { $0.cancel() }
-    acceptedConnectionsLock.unlock()
+    acceptedConnections.value.forEach { $0.cancel() }
     listener.cancel()
     _ = serverPrepared.tlsContext
     _ = clientPrepared.tlsContext
-    return outcome
+    return outcome.value
 }
 #endif
+
+/// The base transport is accessed only under the lock; close may interrupt a release read from another queue.
+private final class ReleaseStallingTransport: DicomCancellableAssociationTransport {
+    private let lock = NSLock()
+    private let base: DIMSEScriptedTransport
+    private let readDelay: TimeInterval
+    private let returnsPData: Bool
+    private var releasing = false
+    private let closed = DispatchSemaphore(value: 0)
+    let releaseStarted = DispatchSemaphore(value: 0)
+
+    init(supportedAbstractSyntaxUIDs: Set<String>, readDelay: TimeInterval, returnsPData: Bool) {
+        base = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: supportedAbstractSyntaxUIDs)
+        self.readDelay = readDelay
+        self.returnsPData = returnsPData
+    }
+
+    var isOpen: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return base.isOpen
+    }
+
+    var releaseRequestCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return base.releaseRequestCount
+    }
+
+    var associationRequests: [DicomAssociationRequest] {
+        lock.lock()
+        defer { lock.unlock() }
+        return base.associationRequests
+    }
+
+    func writePDU(_ data: Data) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        try base.writePDU(data)
+        if case .releaseRequest = try DicomPDUCodec.decode(data) {
+            releasing = true
+            releaseStarted.signal()
+        }
+    }
+
+    func readPDU() throws -> Data {
+        lock.lock()
+        if !releasing {
+            defer { lock.unlock() }
+            return try base.readPDU()
+        }
+        lock.unlock()
+        _ = closed.wait(timeout: .now() + readDelay)
+        guard isOpen else { throw DicomNetworkError.networkUnavailable("Transport closed.") }
+        guard returnsPData else { throw DicomNetworkError.networkTimeout("test release read") }
+        return try DicomPDUCodec.encode(.pData([]))
+    }
+
+    func close() {
+        lock.lock()
+        base.close()
+        lock.unlock()
+        closed.signal()
+    }
+}
 
 private final class ScriptedTransportFactory: @unchecked Sendable {
     private let supportedAbstractSyntaxUIDs: Set<String>
     private let lock = NSLock()
     private var storage: [DIMSEScriptedTransport] = []
 
-    init(supportedAbstractSyntaxUIDs: Set<String>) {
+    private let trailingReleasePDUs: Int
+    private let acknowledgesRelease: Bool
+
+    init(supportedAbstractSyntaxUIDs: Set<String>, trailingReleasePDUs: Int = 0, acknowledgesRelease: Bool = true) {
         self.supportedAbstractSyntaxUIDs = supportedAbstractSyntaxUIDs
+        self.trailingReleasePDUs = trailingReleasePDUs
+        self.acknowledgesRelease = acknowledgesRelease
     }
 
     var transports: [DIMSEScriptedTransport] {
@@ -2044,6 +3440,8 @@ private final class ScriptedTransportFactory: @unchecked Sendable {
 
     func makeTransport(configuration _: DicomDIMSEConnectionConfiguration) -> DicomAssociationTransport {
         let transport = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: supportedAbstractSyntaxUIDs)
+        transport.trailingReleasePDUs = trailingReleasePDUs
+        transport.acknowledgesRelease = acknowledgesRelease
         lock.lock()
         storage.append(transport)
         lock.unlock()
@@ -2086,23 +3484,39 @@ private final class LockedErrorStore: @unchecked Sendable {
 private final class DIMSEScriptedTransport: DicomCancellableAssociationTransport {
     private let supportedAbstractSyntaxUIDs: Set<String>
     private let preferredTransferSyntaxes: [DicomTransferSyntax]
+    private let roleSelectionPolicy: DicomAssociationNegotiator.RoleSelectionResponsePolicy
     private let cancelBeforeReturningCommandFields: Set<UInt16>
     private let retrieveFinalStatus: UInt16
     private let failBeforeRetrieveFinalResponse: Bool
     private let findResponseDataSet: DicomDataSet?
     private let grantedImageBoxCount: Int
+    private let grantedAnnotationBoxCount: Int?
+    private let printImageBoxSOPClassUID: String
     private let nCreateResponseStatus: UInt16
     private let nSetResponseStatus: UInt16
+    private let annotationNSetResponseStatus: UInt16
     private let nActionResponseStatus: UInt16
+    private let nGetResponseStatus: UInt16
+    private let printerStatusDataSets: [DicomDataSet]
+    private let printerEventTypeID: UInt16?
+    private let printerEventStatusInfo: String?
+    var maximumPDULength: UInt32 = 16_384
+    /// The Affected SOP Instance UID of the C-GET's store sub-operation.
+    var storeSOPInstanceUID = "2.25.instance"
+    var trailingReleasePDUs = 0
+    var acknowledgesRelease = true
+    private(set) var releaseResponseReadCount = 0
     private var responses: [Data] = []
     private var acceptedContextsByID: [UInt8: DicomAcceptedPresentationContext] = [:]
     private var lastRequestCommand: DicomDIMSECommandSet?
     private var pendingDataSetPayload = Data()
     private var pendingDataSetPresentationContextID: UInt8?
     private var didTriggerCancellation = false
+    private var printerStatusDataSetIndex = 0
     private var isClosed = false
 
     private(set) var associationRequests: [DicomAssociationRequest] = []
+    private(set) var associationAccepts: [DicomAssociationAccept] = []
     private(set) var writtenCommands: [DicomDIMSECommandSet] = []
     private(set) var writtenDataSets: [DicomDataSet] = []
     private(set) var writtenDataSetPayloads: [Data] = []
@@ -2115,25 +3529,41 @@ private final class DIMSEScriptedTransport: DicomCancellableAssociationTransport
     init(
         supportedAbstractSyntaxUIDs: Set<String>,
         preferredTransferSyntaxes: [DicomTransferSyntax] = [.explicitVRLittleEndian],
+        roleSelectionPolicy: DicomAssociationNegotiator.RoleSelectionResponsePolicy = .acceptProposed,
         cancelBeforeReturningCommandFields: Set<UInt16> = [],
         retrieveFinalStatus: UInt16 = 0,
         failBeforeRetrieveFinalResponse: Bool = false,
         findResponseDataSet: DicomDataSet? = nil,
         grantedImageBoxCount: Int = 1,
+        grantedAnnotationBoxCount: Int? = nil,
+        printImageBoxSOPClassUID: String = DicomNetworkUID.basicGrayscaleImageBoxSOPClass,
         nCreateResponseStatus: UInt16 = 0,
         nSetResponseStatus: UInt16 = 0,
-        nActionResponseStatus: UInt16 = 0
+        annotationNSetResponseStatus: UInt16 = 0,
+        nActionResponseStatus: UInt16 = 0,
+        nGetResponseStatus: UInt16 = 0,
+        printerStatusDataSets: [DicomDataSet] = [],
+        printerEventTypeID: UInt16? = nil,
+        printerEventStatusInfo: String? = nil
     ) {
         self.supportedAbstractSyntaxUIDs = supportedAbstractSyntaxUIDs
         self.preferredTransferSyntaxes = preferredTransferSyntaxes
+        self.roleSelectionPolicy = roleSelectionPolicy
         self.cancelBeforeReturningCommandFields = cancelBeforeReturningCommandFields
         self.retrieveFinalStatus = retrieveFinalStatus
         self.failBeforeRetrieveFinalResponse = failBeforeRetrieveFinalResponse
         self.findResponseDataSet = findResponseDataSet
         self.grantedImageBoxCount = grantedImageBoxCount
+        self.grantedAnnotationBoxCount = grantedAnnotationBoxCount
+        self.printImageBoxSOPClassUID = printImageBoxSOPClassUID
         self.nCreateResponseStatus = nCreateResponseStatus
         self.nSetResponseStatus = nSetResponseStatus
+        self.annotationNSetResponseStatus = annotationNSetResponseStatus
         self.nActionResponseStatus = nActionResponseStatus
+        self.nGetResponseStatus = nGetResponseStatus
+        self.printerStatusDataSets = printerStatusDataSets
+        self.printerEventTypeID = printerEventTypeID
+        self.printerEventStatusInfo = printerEventStatusInfo
     }
 
     func writePDU(_ data: Data) throws {
@@ -2146,8 +3576,12 @@ private final class DIMSEScriptedTransport: DicomCancellableAssociationTransport
             let accept = DicomAssociationNegotiator.accept(
                 request,
                 supportedAbstractSyntaxUIDs: supportedAbstractSyntaxUIDs,
-                preferredTransferSyntaxes: preferredTransferSyntaxes
+                preferredTransferSyntaxes: preferredTransferSyntaxes,
+                roleSelectionPolicy: roleSelectionPolicy,
+                maximumPDULength: maximumPDULength,
+                supportedSCUAbstractSyntaxUIDs: supportedAbstractSyntaxUIDs
             )
+            associationAccepts.append(accept)
             acceptedContextsByID = accept.presentationContexts.reduce(into: [:]) { partial, accepted in
                 guard accepted.result == .acceptance,
                       let requested = request.presentationContexts.first(where: { $0.id == accepted.id }),
@@ -2166,7 +3600,10 @@ private final class DIMSEScriptedTransport: DicomCancellableAssociationTransport
             try handlePData(pdvs)
         case .releaseRequest:
             releaseRequestCount += 1
-            responses.append(try DicomPDUCodec.encode(.releaseResponse))
+            for _ in 0..<trailingReleasePDUs {
+                responses.append(try DicomPDUCodec.encode(.pData([])))
+            }
+            if acknowledgesRelease { responses.append(try DicomPDUCodec.encode(.releaseResponse)) }
         default:
             break
         }
@@ -2190,6 +3627,7 @@ private final class DIMSEScriptedTransport: DicomCancellableAssociationTransport
            }) {
             throw DicomNetworkError.networkUnavailable("Failed before final C-GET response.")
         }
+        if case .releaseResponse = try DicomPDUCodec.decode(response) { releaseResponseReadCount += 1 }
         triggerCancellationIfNeeded(for: response)
         return response
     }
@@ -2240,7 +3678,35 @@ private final class DIMSEScriptedTransport: DicomCancellableAssociationTransport
             ), contextID: presentationContextID)
         case DicomDIMSECommandField.cStoreRQ:
             break
+        case DicomDIMSECommandField.nDeleteRQ:
+            try enqueueCommand(DicomDIMSECommandSet(
+                commandField: DicomDIMSECommandField.nDeleteRSP,
+                messageIDBeingRespondedTo: command.messageID,
+                commandDataSetType: DicomDIMSECommandDataSetType.noDataSet,
+                status: 0
+            ), contextID: presentationContextID)
         case DicomDIMSECommandField.nActionRQ:
+            if let eventTypeID = printerEventTypeID,
+               let printerContextID = acceptedContextsByID.first(where: {
+                   $0.value.abstractSyntaxUID == DicomNetworkUID.printerSOPClass
+               })?.key {
+                let hasDataSet = printerEventStatusInfo != nil
+                try enqueueCommand(DicomDIMSECommandSet(
+                    affectedSOPClassUID: DicomNetworkUID.printerSOPClass,
+                    commandField: DicomDIMSECommandField.nEventReportRQ,
+                    messageID: 0x7100,
+                    commandDataSetType: hasDataSet
+                        ? DicomDIMSECommandDataSetType.hasDataSet
+                        : DicomDIMSECommandDataSetType.noDataSet,
+                    affectedSOPInstanceUID: DicomNetworkUID.printerSOPInstance,
+                    eventTypeID: eventTypeID
+                ), contextID: printerContextID)
+                if let printerEventStatusInfo {
+                    try enqueueDataSet(DicomDataSet(elements: [
+                        element(DicomPrintTag.printerStatusInfo, .CS, printerEventStatusInfo)
+                    ]), contextID: printerContextID)
+                }
+            }
             try enqueueCommand(DicomDIMSECommandSet(
                 requestedSOPClassUID: command.requestedSOPClassUID,
                 commandField: DicomDIMSECommandField.nActionRSP,
@@ -2250,6 +3716,27 @@ private final class DIMSEScriptedTransport: DicomCancellableAssociationTransport
                 requestedSOPInstanceUID: command.requestedSOPInstanceUID,
                 actionTypeID: command.actionTypeID
             ), contextID: presentationContextID)
+        case DicomDIMSECommandField.nGetRQ:
+            try enqueueCommand(DicomDIMSECommandSet(
+                requestedSOPClassUID: command.requestedSOPClassUID,
+                commandField: DicomDIMSECommandField.nGetRSP,
+                messageIDBeingRespondedTo: command.messageID,
+                commandDataSetType: nGetResponseStatus == 0
+                    ? DicomDIMSECommandDataSetType.hasDataSet
+                    : DicomDIMSECommandDataSetType.noDataSet,
+                status: nGetResponseStatus,
+                requestedSOPInstanceUID: command.requestedSOPInstanceUID
+            ), contextID: presentationContextID)
+            if nGetResponseStatus == 0 {
+                let dataSet: DicomDataSet
+                if printerStatusDataSetIndex < printerStatusDataSets.count {
+                    dataSet = printerStatusDataSets[printerStatusDataSetIndex]
+                } else {
+                    dataSet = printerStatusDataSet(state: "NORMAL", info: "NORMAL")
+                }
+                printerStatusDataSetIndex += 1
+                try enqueueDataSet(dataSet, contextID: presentationContextID)
+            }
         default:
             break
         }
@@ -2306,14 +3793,22 @@ private final class DIMSEScriptedTransport: DicomCancellableAssociationTransport
                 warningSuboperations: 0
             ), contextID: presentationContextID)
         case DicomDIMSECommandField.cGetRQ:
+            // The store sub-operation rides whichever accepted context carries
+            // the storage class — its id shifts as the SCU proposes more
+            // query models ahead of the storage classes (issue #1867).
+            guard let storeContextID = acceptedContextsByID.first(where: {
+                $0.value.abstractSyntaxUID == DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID
+            })?.key else {
+                throw DicomNetworkError.invalidPresentationContextID(presentationContextID)
+            }
             try enqueueCommand(DicomDIMSECommandSet(
                 affectedSOPClassUID: DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID,
                 commandField: DicomDIMSECommandField.cStoreRQ,
                 messageID: 33,
                 commandDataSetType: DicomDIMSECommandDataSetType.hasDataSet,
-                affectedSOPInstanceUID: "2.25.instance"
-            ), contextID: 3)
-            try enqueueDataSet(storageDataSet(), contextID: 3)
+                affectedSOPInstanceUID: storeSOPInstanceUID
+            ), contextID: storeContextID)
+            try enqueueDataSet(storageDataSet(), contextID: storeContextID)
             try enqueueCommand(DicomDIMSECommandSet(
                 affectedSOPClassUID: command.affectedSOPClassUID,
                 commandField: DicomDIMSECommandField.cGetRSP,
@@ -2343,23 +3838,36 @@ private final class DIMSEScriptedTransport: DicomCancellableAssociationTransport
                 commandDataSetType: hasFilmBoxDataSet
                     ? DicomDIMSECommandDataSetType.hasDataSet
                     : DicomDIMSECommandDataSetType.noDataSet,
-                status: nCreateResponseStatus,
+                status: hasFilmBoxDataSet ? nCreateResponseStatus : 0,
                 affectedSOPInstanceUID: command.affectedSOPInstanceUID
             ), contextID: presentationContextID)
             if hasFilmBoxDataSet {
                 try enqueueDataSet(
-                    printFilmBoxResponseDataSet(grantedImageBoxCount: grantedImageBoxCount),
+                    printFilmBoxResponseDataSet(imageBoxSOPClassUID: printImageBoxSOPClassUID,
+                                                grantedImageBoxCount: grantedImageBoxCount,
+                                                grantedAnnotationBoxCount: grantedAnnotationBoxCount),
                     contextID: presentationContextID
                 )
             }
         case DicomDIMSECommandField.nSetRQ:
+            let isAnnotation = command.requestedSOPClassUID == DicomNetworkUID.basicAnnotationBoxSOPClass
             try enqueueCommand(DicomDIMSECommandSet(
                 requestedSOPClassUID: command.requestedSOPClassUID,
                 commandField: DicomDIMSECommandField.nSetRSP,
                 messageIDBeingRespondedTo: command.messageID,
                 commandDataSetType: DicomDIMSECommandDataSetType.noDataSet,
-                status: nSetResponseStatus,
+                status: isAnnotation ? annotationNSetResponseStatus : nSetResponseStatus,
                 requestedSOPInstanceUID: command.requestedSOPInstanceUID
+            ), contextID: presentationContextID)
+        case DicomDIMSECommandField.nEventReportRQ:
+            try enqueueCommand(DicomDIMSECommandSet(
+                affectedSOPClassUID: command.affectedSOPClassUID,
+                commandField: DicomDIMSECommandField.nEventReportRSP,
+                messageIDBeingRespondedTo: command.messageID,
+                commandDataSetType: DicomDIMSECommandDataSetType.noDataSet,
+                status: 0,
+                affectedSOPInstanceUID: command.affectedSOPInstanceUID,
+                eventTypeID: command.eventTypeID
             ), contextID: presentationContextID)
         default:
             break
@@ -2428,6 +3936,7 @@ private final class FailingReadTransport: DicomAssociationTransport {
 private final class RecordingTransport: DicomAssociationTransport {
     private var responses: [Data]
     private(set) var writtenPDUs: [Data] = []
+    private(set) var readCount = 0
 
     init(responses: [Data]) {
         self.responses = responses
@@ -2441,6 +3950,214 @@ private final class RecordingTransport: DicomAssociationTransport {
         guard !responses.isEmpty else {
             throw DicomNetworkError.invalidPDULength(expected: 1, actual: 0)
         }
+        readCount += 1
         return responses.removeFirst()
+    }
+}
+
+extension DicomDIMSEServiceSCUTests {
+    func test_storeBatch_windowFourDispatchesWholeMessagesBeforeReading() throws {
+        let peer = DIMSEWindowTransport()
+        let service = DicomDIMSEServiceSCU(configuration: .init(host: "fake", port: 1,
+            calledAETitle: "SCP", callingAETitle: "SCU", asynchronousOperationsWindow: .init(maximumInvoked: 4)))
+        let requests = try (1...4).map { index in
+            try DicomStoreRequest(sopClassUID: DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID,
+                sopInstanceUID: "2.25.\(index)", transferSyntax: .explicitVRLittleEndian,
+                dataSetData: Data(repeating: UInt8(index), count: 4096))
+        }
+        let results = try service.store(requests: requests, using: peer)
+        XCTAssertEqual(results.count, 4)
+        for result in results { XCTAssertEqual(try result.get().status, 0) }
+        XCTAssertEqual(peer.maximumOutstanding, 4)
+        XCTAssertEqual(peer.completedMessageIDs, [1, 2, 3, 4])
+        XCTAssertEqual(peer.responseIDs, [4, 3, 2, 1])
+        XCTAssertTrue(peer.pduBodyLengths.allSatisfy { $0 <= 1024 })
+    }
+
+    func test_findAndEcho_windowFourDispatchesBeforeReading() throws {
+        let peer = DIMSEWindowTransport()
+        let service = DicomDIMSEServiceSCU(configuration: .init(host: "fake", port: 1,
+            calledAETitle: "SCP", callingAETitle: "SCU", asynchronousOperationsWindow: .init(maximumInvoked: 4)))
+        let results = try service.find(identifiers: [DicomDataSet(elements: [])], verifyOnAssociation: true, using: peer)
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(peer.maximumOutstanding, 2)
+        XCTAssertEqual(peer.fields, [DicomDIMSECommandField.cFindRQ, DicomDIMSECommandField.cEchoRQ])
+        XCTAssertEqual(peer.responseIDs, [2, 1])
+    }
+
+    func test_commandAndDataset_fragmentWithinPeerMaximum() throws {
+        let peer = DIMSEWindowTransport()
+        let service = DicomDIMSEServiceSCU(configuration: .init(host: "fake", port: 1,
+            calledAETitle: "SCP", callingAETitle: "SCU"))
+        let association = try service.openAssociation(for: .store,
+            abstractSyntaxUIDs: [DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID],
+            using: peer, progress: nil)
+        let command = DicomDIMSECommandSet(commandField: DicomDIMSECommandField.cStoreRQ, messageID: 1,
+            commandDataSetType: DicomDIMSECommandDataSetType.hasDataSet, errorComment: String(repeating: "A", count: 2048))
+        try service.sendCommand(command, presentationContextID: 1, association: association, transport: peer)
+        try service.sendDataSetData(Data(repeating: 7, count: 5000), presentationContextID: 1,
+                                    association: association, transport: peer)
+        XCTAssertGreaterThan(peer.commandFragments, 1)
+        XCTAssertGreaterThan(peer.datasetFragments, 1)
+        XCTAssertTrue(peer.pduBodyLengths.allSatisfy { $0 <= 1024 })
+        XCTAssertEqual(peer.completedMessageIDs, [1])
+    }
+}
+
+/// Defers responses until read, then deliberately returns them in reverse order.
+private final class DIMSEWindowTransport: DicomAssociationTransport {
+    var failResponse = false
+    var maximumOutstanding = 0
+    var completedMessageIDs: [UInt16] = []
+    var responseIDs: [UInt16] = []
+    var fields: [UInt16] = []
+    var pduBodyLengths: [Int] = []
+    var commandFragments = 0
+    var datasetFragments = 0
+    private var responses: [Data] = []
+    private var pending: [(UInt8, DicomDIMSECommandSet)] = []
+    private var commandBytes = Data()
+    private var active: (UInt8, DicomDIMSECommandSet)?
+
+    func writePDU(_ data: Data) throws {
+        switch try DicomPDUCodec.decode(data) {
+        case .associationRequest(let request):
+            let accept = DicomAssociationNegotiator.accept(request,
+                supportedAbstractSyntaxUIDs: Set(request.presentationContexts.map(\.abstractSyntaxUID)),
+                preferredTransferSyntaxes: [.explicitVRLittleEndian], maximumPDULength: 1024,
+                supportedAsynchronousOperationsWindow: .init(maximumInvoked: 4))
+            responses.append(try DicomPDUCodec.encode(.associationAccept(accept)))
+        case .pData(let pdvs):
+            pduBodyLengths.append(data.count - 6)
+            for pdv in pdvs {
+                if pdv.isCommand {
+                    guard active == nil else { throw DicomNetworkError.malformedCommandSet("Interleaved messages") }
+                    commandFragments += 1
+                    commandBytes.append(pdv.data)
+                    if pdv.isLastFragment {
+                        let command = try DicomDIMSECommandSet.decode(commandBytes)
+                        commandBytes.removeAll()
+                        fields.append(command.commandField)
+                        active = (pdv.presentationContextID, command)
+                        if command.commandDataSetType == DicomDIMSECommandDataSetType.noDataSet { finishMessage() }
+                    }
+                } else {
+                    guard let active, active.0 == pdv.presentationContextID, commandBytes.isEmpty else {
+                        throw DicomNetworkError.malformedCommandSet("Dataset without complete matching command")
+                    }
+                    datasetFragments += 1
+                    if pdv.isLastFragment { finishMessage() }
+                }
+            }
+        case .releaseRequest:
+            responses.append(try DicomPDUCodec.encode(.releaseResponse))
+        default: break
+        }
+    }
+
+    private func finishMessage() {
+        guard let active else { return }
+        completedMessageIDs.append(active.1.messageID!)
+        pending.append(active)
+        maximumOutstanding = max(maximumOutstanding, pending.count)
+        self.active = nil
+    }
+
+    func readPDU() throws -> Data {
+        if !responses.isEmpty { return responses.removeFirst() }
+        if failResponse { throw DicomNetworkError.networkTimeout("awaiting response") }
+        guard let (context, request) = pending.popLast() else {
+            throw DicomNetworkError.networkUnavailable("No scripted response")
+        }
+        responseIDs.append(request.messageID!)
+        let response = DicomDIMSECommandSet(commandField: request.commandField | 0x8000,
+                                            messageIDBeingRespondedTo: request.messageID, status: 0)
+        return try DicomPDUCodec.encode(.pData([.init(presentationContextID: context, isCommand: true,
+                                                    isLastFragment: true, data: response.encoded())]))
+    }
+}
+
+
+extension DicomDIMSEServiceSCUTests {
+    func test_UPSWrite_sentWithoutResponseIsNotReplayed() throws {
+        var attempts = 0
+        let service = DicomDIMSEServiceSCU(configuration: .init(host: "fake", port: 1,
+            calledAETitle: "SCP", callingAETitle: "SCU", retryPolicy: .init(maxAttempts: 3)),
+            transportFactory: {
+                attempts += 1
+                let transport = DIMSEWindowTransport()
+                transport.failResponse = true
+                return transport
+            })
+        XCTAssertThrowsError(try service.createUnifiedProcedureStep(sopInstanceUID: "2.25.2352", attributes: .init())) { error in
+            XCTAssertEqual(error as? DicomNetworkError, .outcomeUncertain("Workflow write"))
+        }
+        XCTAssertEqual(attempts, 1)
+    }
+
+    func test_UPSWrite_notSentCanRetry() throws {
+        var attempts = 0
+        let service = DicomDIMSEServiceSCU(configuration: .init(host: "fake", port: 1,
+            calledAETitle: "SCP", callingAETitle: "SCU", retryPolicy: .init(maxAttempts: 2)),
+            transportFactory: {
+                attempts += 1
+                if attempts == 1 { throw DicomNetworkError.networkUnavailable("before connect") }
+                return DIMSEWindowTransport()
+            })
+        XCTAssertEqual(try service.createUnifiedProcedureStep(sopInstanceUID: "2.25.2352", attributes: .init()).status, 0)
+        XCTAssertEqual(attempts, 2)
+    }
+
+    func test_UPSRead_sentWithoutResponseCanRetry() throws {
+        var attempts = 0
+        let service = DicomDIMSEServiceSCU(configuration: .init(host: "fake", port: 1,
+            calledAETitle: "SCP", callingAETitle: "SCU", retryPolicy: .init(maxAttempts: 2)),
+            transportFactory: {
+                attempts += 1
+                let transport = DIMSEWindowTransport()
+                transport.failResponse = attempts == 1
+                return transport
+            })
+        XCTAssertEqual(try service.getUnifiedProcedureStep(sopInstanceUID: "2.25.2352").status, 0)
+        XCTAssertEqual(attempts, 2)
+    }
+
+    func test_normalizedRequest_sentWithoutResponseIsNotReplayed() throws {
+        var attempts = 0
+        let service = DicomDIMSEServiceSCU(configuration: .init(host: "fake", port: 1,
+            calledAETitle: "SCP", callingAETitle: "SCU", retryPolicy: .init(maxAttempts: 3)),
+            transportFactory: {
+                attempts += 1
+                let transport = DIMSEWindowTransport()
+                transport.failResponse = true
+                return transport
+            })
+        XCTAssertThrowsError(try service.createMPPS(.init(sopInstanceUID: "2.25.2350"))) { error in
+            XCTAssertEqual(error as? DicomNetworkError, .outcomeUncertain("MPPS N-CREATE"))
+        }
+        XCTAssertEqual(attempts, 1)
+    }
+
+    func test_normalizedRequest_notSentCanRetry() throws {
+        var attempts = 0
+        let service = DicomDIMSEServiceSCU(configuration: .init(host: "fake", port: 1,
+            calledAETitle: "SCP", callingAETitle: "SCU", retryPolicy: .init(maxAttempts: 2)),
+            transportFactory: {
+                attempts += 1
+                if attempts == 1 { throw DicomNetworkError.networkUnavailable("before connect") }
+                return DIMSEWindowTransport()
+            })
+        XCTAssertEqual(try service.createMPPS(.init(sopInstanceUID: "2.25.2350")).status, 0)
+        XCTAssertEqual(attempts, 2)
+    }
+
+    func test_timeoutDefaultsAndOverrides_areSeparate() {
+        let configuration = DicomDIMSEConnectionConfiguration(host: "fake", port: 1, calledAETitle: "SCP",
+            callingAETitle: "SCU", timeout: 9, associationTimeout: 2, cancelTimeout: 3)
+        XCTAssertEqual(configuration.connectTimeout, 9)
+        XCTAssertEqual(configuration.associationTimeout, 2)
+        XCTAssertEqual(configuration.dimseResponseTimeout, 9)
+        XCTAssertEqual(configuration.releaseTimeout, 9)
+        XCTAssertEqual(configuration.cancelTimeout, 3)
     }
 }

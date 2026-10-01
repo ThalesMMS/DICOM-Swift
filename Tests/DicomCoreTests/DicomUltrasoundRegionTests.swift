@@ -110,6 +110,57 @@ final class DicomUltrasoundRegionTests: XCTestCase {
         XCTAssertEqual(regions[0].spatialFormat, 2)
     }
 
+    func testUltrasoundRegionsParsesDopplerReferenceAndFlags() throws {
+        var doppler = regionDataSet(
+            bounds: (100, 50, 200, 150),
+            spatialFormat: 3,
+            dataType: 5,
+            unitX: 4,
+            unitY: 7,
+            deltaX: 0.01,
+            deltaY: -2
+        )
+        doppler.set(unsignedLong(0x00186016, 4))
+        doppler.set(signedLong(0x00186020, 10))
+        doppler.set(signedLong(0x00186022, 20))
+        doppler.set(DicomDataElement(tag: 0x00186028, vr: .FD, value: .floats([0.5])))
+        doppler.set(DicomDataElement(tag: 0x0018602A, vr: .FD, value: .floats([-20])))
+        var dataSet = imageDataSet()
+        dataSet.set(sequence(0x00186011, [doppler]))
+
+        let region = try XCTUnwrap(open(dataSet).ultrasoundRegions().first)
+
+        XCTAssertEqual(region.regionFlags, 4)
+        XCTAssertEqual(region.referencePixelX0, 10)
+        XCTAssertEqual(region.referencePixelY0, 20)
+        XCTAssertEqual(region.referencePixelPhysicalValueX, 0.5)
+        XCTAssertEqual(region.referencePixelPhysicalValueY, -20)
+    }
+
+    func testUltrasoundRegionsForFramePrefersFrameThenSharedThenLegacy() throws {
+        let legacy = regionDataSet(bounds: (0, 0, 10, 10), spatialFormat: 1, dataType: 1,
+                                   unitX: 3, unitY: 3, deltaX: 0.1, deltaY: 0.1)
+        let shared = regionDataSet(bounds: (20, 0, 30, 10), spatialFormat: 1, dataType: 1,
+                                   unitX: 3, unitY: 3, deltaX: 0.2, deltaY: 0.2)
+        let frame = regionDataSet(bounds: (40, 0, 50, 10), spatialFormat: 3, dataType: 5,
+                                  unitX: 4, unitY: 7, deltaX: 0.01, deltaY: -1)
+        var dataSet = imageDataSet()
+        dataSet.set(sequence(0x00186011, [legacy]))
+        dataSet.set(sequence(DicomTag.sharedFunctionalGroupsSequence.rawValue, [
+            DicomDataSet(elements: [sequence(0x00186011, [shared])])
+        ]))
+        dataSet.set(sequence(DicomTag.perFrameFunctionalGroupsSequence.rawValue, [
+            DicomDataSet(elements: [sequence(0x00186011, [frame])]),
+            DicomDataSet()
+        ]))
+        let decoder = try open(dataSet)
+
+        XCTAssertEqual(decoder.ultrasoundRegions(forFrame: 0).first?.minX0, 40)
+        XCTAssertEqual(decoder.ultrasoundRegions(forFrame: 1).first?.minX0, 20)
+        XCTAssertEqual(decoder.ultrasoundRegions(forFrame: 2).first?.minX0, 20)
+        XCTAssertEqual(decoder.ultrasoundRegions().first?.minX0, 0)
+    }
+
     private func regionDataSet(
         bounds: (minX: Int, minY: Int, maxX: Int, maxY: Int),
         spatialFormat: Int,
@@ -179,5 +230,17 @@ final class DicomUltrasoundRegionTests: XCTestCase {
 
     private func unsignedLong(_ tag: Int, _ value: Int) -> DicomDataElement {
         DicomDataElement(tag: tag, vr: .UL, value: .unsignedIntegers([UInt(value)]))
+    }
+
+    private func signedLong(_ tag: Int, _ value: Int) -> DicomDataElement {
+        DicomDataElement(tag: tag, vr: .SL, value: .signedIntegers([value]))
+    }
+
+    private func sequence(_ tag: Int, _ dataSets: [DicomDataSet]) -> DicomDataElement {
+        DicomDataElement(
+            tag: tag,
+            vr: .SQ,
+            value: .sequence(dataSets.map(DicomSequenceItem.init(dataSet:)))
+        )
     }
 }

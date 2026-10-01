@@ -1,4 +1,5 @@
 import CoreGraphics
+import DicomJPEG
 import Foundation
 import ImageIO
 
@@ -59,6 +60,9 @@ public struct DicomImageExportOptions: Sendable {
     public let metadataPolicy: DicomImageExportMetadataPolicy
     public let outputSize: DicomImageSize?
     public let annotations: [DicomAnnotationOverlay]
+    /// JPEG output as a progressive (SOF2, spectral selection) codestream from the own encoder instead of the
+    /// sequential baseline ImageIO writes; 4:4:4 chroma, quality from `quality`.
+    public let progressiveJPEG: Bool
 
     public init(
         format: DicomImageExportFormat = .png,
@@ -67,7 +71,8 @@ public struct DicomImageExportOptions: Sendable {
         pixelMode: DicomImageExportPixelMode = .display8(selection: nil),
         metadataPolicy: DicomImageExportMetadataPolicy = .none,
         outputSize: DicomImageSize? = nil,
-        annotations: [DicomAnnotationOverlay] = []
+        annotations: [DicomAnnotationOverlay] = [],
+        progressiveJPEG: Bool = false
     ) {
         self.format = format
         self.quality = min(max(quality, 0.0), 1.0)
@@ -76,6 +81,7 @@ public struct DicomImageExportOptions: Sendable {
         self.metadataPolicy = metadataPolicy
         self.outputSize = outputSize
         self.annotations = annotations
+        self.progressiveJPEG = progressiveJPEG
     }
 }
 
@@ -129,6 +135,23 @@ public struct DicomImageExporter {
         to url: URL,
         options: DicomImageExportOptions = DicomImageExportOptions()
     ) throws -> DicomImageExportResult {
+        try exportFrame(decoder: decoder, frameIndex: frameIndex, to: url, options: options,
+                        sourceFrameIndex: frameIndex, sourceFrameCount: nil)
+    }
+
+    /// Export a selected native frame through the same session used by pixel readers.
+    /// Sidecars retain the original frame identity rather than the compatibility buffer's frame zero.
+    public func export(session: DicomSourceFrameSession, frame frameIndex: Int = 0, to url: URL,
+                       options: DicomImageExportOptions = DicomImageExportOptions()) async throws -> DicomImageExportResult {
+        let bytes = try await session.part10Data(at: frameIndex)
+        try Task.checkCancellation()
+        let decoder = try DCMDecoder(data: bytes)
+        return try exportFrame(decoder: decoder, frameIndex: 0, to: url, options: options,
+                               sourceFrameIndex: frameIndex, sourceFrameCount: session.index.frameCount)
+    }
+
+    private func exportFrame(decoder: DCMDecoder, frameIndex: Int, to url: URL, options: DicomImageExportOptions,
+                             sourceFrameIndex: Int, sourceFrameCount: Int?) throws -> DicomImageExportResult {
         guard let descriptor = decoder.pixelDataDescriptor else {
             throw DicomImageExportError.invalidPixelData("Native uncompressed Pixel Data is not frame-addressable.")
         }
@@ -146,12 +169,13 @@ public struct DicomImageExporter {
         let metadataURL = try writeMetadataIfNeeded(
             decoder: decoder,
             descriptor: descriptor,
-            frameIndex: frameIndex,
             imageURL: url,
-            options: options
+            options: options,
+            sourceFrameIndex: sourceFrameIndex,
+            sourceFrameCount: sourceFrameCount
         )
 
-        return DicomImageExportResult(imageURL: url, frameIndex: frameIndex, metadataURL: metadataURL)
+        return DicomImageExportResult(imageURL: url, frameIndex: sourceFrameIndex, metadataURL: metadataURL)
     }
 
     public func exportAllFrames(
@@ -349,6 +373,10 @@ public struct DicomImageExporter {
     }
 
     private func writeImage(_ image: CGImage, to url: URL, options: DicomImageExportOptions) throws {
+        if options.format == .jpeg, options.progressiveJPEG {
+            try writeProgressiveJPEG(image, to: url, quality: options.quality)
+            return
+        }
         guard let destination = CGImageDestinationCreateWithURL(
             url as CFURL,
             options.format.contentTypeIdentifier,
@@ -369,6 +397,43 @@ public struct DicomImageExporter {
         }
     }
 
+    /// Progressive JPEG through the own encoder: the CGImage is rendered to 8-bit grayscale or RGB samples and
+    /// encoded as SOF2 (spectral-selection scan script) at full chroma resolution.
+    private func writeProgressiveJPEG(_ image: CGImage, to url: URL, quality: Double) throws {
+        let width = image.width, height = image.height
+        let grayscale = image.colorSpace?.model == .monochrome && image.bitsPerPixel <= 8
+        let components = grayscale ? 1 : 3
+        var buffer = [UInt8](repeating: 0, count: width * height * (grayscale ? 1 : 4))
+        let space = grayscale ? CGColorSpaceCreateDeviceGray() : CGColorSpaceCreateDeviceRGB()
+        let info = grayscale ? CGImageAlphaInfo.none.rawValue : CGImageAlphaInfo.noneSkipLast.rawValue
+        guard let context = CGContext(data: &buffer, width: width, height: height, bitsPerComponent: 8,
+                                      bytesPerRow: width * (grayscale ? 1 : 4), space: space, bitmapInfo: info) else {
+            throw DicomImageExportError.imageCreationFailed("CoreGraphics could not render the frame for progressive JPEG.")
+        }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        var samples: [UInt8]
+        if grayscale {
+            samples = buffer
+        } else {
+            samples = []
+            samples.reserveCapacity(width * height * 3)
+            for pixel in 0..<(width * height) { samples += [buffer[pixel * 4], buffer[pixel * 4 + 1], buffer[pixel * 4 + 2]] }
+        }
+        let encoded: Data
+        do {
+            let jli = try JLIImage(width: width, height: height, pixelFormat: .uint8, colorModel: components == 1 ? .grayscale : .rgb, data: samples)
+            let configuration = JLIEncoderConfiguration(quality: max(1, min(100, (quality * 100).rounded())), chromaSubsampling: .yuv444,
+                                                        colorSpace: .yCbCr, progressive: true, progressiveMode: .spectralSelection,
+                                                        optimiseHuffman: true, adaptiveQuantization: false, perceptualQuantTables: false)
+            encoded = Data(try JLIEncoder().encode(jli, configuration: configuration))
+        } catch {
+            throw DicomImageExportError.imageCreationFailed("Progressive JPEG encoding failed: \(error)")
+        }
+        do { try encoded.write(to: url, options: [.atomic]) } catch {
+            throw DicomImageExportError.fileNotWritable(path: url.path, reason: error.localizedDescription)
+        }
+    }
+
     private func validateWritable(_ url: URL, overwrite: Bool) throws {
         if FileManager.default.fileExists(atPath: url.path), !overwrite {
             throw DicomImageExportError.outputFileExists(path: url.path)
@@ -378,9 +443,10 @@ public struct DicomImageExporter {
     private func writeMetadataIfNeeded(
         decoder: DCMDecoder,
         descriptor: DicomPixelDataDescriptor,
-        frameIndex: Int,
         imageURL: URL,
-        options: DicomImageExportOptions
+        options: DicomImageExportOptions,
+        sourceFrameIndex: Int,
+        sourceFrameCount: Int?
     ) throws -> URL? {
         guard options.metadataPolicy == .nonPHISidecar else { return nil }
 
@@ -389,11 +455,11 @@ public struct DicomImageExporter {
 
         let metadata = NonPHIExportMetadata(
             format: options.format.rawValue,
-            frameIndex: frameIndex,
-            frameNumber: frameIndex + 1,
+            frameIndex: sourceFrameIndex,
+            frameNumber: sourceFrameIndex + 1,
             rows: descriptor.rows,
             columns: descriptor.columns,
-            numberOfFrames: descriptor.numberOfFrames,
+            numberOfFrames: sourceFrameCount ?? descriptor.numberOfFrames,
             bitsAllocated: descriptor.bitsAllocated,
             bitsStored: descriptor.bitsStored,
             samplesPerPixel: descriptor.samplesPerPixel,

@@ -184,36 +184,37 @@ public final class MockDicomDecoder: DicomDecoderProtocol, @unchecked Sendable {
         case invalidFormat
     }
 
-    private static let initErrorLock = NSLock()
-    private static var nextInitializationErrorMode: InitializationErrorMode?
-    private static var initializationErrorModesByPath: [String: InitializationErrorMode] = [:]
+    private static let initializationErrorState = DicomTestLockedValue((
+        next: Optional<InitializationErrorMode>.none,
+        byPath: [String: InitializationErrorMode]()
+    ))
 
     /// Configure the next throwing initializer call to throw a specific error (one-shot).
     /// This is static because the throwing initializer creates the instance.
     public static func setNextInitializationErrorMode(_ mode: InitializationErrorMode?) {
-        initErrorLock.lock()
-        nextInitializationErrorMode = mode
-        initErrorLock.unlock()
+        initializationErrorState.withValue { state in
+            state.next = mode
+        }
     }
 
     /// Configure the next throwing initializer call for a specific file path.
     public static func setInitializationErrorMode(_ mode: InitializationErrorMode?, forPath path: String) {
         let normalizedPath = normalizedInitializationErrorPath(path)
-        initErrorLock.lock()
-        if let mode {
-            initializationErrorModesByPath[normalizedPath] = mode
-        } else {
-            initializationErrorModesByPath.removeValue(forKey: normalizedPath)
+        initializationErrorState.withValue { state in
+            if let mode {
+                state.byPath[normalizedPath] = mode
+            } else {
+                state.byPath.removeValue(forKey: normalizedPath)
+            }
         }
-        initErrorLock.unlock()
     }
 
     /// Clear all configured throwing initializer errors.
     public static func resetInitializationErrorModes() {
-        initErrorLock.lock()
-        nextInitializationErrorMode = nil
-        initializationErrorModesByPath.removeAll()
-        initErrorLock.unlock()
+        initializationErrorState.withValue { state in
+            state.next = nil
+            state.byPath.removeAll()
+        }
     }
 
     // MARK: - Initialization
@@ -334,9 +335,9 @@ public final class MockDicomDecoder: DicomDecoderProtocol, @unchecked Sendable {
 
     private static func consumeInitializationErrorMode(forPath path: String) -> InitializationErrorMode? {
         let normalizedPath = normalizedInitializationErrorPath(path)
-        initErrorLock.lock()
-        defer { initErrorLock.unlock() }
-        return initializationErrorModesByPath.removeValue(forKey: normalizedPath)
+        return initializationErrorState.withValue { state in
+            state.byPath.removeValue(forKey: normalizedPath)
+        }
     }
 
     private static func normalizedInitializationErrorPath(_ path: String) -> String {
@@ -344,11 +345,11 @@ public final class MockDicomDecoder: DicomDecoderProtocol, @unchecked Sendable {
     }
 
     private static func consumeNextInitializationErrorMode() -> InitializationErrorMode? {
-        initErrorLock.lock()
-        defer { initErrorLock.unlock() }
-        let mode = nextInitializationErrorMode
-        nextInitializationErrorMode = nil
-        return mode
+        return initializationErrorState.withValue { state in
+            let mode = state.next
+            state.next = nil
+            return mode
+        }
     }
 
     private static func throwInitializationError(_ mode: InitializationErrorMode, path: String) throws {

@@ -2,6 +2,51 @@ import XCTest
 @testable import DicomCore
 
 final class DicomPixelDataDescriptorTests: XCTestCase {
+    func test_overflowingSampleWidth_rejectsLayoutWithoutTrapping() {
+        XCTAssertNil(DicomPixelDataDescriptor(
+            rows: 1, columns: 1, numberOfFrames: 1,
+            bitsAllocated: Int.max, bitsStored: 1, highBit: 0,
+            pixelRepresentation: 0, samplesPerPixel: 1, planarConfiguration: nil,
+            photometricInterpretation: "MONOCHROME2", pixelDataOffset: 0
+        ))
+    }
+
+    func test_overflowingAbsoluteBitRange_rejectsLayoutBeforeFrameAllocation() {
+        for offset in [Int.max, Int.max / 8] {
+            XCTAssertNil(DicomPixelDataDescriptor(
+                rows: 1, columns: 1, numberOfFrames: 2,
+                bitsAllocated: 8, bitsStored: 8, highBit: 7,
+                pixelRepresentation: 0, samplesPerPixel: 1, planarConfiguration: nil,
+                photometricInterpretation: "MONOCHROME2", pixelDataOffset: offset
+            ))
+        }
+    }
+
+    func test_nonByteAlignedSingleBitFrames_trackBitGranularBoundaries() throws {
+        let descriptor = try XCTUnwrap(DicomPixelDataDescriptor(
+            rows: 1,
+            columns: 3,
+            numberOfFrames: 2,
+            bitsAllocated: 1,
+            bitsStored: 1,
+            highBit: 0,
+            pixelRepresentation: 0,
+            samplesPerPixel: 1,
+            planarConfiguration: nil,
+            photometricInterpretation: "MONOCHROME2",
+            pixelDataOffset: 100
+        ))
+
+        XCTAssertEqual(descriptor.bitsPerFrame, 3)
+        XCTAssertEqual(descriptor.totalPixelBytes, 1)
+        XCTAssertEqual(descriptor.frameBitOffsets, [800, 803])
+        XCTAssertEqual(descriptor.frameOffsets, [100, 100])
+        XCTAssertEqual(descriptor.bitRange(forFrame: 0), 800..<803)
+        XCTAssertEqual(descriptor.bitRange(forFrame: 1), 803..<806)
+        XCTAssertEqual(descriptor.byteRange(forFrame: 0), 100..<101)
+        XCTAssertEqual(descriptor.byteRange(forFrame: 1), 100..<101)
+    }
+
     func testSingleFrame16BitUnsignedDescriptorAndFrameAccess() throws {
         let pixelBytes = littleEndianBytes(values: [UInt16(1), UInt16(2), UInt16(3), UInt16(4)])
         let url = try makeTemporaryDICOM(

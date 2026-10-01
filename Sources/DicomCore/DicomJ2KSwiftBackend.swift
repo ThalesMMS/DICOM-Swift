@@ -2,14 +2,12 @@
 //  DicomJ2KSwiftBackend.swift
 //  DicomCore
 //
-//  Direct-Data J2KSwift CPU adapter.
+//  Own JPEG 2000 backend on the vendored DicomJPEG2000 target (J2KSwift 11.0.2 J2KCore/J2KCodec CPU paths, #2329).
+//  GPU (Metal), NEON, MJ2 and JP3D layers are not carried; codec types stay behind the neutral frame contract.
 //
 
 import Foundation
-#if canImport(J2KCodec) && canImport(J2KCore)
-import J2KCodec
-import J2KCore
-#endif
+import DicomJPEG2000
 
 extension DicomCodecBackendIdentifier {
     static let j2kSwiftCPU: Self = "j2kswift-cpu"
@@ -17,7 +15,9 @@ extension DicomCodecBackendIdentifier {
 }
 
 struct DicomJ2KSwiftBackend: DicomFrameCodecBackend {
-    static let version = "11.0.2"
+    static let version = "11.0.2-vendored"
+    /// Version string reported by the vendored J2KSwift core itself (`getVersion()`).
+    static let coreVersion = "11.0.2"
     static let allFrameTransferSyntaxes: Set<String> = [
         DicomTransferSyntax.jpeg2000Lossless.rawValue,
         DicomTransferSyntax.jpeg2000.rawValue,
@@ -25,17 +25,18 @@ struct DicomJ2KSwiftBackend: DicomFrameCodecBackend {
         DicomTransferSyntax.htj2kLosslessRPCL.rawValue,
         DicomTransferSyntax.htj2k.rawValue
     ]
-    static let qualifiedTransferSyntaxes: Set<String> = [
-        DicomTransferSyntax.jpeg2000Lossless.rawValue,
-        DicomTransferSyntax.jpeg2000.rawValue
-    ]
+    /// Decode qualification covers the same five syntaxes as encode since #2330 (HT decode was OpenJPEG-only before).
+    static let qualifiedTransferSyntaxes: Set<String> = allFrameTransferSyntaxes
+    /// JPEG 2000 Part 2 Multi-component syntaxes (#2331): decoded and encoded as component collections
+    /// (`decodeCollection`/`encodeCollection`), advertised as experimental because no independent Part 2 decoder is
+    /// available locally (OpenJPEG rejects SGcod 2; the coded components and the marker semantics are cross-checked separately).
+    static let part2TransferSyntaxes: Set<String> = DicomJ2KPart2Profile.syntaxUIDs
 
-    #if canImport(J2KCodec) && canImport(J2KCore)
     let capabilities = DicomFrameCodecCapabilities(
         identifier: .j2kSwiftCPU,
         families: [.jpeg2000, .htj2k],
-        transferSyntaxUIDs: qualifiedTransferSyntaxes,
-        encodeTransferSyntaxUIDs: allFrameTransferSyntaxes,
+        transferSyntaxUIDs: qualifiedTransferSyntaxes.union(part2TransferSyntaxes),
+        encodeTransferSyntaxUIDs: allFrameTransferSyntaxes.union(part2TransferSyntaxes),
         operations: [.decode, .encode],
         supportedGrayscaleBitDepths: 1...16,
         supportedColorBitDepths: 1...8,
@@ -46,7 +47,7 @@ struct DicomJ2KSwiftBackend: DicomFrameCodecBackend {
             supportsResolutionLevels: true,
             supportsQualityLayers: true,
             supportsCombinedRegionAndResolution: true,
-            supportsQualityWithSpatialReduction: false
+            supportsQualityWithSpatialReduction: true
         ),
         executionClass: .cpu,
         source: .packageLinked,
@@ -55,6 +56,12 @@ struct DicomJ2KSwiftBackend: DicomFrameCodecBackend {
 
     func decode(_ request: DicomFrameDecodeRequest) async throws -> DicomCodecDecodedFrame {
         try Task.checkCancellation()
+        guard !Self.part2TransferSyntaxes.contains(request.descriptor.transferSyntaxUID) else {
+            throw DicomJ2KSwiftBackendError.unsupportedShape(
+                transferSyntaxUID: request.descriptor.transferSyntaxUID,
+                reason: "Part 2 component collections are decoded through the collection API (every frame is a component)"
+            )
+        }
         if request.partialRequest != nil,
            let reason = capabilities.unsupportedReason(for: request) {
             throw DicomJ2KSwiftBackendError.unsupportedShape(
@@ -63,42 +70,63 @@ struct DicomJ2KSwiftBackend: DicomFrameCodecBackend {
             )
         }
 
-        let decoder = J2KDecoder()
+        let decoder = J2KDecoder(sampleByteOrder: .littleEndian)
+        // Frames wrapped in a JP2/JPX/JPH container decode from their contiguous codestream box; the validator reports
+        // the wrapper separately (PS3.5 A.4.4 requires the raw codestream).
+        let frameData: Data
+        do { frameData = try DicomJ2KCodestreamInspector.unwrap(request.frameData).codestream } catch {
+            throw DicomJ2KSwiftBackendError.unsupportedShape(transferSyntaxUID: request.descriptor.transferSyntaxUID,
+                                                             reason: "the frame carries a malformed JPEG 2000 file-format wrapper")
+        }
+        // The declared syntax and the codestream capabilities must agree (Part 15 for .201–.203, Part 1 for .90/.91,
+        // reversible coding for the lossless-only syntaxes). The .202 progressive options are validator diagnostics.
+        let uid = request.descriptor.transferSyntaxUID
+        guard let inspection = try? DicomJ2KCodestreamInspector.inspect(frameData) else {
+            throw DicomJ2KSwiftBackendError.metadataMismatch(
+                transferSyntaxUID: uid, reason: "the frame is not a parseable JPEG 2000 codestream")
+        }
+        if let violation = DicomHTJ2KProfile.violation(of: uid, inspection: inspection, strictRPCLOptions: false) {
+            throw DicomJ2KSwiftBackendError.metadataMismatch(transferSyntaxUID: uid, reason: violation)
+        }
+        // The SIZ must describe the dataset's frame before the decoder allocates for it (#2901).
+        try Self.checkSIZ(inspection, descriptor: request.descriptor, partial: request.partialRequest != nil)
         let image: J2KImage
+        var codecBytesAvoided: Int?
         if let partial = request.partialRequest,
-           partial.region != nil || partial.resolutionLevel != nil {
+           partial.region != nil || partial.resolutionLevel != nil || partial.maximumQualityLayer != nil {
+            // Region, resolution and quality layer combine in one partial decode (issue #2382); the report
+            // carries the packet bytes the quality limit kept out of the entropy decoder.
             let region = partial.region.map {
                 J2KRegion(x: $0.x, y: $0.y, width: $0.width, height: $0.height)
             }
-            image = try await decoder.decodePartial(
-                request.frameData,
+            let result = try await decoder.decodePartialReporting(
+                frameData,
                 options: J2KPartialDecodingOptions(
+                    maxLayer: partial.maximumQualityLayer,
                     maxResolutionLevel: partial.resolutionLevel,
                     region: region
                 )
             )
-        } else if let layer = request.partialRequest?.maximumQualityLayer {
-            image = try await decoder.decodeQuality(
-                request.frameData,
-                options: J2KQualityDecodingOptions(layer: layer, cumulative: true)
-            )
+            image = result.image
+            codecBytesAvoided = partial.maximumQualityLayer == nil ? nil : result.report.skippedPacketBytes
         } else {
-            image = try await decoder.decode(request.frameData)
+            image = try await decoder.decode(frameData)
         }
         try Task.checkCancellation()
         return try Self.normalizedFrame(
             from: image,
             descriptor: request.descriptor,
-            allowsPartialDimensions: request.partialRequest != nil
+            allowsPartialDimensions: request.partialRequest != nil,
+            codecBytesAvoided: codecBytesAvoided
         )
     }
 
     func encode(_ request: DicomFrameEncodeRequest) async throws -> Data {
         let descriptor = request.descriptor
-        guard request.targetTransferSyntaxUID == descriptor.transferSyntaxUID else {
-            throw DicomJ2KSwiftBackendError.metadataMismatch(
+        guard !Self.part2TransferSyntaxes.contains(request.targetTransferSyntaxUID) else {
+            throw DicomJ2KSwiftBackendError.unsupportedShape(
                 transferSyntaxUID: request.targetTransferSyntaxUID,
-                reason: "the request descriptor names transfer syntax \(descriptor.transferSyntaxUID)"
+                reason: "Part 2 component collections are encoded through the collection API (every frame is a component)"
             )
         }
         if let reason = capabilities.unsupportedReason(for: descriptor, operation: .encode) {
@@ -107,23 +135,135 @@ struct DicomJ2KSwiftBackend: DicomFrameCodecBackend {
                 reason: reason
             )
         }
-        if request.targetTransferSyntaxUID == DicomTransferSyntax.htj2kLosslessRPCL.rawValue {
+        try Self.validateEncoding(
+            descriptor: descriptor,
+            targetTransferSyntaxUID: request.targetTransferSyntaxUID,
+            intent: request.intent
+        )
+        if let tileSize = request.tileSize {
+            guard tileSize.width > 0, tileSize.height > 0 else {
+                throw DicomJ2KSwiftBackendError.unsupportedShape(
+                    transferSyntaxUID: request.targetTransferSyntaxUID, reason: "tile dimensions must be positive")
+            }
+            // Tiles share one main-header QCD; the irreversible path derives adaptive step sizes per tile, so only
+            // reversible encodes are tiled. PS3.5 10.18.1 recommends a single tile for the .202 progressive syntax.
+            guard !request.intent.isLossy else {
+                throw DicomJ2KSwiftBackendError.unsupportedShape(
+                    transferSyntaxUID: request.targetTransferSyntaxUID,
+                    reason: "tiling is qualified for reversible encodes only")
+            }
+            guard request.targetTransferSyntaxUID != DicomTransferSyntax.htj2kLosslessRPCL.rawValue else {
+                throw DicomJ2KSwiftBackendError.unsupportedShape(
+                    transferSyntaxUID: request.targetTransferSyntaxUID,
+                    reason: "the HTJ2K Lossless RPCL syntax is written as a single tile (PS3.5 10.18.1)")
+            }
+        }
+        try Task.checkCancellation()
+        let options = try request.jpeg2000Options?.resolved(descriptor: descriptor, intent: request.intent)
+        if options != nil, request.tileSize != nil {
+            throw DicomJPEG2000EncodingError.unsupportedConfiguration(reason: "explicit resolution layers require a single untiled frame")
+        }
+        let image = try Self.image(from: request)
+        let configuration = Self.encodingConfiguration(for: request, options: options)
+        let encoder = J2KEncoder(encodingConfiguration: configuration)
+        let encoded: Data
+        if options == nil {
+            encoded = try await encoder.encode(image)
+        } else {
+            encoded = try await encoder.encodeResolutionLayers(image)
+        }
+        // The output must satisfy every constraint of the destination syntax before it is encapsulated.
+        if let violation = DicomHTJ2KProfile.violation(of: request.targetTransferSyntaxUID, in: encoded) {
+            throw DicomJ2KSwiftBackendError.metadataMismatch(transferSyntaxUID: request.targetTransferSyntaxUID,
+                                                             reason: "the encoder output violates the syntax: \(violation)")
+        }
+        return encoded
+    }
+
+    static func validateEncoding(
+        descriptor: DicomCompressedFrameDescriptor,
+        targetTransferSyntaxUID: String,
+        intent: DicomEncodingIntent
+    ) throws {
+        guard targetTransferSyntaxUID == descriptor.transferSyntaxUID else {
+            throw DicomJ2KSwiftBackendError.metadataMismatch(
+                transferSyntaxUID: targetTransferSyntaxUID,
+                reason: "the request descriptor names transfer syntax \(descriptor.transferSyntaxUID)"
+            )
+        }
+        if targetTransferSyntaxUID == DicomTransferSyntax.htj2kLosslessRPCL.rawValue {
             let linkedVersion = getVersion()
-            guard linkedVersion == Self.version else {
+            guard linkedVersion == Self.coreVersion else {
                 throw DicomJ2KSwiftBackendError.codecVersionMismatch(
-                    expected: Self.version,
+                    expected: Self.coreVersion,
                     actual: linkedVersion
                 )
             }
         }
-        try Self.validateEncodingIntent(request.intent, transferSyntaxUID: request.targetTransferSyntaxUID)
-        let image = try Self.image(from: request)
-        let configuration = Self.encodingConfiguration(for: request)
-        let encoded = try await J2KEncoder(encodingConfiguration: configuration).encode(image)
-        if request.targetTransferSyntaxUID == DicomTransferSyntax.htj2kLosslessRPCL.rawValue {
-            return try Self.withRPCLProgression(encoded, transferSyntaxUID: request.targetTransferSyntaxUID)
+        try validateEncodingIntent(intent, transferSyntaxUID: targetTransferSyntaxUID)
+        guard descriptor.rows > 0, descriptor.columns > 0 else {
+            throw DicomJ2KSwiftBackendError.unsupportedShape(
+                transferSyntaxUID: targetTransferSyntaxUID,
+                reason: "Rows and Columns must both be positive"
+            )
         }
-        return encoded
+        guard descriptor.bitsAllocated == 8 || descriptor.bitsAllocated == 16,
+              descriptor.bitsStored > 0,
+              descriptor.bitsStored <= descriptor.bitsAllocated,
+              descriptor.highBit == descriptor.bitsStored - 1 else {
+            throw DicomJ2KSwiftBackendError.unsupportedShape(
+                transferSyntaxUID: targetTransferSyntaxUID,
+                reason: "Bits Allocated/Stored/High Bit are outside the qualified layout"
+            )
+        }
+        let pixels = descriptor.rows.multipliedReportingOverflow(by: descriptor.columns)
+        let samples = pixels.partialValue.multipliedReportingOverflow(by: descriptor.samplesPerPixel)
+        let bytes = samples.partialValue.multipliedReportingOverflow(by: descriptor.bitsAllocated / 8)
+        guard !pixels.overflow, !samples.overflow, !bytes.overflow else {
+            throw DicomJ2KSwiftBackendError.unsupportedShape(
+                transferSyntaxUID: targetTransferSyntaxUID,
+                reason: "The declared frame shape exceeds the addressable byte range"
+            )
+        }
+        let photometric = descriptor.photometricInterpretation.uppercased()
+        let supportedPhotometric = descriptor.samplesPerPixel == 1
+            ? photometric.isEmpty || photometric == "MONOCHROME1" || photometric == "MONOCHROME2"
+            : descriptor.samplesPerPixel == 3
+                && descriptor.bitsAllocated == 8
+                && descriptor.bitsStored == 8
+                && descriptor.pixelRepresentation == 0
+                && photometric == "RGB"
+        guard supportedPhotometric else {
+            throw DicomJ2KSwiftBackendError.unsupportedShape(
+                transferSyntaxUID: targetTransferSyntaxUID,
+                reason: "color encoding is qualified only for unsigned 8-bit RGB"
+            )
+        }
+    }
+
+    static func validateFullFrameDecoding(_ descriptor: DicomCompressedFrameDescriptor) throws {
+        guard allFrameTransferSyntaxes.contains(descriptor.transferSyntaxUID)
+            || part2TransferSyntaxes.contains(descriptor.transferSyntaxUID) else {
+            throw DicomJ2KSwiftBackendError.unsupportedShape(
+                transferSyntaxUID: descriptor.transferSyntaxUID,
+                reason: "the transfer syntax is not a JPEG 2000 or HTJ2K frame syntax"
+            )
+        }
+        guard descriptor.rows > 0,
+              descriptor.columns > 0,
+              descriptor.bitsAllocated == 8 || descriptor.bitsAllocated == 16,
+              descriptor.bitsStored > 0,
+              descriptor.bitsStored <= descriptor.bitsAllocated,
+              descriptor.highBit == descriptor.bitsStored - 1,
+              descriptor.samplesPerPixel == 1
+                || descriptor.samplesPerPixel == 3
+                    && descriptor.bitsAllocated == 8
+                    && descriptor.bitsStored <= 8 else {
+            throw DicomJ2KSwiftBackendError.unsupportedShape(
+                transferSyntaxUID: descriptor.transferSyntaxUID,
+                reason: "the declared frame shape is outside the full-frame decoder limits"
+            )
+        }
     }
 
     private static func validateEncodingIntent(
@@ -136,10 +276,23 @@ struct DicomJ2KSwiftBackend: DicomFrameCodecBackend {
                 reason: "JPEG-LS NEAR intent cannot be used for JPEG 2000 or HTJ2K"
             )
         }
+        if case .jpegLossless = intent {
+            throw DicomJ2KSwiftBackendError.unsupportedShape(
+                transferSyntaxUID: transferSyntaxUID,
+                reason: "JPEG lossless predictor options cannot be used for JPEG 2000 or HTJ2K"
+            )
+        }
+        if case .jpegLS = intent {
+            throw DicomJ2KSwiftBackendError.unsupportedShape(
+                transferSyntaxUID: transferSyntaxUID,
+                reason: "JPEG-LS options cannot be used for JPEG 2000 or HTJ2K"
+            )
+        }
         let losslessOnly = Set([
             DicomTransferSyntax.jpeg2000Lossless.rawValue,
             DicomTransferSyntax.htj2kLossless.rawValue,
-            DicomTransferSyntax.htj2kLosslessRPCL.rawValue
+            DicomTransferSyntax.htj2kLosslessRPCL.rawValue,
+            DicomTransferSyntax.jpeg2000Part2MulticomponentLossless.rawValue
         ])
         if case .irreversible(let quality) = intent {
             guard !losslessOnly.contains(transferSyntaxUID) else {
@@ -269,7 +422,7 @@ struct DicomJ2KSwiftBackend: DicomFrameCodecBackend {
     }
 
     private static func encodingConfiguration(
-        for request: DicomFrameEncodeRequest
+        for request: DicomFrameEncodeRequest, options: DicomJPEG2000EncodingOptions?
     ) -> J2KEncodingConfiguration {
         let intent = request.intent
         let lossless = !intent.isLossy
@@ -283,85 +436,64 @@ struct DicomJ2KSwiftBackend: DicomFrameCodecBackend {
         let useHTJ2K = uid == DicomTransferSyntax.htj2kLossless.rawValue
             || uid == DicomTransferSyntax.htj2kLosslessRPCL.rawValue
             || uid == DicomTransferSyntax.htj2k.rawValue
-        let progressionOrder: J2KProgressionOrder = uid == DicomTransferSyntax.htj2kLosslessRPCL.rawValue
-            ? .rpcl
-            : .lrcp
+        let rpcl = uid == DicomTransferSyntax.htj2kLosslessRPCL.rawValue
         let shortestSide = max(1, min(request.descriptor.rows, request.descriptor.columns))
-        let decompositionLevels = uid == DicomTransferSyntax.htj2kLosslessRPCL.rawValue
-            ? 0
+        // PS3.5 10.18.1 (.202): RPCL order, TLM marker and a base resolution of at most 64 samples; the other
+        // syntaxes keep up to five levels bounded by the shortest side.
+        let decompositionLevels = rpcl
+            ? DicomHTJ2KProfile.rpclDecompositionLevels(rows: request.descriptor.rows, columns: request.descriptor.columns)
             : max(0, min(5, Int(log2(Double(shortestSide)))))
-        let tileSize: (width: Int, height: Int)
-        if uid == DicomTransferSyntax.htj2kLosslessRPCL.rawValue {
-            // Keep every tile within the default 2^15 precinct so the
-            // zero-decomposition .202 route has exactly one precinct.
-            let requestedWidth = request.tileSize?.width ?? request.descriptor.columns
-            let requestedHeight = request.tileSize?.height ?? request.descriptor.rows
-            tileSize = (
-                min(max(1, requestedWidth), 32_768),
-                min(max(1, requestedHeight), 32_768)
-            )
-        } else {
-            tileSize = request.tileSize ?? (0, 0)
-        }
         return J2KEncodingConfiguration(
             quality: quality,
             lossless: lossless,
-            decompositionLevels: decompositionLevels,
-            qualityLayers: lossless ? 1 : 5,
-            progressionOrder: progressionOrder,
-            tileSize: tileSize,
+            decompositionLevels: options?.decompositionLevels ?? decompositionLevels,
+            qualityLayers: options?.qualityLayers ?? 1,
+            progressionOrder: options?.progression == .rlcp ? .rlcp : (rpcl ? .rpcl : .lrcp),
+            tileSize: request.tileSize.map { (width: $0.width, height: $0.height) } ?? (0, 0),
             bitrateMode: lossless
                 ? .lossless
                 : .fixedQstep(qstep: max(0.0001, (1 - quality) * 0.05)),
             maxThreads: 0,
             useHTJ2K: useHTJ2K,
             useReversibleFilter: lossless,
-            htj2kBlockFormat: .conformant
+            writeTLMMarker: rpcl
         )
     }
 
-    /// J2KSwift 11.0.2 writes its primary encoder packets as LRCP even when
-    /// the configuration requests RPCL. The .202 route deliberately uses one
-    /// layer, zero decompositions, and the default single precinct, making the
-    /// LRCP and RPCL packet sequence equivalent. Rewriting SGcod therefore
-    /// records the exact DICOM-mandated RPCL progression without reordering or
-    /// relabeling a different packet sequence.
-    private static func withRPCLProgression(
-        _ codestream: Data,
-        transferSyntaxUID: String
-    ) throws -> Data {
-        guard codestream.count >= 6, codestream[0] == 0xFF, codestream[1] == 0x4F else {
-            throw DicomJ2KSwiftBackendError.metadataMismatch(
-                transferSyntaxUID: transferSyntaxUID,
-                reason: "the encoder returned a codestream without an SOC marker"
-            )
-        }
-        var offset = 2
-        while offset + 4 <= codestream.count {
-            guard codestream[offset] == 0xFF else { break }
-            let marker = codestream[offset + 1]
-            if marker == 0x52 {
-                let length = Int(codestream[offset + 2]) << 8 | Int(codestream[offset + 3])
-                guard length >= 7, offset + 2 + length <= codestream.count else { break }
-                var rpcl = codestream
-                rpcl[offset + 5] = 2
-                return rpcl
+    /// Most decoded samples a frame may declare: the decoder holds 32-bit coefficients and output samples per
+    /// sample, so 2^30 keeps a frame's working set within the addressable budget of the smallest supported device.
+    static let maximumDecodedSamples = 1 << 30
+
+    /// Refuses a SIZ that disagrees with Rows, Columns or Samples per Pixel, or that would overflow the sample count,
+    /// before any allocation. A partial decode keeps its own geometry rules and only gets the size limit.
+    static func checkSIZ(_ inspection: DicomJ2KCodestreamInspector.Inspection,
+                         descriptor: DicomCompressedFrameDescriptor, partial: Bool) throws {
+        let uid = descriptor.transferSyntaxUID
+        if !partial {
+            guard inspection.width == descriptor.columns, inspection.height == descriptor.rows else {
+                throw DicomJ2KSwiftBackendError.metadataMismatch(
+                    transferSyntaxUID: uid, reason: "the SIZ declares \(inspection.width)x\(inspection.height), "
+                        + "expected \(descriptor.columns)x\(descriptor.rows)")
             }
-            if marker == 0x90 { break }
-            let length = Int(codestream[offset + 2]) << 8 | Int(codestream[offset + 3])
-            guard length >= 2, offset + 2 + length <= codestream.count else { break }
-            offset += 2 + length
+            guard inspection.components.count == descriptor.samplesPerPixel else {
+                throw DicomJ2KSwiftBackendError.metadataMismatch(
+                    transferSyntaxUID: uid, reason: "the SIZ declares \(inspection.components.count) components, "
+                        + "expected \(descriptor.samplesPerPixel)")
+            }
         }
-        throw DicomJ2KSwiftBackendError.metadataMismatch(
-            transferSyntaxUID: transferSyntaxUID,
-            reason: "the encoder returned a codestream without a valid main-header COD marker"
-        )
+        let area = inspection.width.multipliedReportingOverflow(by: inspection.height)
+        let samples = area.partialValue.multipliedReportingOverflow(by: inspection.components.count)
+        guard !area.overflow, !samples.overflow, samples.partialValue <= maximumDecodedSamples else {
+            throw DicomJ2KSwiftBackendError.unsupportedShape(
+                transferSyntaxUID: uid, reason: "the SIZ declares more than \(maximumDecodedSamples) samples")
+        }
     }
 
     private static func normalizedFrame(
         from image: J2KImage,
         descriptor: DicomCompressedFrameDescriptor,
-        allowsPartialDimensions: Bool = false
+        allowsPartialDimensions: Bool = false,
+        codecBytesAvoided: Int? = nil
     ) throws -> DicomCodecDecodedFrame {
         let uid = descriptor.transferSyntaxUID
         let dimensionsMatch = image.width == descriptor.columns && image.height == descriptor.rows
@@ -401,27 +533,35 @@ struct DicomJ2KSwiftBackend: DicomFrameCodecBackend {
             let precisionMatches = requiresExactPrecision
                 ? component.bitDepth == descriptor.bitsStored
                 : (1...descriptor.bitsStored).contains(component.bitDepth)
-            guard precisionMatches else {
+            // A codestream more precise than Bits Stored that still fits Bits Allocated keeps its own precision, as
+            // GDCM reads it (`Osirix10vs8BitsStored`: 10-bit samples under Bits Stored 8, issue #2854).
+            let exceedsBitsStoredWithinAllocation = component.bitDepth > descriptor.bitsStored
+                && component.bitDepth <= descriptor.bitsAllocated
+            // An 8-bit codestream under a 16-bit declaration is delivered as 8-bit samples, the pixel format GDCM
+            // gives it (`SC16BitsAllocated_8BitsStoredJ2K`, issue #2856).
+            let narrowsToBytes = component.bitDepth <= 8 && descriptor.bitsAllocated > 8
+            guard precisionMatches || exceedsBitsStoredWithinAllocation || narrowsToBytes else {
                 throw DicomJ2KSwiftBackendError.metadataMismatch(
                     transferSyntaxUID: uid,
                     reason: "component \(component.index) is \(component.bitDepth)-bit,"
                         + " incompatible with \(descriptor.bitsStored) stored bits"
                 )
             }
-            guard component.signed == (descriptor.pixelRepresentation == 1) else {
-                throw DicomJ2KSwiftBackendError.metadataMismatch(
-                    transferSyntaxUID: uid,
-                    reason: "component \(component.index) signedness differs from Pixel Representation"
-                )
-            }
+            // A codestream whose Ssiz signedness contradicts Pixel Representation (0028,0103) is not refused:
+            // the samples are reconstructed as the codestream declares them (DC level shift included) and the
+            // Bits Stored bit pattern is then read under the DICOM attribute by the frame normaliser, which is
+            // what GDCM, DCMTK and pydicom do (`J2K_pixelrep_mismatch`). The validator reports the
+            // contradiction as `pixelMetadataContradiction` on (0028,0103).
         }
 
         let bitsPerSample = image.components[0].bitDepth
         let bytes: Data
         if image.components.count == 1 {
-            bytes = try normalizedGrayscaleBytes(
-                image.components[0],
-                transferSyntaxUID: uid
+            bytes = try reinterpreted(
+                normalizedGrayscaleBytes(image.components[0], transferSyntaxUID: uid),
+                bitsStored: bitsPerSample,
+                codestreamIsSigned: image.components[0].signed,
+                pixelRepresentation: descriptor.pixelRepresentation
             )
         } else {
             guard bitsPerSample <= 8 else {
@@ -442,8 +582,43 @@ struct DicomJ2KSwiftBackend: DicomFrameCodecBackend {
             width: image.width,
             height: image.height,
             bitsPerSample: bitsPerSample,
-            componentCount: image.components.count
+            componentCount: image.components.count,
+            codecBytesAvoided: codecBytesAvoided
         )
+    }
+
+    /// Reconciles a codestream whose Ssiz signedness contradicts Pixel Representation (0028,0103): the
+    /// reconstructed sample keeps the bit pattern of its codestream precision (equal to Bits Stored for the
+    /// lossless syntaxes the reader promotes) and is read under the DICOM attribute, so an
+    /// unsigned codestream under Pixel Representation 1 becomes two's complement and a signed codestream under
+    /// Pixel Representation 0 becomes the unsigned pattern. This is the convention of GDCM, DCMTK and pydicom
+    /// (pydicom's `J2K_pixelrep_mismatch`); `DicomJ2KFrameValidator` reports the contradiction separately.
+    /// Consistent objects are returned untouched.
+    private static func reinterpreted(
+        _ bytes: Data,
+        bitsStored: Int,
+        codestreamIsSigned: Bool,
+        pixelRepresentation: Int
+    ) -> Data {
+        let declaredSigned = pixelRepresentation == 1
+        guard codestreamIsSigned != declaredSigned, bitsStored >= 1, bitsStored <= 16 else { return bytes }
+        let mask = (1 << bitsStored) - 1
+        let signBit = 1 << (bitsStored - 1)
+        func stored(_ value: Int) -> Int {
+            let pattern = value & mask
+            return declaredSigned && pattern & signBit != 0 ? pattern - (1 << bitsStored) : pattern
+        }
+        if bitsStored <= 8 {
+            return Data(bytes.map { UInt8(bitPattern: Int8(truncatingIfNeeded: stored(Int($0)))) })
+        }
+        var output = Data(count: bytes.count)
+        for index in stride(from: 0, to: bytes.count - bytes.count % 2, by: 2) {
+            let raw = Int(bytes[bytes.startIndex + index]) | (Int(bytes[bytes.startIndex + index + 1]) << 8)
+            let word = UInt16(bitPattern: Int16(truncatingIfNeeded: stored(raw)))
+            output[index] = UInt8(word & 0xFF)
+            output[index + 1] = UInt8(word >> 8)
+        }
+        return output
     }
 
     private static func normalizedGrayscaleBytes(
@@ -477,8 +652,8 @@ struct DicomJ2KSwiftBackend: DicomFrameCodecBackend {
             return component.data
         }
 
-        // J2KSwift tags decoder-produced 16-bit components as big-endian;
-        // DICOM decoded frame buffers use little-endian stored-value bytes.
+        // The backend's decoders write little-endian (#2902); a big-endian component
+        // still converts, since DICOM decoded frame buffers use little-endian bytes.
         var littleEndian = Data(count: component.data.count)
         for index in 0..<pixelCount {
             littleEndian[index * 2] = component.data[index * 2 + 1]
@@ -506,36 +681,156 @@ struct DicomJ2KSwiftBackend: DicomFrameCodecBackend {
         }
         return output
     }
-    #else
-    let capabilities = DicomFrameCodecCapabilities(
-        identifier: .j2kSwiftCPU,
-        families: [.jpeg2000, .htj2k],
-        transferSyntaxUIDs: qualifiedTransferSyntaxes,
-        encodeTransferSyntaxUIDs: allFrameTransferSyntaxes,
-        operations: [.decode, .encode],
-        supportedGrayscaleBitDepths: 1...16,
-        supportedColorBitDepths: 1...8,
-        maximumComponents: 3,
-        supportsSignedSamples: true,
-        executionClass: .cpu,
-        source: .packageLinked,
-        version: nil,
-        isAvailable: false,
-        unsupportedReason: "J2KSwift is unavailable on this platform; use the OpenJPEG backend."
-    )
+}
 
-    func decode(_ request: DicomFrameDecodeRequest) async throws -> DicomCodecDecodedFrame {
-        throw DicomJ2KSwiftBackendError.unsupportedShape(
-            transferSyntaxUID: request.descriptor.transferSyntaxUID,
-            reason: capabilities.unsupportedReason ?? "J2KSwift is unavailable."
-        )
+// MARK: - JPEG 2000 Part 2 component collections (#2331)
+
+extension DicomJ2KSwiftBackend {
+    /// Decodes one component collection of a `.92/.93` object: the codestream must satisfy the syntax rules
+    /// (`DicomJ2KPart2Profile`), use only array-based Annex J transformations, and stay within the component and
+    /// byte bounds. Every component becomes one stored-pixel frame.
+    func decodeCollection(_ codestream: Data, transferSyntaxUID: String) async throws -> DicomJ2KDecodedCollection {
+        try Task.checkCancellation()
+        let inspection: DicomJ2KCodestreamInspector.Inspection
+        do { inspection = try DicomJ2KCodestreamInspector.inspect(codestream) } catch {
+            throw DicomJ2KSwiftBackendError.unsupportedShape(transferSyntaxUID: transferSyntaxUID,
+                                                             reason: "the collection is not a parseable JPEG 2000 codestream")
+        }
+        // A plain multi-component Part 1 codestream (no Annex J transformation, no Part 2 capabilities) is not
+        // conformant to .92/.93, but it decodes unambiguously (identity transformation): the validator reports the
+        // profile mismatch while the samples stay available. Every other violation is refused typed.
+        let plain = !inspection.usesPart2Extensions && inspection.annexJ == nil && !inspection.usesMultipleComponentTransform
+        if !plain, let violation = DicomJ2KPart2Profile.violation(of: transferSyntaxUID, in: inspection) {
+            throw DicomJ2KSwiftBackendError.metadataMismatch(transferSyntaxUID: transferSyntaxUID, reason: violation)
+        }
+        if let reason = DicomJ2KPart2Profile.unsupportedReason(inspection) {
+            throw DicomJ2KSwiftBackendError.unsupportedShape(transferSyntaxUID: transferSyntaxUID, reason: reason)
+        }
+        if inspection.usesMultipleComponentTransform {
+            throw DicomJ2KSwiftBackendError.metadataMismatch(
+                transferSyntaxUID: transferSyntaxUID,
+                reason: "the Annex G RCT/ICT (SGcod 1) cannot be applied across the frames of a .92/.93 collection")
+        }
+        let outputs = inspection.annexJ?.outputComponents ?? inspection.components
+        guard let first = outputs.first, outputs.allSatisfy({ $0.precision == first.precision && $0.isSigned == first.isSigned }),
+              first.precision >= 1, first.precision <= 16 else {
+            throw DicomJ2KSwiftBackendError.unsupportedShape(transferSyntaxUID: transferSyntaxUID,
+                                                             reason: "the reconstructed components must share one 1–16-bit depth and sign")
+        }
+        let bytesPerSample = first.precision > 8 ? 2 : 1
+        let byteCount = inspection.width.multipliedReportingOverflow(by: inspection.height)
+        let total = byteCount.partialValue.multipliedReportingOverflow(by: outputs.count * bytesPerSample)
+        guard !byteCount.overflow, !total.overflow, total.partialValue <= DicomJ2KPart2Profile.maximumCollectionBytes else {
+            throw DicomJ2KSwiftBackendError.unsupportedShape(
+                transferSyntaxUID: transferSyntaxUID,
+                reason: "the collection would decode to more than \(DicomJ2KPart2Profile.maximumCollectionBytes) bytes")
+        }
+        let image = try await J2KDecoder(sampleByteOrder: .littleEndian).decode(codestream)
+        try Task.checkCancellation()
+        guard image.width == inspection.width, image.height == inspection.height, image.components.count == outputs.count else {
+            throw DicomJ2KSwiftBackendError.metadataMismatch(transferSyntaxUID: transferSyntaxUID,
+                                                             reason: "decoded \(image.components.count) components of \(image.width)x\(image.height), expected \(outputs.count) of \(inspection.width)x\(inspection.height)")
+        }
+        var frames: [Data] = []
+        frames.reserveCapacity(outputs.count)
+        for component in image.components {
+            guard component.bitDepth == first.precision, component.signed == first.isSigned else {
+                throw DicomJ2KSwiftBackendError.metadataMismatch(transferSyntaxUID: transferSyntaxUID,
+                                                                 reason: "component \(component.index) is \(component.bitDepth)-bit, expected \(first.precision)")
+            }
+            frames.append(try Self.normalizedGrayscaleBytes(component, transferSyntaxUID: transferSyntaxUID))
+        }
+        return DicomJ2KDecodedCollection(width: image.width, height: image.height, bitsPerSample: first.precision,
+                                         isSigned: first.isSigned, frames: frames)
     }
 
-    func encode(_ request: DicomFrameEncodeRequest) async throws -> Data {
-        throw DicomJ2KSwiftBackendError.unsupportedShape(
-            transferSyntaxUID: request.targetTransferSyntaxUID,
-            reason: capabilities.unsupportedReason ?? "J2KSwift is unavailable."
+    /// Encodes `frames` (stored-pixel buffers of one grayscale descriptor) as one component collection: the frames
+    /// become the components of a single codestream and the own difference matrix is applied across them
+    /// (reversible integer transformation; `.93` with an irreversible intent adds the 9-7 filter and quantisation).
+    func encodeCollection(
+        frames: [Data],
+        descriptor: DicomCompressedFrameDescriptor,
+        targetTransferSyntaxUID uid: String,
+        intent: DicomEncodingIntent
+    ) async throws -> Data {
+        guard Self.part2TransferSyntaxes.contains(uid), uid == descriptor.transferSyntaxUID else {
+            throw DicomJ2KSwiftBackendError.metadataMismatch(transferSyntaxUID: uid, reason: "the descriptor names transfer syntax \(descriptor.transferSyntaxUID)")
+        }
+        guard (1...DicomJ2KPart2Profile.maximumCollectionComponents).contains(frames.count) else {
+            throw DicomJ2KSwiftBackendError.unsupportedShape(uid: uid, reason: "a collection holds 1–\(DicomJ2KPart2Profile.maximumCollectionComponents) frames")
+        }
+        guard descriptor.samplesPerPixel == 1 else {
+            throw DicomJ2KSwiftBackendError.unsupportedShape(uid: uid, reason: "frames-as-components requires single-sample (grayscale) frames")
+        }
+        try Self.validateEncodingIntent(intent, transferSyntaxUID: uid)
+        guard descriptor.rows > 0, descriptor.columns > 0, descriptor.bitsAllocated == 8 || descriptor.bitsAllocated == 16,
+              descriptor.bitsStored > 0, descriptor.bitsStored <= descriptor.bitsAllocated, descriptor.highBit == descriptor.bitsStored - 1 else {
+            throw DicomJ2KSwiftBackendError.unsupportedShape(uid: uid, reason: "Bits Allocated/Stored/High Bit are outside the qualified layout")
+        }
+        let bytesPerSample = descriptor.bitsAllocated / 8
+        let expected = descriptor.rows * descriptor.columns * bytesPerSample
+        let components = try frames.enumerated().map { index, frame -> J2KComponent in
+            guard frame.count == expected else {
+                throw DicomJ2KSwiftBackendError.unsupportedShape(uid: uid, reason: "frame \(index) holds \(frame.count) bytes, expected \(expected)")
+            }
+            return J2KComponent(index: index, bitDepth: descriptor.bitsStored, signed: descriptor.pixelRepresentation == 1,
+                                width: descriptor.columns, height: descriptor.rows, data: frame,
+                                sampleByteOrder: bytesPerSample == 2 ? .littleEndian : nil)
+        }
+        let lossless = !intent.isLossy
+        var quality = 1.0
+        if case .irreversible(let requested) = intent { quality = requested }
+        let configuration = J2KEncodingConfiguration(
+            quality: quality,
+            lossless: lossless,
+            decompositionLevels: max(0, min(5, Int(log2(Double(max(1, min(descriptor.rows, descriptor.columns))))))),
+            qualityLayers: 1,
+            progressionOrder: .lrcp,
+            bitrateMode: lossless ? .lossless : .fixedQstep(qstep: max(0.0001, (1 - quality) * 0.05)),
+            maxThreads: 0,
+            useHTJ2K: false,
+            useReversibleFilter: lossless,
+            mctConfiguration: J2KMCTEncodingConfiguration(mode: .arrayBased(try DicomJ2KPart2Profile.differenceMatrix(count: frames.count)))
         )
+        let image = J2KImage(width: descriptor.columns, height: descriptor.rows, components: components, colorSpace: .grayscale)
+        let encoded = try await J2KEncoder(encodingConfiguration: configuration).encode(image)
+        let inspection = try DicomJ2KCodestreamInspector.inspect(encoded)
+        if let violation = DicomJ2KPart2Profile.violation(of: uid, in: inspection) {
+            throw DicomJ2KSwiftBackendError.metadataMismatch(transferSyntaxUID: uid, reason: "the encoder output violates the syntax: \(violation)")
+        }
+        return encoded
     }
-    #endif
+}
+
+private extension DicomJ2KSwiftBackendError {
+    static func unsupportedShape(uid: String, reason: String) -> DicomJ2KSwiftBackendError {
+        .unsupportedShape(transferSyntaxUID: uid, reason: reason)
+    }
+}
+
+extension DicomJ2KSwiftBackend {
+    /// Synchronous entry for the frame reader's synchronous API and the transcoder's stored-frame path: the async
+    /// collection decode runs on a detached task while the caller waits (callers are never on the cooperative pool).
+    func decodeCollectionSynchronously(_ codestream: Data, transferSyntaxUID: String) throws -> DicomJ2KDecodedCollection {
+        let box = DicomJ2KCollectionResultBox()
+        let semaphore = DispatchSemaphore(value: 0)
+        let backend = self
+        Task.detached(priority: .userInitiated) {
+            do { box.store(.success(try await backend.decodeCollection(codestream, transferSyntaxUID: transferSyntaxUID))) }
+            catch { box.store(.failure(error)) }
+            semaphore.signal()
+        }
+        semaphore.wait()
+        return try box.take().get()
+    }
+}
+
+private final class DicomJ2KCollectionResultBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var result: Result<DicomJ2KDecodedCollection, Error>?
+    func store(_ value: Result<DicomJ2KDecodedCollection, Error>) { lock.lock(); result = value; lock.unlock() }
+    func take() -> Result<DicomJ2KDecodedCollection, Error> {
+        lock.lock(); defer { lock.unlock() }
+        return result ?? .failure(DicomJ2KSwiftBackendError.unsupportedShape(transferSyntaxUID: "", reason: "the collection decode produced no result"))
+    }
 }

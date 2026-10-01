@@ -6,6 +6,9 @@ cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 
 GATE="${1:-}"
 case "$GATE" in
+  differential)
+    bash Scripts/conformance/run_independent_differential.sh
+    ;;
   fixture|runtime|release)
     Scripts/test_gates.sh "$GATE"
     ;;
@@ -23,7 +26,7 @@ case "$GATE" in
       --enforce-required
     ;;
   *)
-    echo "usage: Scripts/conformance/run_clinical_conformance.sh <fixture|runtime|release|nightly>" >&2
+    echo "usage: Scripts/conformance/run_clinical_conformance.sh <fixture|runtime|release|nightly|differential>" >&2
     exit 2
     ;;
 esac

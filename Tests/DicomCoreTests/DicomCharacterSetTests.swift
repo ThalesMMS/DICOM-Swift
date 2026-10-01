@@ -2,6 +2,34 @@ import XCTest
 @testable import DicomCore
 
 final class DicomCharacterSetTests: XCTestCase {
+    func test_longTextVRs_preserveYenInLegacyAndParsedMetadata() throws {
+        var source = makeTextDataSet(characterSet: "ISO_IR 13", patientName: "Doe^Jane", studyDescription: "Study")
+        let textTags: [(Int, DicomVR)] = [(0x00104000, .LT), (0x00082111, .ST), (0x0040A160, .UT)]
+        for (tag, vr) in textTags {
+            source.set(.init(tag: tag, vr: vr, value: .strings(["Cost ¥100"])))
+        }
+        for syntax in [DicomTransferSyntax.explicitVRLittleEndian, .implicitVRLittleEndian] {
+            let data = try DicomDataSetWriter.part10Data(from: source, options: .init(transferSyntax: syntax))
+            let decoder = try open(data)
+            for (tag, _) in textTags {
+                XCTAssertEqual(decoder.info(for: tag), "Cost ¥100", syntax.rawValue)
+                XCTAssertEqual(decoder.dataSet.string(for: tag), "Cost ¥100", syntax.rawValue)
+            }
+        }
+    }
+
+    func test_unrepresentableText_rejectsEncodingInsteadOfFallingBackToUTF8() {
+        for (characterSet, name) in [("ISO_IR 6", "Müller"), ("ISO_IR 100", "山田"), ("ISO_IR 144", "😀")] {
+            let dataSet = makeTextDataSet(characterSet: characterSet, patientName: name, studyDescription: "Study")
+            XCTAssertThrowsError(try DicomDataSetWriter.part10Data(from: dataSet), characterSet) {
+                guard case .unsupportedValue(tag: DicomTag.patientName.rawValue, vr: .PN, reason: _) =
+                        $0 as? DicomDataSetWriterError else {
+                    return XCTFail("Expected character-set encoding failure, got \($0)")
+                }
+            }
+        }
+    }
+
     private let sopClassUIDTag = 0x00080016
 
     func testDefaultCharacterSetReadsAsciiText() throws {
@@ -49,7 +77,7 @@ final class DicomCharacterSetTests: XCTestCase {
     }
 
     func testISO2022JapaneseSpecificCharacterSetDecodesCommonEscapes() throws {
-        let dataSet = makeTextDataSet(characterSet: "ISO 2022 IR 87",
+        let dataSet = makeTextDataSet(characterSet: "\\ISO 2022 IR 87",
                                       patientName: "Yamada^Taro=山田^太郎",
                                       studyDescription: "検査")
         let data = try DicomDataSetWriter.part10Data(from: dataSet)
@@ -58,7 +86,7 @@ final class DicomCharacterSetTests: XCTestCase {
         let decoder = try open(data)
         let personName = decoder.dataSet.personName(for: .patientName)
 
-        XCTAssertEqual(decoder.specificCharacterSet, ["ISO 2022 IR 87"])
+        XCTAssertEqual(decoder.specificCharacterSet, ["", "ISO 2022 IR 87"])
         XCTAssertEqual(personName?.familyName, "Yamada")
         XCTAssertEqual(personName?.givenName, "Taro")
         XCTAssertEqual(personName?.ideographic, "山田^太郎")
@@ -209,7 +237,7 @@ final class DicomCharacterSetTests: XCTestCase {
         if let characterSet {
             elements.append(DicomDataElement(tag: DicomTag.specificCharacterSet.rawValue,
                                              vr: .CS,
-                                             value: .strings([characterSet])))
+                                             value: .strings(characterSet.components(separatedBy: "\\"))))
         }
         return DicomDataSet(elements: elements)
     }

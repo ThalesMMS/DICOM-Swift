@@ -14,14 +14,16 @@ internal enum DicomCompressedPixelBackendResolver {
         requestedBitDepth: Int?,
         samplesPerPixel: Int?,
         photometricInterpretation: String? = nil,
-        bitsStored: Int? = nil
+        bitsStored: Int? = nil,
+        environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> DicomCompressedPixelBackendDecision {
         DicomCompressedPixelBackendRegistry.resolve(
             transferSyntax: transferSyntax,
             requestedBitDepth: requestedBitDepth,
             samplesPerPixel: samplesPerPixel,
             photometricInterpretation: photometricInterpretation,
-            bitsStored: bitsStored
+            bitsStored: bitsStored,
+            environment: environment
         )
     }
 }
@@ -64,6 +66,8 @@ extension DCMPixelReader {
         pixelRepresentation: Int = 0,
         photometricInterpretation: String = "MONOCHROME2",
         bitsStored: Int? = nil,
+        planarConfiguration: Int = 0,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
         logger: LoggerProtocol? = nil
     ) -> DCMPixelReadResult? {
         guard offset > 0, offset <= data.count else {
@@ -82,6 +86,8 @@ extension DCMPixelReader {
             pixelRepresentation: pixelRepresentation,
             photometricInterpretation: photometricInterpretation,
             bitsStored: bitsStored,
+            planarConfiguration: planarConfiguration,
+            environment: environment,
             logger: logger
         )
     }
@@ -96,6 +102,8 @@ extension DCMPixelReader {
         pixelRepresentation: Int = 0,
         photometricInterpretation: String = "MONOCHROME2",
         bitsStored: Int? = nil,
+        planarConfiguration: Int = 0,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
         logger: LoggerProtocol? = nil
     ) -> DCMPixelReadResult? {
         let backendDecision = DicomCompressedPixelBackendResolver.resolve(
@@ -103,7 +111,8 @@ extension DCMPixelReader {
             requestedBitDepth: bitDepth,
             samplesPerPixel: samplesPerPixel,
             photometricInterpretation: photometricInterpretation,
-            bitsStored: bitsStored
+            bitsStored: bitsStored,
+            environment: environment
         )
 
         switch backendDecision.backend {
@@ -127,9 +136,55 @@ extension DCMPixelReader {
                 return nil
             }
 
-        case .nativeJPEGLS:
+        case .nativeDeflatedFrames:
+            guard let width, let height, let bitDepth, let samplesPerPixel else {
+                logger?.warning("Deflated Image Frame Compression decode requires image dimensions, bit depth, and samples per pixel")
+                return nil
+            }
+            guard [8, 16].contains(bitDepth), samplesPerPixel == 1 || samplesPerPixel == 3 && bitDepth == 8 else {
+                logger?.warning("Deflated frame layout is not representable as gray8/gray16/rgb8")
+                return nil
+            }
             do {
-                let decoded = try DicomJPEGLSCodec.decode(compressedData)
+                let native = try DicomDeflatedFrameDecoder.interleavedNativeBytes(
+                    fragment: compressedData, width: width, height: height, bitsAllocated: bitDepth,
+                    samplesPerPixel: samplesPerPixel, planarConfiguration: planarConfiguration,
+                    photometricInterpretation: photometricInterpretation
+                )
+                guard let result = makeResult(
+                    bytes: native, width: width, height: height, bitsPerSample: bitDepth, componentCount: samplesPerPixel,
+                    pixelRepresentation: pixelRepresentation, photometricInterpretation: photometricInterpretation
+                ) else {
+                    logger?.warning("Deflated Image Frame Compression: \(bitDepth)-bit, \(samplesPerPixel)-sample frames are not representable as gray8/gray16/rgb8")
+                    return nil
+                }
+                return result
+            } catch {
+                logger?.warning("Deflated Image Frame Compression decoding failed: \(error)")
+                return nil
+            }
+
+        case .nativeJPEGLS:
+            if DicomJLSwiftRolloutMode(environment: environment) != .disabled,
+               let width, let height, let samplesPerPixel, let stored = bitsStored ?? bitDepth {
+                // Own JPEG-LS decoder (vendored core) first; CharLS stays the fallback when it declines.
+                let descriptor = DicomCompressedFrameDescriptor(
+                    transferSyntaxUID: transferSyntax?.rawValue ?? DicomTransferSyntax.jpegLSLossless.rawValue,
+                    rows: height, columns: width, bitsAllocated: stored > 8 ? 16 : 8, bitsStored: stored,
+                    highBit: stored - 1, pixelRepresentation: pixelRepresentation,
+                    samplesPerPixel: samplesPerPixel, photometricInterpretation: photometricInterpretation, planarConfiguration: nil
+                )
+                if let frame = try? DicomJLSwiftBackend.decodeSynchronously(compressedData, descriptor: descriptor) {
+                    return makeResult(
+                        bytes: frame.buffer.data, width: frame.width, height: frame.height, bitsPerSample: frame.bitsPerSample,
+                        componentCount: frame.componentCount, pixelRepresentation: pixelRepresentation,
+                        photometricInterpretation: photometricInterpretation
+                    )
+                }
+                logger?.warning("Own JPEG-LS decode declined the frame; using the CharLS runtime")
+            }
+            do {
+                let decoded = try DicomJPEGLSCodec.decode(compressedData, environment: environment)
                 return makeResult(
                     from: decoded,
                     pixelRepresentation: pixelRepresentation,
@@ -143,11 +198,36 @@ extension DCMPixelReader {
         case .nativeJPEGLossless:
             return decodeJPEGLosslessFrame(
                 compressedData,
+                bitsStored: bitsStored,
                 pixelRepresentation: pixelRepresentation,
                 photometricInterpretation: photometricInterpretation,
                 logger: logger
             )
 
+        case .nativeJPEG:
+            do {
+                // Callers without dataset dimensions (frame-level probes) take them from the codestream header.
+                let inspection = try DicomJPEGFrameInspector.inspect(compressedData)
+                let width = width ?? inspection.width, height = height ?? inspection.height
+                let samplesPerPixel = samplesPerPixel ?? inspection.components.count
+                let stored = bitsStored ?? bitDepth ?? inspection.precision
+                let bitDepth = bitDepth ?? (stored > 8 ? 16 : 8)
+                let descriptor = DicomCompressedFrameDescriptor(
+                    transferSyntaxUID: transferSyntax?.rawValue ?? DicomTransferSyntax.jpegBaseline.rawValue,
+                    rows: height, columns: width, bitsAllocated: bitDepth, bitsStored: stored,
+                    highBit: stored - 1, pixelRepresentation: pixelRepresentation,
+                    samplesPerPixel: samplesPerPixel, photometricInterpretation: photometricInterpretation, planarConfiguration: nil
+                )
+                let frame = try DicomJPEGSwiftBackend.decodeSynchronously(compressedData, descriptor: descriptor)
+                return makeResult(
+                    bytes: frame.buffer.data, width: frame.width, height: frame.height, bitsPerSample: frame.bitsPerSample,
+                    componentCount: frame.componentCount, pixelRepresentation: pixelRepresentation,
+                    photometricInterpretation: photometricInterpretation
+                )
+            } catch {
+                logger?.warning("JPEG native decoding failed: \(error)")
+                return nil
+            }
         case .nativeJPEGExtended:
             do {
                 let frame = try JPEGExtendedDecoder.decode(compressedData)
@@ -176,7 +256,7 @@ extension DCMPixelReader {
 
         case .openJPEG2000:
             do {
-                let decoded = try DicomJPEG2000Codec.decode(compressedData)
+                let decoded = try DicomJPEG2000Codec.decode(compressedData, environment: environment)
                 return makeResult(
                     bytes: decoded.bytes,
                     width: decoded.width,
@@ -193,7 +273,7 @@ extension DCMPixelReader {
 
         case .openJPEGHTJ2K:
             do {
-                let decoded = try DicomJPEG2000Codec.decode(compressedData)
+                let decoded = try DicomJPEG2000Codec.decode(compressedData, environment: environment)
                 return makeResult(
                     bytes: decoded.bytes,
                     width: decoded.width,
@@ -234,6 +314,7 @@ extension DCMPixelReader {
 
     private static func decodeJPEGLosslessFrame(
         _ compressedData: Data,
+        bitsStored: Int? = nil,
         pixelRepresentation: Int,
         photometricInterpretation: String,
         logger: LoggerProtocol?
@@ -254,9 +335,10 @@ extension DCMPixelReader {
                     )
                     return nil
                 }
-                guard photometricInterpretation == "RGB" else {
+                // Lossless JPEG applies no colour transform: YBR_FULL(_422) samples come out as coded (issue #2821).
+                guard ["RGB", "YBR_FULL", "YBR_FULL_422"].contains(photometricInterpretation) else {
                     logger?.warning(
-                        "JPEG Lossless 3-component output is only unambiguous for Photometric Interpretation=RGB; "
+                        "JPEG Lossless 3-component output is only unambiguous for RGB, YBR_FULL or YBR_FULL_422; "
                             + "got \(photometricInterpretation)"
                     )
                     return nil
@@ -272,8 +354,18 @@ extension DCMPixelReader {
                     samplesPerPixel: 3
                 )
             }
+            var pixels = losslessResult.pixels
+            let stored = bitsStored ?? losslessResult.bitDepth
+            if pixelRepresentation == 1, losslessResult.bitDepth > 8, stored < 16 {
+                // The codestream carries the Bits Stored two's-complement codes; extend the sign to 16 bits.
+                let valueMask = UInt16(truncatingIfNeeded: (1 << stored) - 1)
+                let signBit = UInt16(1 << (stored - 1))
+                for index in pixels.indices where pixels[index] & signBit != 0 {
+                    pixels[index] = (pixels[index] & valueMask) | ~valueMask
+                }
+            }
             return makeGrayscaleResult(
-                pixels: losslessResult.pixels,
+                pixels: pixels,
                 width: losslessResult.width,
                 height: losslessResult.height,
                 bitDepth: losslessResult.bitDepth,

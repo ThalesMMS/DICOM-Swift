@@ -217,15 +217,15 @@ struct PreflightCommand: ParsableCommand {
                 .first(where: { $0.identifier == "j2kswift-cpu" }) else {
                 return PreflightCheck(kind: .regression, message: "The J2KSwift backend is not registered.")
             }
-            guard status.isAvailable, status.version == "11.0.2" else {
+            guard status.isAvailable, status.version == "11.0.2-vendored" else {
                 return PreflightCheck(
                     kind: .regression,
-                    message: status.unsupportedReason ?? "J2KSwift 11.0.2 is not active."
+                    message: status.unsupportedReason ?? "The own JPEG 2000 codec (J2KSwift 11.0.2 core vendored as DicomJPEG2000) is not active."
                 )
             }
             return PreflightCheck(
                 kind: .available,
-                message: "J2KSwift \(status.version ?? "unknown") is package-linked for JPEG 2000 decode and encode."
+                message: "Own JPEG 2000 codec \(status.version ?? "unknown") (vendored J2KSwift core) decodes and encodes JPEG 2000/HTJ2K."
             )
 
         case "jlswift-backend":
@@ -233,15 +233,15 @@ struct PreflightCommand: ParsableCommand {
                 .first(where: { $0.identifier == "jlswift" }) else {
                 return PreflightCheck(kind: .regression, message: "The JLSwift backend is not registered.")
             }
-            guard status.isAvailable, status.version == "0.9.0" else {
+            guard status.isAvailable, status.version == "0.9.1-vendored" else {
                 return PreflightCheck(
                     kind: .regression,
-                    message: status.unsupportedReason ?? "JLSwift 0.9.0 is not active."
+                    message: status.unsupportedReason ?? "The own JPEG-LS codec (JLSwift 0.9.1 core vendored as DicomJPEGLS) is not active."
                 )
             }
             return PreflightCheck(
                 kind: .available,
-                message: "JLSwift \(status.version ?? "unknown") is package-linked for JPEG-LS decode and encode."
+                message: "Own JPEG-LS codec \(status.version ?? "unknown") (vendored JLSwift core) decodes and encodes .80/.81."
             )
 
         case "jxlswift-backend":
@@ -249,15 +249,15 @@ struct PreflightCommand: ParsableCommand {
                 .first(where: { $0.identifier == "jxlswift" }) else {
                 return PreflightCheck(kind: .regression, message: "The JXLSwift backend is not registered.")
             }
-            guard status.isAvailable, status.version == "1.4.0" else {
+            guard status.isAvailable, status.version == "1.4.0-vendored" else {
                 return PreflightCheck(
                     kind: .regression,
-                    message: status.unsupportedReason ?? "JXLSwift 1.4.0 is not active."
+                    message: status.unsupportedReason ?? "The vendored JPEG XL codec (1.4.0-vendored) is not active."
                 )
             }
             return PreflightCheck(
                 kind: .available,
-                message: "JXLSwift \(status.version ?? "unknown") is package-linked behind the disabled-by-default experimental flag."
+                message: "JPEG XL \(status.version ?? "unknown") is vendored as DicomJPEGXL behind the disabled-by-default experimental flag."
             )
 
         case "openjpeg-runtime":

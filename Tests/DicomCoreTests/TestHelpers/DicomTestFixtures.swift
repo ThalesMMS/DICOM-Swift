@@ -5,10 +5,7 @@ import DicomTestSupport
 /// Computes the URL for the `Fixtures` directory used by tests, located relative to this source file.
 /// - Returns: A `URL` pointing to the `Fixtures` directory.
 func getFixturesPath() -> URL {
-    URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .appendingPathComponent("Fixtures", isDirectory: true)
+    DicomTestFixtures.directory
 }
 
 /// Locate the CT synthetic DICOM fixture and return its file URL.

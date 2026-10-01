@@ -26,7 +26,7 @@ public enum DicomVideoError: Error, Equatable, LocalizedError, Sendable {
         case .unsupportedTransferSyntax(let uid):
             return "Unsupported video transfer syntax: \(uid)."
         case .nativeFrameDecodeUnsupported(let codec):
-            return "Native DICOM video frame decode is not implemented for \(codec)."
+            return "DicomCore does not decode \(codec); use DicomAppleMedia.DicomVideoFrameDecoder."
         case .transcodingUnsupported(let source, let destination):
             return "DICOM video transcoding from \(source) to \(destination) is not implemented."
         case .missingPixelData:
@@ -228,7 +228,10 @@ public struct DicomVideoPixelData: Equatable, Sendable {
         if let frameTimeMilliseconds, (!frameTimeMilliseconds.isFinite || frameTimeMilliseconds <= 0) {
             throw DicomVideoError.invalidFrameTiming
         }
-        if frameTimeVectorMilliseconds.contains(where: { !$0.isFinite || $0 <= 0 }) {
+        if !frameTimeVectorMilliseconds.isEmpty, frameTimeVectorMilliseconds.count != numberOfFrames {
+            throw DicomVideoError.invalidFrameTiming
+        }
+        if frameTimeVectorMilliseconds.enumerated().contains(where: { !$0.element.isFinite || ($0.offset == 0 ? $0.element != 0 : $0.element <= 0) }) {
             throw DicomVideoError.invalidFrameTiming
         }
 
@@ -261,6 +264,7 @@ public struct DicomVideoPixelData: Equatable, Sendable {
 
 public struct DicomVideoBuildOptions: Equatable, Sendable {
     public var kind: DicomVideoStorageKind
+    public var anatomicRegion: DicomDataSet?
     public var sopInstanceUID: String?
     public var studyInstanceUID: String?
     public var seriesInstanceUID: String?
@@ -299,9 +303,11 @@ public struct DicomVideoBuildOptions: Equatable, Sendable {
         contentTime: String? = nil,
         modality: String? = nil,
         imageType: [String] = ["ORIGINAL", "PRIMARY", "VIDEO"],
-        sourceImageReferences: [DicomSourceImageReference] = []
+        sourceImageReferences: [DicomSourceImageReference] = [],
+        anatomicRegion: DicomDataSet? = nil
     ) {
         self.kind = kind
+        self.anatomicRegion = anatomicRegion
         self.sopInstanceUID = sopInstanceUID?.dicomVideoNonEmptyValue
         self.studyInstanceUID = studyInstanceUID?.dicomVideoNonEmptyValue
         self.seriesInstanceUID = seriesInstanceUID?.dicomVideoNonEmptyValue
@@ -334,6 +340,8 @@ public struct DicomVideo: Equatable, Sendable {
         videoPhotographicImageStorageSOPClassUID
     ]
 
+    public let cine: DicomVideoCine
+    public let anatomicRegion: DicomDataSet?
     public let sopClassUID: String
     public let sopInstanceUID: String?
     public let studyInstanceUID: String?
@@ -383,8 +391,19 @@ public struct DicomVideo: Equatable, Sendable {
         sourceImageReferences: [DicomSourceImageReference] = [],
         streamData: Data,
         indexedFramePayloads: [Data] = [],
-        encapsulatedPixelDataDescriptor: DicomEncapsulatedPixelDataDescriptor
+        encapsulatedPixelDataDescriptor: DicomEncapsulatedPixelDataDescriptor,
+        cine: DicomVideoCine? = nil,
+        anatomicRegion: DicomDataSet? = nil
     ) {
+        var timing = cine ?? DicomVideoCine()
+        if cine == nil {
+            timing.frameTimeMilliseconds = frameTimeMilliseconds
+            timing.frameTimeVectorMilliseconds = frameTimeVectorMilliseconds
+            timing.cineRate = cineRate
+            timing.recommendedDisplayFrameRate = recommendedDisplayFrameRate
+        }
+        self.cine = timing
+        self.anatomicRegion = anatomicRegion
         self.sopClassUID = sopClassUID.dicomVideoNonEmptyValue ?? sopClassUID
         self.sopInstanceUID = sopInstanceUID?.dicomVideoNonEmptyValue
         self.studyInstanceUID = studyInstanceUID?.dicomVideoNonEmptyValue
@@ -398,15 +417,15 @@ public struct DicomVideo: Equatable, Sendable {
         self.columns = columns
         self.rows = rows
         self.numberOfFrames = max(1, numberOfFrames)
-        self.frameTimeMilliseconds = frameTimeMilliseconds
-        self.frameTimeVectorMilliseconds = frameTimeVectorMilliseconds
-        self.cineRate = cineRate
-        self.recommendedDisplayFrameRate = recommendedDisplayFrameRate
+        self.frameTimeMilliseconds = timing.frameTimeMilliseconds
+        self.frameTimeVectorMilliseconds = timing.frameTimeVectorMilliseconds
+        self.cineRate = timing.cineRate
+        self.recommendedDisplayFrameRate = timing.recommendedDisplayFrameRate
         self.lossyImageCompression = lossyImageCompression?.dicomVideoNonEmptyValue
         self.lossyImageCompressionRatio = lossyImageCompressionRatio
         self.lossyImageCompressionMethod = lossyImageCompressionMethod?.dicomVideoNonEmptyValue
         self.sourceImageReferences = sourceImageReferences.removingDuplicateVideoElements()
-        self.streamData = streamData
+        self.streamData = Data(streamData)
         self.indexedFramePayloads = indexedFramePayloads
         self.encapsulatedPixelDataDescriptor = encapsulatedPixelDataDescriptor
     }
@@ -467,6 +486,7 @@ public struct DicomVideo: Equatable, Sendable {
         throw DicomVideoError.nativeFrameDecodeUnsupported(codec: codec.displayName)
     }
 
+    /// DicomCore preserves bytes only for the same syntax. Cross-syntax encoding is supplied by DicomAppleMedia.
     public func transcodeStream(to destination: DicomTransferSyntax) throws -> Data {
         if let transferSyntax, destination == transferSyntax {
             return streamData
@@ -545,11 +565,37 @@ public enum DicomVideoBuilder {
         if let method = video.codec.lossyCompressionMethod {
             elements.append(string(.lossyImageCompressionMethod, vr: .CS, method))
         }
+        if let region = options.anatomicRegion { elements.append(.init(tag: DicomTag.anatomicRegionSequence.rawValue, vr: .SQ, value: .sequence([.init(dataSet: region)]))) }
         appendOptionalStrings(options, to: &elements)
         if !options.sourceImageReferences.isEmpty {
             elements.append(sequence(.sourceImageSequence, options.sourceImageReferences.map(sourceImageDataSet)))
         }
-        return DicomDataSet(elements: elements)
+        var cine = DicomVideoCine()
+        cine.frameTimeMilliseconds = video.frameTimeMilliseconds
+        cine.frameTimeVectorMilliseconds = video.frameTimeVectorMilliseconds
+        return try cine.applying(to: DicomDataSet(elements: elements))
+    }
+
+    public static func dataSet(video: DicomVideoPixelData, options: DicomVideoBuildOptions = .init(),
+                               cine: DicomVideoCine) throws -> DicomDataSet {
+        var merged = cine
+        if merged.frameTimeMilliseconds == nil, merged.frameTimeVectorMilliseconds.isEmpty {
+            merged.frameTimeMilliseconds = video.frameTimeMilliseconds
+            merged.frameTimeVectorMilliseconds = video.frameTimeVectorMilliseconds
+        }
+        return try merged.applying(to: dataSet(video: video, options: options)
+            .removing(0x00181063).removing(0x00181065).removing(0x00280009))
+    }
+
+    /// Builds a video dataset and applies its required Type 2 attributes.
+    public static func dataSet(
+        video: DicomVideoPixelData,
+        options: DicomVideoBuildOptions = DicomVideoBuildOptions(),
+        requiredType2Attributes: DicomMediaAttachmentType2Attributes
+    ) throws -> DicomDataSet {
+        var dataSet = try dataSet(video: video, options: options)
+        requiredType2Attributes.apply(to: &dataSet)
+        return dataSet
     }
 
     public static func part10Data(
@@ -557,6 +603,27 @@ public enum DicomVideoBuilder {
         options: DicomVideoBuildOptions = DicomVideoBuildOptions()
     ) throws -> Data {
         let dataSet = try dataSet(video: video, options: options)
+        return try DicomDataSetWriter.part10Data(
+            from: dataSet,
+            options: DicomPart10WriterOptions(
+                transferSyntax: video.transferSyntax,
+                mediaStorageSOPClassUID: options.kind.storageSOPClassUID,
+                mediaStorageSOPInstanceUID: dataSet.string(for: .sopInstanceUID)
+            )
+        )
+    }
+
+    /// Writes a video Part 10 object with required Type 2 attributes.
+    public static func part10Data(
+        video: DicomVideoPixelData,
+        options: DicomVideoBuildOptions = DicomVideoBuildOptions(),
+        requiredType2Attributes: DicomMediaAttachmentType2Attributes
+    ) throws -> Data {
+        let dataSet = try dataSet(
+            video: video,
+            options: options,
+            requiredType2Attributes: requiredType2Attributes
+        )
         return try DicomDataSetWriter.part10Data(
             from: dataSet,
             options: DicomPart10WriterOptions(
@@ -710,14 +777,24 @@ public enum DicomVideoBuilder {
 
 extension DCMDecoder {
     public var video: DicomVideo? {
+        video(payloadMode: .indexedFrames)
+    }
+
+    /// Parses the DICOM video using the requested encoded-payload retention policy.
+    /// - Parameter payloadMode: Whether to retain indexed frames in addition to the complete stream.
+    /// - Returns: The parsed video, or `nil` when the instance is not a supported DICOM video.
+    public func video(payloadMode: DicomVideoPayloadMode) -> DicomVideo? {
         synchronized {
-            DicomVideoParser.makeVideo(from: self)
+            DicomVideoParser.makeVideo(from: self, payloadMode: payloadMode)
         }
     }
 }
 
 private enum DicomVideoParser {
-    static func makeVideo(from decoder: DCMDecoder) -> DicomVideo? {
+    static func makeVideo(
+        from decoder: DCMDecoder,
+        payloadMode: DicomVideoPayloadMode
+    ) -> DicomVideo? {
         guard matches(decoder),
               let descriptor = encapsulatedDescriptor(from: decoder),
               !descriptor.fragments.isEmpty else {
@@ -727,8 +804,12 @@ private enum DicomVideoParser {
         let streamData = fragmentData(descriptor.fragments, in: decoder)
         guard !streamData.isEmpty else { return nil }
         let syntax = DicomTransferSyntax(uid: decoder.transferSyntaxUID)
-        let framePayloads = descriptor.frameFragmentIndexes.indices.compactMap {
-            descriptor.frame($0, in: decoder.dicomData)?.data
+        let framePayloads: [Data]
+        switch payloadMode {
+        case .indexedFrames:
+            framePayloads = indexedFramePayloads(from: descriptor, in: decoder.dicomData)
+        case .streamOnly:
+            framePayloads = []
         }
         let sourceReferences = parseItems(in: decoder, for: .sourceImageSequence).map(sourceImageReference)
 
@@ -756,7 +837,9 @@ private enum DicomVideoParser {
             sourceImageReferences: sourceReferences,
             streamData: streamData,
             indexedFramePayloads: framePayloads,
-            encapsulatedPixelDataDescriptor: descriptor
+            encapsulatedPixelDataDescriptor: descriptor,
+            cine: DicomVideoCine(dataSet: decoder.dataSet),
+            anatomicRegion: decoder.dataSet.sequenceItems(for: .anatomicRegionSequence).first?.dataSet
         )
     }
 
@@ -796,13 +879,40 @@ private enum DicomVideoParser {
         _ fragments: [DicomEncapsulatedPixelDataFragment],
         in decoder: DCMDecoder
     ) -> Data {
-        fragments.reduce(into: Data()) { result, fragment in
+        var capacity = 0
+        for fragment in fragments {
             guard fragment.valueRange.lowerBound >= 0,
                   fragment.valueRange.upperBound <= decoder.dicomData.count else {
-                return
+                return Data()
             }
-            result.append(Data(decoder.dicomData[fragment.valueRange]))
+            let (nextCapacity, overflow) = capacity.addingReportingOverflow(fragment.valueRange.count)
+            if overflow {
+                return Data()
+            }
+            capacity = nextCapacity
         }
+
+        var result = Data()
+        result.reserveCapacity(capacity)
+        for fragment in fragments {
+            result.append(contentsOf: decoder.dicomData[fragment.valueRange])
+        }
+        return result
+    }
+
+    private static func indexedFramePayloads(
+        from descriptor: DicomEncapsulatedPixelDataDescriptor,
+        in data: Data
+    ) -> [Data] {
+        var payloads: [Data] = []
+        payloads.reserveCapacity(descriptor.frameFragmentIndexes.count)
+        for index in descriptor.frameFragmentIndexes.indices {
+            guard let payload = descriptor.frame(index, in: data)?.data else {
+                return []
+            }
+            payloads.append(payload)
+        }
+        return payloads
     }
 
     private static func sourceImageReference(from item: DicomSequenceItem) -> DicomSourceImageReference {

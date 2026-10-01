@@ -49,7 +49,7 @@ import Accelerate
 /// medical imaging.  The underlying raw values mirror those used
 /// in the Objective‑C NS_ENUM.  Each case describes a typical
 /// anatomy or modality and can be mapped to a pair of centre and
-/// width values via ``getPresetValuesV2(preset:)``.
+/// width values via ``DCMWindowingProcessor/getPresetValuesV2(preset:)``.
 public enum MedicalPreset: Int, CaseIterable, Sendable {
     // Original CT presets (raw values preserved for backward compatibility)
     case lung       = 0
@@ -112,7 +112,7 @@ public enum MedicalPreset: Int, CaseIterable, Sendable {
 // MARK: - Processing Mode Enumeration
 
 /// Processing backend selection for window/level operations
-public enum ProcessingMode {
+public enum ProcessingMode: Sendable {
     /// CPU-based processing using vDSP (Accelerate framework)
     /// - Best for: Small images (<800×800 pixels), guaranteed availability
     /// - Performance: Optimal for small datasets, 1-2ms for 512×512 images
@@ -263,19 +263,18 @@ public enum ProcessingMode {
 /// ### Image Enhancement
 ///
 /// - ``applyHistogramEqualization(imageData:width:height:)``
-/// - ``applyNoiseReduction(imageData:width:height:)``
+/// - ``applyNoiseReduction(imageData:width:height:strength:)``
 ///
 /// ### Quality Metrics
 ///
-/// - ``calculatePSNR(original:processed:maxValue:)``
-/// - ``calculateContrast(pixels:)``
+/// - ``calculateQualityMetrics(pixels16:)``
 public struct DCMWindowingProcessor {
 
     // MARK: - Metal GPU Processing
 
     /// Lazily initialized Metal processor for GPU-accelerated operations.
     /// Returns nil if Metal is unavailable or initialization fails.
-    private static var metalProcessor: MetalWindowingProcessor? = {
+    private static let metalProcessor: MetalWindowingProcessor? = {
         return try? MetalWindowingProcessor()
     }()
 
@@ -298,7 +297,7 @@ public struct DCMWindowingProcessor {
     ///   - pixels16: An array of unsigned 16‑bit pixel intensities.
     ///   - center: The centre of the window.
     ///   - width: The width of the window.
-    /// - Returns: A ``Data`` object containing 8‑bit pixel values or
+    /// - Returns: A `Data` object containing 8‑bit pixel values or
     ///   `nil` if the input is invalid.
     private static func applyWindowLevelVDSP(pixels16: [UInt16],
                                              center: Double,
@@ -354,7 +353,7 @@ public struct DCMWindowingProcessor {
     /// Applies a linear window/level transformation to a 16‑bit
     /// grayscale pixel buffer with selectable processing backend.
     /// The resulting pixels are scaled to the 0–255 range and
-    /// returned as ``Data``.
+    /// returned as `Data`.
     ///
     /// This function supports three processing modes:
     /// - `.vdsp`: CPU-based processing using Accelerate framework
@@ -368,7 +367,7 @@ public struct DCMWindowingProcessor {
     ///   - center: The centre of the window.
     ///   - width: The width of the window.
     ///   - processingMode: The processing backend to use (default: `.vdsp`).
-    /// - Returns: A ``Data`` object containing 8‑bit pixel values or
+    /// - Returns: A `Data` object containing 8‑bit pixel values or
     ///   `nil` if the input is invalid.
     public static func applyWindowLevel(
         pixels16: [UInt16],
@@ -376,7 +375,32 @@ public struct DCMWindowingProcessor {
         width: Double,
         processingMode: ProcessingMode = .vdsp
     ) -> Data? {
-        guard !pixels16.isEmpty, width > 0 else { return nil }
+        applyWindowLevelReportingBackend(pixels16: pixels16,
+                                         center: center,
+                                         width: width,
+                                         processingMode: processingMode).data
+    }
+
+    /// The backend that actually produced a windowing result.
+    ///
+    /// Issue #1905: the `.metal` mode silently falls back to vDSP when the
+    /// Metal processor fails to initialize or execute, and because the two
+    /// backends agree within ±1 the fallback is invisible to every output
+    /// assertion. This is the observable difference: a test that requires the
+    /// GPU path asserts `.metal` here and fails when the kernel did not run.
+    public enum WindowingBackend: Equatable, Sendable {
+        case vdsp
+        case metal
+    }
+
+    /// `applyWindowLevel`, also reporting which backend produced the result.
+    public static func applyWindowLevelReportingBackend(
+        pixels16: [UInt16],
+        center: Double,
+        width: Double,
+        processingMode: ProcessingMode = .vdsp
+    ) -> (data: Data?, backend: WindowingBackend) {
+        guard !pixels16.isEmpty, width > 0 else { return (nil, .vdsp) }
 
         // Determine effective mode
         let effectiveMode: ProcessingMode
@@ -393,12 +417,17 @@ public struct DCMWindowingProcessor {
 
         // Dispatch to appropriate implementation
         switch effectiveMode {
-        case .vdsp:
-            return applyWindowLevelVDSP(pixels16: pixels16, center: center, width: width)
+        case .vdsp, .auto:
+            return (applyWindowLevelVDSP(pixels16: pixels16, center: center, width: width), .vdsp)
         case .metal:
-            return try? metalProcessor?.applyWindowLevel(pixels16: pixels16, center: center, width: width)
-        case .auto:
-            return applyWindowLevelVDSP(pixels16: pixels16, center: center, width: width)
+            // A Metal execution failure still falls back to the CPU — but it
+            // says so, instead of the caller finding a nil.
+            if let metalData = try? metalProcessor?.applyWindowLevel(pixels16: pixels16,
+                                                                     center: center,
+                                                                     width: width) {
+                return (metalData, .metal)
+            }
+            return (applyWindowLevelVDSP(pixels16: pixels16, center: center, width: width), .vdsp)
         }
     }
 

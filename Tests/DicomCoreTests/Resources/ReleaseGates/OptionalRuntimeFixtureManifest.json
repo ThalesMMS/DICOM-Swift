@@ -51,30 +51,30 @@
     {
       "id": "j2kswift-backend",
       "kind": "package-runtime",
-      "source": "J2KSwift 11.0.2 linked through SwiftPM; no host installation is required.",
+      "source": "J2KSwift 11.0.2 J2KCore/J2KCodec core vendored as the DicomJPEG2000 target (#2329); no package pin or host installation is required.",
       "phiStatus": "Package dependency only; qualification uses synthetic pixel buffers and provenance-tracked fixtures.",
-      "expectedMetadata": "Backend status reports package-linked source, version 11.0.2, JPEG 2000 decode, JPEG 2000 and HTJ2K encode, and explicit experimental/fallback verdicts.",
-      "expectedPixelBehavior": "J2KSwift and OpenJPEG cross-decode lossless samples exactly; lossy cases declare a fixture-specific metric; the pinned OpenJPH HTJ2K mismatch remains visible.",
+      "expectedMetadata": "Backend status reports vendored source, version 11.0.2-vendored, JPEG 2000 and HTJ2K decode and encode, and explicit experimental/fallback verdicts.",
+      "expectedPixelBehavior": "J2KSwift and OpenJPEG cross-decode lossless samples exactly; lossy cases declare a fixture-specific metric; the pinned OpenJPH HTJ2K fixture decodes exactly.",
       "testCoverage": [
         "Tests/DicomCoreTests/DicomJ2KSwiftBackendTests.swift",
         "Tests/DicomCoreTests/DicomJ2KSwiftEncoderTests.swift"
       ],
-      "preflight": "DicomCodecCapabilities.backendStatuses() contains the package-linked j2kswift-cpu backend at version 11.0.2",
-      "ciBehavior": "Required in default CI because the dependency is package-linked and deterministic."
+      "preflight": "DicomCodecCapabilities.backendStatuses() contains the own j2kswift-cpu backend at version 11.0.2-vendored",
+      "ciBehavior": "Required in default CI because the backend is compiled into DicomCore and deterministic."
     },
     {
       "id": "jlswift-backend",
       "kind": "package-runtime",
-      "source": "JLSwift 0.9.0 linked through SwiftPM; no host installation is required.",
+      "source": "JLSwift 0.9.1 core vendored as the DicomJPEGLS target (#2328); no package pin or host installation is required.",
       "phiStatus": "Package dependency only; qualification uses synthetic pixel buffers.",
-      "expectedMetadata": "Backend status reports package-linked source, version 0.9.0, JPEG-LS .80/.81 decode and encode, and qualified bit-depth ranges.",
+      "expectedMetadata": "Backend status reports vendored source, version 0.9.1-vendored, JPEG-LS .80/.81 decode and encode, and qualified bit-depth ranges.",
       "expectedPixelBehavior": "JLSwift and CharLS cross-decode lossless frames bit-exactly and near-lossless frames within the explicit NEAR bound.",
       "testCoverage": [
         "Tests/DicomCoreTests/DicomJLSwiftBackendTests.swift",
         "Tests/DicomCoreTests/DicomTranscoderTests.swift"
       ],
-      "preflight": "DicomCodecCapabilities.backendStatuses() contains the package-linked jlswift backend at version 0.9.0",
-      "ciBehavior": "Required in default CI because the dependency is package-linked and deterministic."
+      "preflight": "DicomCodecCapabilities.backendStatuses() contains the own jlswift backend at version 0.9.1-vendored",
+      "ciBehavior": "Required in default CI because the codec is compiled into DicomCore and deterministic."
     },
     {
       "id": "jxlswift-backend",
@@ -88,7 +88,7 @@
         "Tests/DicomCoreTests/DicomTranscoderTests.swift"
       ],
       "preflight": "DicomCodecCapabilities.backendStatuses() contains the package-linked jxlswift backend at version 1.4.0",
-      "ciBehavior": "Required in default CI because the dependency is package-linked; clinical use remains disabled by default."
+      "ciBehavior": "Required in default CI because the backend is compiled into DicomCore; clinical use remains disabled by default."
     },
     {
       "id": "charls-runtime",
@@ -189,6 +189,22 @@
       ],
       "preflight": "DicomTestRuntimePreflight.status(for: .networkInteropSmoke)",
       "ciBehavior": "Skipped unless DICOM_INTEROP_SMOKE=1. Set DICOM_REQUIRE_NETWORK_INTEROP_SMOKE=1 when endpoints are provisioned."
+    },
+    {
+      "id": "pynetdicom-peer",
+      "kind": "optional-network-runtime",
+      "source": "pynetdicom 3.0.4 (with pydicom 3.0.2) in the Python interpreter named by DICOM_SWIFT_PYNETDICOM_PYTHON (default /tmp/isis-2321-iod-oracle/bin/python), driven by Scripts/interop/pynetdicom_peer.py over loopback TCP.",
+      "phiStatus": "Synthetic data sets built in the tests; no PHI.",
+      "expectedMetadata": "The peer echoes the negotiated presentation contexts, extended negotiation, user identity and asynchronous window it accepted, and the Message IDs it answered.",
+      "expectedPixelBehavior": "Native and RLE payloads stored through the peer are returned byte-identical (SHA-256) by C-GET/C-MOVE; a refused syntax or a failed persistence callback is isolated per object.",
+      "testCoverage": [
+        "Tests/DicomCoreTests/DicomDIMSEPynetdicomPeerTests.swift",
+        "Tests/DicomCoreTests/DicomDIMSEServerPynetdicomTests.swift",
+        "Tests/DicomTestSupport/PynetdicomPeer.swift",
+        "Scripts/interop/pynetdicom_peer.py"
+      ],
+      "preflight": "DicomTestRuntimePreflight.status(for: .pynetdicomPeer)",
+      "ciBehavior": "Skipped unless DICOM_SWIFT_PYNETDICOM_PYTHON names an interpreter with pynetdicom (or the default oracle interpreter exists)."
     },
     {
       "id": "network-security-tls",

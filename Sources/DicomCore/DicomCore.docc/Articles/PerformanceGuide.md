@@ -123,6 +123,28 @@ let pixels = decoder.getPixels16()
 - Defer pixel loading until display time
 - Useful for thumbnail views or batch metadata extraction
 
+### Data-backed decoded frames
+
+Use `DicomDecodedFrameReader.dataBackedFrame(at:)` when the consumer
+accepts canonical bytes directly. ``DicomDecodedFrameDataBuffer`` declares its
+format, byte order, ownership, pixel/component counts, bytes per row, and the
+absence of a stable alignment guarantee. Its `Data` remains valid while the
+buffer or a copy exists; pointers obtained through `withUnsafeBytes` are valid
+only inside the closure.
+
+``DicomDecodedFrameReader/dataBackedFrames(in:)`` is pull-based and decodes one
+frame per iterator `next()`, so a slow consumer does not create an eager frame
+queue. Use `copyingToArrayBackedPixels()` only for compatibility with code that
+requires ``DicomDecodedFramePixelBuffer``. The legacy `frame(at:)` API and its
+three enum cases remain unchanged.
+
+The Release characterization and reproduction command are maintained in
+`BENCHMARKS.md`. The Data-backed path avoids a measured full-payload copy for
+eligible JPEG-LS, JPEG 2000, and experimental JPEG XL backends. Signed samples,
+MONOCHROME1, and noncanonical endian input still require normalized Data;
+native, RLE, and JPEG Lossless paths retain their existing normalization
+behavior.
+
 ### Tag Caching
 
 Frequently accessed tags are cached after first lookup:
@@ -295,6 +317,25 @@ default:
     break
 }
 ```
+
+### Encapsulated Frame Assembly Benchmark
+
+The opt-in benchmark compares the current per-fragment intermediate `Data` assembly with direct appends from the
+source ranges. It does not change the production extraction path:
+
+```bash
+DICOM_ENCAPSULATED_EXTRACTION_BENCHMARK=1 \
+    swift test -c release --jobs 2 \
+    --filter DicomEncapsulatedPixelDataBenchmarkTests/test_benchmarkFrameAssemblyCopies
+```
+
+Each `ENCAPSULATED_FRAME_ASSEMBLY` line records p50/p95 time, payload bytes, modeled intermediate copy bytes and
+buffer count, modeled peak payload bytes, observed live-heap and resident-memory deltas, and process peak RSS for
+simple and 64-fragment 16 MiB frames. For isolated peak-RSS comparisons, run one combination per process by also
+setting `DICOM_ENCAPSULATED_EXTRACTION_SCENARIO` (`simple` or `fragmented`) and
+`DICOM_ENCAPSULATED_EXTRACTION_STRATEGY` (`intermediate-data` or `direct-range`). Repeat the release measurement on
+otherwise idle target hardware before proposing a production optimization; the benchmark intentionally has no
+hardware-dependent performance threshold.
 
 ## Performance Monitoring
 

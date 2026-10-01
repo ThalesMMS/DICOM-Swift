@@ -42,6 +42,8 @@ mkdir -p "$COVERAGE_DIR"
 TEST_LOG="$COVERAGE_DIR/test.log"
 
 run_preflight_or_fail_fast() {
+  echo "==> Reproducible standard dictionary"
+  python3 Scripts/Dictionary/generate_dictionary.py --check
   echo "==> Preflight (required capabilities fail fast before tests)"
   if ! swift run dicomtool preflight; then
     echo "[gate=$GATE] FAILED in preflight: required capabilities are missing." >&2
@@ -69,8 +71,12 @@ emit_clinical_conformance_report() {
     --gate "$GATE"
     --enforce-required
   )
-  if [ -f ".build/clinical-conformance/dicomkit-interop.jsonl" ]; then
-    args+=(--interop-results ".build/clinical-conformance/dicomkit-interop.jsonl")
+  if [ -n "${DICOM_CONFORMANCE_INTEROP_RESULTS:-}" ]; then
+    if [ ! -f "$DICOM_CONFORMANCE_INTEROP_RESULTS" ]; then
+      echo "DICOM_CONFORMANCE_INTEROP_RESULTS must point to an existing file: $DICOM_CONFORMANCE_INTEROP_RESULTS" >&2
+      return 1
+    fi
+    args+=(--interop-results "$DICOM_CONFORMANCE_INTEROP_RESULTS")
   fi
   python3 Scripts/clinical_conformance_report.py "${args[@]}"
 }
@@ -103,8 +109,20 @@ QUICK_SKIPS=(
 # Fixture-focused suites: bundled synthetic fixtures plus curated non-PHI
 # conformance/parity material. Deterministic, network-free.
 FIXTURE_FILTERS=(
+  DicomDataTests
+  DicomByteSourceFrameTests
+  DicomSourceFrameIndexTests
+  DicomSourceFrameSessionTests
+  DicomJPEGFrameBoundaryScannerTests
+  SelectiveFrameOracleTests
+  ExtractCommandTests
   ClinicalCodecConformanceManifestTests
   ClinicalCodecConformanceReportTests
+  ClinicalIndependentCorpusTests
+  ClinicalAdversarialCorpusTests
+  ClinicalMetadataRepresentationTests
+  DCMDecoderSecurityTests
+  DicomWebClientTests
   ClinicalInteropFixtureExportTests.test_committedClinicalObjectFixturesMatchDeterministicBuildersAndParse
   ClinicalParityFixtureManifestTests
   DCMDecoderIntegrationTests

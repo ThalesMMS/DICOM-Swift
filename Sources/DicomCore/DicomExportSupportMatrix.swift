@@ -79,34 +79,35 @@ public struct DicomExportSupportMatrix: Equatable, Sendable {
         ),
         DicomExportSupportRow(
             feature: "Print management",
-            supportedIODs: "Basic Grayscale Print Management Meta SOP Class with Basic Film Session, "
-                + "Basic Film Box, and Basic Grayscale Image Box",
+            supportedIODs: "Basic Grayscale and Color Print Management Meta SOP Classes with Basic Film "
+                + "Session, Basic Film Box, matching Image Box, Basic Annotation Box, and Printer",
             requiredTags: "Film session copy/priority/medium/destination, film box layout/orientation/size, "
-                + "image box position, and grayscale 8-bit image pixel attributes",
+                + "image box position, and grayscale or RGB 8-bit image pixel attributes",
             transferSyntaxes: "Negotiated DIMSE presentation context, defaulting to Explicit VR Little Endian when absent",
-            payloadRules: "Rendered RGB bitmaps and PNG snapshots are converted to 8-bit MONOCHROME2 "
-                + "Basic Grayscale Image Box payloads",
+            payloadRules: "Grayscale jobs send 8-bit MONOCHROME2; color jobs send interleaved RGB8 with "
+                + "Planar Configuration 0; automatic mode prefers color and falls back to grayscale",
             metadataPreservation: "Film session label, film box display settings, queue status, and "
                 + "returned image box SOP Instance UIDs are preserved",
-            unsupportedCases: "Color print, Presentation LUT service, annotation boxes, "
-                + "printer configuration/status services, storage commitment, and film boxes for "
+            unsupportedCases: "Presentation LUT, Printer Configuration, Print Job monitoring, "
+                + "storage commitment, and film boxes for "
                 + "which the printer grants fewer image boxes than the job requested",
             typedFailure: "DicomPrintManagementError.unsupportedService or "
-                + "insufficientImageBoxes(requested:granted:)"
+                + "printModeNotNegotiated(_:) or insufficientImageBoxes(requested:granted:)"
         ),
         DicomExportSupportRow(
             feature: "Waveform",
             supportedIODs: "12-lead ECG, General ECG, Ambulatory ECG, General 32-bit ECG, Hemodynamic, "
-                + "Cardiac Electrophysiology, Arterial Pulse, and Respiratory Waveform Storage",
+                + "Cardiac Electrophysiology, Arterial Pulse, Respiratory, Routine Scalp EEG, EMG, EOG, "
+                + "Sleep EEG, Basic Voice Audio, and General Audio Waveform Storage",
             requiredTags: "Waveform Sequence, Number of Channels, Number of Samples, Sampling Frequency, "
                 + "Channel Definition Sequence, Waveform Bits Allocated, Waveform Sample Interpretation, "
                 + "and Waveform Data",
             transferSyntaxes: "Native dataset and Part 10 writing through DicomDataSetWriter; "
                 + "compressed waveform encodings are not implemented",
-            payloadRules: "SB, UB, SS, US, SL, and UL integer samples are interleaved by sample then channel with range checks",
+            payloadRules: "SB, UB, SS, US, SL, UL, MB, and AB samples are interleaved by sample then channel with range checks",
             metadataPreservation: "Channel labels, source concepts, units, sensitivity, filters, "
                 + "timing offsets, and source waveform references are preserved",
-            unsupportedCases: "Float/double samples, audio waveforms, vendor-specific packed encodings, "
+            unsupportedCases: "Float/double samples, vendor-specific packed encodings, "
                 + "inconsistent channel sample counts, and malformed payload lengths",
             typedFailure: "DicomWaveformError.unsupportedSampleInterpretation, sampleOutOfRange, or invalidWaveformData"
         ),

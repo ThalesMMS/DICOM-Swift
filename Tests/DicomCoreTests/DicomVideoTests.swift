@@ -72,6 +72,48 @@ final class DicomVideoTests: XCTestCase {
         XCTAssertEqual(video.lossyImageCompressionMethod, "ISO_14496_10")
     }
 
+    func testStreamOnlyVideoPreservesLargeMultiFragmentStreamWithoutRetainingFrameCopies() throws {
+        let fragments = (0..<64).map { index in
+            Data(repeating: UInt8(index), count: 64 * 1_024)
+        }
+        let pixelData = try DicomVideoPixelData(
+            fragments: fragments,
+            transferSyntax: .mpeg4AVCH264HighProfileLevel41Fragmentable,
+            columns: 1_920,
+            rows: 1_080,
+            numberOfFrames: fragments.count,
+            recommendedDisplayFrameRate: 30
+        )
+        let decoder = try open(
+            video: pixelData,
+            options: DicomVideoBuildOptions(kind: .endoscopic)
+        )
+
+        let indexedVideo = try XCTUnwrap(decoder.video)
+        let explicitIndexedVideo = try XCTUnwrap(decoder.video(payloadMode: .indexedFrames))
+        let streamOnlyVideo = try XCTUnwrap(decoder.video(payloadMode: .streamOnly))
+        let expectedStream = fragments.reduce(into: Data()) { $0.append($1) }
+
+        XCTAssertEqual(indexedVideo, explicitIndexedVideo)
+        XCTAssertEqual(streamOnlyVideo.streamData, expectedStream)
+        XCTAssertEqual(streamOnlyVideo.streamData, indexedVideo.streamData)
+        XCTAssertEqual(indexedVideo.indexedFramePayloads, fragments)
+        XCTAssertEqual(streamOnlyVideo.indexedFramePayloads, [])
+        XCTAssertEqual(
+            streamOnlyVideo.encapsulatedPixelDataDescriptor,
+            indexedVideo.encapsulatedPixelDataDescriptor
+        )
+
+        let indexedPayloadBytes = indexedVideo.streamData.count + indexedVideo.indexedFramePayloads.reduce(0) {
+            $0 + $1.count
+        }
+        let streamOnlyPayloadBytes = streamOnlyVideo.streamData.count
+        XCTAssertEqual(indexedPayloadBytes - streamOnlyPayloadBytes, expectedStream.count)
+        XCTAssertThrowsError(try streamOnlyVideo.encodedFramePayload(at: 0)) { error in
+            XCTAssertEqual(error as? DicomVideoError, .nativeFrameDecodeUnsupported(codec: "H.264"))
+        }
+    }
+
     func testHEVCVideoRoundTripsAsForwardableStreamWhenFramesAreNotIndividuallyIndexed() throws {
         let stream = Data([0x00, 0x00, 0x01, 0x40, 0x00, 0x00, 0x01, 0x26])
         let pixelData = try DicomVideoPixelData(

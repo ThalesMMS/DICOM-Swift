@@ -57,10 +57,6 @@ extension DicomSeriesLoader {
     /// }
     /// ```
     ///
-    /// - Parameters:
-    ///   - directory: Directory containing DICOM slices
-    ///   - progress: Optional callback invoked with (fractionComplete, slicesCopied, sliceData, volume)
-    /// - Returns: ``DicomSeriesVolume`` with voxel buffer and geometry metadata
     /// Asynchronously loads a DICOM series from a directory, supporting cancellation and optional progress updates.
     /// - Parameters:
     ///   - directory: URL of the directory containing the DICOM series to load.
@@ -76,7 +72,9 @@ extension DicomSeriesLoader {
         let task = Task.detached(priority: .userInitiated) { () throws -> DicomSeriesVolume in
             try Task.checkCancellation()
             let loader = DicomSeriesLoader(decoderFactory: decoderFactory)
-            return try loader.loadSeries(in: directory, progress: progress)
+            let volume = try loader.loadSeries(in: directory, progress: progress)
+            try Task.checkCancellation()
+            return volume
         }
 
         return try await withTaskCancellationHandler(operation: {
@@ -89,7 +87,7 @@ extension DicomSeriesLoader {
     /// Asynchronously loads a DICOM series from a directory with progress reporting via AsyncStream.
     ///
     /// This async method provides the same functionality as the synchronous
-    /// ``loadSeries(in:progress:)`` but can be called from async contexts and
+    /// ``loadSeries(in:progress:)-17egi`` but can be called from async contexts and
     /// provides progress updates through an `AsyncThrowingStream`.
     ///
     /// The file loading and volume assembly is performed on a background thread
@@ -110,18 +108,10 @@ extension DicomSeriesLoader {
     /// }
     /// ```
     ///
-    /// - Parameter directory: Directory containing DICOM slices
-    /// - Returns: `AsyncThrowingStream` that yields ``SeriesLoadProgress`` updates
-    /// Creates a stream of progress updates while loading a DICOM series from the specified directory.
-    ///
-    /// The stream yields `SeriesLoadProgress` values as slices are decoded and copied, and yields a final
-    /// progress item containing the completed `DicomSeriesVolume`. If loading fails, the stream finishes with the encountered error.
-    /// - Parameter directory: Filesystem directory containing the DICOM series to load.
     /// Streams incremental progress updates while loading a DICOM series from a directory.
     /// 
     /// Progress updates are produced from a detached background task. If loading completes successfully the stream yields a final progress item with `fractionComplete == 1.0` and the completed `DicomSeriesVolume`. If loading fails or is cancelled, the stream finishes by throwing the encountered error. Terminating the stream cancels the background task that performs the load.
-    /// - Parameters:
-    ///   - directory: The file-system directory URL containing the DICOM series to load.
+    /// - Parameter directory: The file-system directory URL containing the DICOM series to load.
     /// - Returns: An `AsyncThrowingStream` that yields `SeriesLoadProgress` updates; the stream yields incremental progress items, a final completed progress with the loaded volume, and finishes normally on success or finishes throwing an error if loading fails or is cancelled.
     public func loadSeriesWithProgress(
         in directory: URL

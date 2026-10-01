@@ -101,7 +101,7 @@ extension DCMDecoder {
     /// - Note: The method updates many decoder properties (e.g., `width`, `height`, `bitDepth`, `transferSyntaxUID`,
     ///   `compressedImage`, `pixelWidth`, `pixelHeight`, `reds`, `greens`, `blues`, `offset`, `nImages`) as part of parsing.
     /// - Returns: `true` if header parsing completed, decoder state was populated, and a valid pixel-data offset was determined; `false` otherwise (for example when the DICOM magic marker is missing, required parser/reader is unavailable, image dimension or buffer-size validation fails, or the pixel data location cannot be determined).
-    func readFileInfoUnsafe() -> Bool {
+    func readFileInfoUnsafe() throws -> Bool {
         guard let initialReader = reader else { return false }
         var reader = initialReader
         // Reset some state to sane defaults
@@ -135,6 +135,7 @@ extension DCMDecoder {
         guard tagParser != nil else { return false }
         let infoAdder = InfoAdder()
         var decodingTags = true
+        var fileMetaEndOffset: Int?
         var tagCount = 0
         let maxTags = 10000  // Safety limit to prevent infinite loops
         func rebuildParserIfNeeded(afterEndiannessChange endiannessChanged: Bool) {
@@ -157,6 +158,12 @@ extension DCMDecoder {
                 break
             }
 
+            if location == fileMetaEndOffset, bigEndianTransferSyntax, littleEndian {
+                littleEndian = false
+                let dataSetReader = DCMBinaryReader(data: dicomData, littleEndian: false)
+                self.reader = dataSetReader
+                tagParser = DCMTagParser(data: dicomData, dict: dict, binaryReader: dataSetReader)
+            }
             let parsedTag = getNextTag()
             let tag = parsedTag.tag
             guard let activeReader = self.reader else { return false }
@@ -181,8 +188,31 @@ extension DCMDecoder {
 
             // Use handler registry for tag processing
             guard let parser = tagParser else { continue }
+            if tag == 0x00020000, parser.currentVR == .UL, parser.currentElementLength == 4 {
+                guard location <= dicomData.count, 4 <= dicomData.count - location else { return false }
+                let length = Int(dicomData.dicomInteger(at: location, as: UInt32.self, littleEndian: true))
+                if length <= dicomData.count - location - 4 {
+                    fileMetaEndOffset = location + 4 + length
+                }
+            }
 
             if let handler = handlerRegistry.getHandler(for: tag) {
+                if tag == DicomTag.pixelData.rawValue,
+                   info(for: .sopClassUID).trimmingCharacters(in: .whitespacesAndNewlines
+                    .union(CharacterSet(charactersIn: "\0"))) == DicomRTDoseVolume.storageSOPClassUID,
+                   !parser.currentElementLengthIsUndefined {
+                    // The tolerant tag parser clamps value lengths to the remaining file.
+                    // Check the encoded VL before accepting a native dose grid.
+                    let declaredLength = dicomData.dicomInteger(at: location - 4, as: UInt32.self,
+                                                               littleEndian: littleEndian)
+                    guard Int(declaredLength) <= dicomData.count - location else { return false }
+                }
+                // Keep source VR and bytes for contextual values even when a handler
+                // also supplies a formatted string. Pixel Data is never captured here.
+                if DicomContextualVRResolver.needsContext(tag) || DicomPixelValueContext.discriminatorTags.contains(tag) {
+                    tagMetadataCache[tag] = .init(tag: tag, offset: location, vr: parser.currentVR,
+                        elementLength: parser.currentElementLength)
+                }
                 // Tag has a registered handler - delegate processing
                 let shouldContinue = handler.handle(
                     tag: tag,
@@ -223,12 +253,19 @@ extension DCMDecoder {
                 let metadataLength: Int
                 if metadataVR == .SQ, parser.currentElementLengthIsUndefined {
                     do {
+                        let valueLengthLimit: DicomSequenceValueParser.ValueLengthLimit?
+                        if tag == DicomTag.voiLUTSequence.rawValue {
+                            valueLengthLimit = Self.voiLUTValueLengthLimit
+                        } else {
+                            valueLengthLimit = nil
+                        }
                         let bounds = try DicomSequenceValueParser.undefinedLengthSequenceBounds(
                             in: dicomData,
                             valueOffset: location,
                             end: dicomData.count,
                             littleEndian: littleEndian,
-                            explicitVR: isExplicitVRTransferSyntax
+                            explicitVR: isExplicitVRTransferSyntax,
+                            valueLengthLimit: valueLengthLimit
                         )
                         metadataLength = bounds.valueLength
                         let metadata = TagMetadata(
@@ -242,7 +279,10 @@ extension DCMDecoder {
                         parser.finishSequenceValue()
                         rebuildParserIfNeeded(afterEndiannessChange: parsedTag.endiannessChanged)
                         continue
+                    } catch is CancellationError {
+                        throw CancellationError()
                     } catch {
+                        try Task.checkCancellation()
                         logger.warning(
                             "Failed to scan undefined-length sequence \(String(format: "%08X", tag)): \(error)"
                         )
@@ -294,6 +334,7 @@ extension DCMDecoder {
         greenPaletteDescriptor = context.greenPaletteDescriptor
         bluePaletteDescriptor = context.bluePaletteDescriptor
         offset = context.offset
+        pixelDataVR = context.pixelDataVR
         nImages = context.nImages
         // Note: modality and planarConfiguration are stored in context but not
         // copied to decoder properties - they were temporary values in the original
@@ -332,10 +373,26 @@ extension DCMDecoder {
                 .trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "\0")))
             let modality = info(for: .modality)
                 .trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "\0")))
+            let isDVHOnlyDose: Bool
+            if sopClassUID == DicomRTDoseVolume.storageSOPClassUID,
+               dicomInfoDict[DicomTag.rows.rawValue] == nil,
+               dicomInfoDict[DicomTag.columns.rawValue] == nil,
+               tagMetadataCache[DicomTag.rows.rawValue] == nil,
+               tagMetadataCache[DicomTag.columns.rawValue] == nil {
+                isDVHOnlyDose = dataElement(for: 0x30040050)?.sequenceItems.isEmpty == false
+                // The nonthrowing sequence accessor can return an empty value on cancellation (#2517).
+                try Task.checkCancellation()
+            } else {
+                isDVHOnlyDose = false
+            }
             if sopClassUID == DicomRTStructureSet.storageSOPClassUID ||
                 sopClassUID == DicomRTPlan.storageSOPClassUID ||
+                isDVHOnlyDose ||
+                sopClassUID == DicomSpatialRegistrationDocument.storageSOPClassUID ||
+                sopClassUID == DicomDeformableSpatialRegistrationDocument.storageSOPClassUID ||
+                sopClassUID == DicomSurfaceSegmentation.storageSOPClassUID ||
                 DicomSRDocument.structuredReportSOPClassUIDs.contains(sopClassUID) ||
-                sopClassUID == DicomGrayscalePresentationState.storageSOPClassUID ||
+                DicomGrayscalePresentationState.supportedStorageSOPClassUIDs.contains(sopClassUID) ||
                 DicomEncapsulatedDocument.supportedStorageSOPClassUIDs.contains(sopClassUID) ||
                 DicomWaveform.supportedStorageSOPClassUIDs.contains(sopClassUID) ||
                 modality == "RTSTRUCT" ||

@@ -494,61 +494,6 @@ final class DCMWindowingProcessorPerformanceTests: XCTestCase {
         XCTAssertLessThan(avgVDSPBatchTime, 2.0, "vDSP batch processing should complete in <2s")
     }
 
-    // MARK: - Performance Impact Documentation
-
-    /// Documents the expected performance characteristics of Metal GPU acceleration.
-    ///
-    /// METAL GPU ACCELERATION:
-    /// - Target speedup: 2-5x for large images (≥800×800)
-    /// - Threshold: 640,000 pixels (800×800)
-    /// - Auto mode: Automatically selects Metal for images ≥640K pixels
-    /// - Fallback: vDSP if Metal unavailable
-    ///
-    /// PERFORMANCE TARGETS:
-    /// - Small images (<640K pixels): vDSP optimal (lower overhead)
-    /// - Large images (≥640K pixels): Metal optimal (parallel processing)
-    /// - Correctness: Metal and vDSP produce identical results (±1 pixel)
-    func testPerformanceImpactDocumentation() {
-        // This test always passes - it exists to document the performance analysis
-        XCTAssertTrue(true, "Metal GPU acceleration documented")
-
-        print("""
-
-        ========== Metal GPU Acceleration Analysis ==========
-        Implementation: Metal compute shaders for window/level operations
-        Target: 2-5x speedup for large images (≥800×800 pixels)
-
-        Auto Mode Selection:
-        - Threshold: 640,000 pixels (800×800)
-        - Logic: Images ≥640K pixels → Metal, smaller → vDSP
-        - Fallback: vDSP if Metal unavailable
-
-        Expected Performance:
-        - Small images (<640K): vDSP optimal (1-2ms, lower overhead)
-        - Large images (≥640K): Metal optimal (parallel GPU processing)
-        - 1024×1024: 3.94× speedup (measured in development)
-        - 2048×2048: 4-5× speedup (expected)
-
-        Correctness Guarantee:
-        - Metal and vDSP produce identical results
-        - Maximum pixel difference: ±1 (floating point precision)
-        - Verified across all image sizes and window/level values
-
-        Hardware Requirements:
-        - Metal-capable device
-        - Apple Silicon: Optimal performance
-        - Intel Mac: Good performance with discrete GPU
-
-        Acceptance Criteria: ✓ DESIGNED TO MEET
-        - Metal speedup ≥2x: ✓ (measured 3.94x on 1024×1024)
-        - Correct auto selection: ✓ (800×800 threshold)
-        - Results identical: ✓ (±1 pixel verified)
-        - Graceful fallback: ✓ (vDSP if Metal unavailable)
-        ======================================================
-
-        """)
-    }
-
     // MARK: - Helper Methods
 
     /// Generates deterministic test pixels with realistic medical imaging values.

@@ -203,9 +203,7 @@ public enum DicomCodecCapabilities {
         case .openJPEG:
             return [
                 DicomTransferSyntax.jpeg2000Lossless.rawValue,
-                DicomTransferSyntax.jpeg2000.rawValue,
-                DicomTransferSyntax.jpeg2000Part2MulticomponentLossless.rawValue,
-                DicomTransferSyntax.jpeg2000Part2Multicomponent.rawValue
+                DicomTransferSyntax.jpeg2000.rawValue
             ]
         }
     }

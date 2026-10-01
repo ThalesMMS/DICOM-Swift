@@ -12,6 +12,13 @@ final class DicomTransferSyntaxRegistryTests: XCTestCase {
         }
     }
 
+    func testStandardRegistryUsesCanonicalTransferSyntaxOrder() {
+        XCTAssertEqual(
+            DicomTransferSyntaxRegistry.standard.entries.map(\.syntax),
+            DicomTransferSyntax.allCases
+        )
+    }
+
     func testRegistryReportsCompressionAndFragmentationProperties() throws {
         let native = try XCTUnwrap(DicomTransferSyntaxRegistry.standard.entry(for: .explicitVRLittleEndian))
         XCTAssertFalse(native.isCompressed)
@@ -42,7 +49,9 @@ final class DicomTransferSyntaxRegistryTests: XCTestCase {
         XCTAssertEqual(part2.codec, .jpeg2000Part2)
         XCTAssertTrue(part2.isEncapsulated)
         XCTAssertEqual(part2.compression, .lossless)
-        XCTAssertTrue("\(part2.decoderSupport)".contains("OpenJPEG"))
+        XCTAssertEqual(part2.decoderSupport, .bestEffort(
+            "Experimental own DicomJPEG2000 Annex J array-based multi-component decoder (frames as components, reversible collections); wavelet-based collections are refused typed and no independent Part 2 decoder is available locally."
+        ))
 
         let jpip = try XCTUnwrap(DicomTransferSyntaxRegistry.standard.entry(for: .jpipReferenced))
         XCTAssertEqual(jpip.codec, .jpip)
@@ -52,11 +61,19 @@ final class DicomTransferSyntaxRegistryTests: XCTestCase {
         XCTAssertFalse(jpip.supportsFragmentation)
         XCTAssertTrue(jpip.syntax.usesPixelDataProviderURL)
 
+        let htj2kJPIP = try XCTUnwrap(
+            DicomTransferSyntaxRegistry.standard.entry(for: .jpipHTJ2KReferencedDeflate)
+        )
+        XCTAssertEqual(htj2kJPIP.codec, .jpip)
+        XCTAssertEqual(htj2kJPIP.pixelEncoding, .referenced)
+        XCTAssertTrue(htj2kJPIP.syntax.usesPixelDataProviderURL)
+        XCTAssertTrue(htj2kJPIP.syntax.usesDataSetDeflate)
+
         let htj2k = try XCTUnwrap(DicomTransferSyntaxRegistry.standard.entry(for: .htj2kLossless))
         XCTAssertEqual(htj2k.codec, .htj2k)
         XCTAssertEqual(
             htj2k.decoderSupport,
-            .bestEffort("HTJ2K decoding requires the preflighted OpenJPEG runtime version 2.5 or newer (HT block decoder); ImageIO JPEG 2000 fallback is not used.")
+            .bestEffort("Own DicomJPEG2000 HT decoder (j2kswift-cpu) is preferred; the preflighted OpenJPEG runtime version 2.5 or newer (HT block decoder) is the fallback; ImageIO JPEG 2000 fallback is not used.")
         )
 
         let jpegXLLossless = try XCTUnwrap(
@@ -91,6 +108,8 @@ final class DicomTransferSyntaxRegistryTests: XCTestCase {
         XCTAssertEqual(statusesBySyntax[.deflatedExplicitVRLittleEndian], .deflatedDataset)
         XCTAssertEqual(statusesBySyntax[.jpipReferenced], .referencedDataset)
         XCTAssertEqual(statusesBySyntax[.jpipReferencedDeflate], .referencedDataset)
+        XCTAssertEqual(statusesBySyntax[.jpipHTJ2KReferenced], .referencedDataset)
+        XCTAssertEqual(statusesBySyntax[.jpipHTJ2KReferencedDeflate], .referencedDataset)
 
         let encapsulatedRows = matrix.filter { support in
             registry.entry(for: support.syntax)?.pixelEncoding == .encapsulated
@@ -149,9 +168,10 @@ final class DicomTransferSyntaxRegistryTests: XCTestCase {
     }
 
     func testUncompressedToCompressedReportsMissingEncoder() {
+        // RLE gained an encoder in #2325; JPEG Baseline still has none.
         let plan = DicomTransferSyntax.transcodePlan(
             from: .explicitVRLittleEndian,
-            to: .rleLossless
+            to: .jpegBaseline
         )
 
         XCTAssertFalse(plan.canTranscode)
@@ -159,7 +179,7 @@ final class DicomTransferSyntaxRegistryTests: XCTestCase {
         XCTAssertEqual(plan.route, .compress)
         XCTAssertFalse(plan.requiresDecompression)
         XCTAssertTrue(plan.requiresCompression)
-        XCTAssertTrue(diagnosticText(plan).contains("Encoder for RLE Lossless is unavailable"))
+        XCTAssertTrue(diagnosticText(plan).contains("Encoder for JPEG Baseline"))
     }
 
     func testBestEffortDecoderMakesTranscodeAmbiguous() {

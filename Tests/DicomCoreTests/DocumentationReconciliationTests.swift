@@ -39,6 +39,8 @@ final class DocumentationReconciliationTests: XCTestCase {
     func testDIMSEAndDICOMwebDocsDeclareHelperScope() throws {
         let conformance = try Self.packageText("Sources/DicomCore/DicomCore.docc/Articles/ConformanceStatement.md")
         let readme = try Self.packageText("README.md")
+        let gaps = try Self.packageText("IMPLEMENTATION_GAPS.md")
+
         assert(conformance, contains: [
             "C-ECHO",
             "C-FIND",
@@ -48,7 +50,7 @@ final class DocumentationReconciliationTests: XCTestCase {
             "Storage SCP",
             "Storage Commitment",
             "MPPS",
-            "Basic Grayscale Print",
+            "Basic Grayscale/Color Print",
             "User identity",
             "Pooling/retry/cancellation",
             "not a full managed PACS service",
@@ -59,6 +61,10 @@ final class DocumentationReconciliationTests: XCTestCase {
 
         XCTAssertTrue(readme.contains("DIMSE helpers for tested C-ECHO"))
         XCTAssertTrue(readme.contains("They are not a managed PACS service"))
+
+        XCTAssertTrue(gaps.contains("DIMSE and Network Scope Is Reconciled to Tested Helpers"))
+        XCTAssertTrue(gaps.contains("Status: scoped and guarded"))
+        XCTAssertFalse(gaps.contains("DIMSE and Network Documentation/Parity Need Reconciliation"))
     }
 
     func testRegistryDiagnosticsDoNotClaimUnsupportedFeaturesAreSupported() {
@@ -66,7 +72,8 @@ final class DocumentationReconciliationTests: XCTestCase {
 
         for row in registry.compressedPixelSupportMatrix where row.status == .unsupported {
             let diagnostic = row.diagnostic.lowercased()
-            XCTAssertTrue(diagnostic.contains("unsupported") || diagnostic.contains("requires an explicit"),
+            XCTAssertTrue(diagnostic.contains("unsupported") || diagnostic.contains("requires an explicit")
+                          || diagnostic.contains("no local multi-component frame decoder is qualified"),
                           "\(row.name) should explain why native decode is unsupported.")
             XCTAssertFalse(diagnostic.contains("decoded natively"),
                            "\(row.name) should not claim native decode in unsupported diagnostics.")
@@ -93,13 +100,13 @@ final class DocumentationReconciliationTests: XCTestCase {
         XCTAssertFalse(migration.contains("- [ ]"))
     }
 
-    func testDocumentationReconciliationIsGuardedByPublicSources() throws {
-        let conformance = try Self.packageText("Sources/DicomCore/DicomCore.docc/Articles/ConformanceStatement.md")
-        let migration = try Self.packageText("Sources/DicomCore/DicomCore.docc/Articles/MigrationGuide.md")
+    func testDocumentationGapIsMarkedReconciledAndGuarded() throws {
+        let gaps = try Self.packageText("IMPLEMENTATION_GAPS.md")
 
-        XCTAssertTrue(conformance.contains("Backlog Alignment"))
-        XCTAssertTrue(migration.contains("project checklist; current package documentation reconciliation"))
-        XCTAssertFalse(conformance.contains("network service classes are not implemented"))
+        XCTAssertTrue(gaps.contains("Documentation Drift and Migration Checklist Reconciled"))
+        XCTAssertTrue(gaps.contains("Status: reconciled and guarded by #1077."))
+        XCTAssertTrue(gaps.contains("DocumentationReconciliationTests.swift"))
+        XCTAssertTrue(gaps.contains("None currently tracked in the package audit after #1074."))
     }
 
     private func assert(

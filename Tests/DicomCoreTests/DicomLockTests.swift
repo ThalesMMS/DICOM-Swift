@@ -88,8 +88,7 @@ final class DicomLockTests: XCTestCase {
     // MARK: - Thread Safety Tests
 
     func testConcurrentIncrement() {
-        let lock = DicomLock()
-        var counter = 0
+        let counter = DicomLockTestState(0)
         let iterations = 1000
         let threads = 10
 
@@ -99,9 +98,7 @@ final class DicomLockTests: XCTestCase {
         for _ in 0..<threads {
             DispatchQueue.global().async {
                 for _ in 0..<iterations {
-                    lock.withLock {
-                        counter += 1
-                    }
+                    counter.withValue { $0 += 1 }
                 }
                 expectation.fulfill()
             }
@@ -110,12 +107,11 @@ final class DicomLockTests: XCTestCase {
         wait(for: [expectation], timeout: 10.0)
 
         // Without proper locking, this would likely fail
-        XCTAssertEqual(counter, threads * iterations)
+        XCTAssertEqual(counter.value, threads * iterations)
     }
 
     func testConcurrentReadWrite() {
-        let lock = DicomLock()
-        var sharedState = [Int]()
+        let sharedState = DicomLockTestState<[Int]>([])
         let writers = 5
         let readers = 10
         let writerIterations = 100
@@ -127,9 +123,7 @@ final class DicomLockTests: XCTestCase {
         for i in 0..<writers {
             DispatchQueue.global().async {
                 for j in 0..<writerIterations {
-                    lock.withLock {
-                        sharedState.append(i * writerIterations + j)
-                    }
+                    sharedState.withValue { $0.append(i * writerIterations + j) }
                 }
                 expectation.fulfill()
             }
@@ -139,10 +133,10 @@ final class DicomLockTests: XCTestCase {
         for _ in 0..<readers {
             DispatchQueue.global().async {
                 for _ in 0..<writerIterations {
-                    lock.withLock {
-                        _ = sharedState.count
-                        if !sharedState.isEmpty {
-                            _ = sharedState[0]
+                    sharedState.withValue { state in
+                        _ = state.count
+                        if !state.isEmpty {
+                            _ = state[0]
                         }
                     }
                     // Small sleep to allow writers to make progress
@@ -155,14 +149,11 @@ final class DicomLockTests: XCTestCase {
         wait(for: [expectation], timeout: 20.0)
 
         // Verify all writes completed
-        lock.withLock {
-            XCTAssertEqual(sharedState.count, writers * writerIterations)
-        }
+        XCTAssertEqual(sharedState.value.count, writers * writerIterations)
     }
 
     func testConcurrentDictionaryAccess() {
-        let lock = DicomLock()
-        var dictionary = [Int: String]()
+        let dictionary = DicomLockTestState<[Int: String]>([:])
         let operations = 1000
         let threads = 10
 
@@ -172,7 +163,7 @@ final class DicomLockTests: XCTestCase {
         for threadId in 0..<threads {
             DispatchQueue.global().async {
                 for i in 0..<operations {
-                    lock.withLock {
+                    dictionary.withValue { dictionary in
                         let key = threadId * operations + i
                         dictionary[key] = "thread\(threadId)-value\(i)"
                     }
@@ -184,9 +175,7 @@ final class DicomLockTests: XCTestCase {
         wait(for: [expectation], timeout: 10.0)
 
         // Verify all writes completed
-        lock.withLock {
-            XCTAssertEqual(dictionary.count, threads * operations)
-        }
+        XCTAssertEqual(dictionary.value.count, threads * operations)
     }
 
     // MARK: - Performance Tests
@@ -291,7 +280,8 @@ final class DicomLockTests: XCTestCase {
 
     func testLockUsagePattern() {
         // Document the recommended usage pattern
-        final class ThreadSafeCounter {
+        // `lock` guards every access to `value`.
+        final class ThreadSafeCounter: @unchecked Sendable {
             private var value = 0
             private let lock = DicomLock()
 

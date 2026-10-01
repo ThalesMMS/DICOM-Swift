@@ -173,14 +173,23 @@ final class JPEGExtendedDecoderTests: XCTestCase {
     func testResolverRoutesJPEGExtendedByBitDepth() {
         XCTAssertEqual(
             DicomCompressedPixelBackendResolver.resolve(
-                transferSyntax: .jpegExtended, requestedBitDepth: 12, samplesPerPixel: 1
+                transferSyntax: .jpegExtended, requestedBitDepth: 12, samplesPerPixel: 1, bitsStored: 12,
+                environment: ["DICOM_JPEGSWIFT_MODE": "disabled"]
             ).backend,
             .nativeJPEGExtended,
-            "12-bit grayscale must use the native precision-preserving decoder"
+            "12-bit grayscale must use the native precision-preserving decoder when the own JPEG backend is disabled"
         )
         XCTAssertEqual(
             DicomCompressedPixelBackendResolver.resolve(
-                transferSyntax: .jpegExtended, requestedBitDepth: 8, samplesPerPixel: 1
+                transferSyntax: .jpegExtended, requestedBitDepth: 16, samplesPerPixel: 1, bitsStored: 12
+            ).backend,
+            .nativeJPEG,
+            "12-bit grayscale uses the own JPEG backend by default"
+        )
+        XCTAssertEqual(
+            DicomCompressedPixelBackendResolver.resolve(
+                transferSyntax: .jpegExtended, requestedBitDepth: 8, samplesPerPixel: 1,
+                environment: ["DICOM_JPEGSWIFT_MODE": "disabled"]
             ).backend,
             .imageIOJPEGExtended,
             "8-bit frames stay on the delegated ImageIO backend"
@@ -243,6 +252,14 @@ final class JPEGExtendedDecoderTests: XCTestCase {
         XCTAssertThrowsError(try JPEGExtendedDecoder.decode(stream)) {
             XCTAssertEqual($0 as? JPEGExtendedDecoder.DecodeError, .invalidHuffmanCode)
         }
+    }
+
+    func test_zrlEndingAtBlockBoundary_decodesCompleteBlock() throws {
+        let stream = JPEGExtendedFixtureFactory.makeZRLOverflowStream(exactlyFillsBlock: true)
+        let decoded = try JPEGExtendedDecoder.decode(stream)
+        XCTAssertEqual(decoded.width, 8)
+        XCTAssertEqual(decoded.height, 8)
+        XCTAssertEqual(decoded.pixels, Array(repeating: UInt16(2048), count: 64))
     }
 
     // MARK: - Expected data
@@ -347,7 +364,7 @@ enum JPEGExtendedFixtureFactory {
         return data
     }
 
-    static func makeZRLOverflowStream() -> Data {
+    static func makeZRLOverflowStream(exactlyFillsBlock: Bool = false) -> Data {
         var data = Data([0xFF, 0xD8]) // SOI
 
         // DQT: 16-bit entries, all ones, table 0.
@@ -367,18 +384,24 @@ enum JPEGExtendedFixtureFactory {
         data.append(contentsOf: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
         data.append(0x00)
 
-        // DHT AC table 0: one-bit ZRL code.
-        data.append(contentsOf: [0xFF, 0xC4, 0x00, 0x14, 0x10])
-        data.append(contentsOf: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+        // DHT AC table 0: ZRL and, optionally, fourteen zeros followed by a one-bit coefficient.
+        data.append(contentsOf: [0xFF, 0xC4, 0x00, exactlyFillsBlock ? 0x15 : 0x14, 0x10])
+        data.append(contentsOf: [exactlyFillsBlock ? 0 : 1, exactlyFillsBlock ? 2 : 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
         data.append(0xF0)
+        if exactlyFillsBlock { data.append(0xE1) }
 
         // SOS: one component, DC table 0, AC table 0.
         data.append(contentsOf: [0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00])
 
         var writer = StuffedBitWriter()
         writer.append(bits: 0, count: 1, into: &data) // DC category 0
-        for _ in 0..<4 {
-            writer.append(bits: 0, count: 1, into: &data) // ZRL x4 exceeds the AC block.
+        if exactlyFillsBlock {
+            writer.append(bits: 1, count: 2, into: &data) // Fourteen zeros, then one nonzero coefficient.
+            writer.append(bits: 1, count: 1, into: &data)
+        }
+        for _ in 0..<(exactlyFillsBlock ? 3 : 4) {
+            writer.append(bits: 0, count: exactlyFillsBlock ? 2 : 1, into: &data)
         }
         writer.flushWithOnePadding(into: &data)
 

@@ -47,6 +47,9 @@ public struct DicomPartialFrameDecodeResult: Sendable, Equatable {
     public let qualityState: QualityState
     /// Direct operation used by the backend.
     public let execution: Execution
+    /// Compressed bytes the codec parsed past but never entropy-decoded because they belong to quality layers
+    /// above the delivered one (issue #2382); nil when the backend does not measure it.
+    public let codecBytesAvoided: Int?
 
     /// Creates a partial frame result.
     public init(
@@ -55,7 +58,8 @@ public struct DicomPartialFrameDecodeResult: Sendable, Equatable {
         coordinateTransform: CoordinateTransform,
         deliveredQualityLayer: Int?,
         qualityState: QualityState,
-        execution: Execution
+        execution: Execution,
+        codecBytesAvoided: Int? = nil
     ) {
         self.frame = frame
         self.decodedSourceRegion = decodedSourceRegion
@@ -63,6 +67,7 @@ public struct DicomPartialFrameDecodeResult: Sendable, Equatable {
         self.deliveredQualityLayer = deliveredQualityLayer
         self.qualityState = qualityState
         self.execution = execution
+        self.codecBytesAvoided = codecBytesAvoided
     }
 
     /// Whether the result is safe for final display or export.

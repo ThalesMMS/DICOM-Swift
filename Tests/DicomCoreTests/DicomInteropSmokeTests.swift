@@ -56,9 +56,9 @@ final class DicomInteropSmokeTests: XCTestCase {
             let metadata = try await retrying("WADO metadata \(archive.id)") {
                 try await client.retrieveStudyMetadata(studyInstanceUID: fixture.studyInstanceUID)
             } until: { dataSets in
-                dataSets.contains { $0.string(for: .sopInstanceUID) == fixture.sopInstanceUID }
+                dataSets.contains { $0.dataSet.string(for: .sopInstanceUID) == fixture.sopInstanceUID }
             }
-            XCTAssertTrue(metadata.contains { $0.string(for: .sopInstanceUID) == fixture.sopInstanceUID }, archive.id)
+            XCTAssertTrue(metadata.contains { $0.dataSet.string(for: .sopInstanceUID) == fixture.sopInstanceUID }, archive.id)
         }
     }
 
@@ -617,9 +617,9 @@ extension DicomInteropSmokeTests {
             let metadata = try await interopRetryingAsync("WADO metadata \(archive.id)") {
                 try await client.retrieveStudyMetadata(studyInstanceUID: fixture.studyInstanceUID)
             } until: { dataSets in
-                dataSets.contains { $0.string(for: .sopInstanceUID) == fixture.sopInstanceUID }
+                dataSets.contains { $0.dataSet.string(for: .sopInstanceUID) == fixture.sopInstanceUID }
             }
-            guard let instance = metadata.first(where: {
+            guard let instance = metadata.map(\.dataSet).first(where: {
                 $0.string(for: .sopInstanceUID) == fixture.sopInstanceUID
             }) else {
                 XCTFail("\(archive.id): stored instance missing from metadata")

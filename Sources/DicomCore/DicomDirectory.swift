@@ -26,15 +26,24 @@ public struct DicomDirectoryStudy: Equatable, Sendable {
     public var studyInstanceUID: String?
     public var studyID: String?
     public var studyDate: String?
+    public var studyTime: String?
+    public var studyDescription: String?
+    public var accessionNumber: String?
     public var series: [DicomDirectorySeries]
 
     public init(studyInstanceUID: String? = nil,
                 studyID: String? = nil,
                 studyDate: String? = nil,
+                studyTime: String? = nil,
+                studyDescription: String? = nil,
+                accessionNumber: String? = nil,
                 series: [DicomDirectorySeries]) {
         self.studyInstanceUID = studyInstanceUID
         self.studyID = studyID
         self.studyDate = studyDate
+        self.studyTime = studyTime
+        self.studyDescription = studyDescription
+        self.accessionNumber = accessionNumber
         self.series = series
     }
 }
@@ -56,23 +65,34 @@ public struct DicomDirectorySeries: Equatable, Sendable {
     }
 }
 
+/// A leaf directory record below a SERIES: an IMAGE by default, or any other PS3.3 Annex F leaf record type
+/// (PRESENTATION, SR DOCUMENT, KEY OBJECT DOC, RT DOSE, RT STRUCTURE SET, RT PLAN, WAVEFORM, ENCAP DOC, ...)
+/// with its record selection keys carried in `keys`.
 public struct DicomDirectoryImage: Equatable, Sendable {
     public var referencedFileID: [String]
     public var referencedSOPClassUID: String?
     public var referencedSOPInstanceUID: String?
     public var referencedTransferSyntaxUID: String?
     public var instanceNumber: Int?
+    /// Directory Record Type (0004,1430) of the leaf record.
+    public var recordType: String
+    /// Record selection keys other than the references and Instance Number (PS3.3 F.5), in tag order.
+    public var keys: [DicomDataElement]
 
     public init(referencedFileID: [String],
                 referencedSOPClassUID: String? = nil,
                 referencedSOPInstanceUID: String? = nil,
                 referencedTransferSyntaxUID: String? = nil,
-                instanceNumber: Int? = nil) {
+                instanceNumber: Int? = nil,
+                recordType: String = "IMAGE",
+                keys: [DicomDataElement] = []) {
         self.referencedFileID = referencedFileID
         self.referencedSOPClassUID = referencedSOPClassUID
         self.referencedSOPInstanceUID = referencedSOPInstanceUID
         self.referencedTransferSyntaxUID = referencedTransferSyntaxUID
         self.instanceNumber = instanceNumber
+        self.recordType = recordType
+        self.keys = keys.sorted { $0.tag < $1.tag }
     }
 
     public func resolvedFileURL(relativeTo root: URL) throws -> URL {
@@ -113,18 +133,58 @@ public enum DicomDirectoryPathResolver {
     }
 }
 
+/// Structural findings of a DICOMDIR read: the offset chains are followed as written and every deviation is
+/// reported instead of being repaired silently.
+public struct DicomDirectoryDiagnostic: Equatable, Sendable {
+    public enum Code: String, Sendable {
+        /// An offset chain returned to an already visited record; the chain was cut there.
+        case cycleDetected
+        /// An offset points outside the Directory Record Sequence or not at a record item.
+        case danglingOffset
+        /// A record under a directory entity has a type that does not belong at that level.
+        case unexpectedRecordType
+        /// Record In-use Flag (0004,1410) is not FFFFH.
+        case recordNotInUse
+        /// The root offsets are absent or unusable; the records were read in sequence order instead.
+        case sequentialFallback
+        /// Offset of the Last Directory Record of the Root Directory Entity does not name the last root record reached.
+        case lastRootOffsetMismatch
+    }
+
+    public let code: Code
+    /// Byte offset of the record item concerned, when known.
+    public let offset: Int?
+    public let detail: String
+
+    public init(code: Code, offset: Int? = nil, detail: String) { self.code = code; self.offset = offset; self.detail = detail }
+}
+
+public struct DicomDirectoryReadResult: Equatable, Sendable {
+    public let directory: DicomDirectory
+    public let diagnostics: [DicomDirectoryDiagnostic]
+    /// True when the offset chains were followed without any deviation.
+    public var isStructurallyConsistent: Bool { diagnostics.isEmpty }
+}
+
 public enum DicomDirectoryReader {
     public static func read(from url: URL) throws -> DicomDirectory {
-        let data = try Data(contentsOf: url)
-        return try read(data: data)
+        try readWithDiagnostics(from: url).directory
     }
 
     public static func read(data: Data) throws -> DicomDirectory {
+        try readWithDiagnostics(data: data).directory
+    }
+
+    public static func readWithDiagnostics(from url: URL) throws -> DicomDirectoryReadResult {
+        try readWithDiagnostics(data: try Data(contentsOf: url))
+    }
+
+    public static func readWithDiagnostics(data: Data) throws -> DicomDirectoryReadResult {
         let parsed = try DicomDirectoryDataSetParser.parsePart10DataWithDirectoryRecordOffsets(data)
         return try directory(from: parsed.dataSet, recordItemOffsets: parsed.directoryRecordItemOffsets)
     }
 
-    private static func directory(from dataSet: DicomDataSet, recordItemOffsets: [Int]) throws -> DicomDirectory {
+    private static func directory(from dataSet: DicomDataSet, recordItemOffsets: [Int]) throws -> DicomDirectoryReadResult {
         let recordItems = dataSet.sequenceItems(for: DicomDirectoryTags.directoryRecordSequence)
         let records = recordItems.enumerated().map { index, item in
             DicomDirectoryRecord(
@@ -135,19 +195,33 @@ public enum DicomDirectoryReader {
         guard !records.isEmpty else {
             throw DicomDirectoryError.invalidDICOMDIR("Directory Record Sequence is missing or empty")
         }
-
-        if let patients = offsetLinkedHierarchy(from: dataSet, records: records), !patients.isEmpty {
-            return DicomDirectory(fileSetID: dataSet.string(for: DicomDirectoryTags.fileSetID),
-                                  patients: patients)
+        var diagnostics: [DicomDirectoryDiagnostic] = []
+        for record in records where record.dataSet.int(for: DicomDirectoryTags.recordInUseFlag) != 0xFFFF {
+            diagnostics.append(.init(code: .recordNotInUse, offset: record.itemOffset, detail: "\(record.recordType) record"))
         }
 
+        if let patients = offsetLinkedHierarchy(from: dataSet, records: records, diagnostics: &diagnostics), !patients.isEmpty {
+            return .init(directory: DicomDirectory(fileSetID: dataSet.string(for: DicomDirectoryTags.fileSetID), patients: patients),
+                         diagnostics: diagnostics)
+        }
+
+        diagnostics.append(.init(code: .sequentialFallback, detail: "root offsets absent or unusable; records read in sequence order"))
         let patients = flatHierarchy(from: records)
-        return DicomDirectory(fileSetID: dataSet.string(for: DicomDirectoryTags.fileSetID),
-                              patients: patients)
+        return .init(directory: DicomDirectory(fileSetID: dataSet.string(for: DicomDirectoryTags.fileSetID), patients: patients),
+                     diagnostics: diagnostics)
     }
 
+    /// Leaf record types accepted below a SERIES (PS3.3 F.4).
+    public static let leafRecordTypes: Set<String> = [
+        "IMAGE", "PRESENTATION", "SR DOCUMENT", "KEY OBJECT DOC", "RT DOSE", "RT STRUCTURE SET", "RT PLAN", "RT TREAT RECORD",
+        "WAVEFORM", "ENCAP DOC", "RAW DATA", "SPECTROSCOPY", "REGISTRATION", "FIDUCIAL", "HANGING PROTOCOL", "STEREOMETRIC",
+        "HL7 STRUC DOC", "VALUE MAP", "MEASUREMENT", "SURFACE", "IMPLANT", "IMPLANT ASSY", "IMPLANT GROUP", "PLAN", "SURFACE SCAN",
+        "TRACT", "ASSESSMENT", "RADIOTHERAPY", "ANNOTATION", "INVENTORY", "PRIVATE"
+    ]
+
     private static func offsetLinkedHierarchy(from dataSet: DicomDataSet,
-                                              records: [DicomDirectoryRecord]) -> [DicomDirectoryPatient]? {
+                                              records: [DicomDirectoryRecord],
+                                              diagnostics: inout [DicomDirectoryDiagnostic]) -> [DicomDirectoryPatient]? {
         guard let firstRootOffset = dataSet.int(for: DicomDirectoryTags.offsetOfFirstRootRecord),
               firstRootOffset > 0 else {
             return nil
@@ -159,29 +233,43 @@ public enum DicomDirectoryReader {
         })
         guard !recordsByOffset.isEmpty else { return nil }
 
-        func siblingRecords(startingAt offset: Int) -> [DicomDirectoryRecord] {
+        func siblingRecords(startingAt offset: Int, expecting types: Set<String>) -> [DicomDirectoryRecord] {
             var siblings: [DicomDirectoryRecord] = []
             var visitedOffsets: Set<Int> = []
             var currentOffset = offset
 
-            while currentOffset > 0,
-                  !visitedOffsets.contains(currentOffset),
-                  let record = recordsByOffset[currentOffset] {
+            while currentOffset > 0 {
+                guard !visitedOffsets.contains(currentOffset) else {
+                    diagnostics.append(.init(code: .cycleDetected, offset: currentOffset, detail: "offset chain revisits record"))
+                    break
+                }
+                guard let record = recordsByOffset[currentOffset] else {
+                    diagnostics.append(.init(code: .danglingOffset, offset: currentOffset, detail: "no directory record item starts here"))
+                    break
+                }
                 visitedOffsets.insert(currentOffset)
+                if !types.contains(record.recordType) {
+                    diagnostics.append(.init(code: .unexpectedRecordType, offset: currentOffset,
+                                             detail: "\(record.recordType) among \(types.sorted().joined(separator: "/"))"))
+                }
                 siblings.append(record)
                 currentOffset = record.nextRecordOffset
             }
             return siblings
         }
 
-        return siblingRecords(startingAt: firstRootOffset).compactMap { patientRecord in
+        let roots = siblingRecords(startingAt: firstRootOffset, expecting: ["PATIENT"])
+        if let last = dataSet.int(for: DicomDirectoryTags.offsetOfLastRootRecord), let reached = roots.last?.itemOffset, last != reached {
+            diagnostics.append(.init(code: .lastRootOffsetMismatch, offset: last, detail: "last root record reached at \(reached)"))
+        }
+        return roots.compactMap { patientRecord in
             guard patientRecord.recordType == "PATIENT" else { return nil }
-            let studies = siblingRecords(startingAt: patientRecord.lowerRecordOffset).compactMap { studyRecord -> DicomDirectoryStudy? in
+            let studies = siblingRecords(startingAt: patientRecord.lowerRecordOffset, expecting: ["STUDY"]).compactMap { studyRecord -> DicomDirectoryStudy? in
                 guard studyRecord.recordType == "STUDY" else { return nil }
-                let series = siblingRecords(startingAt: studyRecord.lowerRecordOffset).compactMap { seriesRecord -> DicomDirectorySeries? in
+                let series = siblingRecords(startingAt: studyRecord.lowerRecordOffset, expecting: ["SERIES"]).compactMap { seriesRecord -> DicomDirectorySeries? in
                     guard seriesRecord.recordType == "SERIES" else { return nil }
-                    let images = siblingRecords(startingAt: seriesRecord.lowerRecordOffset).compactMap { imageRecord -> DicomDirectoryImage? in
-                        guard imageRecord.recordType == "IMAGE" else { return nil }
+                    let images = siblingRecords(startingAt: seriesRecord.lowerRecordOffset, expecting: leafRecordTypes).compactMap { imageRecord -> DicomDirectoryImage? in
+                        guard leafRecordTypes.contains(imageRecord.recordType) else { return nil }
                         return image(from: imageRecord)
                     }
                     return DicomDirectorySeries(
@@ -195,6 +283,9 @@ public enum DicomDirectoryReader {
                     studyInstanceUID: studyRecord.dataSet.string(for: DicomTag.studyInstanceUID),
                     studyID: studyRecord.dataSet.string(for: DicomTag.studyID),
                     studyDate: studyRecord.dataSet.string(for: DicomTag.studyDate),
+                    studyTime: studyRecord.dataSet.string(for: DicomTag.studyTime),
+                    studyDescription: studyRecord.dataSet.string(for: DicomTag.studyDescription),
+                    accessionNumber: studyRecord.dataSet.string(for: DicomTag.accessionNumber),
                     series: series
                 )
             }
@@ -250,6 +341,9 @@ public enum DicomDirectoryReader {
                     studyInstanceUID: record.dataSet.string(for: DicomTag.studyInstanceUID),
                     studyID: record.dataSet.string(for: DicomTag.studyID),
                     studyDate: record.dataSet.string(for: DicomTag.studyDate),
+                    studyTime: record.dataSet.string(for: DicomTag.studyTime),
+                    studyDescription: record.dataSet.string(for: DicomTag.studyDescription),
+                    accessionNumber: record.dataSet.string(for: DicomTag.accessionNumber),
                     series: []
                 )
             case "SERIES":
@@ -266,7 +360,7 @@ public enum DicomDirectoryReader {
                     seriesNumber: record.dataSet.integerString(for: DicomTag.seriesNumber),
                     images: []
                 )
-            case "IMAGE":
+            case let type where leafRecordTypes.contains(type):
                 if currentPatient == nil {
                     currentPatient = DicomDirectoryPatient(studies: [])
                 }
@@ -292,7 +386,9 @@ public enum DicomDirectoryReader {
             referencedSOPClassUID: record.dataSet.string(for: DicomDirectoryTags.referencedSOPClassUIDInFile),
             referencedSOPInstanceUID: record.dataSet.string(for: DicomDirectoryTags.referencedSOPInstanceUIDInFile),
             referencedTransferSyntaxUID: record.dataSet.string(for: DicomDirectoryTags.referencedTransferSyntaxUIDInFile),
-            instanceNumber: record.dataSet.integerString(for: DicomTag.instanceNumber)
+            instanceNumber: record.dataSet.integerString(for: DicomTag.instanceNumber),
+            recordType: record.recordType,
+            keys: record.dataSet.elements.filter { $0.group != 0x0004 && $0.tag != DicomTag.instanceNumber.rawValue }
         )
     }
 }
@@ -300,7 +396,10 @@ public enum DicomDirectoryReader {
 public enum DicomDirectoryWriter {
     public static let mediaStorageDirectoryStorageSOPClassUID = "1.2.840.10008.1.3.10"
 
-    public static func part10Data(from directory: DicomDirectory) throws -> Data {
+    public static func part10Data(
+        from directory: DicomDirectory,
+        mediaStorageSOPInstanceUID: String? = nil
+    ) throws -> Data {
         let records = makeRecords(from: directory)
         let dataSet = DicomDataSet(elements: [
             DicomDataElement(tag: DicomDirectoryTags.fileSetID, vr: .CS, value: directory.fileSetID.map { .strings([$0]) } ?? .empty),
@@ -317,15 +416,22 @@ public enum DicomDirectoryWriter {
             options: DicomPart10WriterOptions(
                 transferSyntax: .explicitVRLittleEndian,
                 mediaStorageSOPClassUID: mediaStorageDirectoryStorageSOPClassUID,
-                mediaStorageSOPInstanceUID: mediaStorageSOPInstanceUID(for: directory)
+                mediaStorageSOPInstanceUID: mediaStorageSOPInstanceUID ?? self.mediaStorageSOPInstanceUID(for: directory)
             )
         )
         try patchRecordOffsets(records: records, in: &data)
         return data
     }
 
-    public static func write(_ directory: DicomDirectory, to url: URL) throws {
-        try part10Data(from: directory).write(to: url, options: [.atomic])
+    public static func write(
+        _ directory: DicomDirectory,
+        to url: URL,
+        mediaStorageSOPInstanceUID: String? = nil
+    ) throws {
+        try part10Data(
+            from: directory,
+            mediaStorageSOPInstanceUID: mediaStorageSOPInstanceUID
+        ).write(to: url, options: [.atomic])
     }
 
     private static func makeRecords(from directory: DicomDirectory) -> [WritableDicomDirectoryRecord] {
@@ -521,34 +627,41 @@ private struct WritableDicomDirectoryRecord {
 
     static func patient(_ patient: DicomDirectoryPatient) -> WritableDicomDirectoryRecord {
         WritableDicomDirectoryRecord(dataSet: DicomDataSet(elements: baseElements(type: "PATIENT") + [
-            optionalString(DicomTag.patientID.rawValue, .LO, patient.patientID),
-            optionalString(DicomTag.patientName.rawValue, .PN, patient.patientName)
-        ].compactMap { $0 }))
+            requiredString(DicomTag.patientID.rawValue, .LO, patient.patientID),
+            requiredString(DicomTag.patientName.rawValue, .PN, patient.patientName)
+        ]))
     }
 
     static func study(_ study: DicomDirectoryStudy) -> WritableDicomDirectoryRecord {
         WritableDicomDirectoryRecord(dataSet: DicomDataSet(elements: baseElements(type: "STUDY") + [
-            optionalString(DicomTag.studyInstanceUID.rawValue, .UI, study.studyInstanceUID),
-            optionalString(DicomTag.studyID.rawValue, .SH, study.studyID),
-            optionalString(DicomTag.studyDate.rawValue, .DA, study.studyDate)
-        ].compactMap { $0 }))
+            requiredString(DicomTag.studyDate.rawValue, .DA, study.studyDate),
+            requiredString(DicomTag.studyTime.rawValue, .TM, study.studyTime),
+            requiredString(DicomTag.accessionNumber.rawValue, .SH, study.accessionNumber),
+            requiredString(DicomTag.studyDescription.rawValue, .LO, study.studyDescription),
+            requiredString(DicomTag.studyInstanceUID.rawValue, .UI, study.studyInstanceUID),
+            requiredString(DicomTag.studyID.rawValue, .SH, study.studyID)
+        ]))
     }
 
     static func series(_ series: DicomDirectorySeries) -> WritableDicomDirectoryRecord {
         WritableDicomDirectoryRecord(dataSet: DicomDataSet(elements: baseElements(type: "SERIES") + [
-            optionalString(DicomTag.seriesInstanceUID.rawValue, .UI, series.seriesInstanceUID),
-            optionalString(DicomTag.modality.rawValue, .CS, series.modality),
-            series.seriesNumber.map { DicomDataElement(tag: DicomTag.seriesNumber.rawValue, vr: .IS, value: .signedIntegers([$0])) }
-        ].compactMap { $0 }))
+            requiredString(DicomTag.modality.rawValue, .CS, series.modality),
+            requiredString(DicomTag.seriesInstanceUID.rawValue, .UI, series.seriesInstanceUID),
+            series.seriesNumber.map {
+                DicomDataElement(tag: DicomTag.seriesNumber.rawValue, vr: .IS, value: .signedIntegers([$0]))
+            } ?? DicomDataElement(tag: DicomTag.seriesNumber.rawValue, vr: .IS, value: .empty)
+        ]))
     }
 
     static func image(_ image: DicomDirectoryImage) -> WritableDicomDirectoryRecord {
-        WritableDicomDirectoryRecord(dataSet: DicomDataSet(elements: baseElements(type: "IMAGE") + [
+        WritableDicomDirectoryRecord(dataSet: DicomDataSet(elements: baseElements(type: image.recordType) + image.keys.filter { $0.group != 0x0004 } + [
             DicomDataElement(tag: DicomDirectoryTags.referencedFileID, vr: .CS, value: .strings(image.referencedFileID)),
             optionalString(DicomDirectoryTags.referencedSOPClassUIDInFile, .UI, image.referencedSOPClassUID),
             optionalString(DicomDirectoryTags.referencedSOPInstanceUIDInFile, .UI, image.referencedSOPInstanceUID),
             optionalString(DicomDirectoryTags.referencedTransferSyntaxUIDInFile, .UI, image.referencedTransferSyntaxUID),
-            image.instanceNumber.map { DicomDataElement(tag: DicomTag.instanceNumber.rawValue, vr: .IS, value: .signedIntegers([$0])) }
+            image.instanceNumber.map {
+                DicomDataElement(tag: DicomTag.instanceNumber.rawValue, vr: .IS, value: .signedIntegers([$0]))
+            } ?? DicomDataElement(tag: DicomTag.instanceNumber.rawValue, vr: .IS, value: .empty)
         ].compactMap { $0 }))
     }
 
@@ -563,6 +676,13 @@ private struct WritableDicomDirectoryRecord {
 
     private static func optionalString(_ tag: Int, _ vr: DicomVR, _ value: String?) -> DicomDataElement? {
         guard let value, !value.isEmpty else { return nil }
+        return DicomDataElement(tag: tag, vr: vr, value: .strings([value]))
+    }
+
+    private static func requiredString(_ tag: Int, _ vr: DicomVR, _ value: String?) -> DicomDataElement {
+        guard let value, !value.isEmpty else {
+            return DicomDataElement(tag: tag, vr: vr, value: .empty)
+        }
         return DicomDataElement(tag: tag, vr: vr, value: .strings([value]))
     }
 }
@@ -718,7 +838,7 @@ private enum DicomDirectoryDataSetParser {
             return .unsignedIntegers(stride(from: 0, to: data.count - data.count % 2, by: 2).map {
                 UInt(readUInt16Value(data, at: $0, littleEndian: littleEndian))
             })
-        case .UL:
+        case .OL, .UL:
             return .unsignedIntegers(stride(from: 0, to: data.count - data.count % 4, by: 4).map {
                 UInt(readUInt32Value(data, at: $0, littleEndian: littleEndian))
             })

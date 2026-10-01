@@ -2,11 +2,142 @@ import XCTest
 @testable import DicomCore
 
 final class DicomDataSetWriterTests: XCTestCase {
+    func test_numericOWAndOV_encodeBinaryWordsInBothByteOrders() throws {
+        let word = DicomDataElement(tag: 0x77771001, vr: .OW, value: .unsignedIntegers([0x1234, 0xABCD]))
+        let long = DicomDataElement(tag: 0x77771002, vr: .OV, value: .unsignedIntegers([0x0102030405060708, UInt.max]))
+        let source = DicomDataSet(elements: [word, long])
+        for syntax in [DicomTransferSyntax.explicitVRLittleEndian, .explicitVRBigEndian] {
+            let wire = try DicomDataSetWriter.dataSetData(from: source, transferSyntax: syntax)
+            let parsed = try DicomDataSetParser.dataSet(from: wire, transferSyntax: syntax)
+            let little = syntax == .explicitVRLittleEndian
+            XCTAssertEqual(parsed[word.tag]?.bytesValue, Data(little ? [0x34, 0x12, 0xCD, 0xAB] : [0x12, 0x34, 0xAB, 0xCD]))
+            XCTAssertEqual(parsed[long.tag]?.bytesValue,
+                           Data(little ? [8, 7, 6, 5, 4, 3, 2, 1] : [1, 2, 3, 4, 5, 6, 7, 8]) + Data(repeating: 255, count: 8))
+            XCTAssertEqual(try DicomDataSetWriter.dataSetData(from: parsed, transferSyntax: syntax), wire)
+        }
+        XCTAssertThrowsError(try DicomDataSetWriter.dataSetData(from: source, purpose: .instance))
+    }
+
     private let sopClassUIDTag = 0x00080016
     private let procedureCodeSequenceTag = 0x00081032
     private let codeValueTag = 0x00080100
     private let codeMeaningTag = 0x00080104
     private let privateTag = 0x00111010
+
+    func test_veryLongIntegers_roundTripBinaryValuesInBothByteOrders() throws {
+        let signed = DicomDataElement(tag: 0x77771001, vr: .SV, value: .signedIntegers([Int.min, -1, Int.max]))
+        let unsigned = DicomDataElement(tag: 0x77771002, vr: .UV, value: .unsignedIntegers([0, UInt.max]))
+        for syntax in [DicomTransferSyntax.explicitVRLittleEndian, .explicitVRBigEndian] {
+            let data = try DicomDataSetWriter.dataSetData(from: DicomDataSet(elements: [signed, unsigned]),
+                                                         transferSyntax: syntax)
+            XCTAssertEqual(data.count, 24 + 24 + 16)
+            let parsed = try DicomDataSetParser.dataSet(from: data, transferSyntax: syntax)
+            XCTAssertEqual(parsed.element(for: signed.tag), signed)
+            XCTAssertEqual(parsed.element(for: unsigned.tag), unsigned)
+        }
+    }
+
+    func test_veryLongIntegers_rejectIncompatibleValuesWithoutDroppingComponents() {
+        let cases: [(DicomVR, DicomDataValue)] = [
+            (.SV, .unsignedIntegers([0, UInt(Int.max) + 1, 1])),
+            (.SV, .unsignedIntegers([UInt.max])),
+            (.UV, .signedIntegers([0, -1, 1])),
+            (.UV, .signedIntegers([Int.min])),
+            (.SV, .strings(["1", String(UInt.max), "2"])),
+            (.UV, .strings(["1", "-1", "2"])),
+            (.SV, .strings(["1", "invalid", "2"])),
+            (.UV, .strings(["1", "", "2"]))
+        ]
+        for syntax in [DicomTransferSyntax.explicitVRLittleEndian, .explicitVRBigEndian] {
+            for (vr, value) in cases {
+                let element = DicomDataElement(tag: privateTag, vr: vr, value: value)
+                XCTAssertThrowsError(try DicomDataSetWriter.dataSetData(
+                    from: DicomDataSet(elements: [element]), transferSyntax: syntax
+                ), "\(vr.code): \(value)") { error in
+                    guard case let .unsupportedValue(tag, rejectedVR, _) = error as? DicomDataSetWriterError else {
+                        return XCTFail("Expected unsupportedValue, got \(error)")
+                    }
+                    XCTAssertEqual(tag, element.tag)
+                    XCTAssertEqual(rejectedVR, vr)
+                }
+            }
+        }
+    }
+
+    func test_veryLongIntegers_preserveCompatibleConversionsAndEmptyValues() throws {
+        let cases: [(DicomVR, DicomDataValue, DicomDataValue)] = [
+            (.SV, .unsignedIntegers([0, 1, UInt(Int.max)]), .signedIntegers([0, 1, Int.max])),
+            (.UV, .signedIntegers([0, 1, Int.max]), .unsignedIntegers([0, 1, UInt(Int.max)])),
+            (.SV, .strings([String(Int.min), " 0 ", String(Int.max)]), .signedIntegers([Int.min, 0, Int.max])),
+            (.UV, .strings([" 0 ", String(UInt.max)]), .unsignedIntegers([0, UInt.max])),
+            (.SV, .empty, .signedIntegers([])),
+            (.UV, .empty, .unsignedIntegers([]))
+        ]
+        for syntax in [DicomTransferSyntax.explicitVRLittleEndian, .explicitVRBigEndian] {
+            for (vr, source, expected) in cases {
+                let element = DicomDataElement(tag: privateTag, vr: vr, value: source)
+                let data = try DicomDataSetWriter.dataSetData(
+                    from: DicomDataSet(elements: [element]), transferSyntax: syntax
+                )
+                let parsed = try DicomDataSetParser.dataSet(from: data, transferSyntax: syntax)
+                XCTAssertEqual(parsed.element(for: privateTag),
+                               DicomDataElement(tag: privateTag, vr: vr, value: expected))
+            }
+        }
+    }
+
+    func test_decimalFloats_encodeFiniteComponentsWithinSixteenCharacters() throws {
+        let values = [Double.pi, -123456789.123456, 1e-120, 1e120, Double.leastNonzeroMagnitude]
+        let dataSet = DicomDataSet(elements: [
+            DicomDataElement(tag: DicomTag.pixelSpacing.rawValue, vr: .DS, value: .floats(values))
+        ])
+        let parsed = try DicomDataSetParser.dataSet(from: DicomDataSetWriter.dataSetData(from: dataSet))
+        let components = try XCTUnwrap(parsed.element(for: .pixelSpacing)).stringValues
+        XCTAssertEqual(components.count, values.count)
+        for (text, original) in zip(components, values) {
+            XCTAssertLessThanOrEqual(text.utf8.count, 16, text)
+            let number = try XCTUnwrap(Double(text))
+            XCTAssertTrue(number.isFinite)
+            XCTAssertEqual(number, original, accuracy: max(abs(original) * 1e-12, Double.leastNonzeroMagnitude))
+        }
+        for value in [Double.nan, .infinity, -.infinity] {
+            let invalid = DicomDataSet(elements: [
+                DicomDataElement(tag: DicomTag.pixelSpacing.rawValue, vr: .DS, value: .floats([value]))
+            ])
+            XCTAssertThrowsError(try DicomDataSetWriter.dataSetData(from: invalid))
+        }
+    }
+
+    func test_decimalStrings_preserveCallerFormatting() throws {
+        let values = ["+01.2500", "1.5E-03"]
+        let dataSet = DicomDataSet(elements: [
+            DicomDataElement(tag: DicomTag.pixelSpacing.rawValue, vr: .DS, value: .strings(values))
+        ])
+        let parsed = try DicomDataSetParser.dataSet(from: DicomDataSetWriter.dataSetData(from: dataSet))
+        XCTAssertEqual(parsed.element(for: .pixelSpacing)?.stringValues, values)
+    }
+
+    func test_decimalStrings_rejectOversizedAndNonfiniteComponents() {
+        for value in ["12345678901234567", "NaN", "Infinity", "1e999", "invalid", "0x1p2", "1\t", "1\n", "1 2",
+                      " 1234567890123456 "] {
+            let element = DicomDataElement(tag: privateTag, vr: .DS, value: .strings(["1.25", value]))
+            XCTAssertThrowsError(try DicomDataSetWriter.dataSetData(from: DicomDataSet(elements: [element]))) {
+                guard case .unsupportedValue(tag: self.privateTag, vr: .DS, reason: _) = $0 as? DicomDataSetWriterError else {
+                    return XCTFail("Expected DS unsupportedValue, got \($0)")
+                }
+            }
+        }
+    }
+
+    func test_decimalStrings_acceptNumericGrammarAndSpacePadding() throws {
+        for value in [" +.5e+02 ", "-1.", ".5", "", "    ", "1234567890123456"] {
+            let element = DicomDataElement(tag: privateTag, vr: .DS, value: .strings([value]))
+            let data = try DicomDataSetWriter.dataSetData(from: DicomDataSet(elements: [element]))
+            var expected = Data(value.utf8)
+            if expected.count % 2 != 0 { expected.append(0x20) }
+            XCTAssertEqual(Data(data.dropFirst(8)), expected)
+        }
+    }
 
     func testWriterAppliesDatasetEditsAndReopensPart10File() throws {
         var dataSet = makeBaseDataSet(pixelBytes: Data([0x2A, 0x00]))
@@ -185,12 +316,11 @@ final class DicomDataSetWriterTests: XCTestCase {
     }
 
     func test_writerRoundTripsLongTextWithoutSplittingOrTrimming() throws {
-        let studyCommentsTag = 0x0032_4000
+        let fields: [(Int, DicomVR)] = [(0x0032_4000, .LT), (0x0008_2111, .ST), (0x0040_A160, .UT)]
         let comment = "  linha 1\nRenée\\B"
         let transferSyntaxes: [DicomTransferSyntax] = [
-            .explicitVRLittleEndian,
-            .implicitVRLittleEndian,
-            .deflatedExplicitVRLittleEndian
+            .explicitVRLittleEndian, .explicitVRBigEndian,
+            .implicitVRLittleEndian, .deflatedExplicitVRLittleEndian
         ]
 
         for transferSyntax in transferSyntaxes {
@@ -200,23 +330,49 @@ final class DicomDataSetWriterTests: XCTestCase {
                 vr: .CS,
                 value: .strings(["ISO_IR 192"])
             ))
-            dataSet.set(DicomDataElement(
-                tag: studyCommentsTag,
-                vr: .LT,
-                value: .strings([comment])
-            ))
-
+            for (tag, vr) in fields {
+                dataSet.set(DicomDataElement(tag: tag, vr: vr, value: .strings([comment])))
+            }
             let data = try DicomDataSetWriter.part10Data(
                 from: dataSet,
                 options: DicomPart10WriterOptions(transferSyntax: transferSyntax)
             )
             let decoder = try DCMDecoder(data: data)
-            let element = try XCTUnwrap(decoder.dataSet.element(for: studyCommentsTag))
-
-            XCTAssertEqual(element.vr, .LT, transferSyntax.rawValue)
-            XCTAssertEqual(element.stringValue, comment, transferSyntax.rawValue)
-            XCTAssertEqual(element.stringValues, [comment], transferSyntax.rawValue)
+            for (tag, vr) in fields {
+                let element = try XCTUnwrap(decoder.dataSet.element(for: tag))
+                XCTAssertEqual(element.vr, vr, transferSyntax.rawValue)
+                XCTAssertEqual(element.stringValue, comment, transferSyntax.rawValue)
+                XCTAssertEqual(element.stringValues, [comment], transferSyntax.rawValue)
+            }
         }
+    }
+
+    /// Isis issue #2855: private sequences stored as OB or UN bytes (CP 246) before encapsulated Pixel Data, even with
+    /// item delimiters and a Pixel Data tag inside, leave the fragments where they are.
+    func testSequenceBytesInOBOrUNBeforeEncapsulatedPixelData_leaveTheFragmentsInPlace() throws {
+        let frame = Data([0xFF, 0xD8, 0x01, 0x02, 0xFF, 0xD9])
+        var dataSet = makeEncapsulatedDataSet(fragments: [frame])
+        var sequenceBytes = Data()
+        appendTag(0xFFFEE000, to: &sequenceBytes)
+        appendUInt32(0xFFFF_FFFF, to: &sequenceBytes)
+        appendTag(0x7FE00010, to: &sequenceBytes)
+        sequenceBytes.append(contentsOf: Array("OB".utf8) + [0, 0])
+        appendUInt32(0xFFFF_FFFF, to: &sequenceBytes)
+        appendTag(0xFFFEE00D, to: &sequenceBytes)
+        appendUInt32(0, to: &sequenceBytes)
+        appendTag(0xFFFEE0DD, to: &sequenceBytes)
+        appendUInt32(0, to: &sequenceBytes)
+        dataSet.set(DicomDataElement(tag: 0x00291010, vr: .OB, value: .bytes(sequenceBytes)))
+        dataSet.set(DicomDataElement(tag: 0x00191011, vr: .UN, value: .bytes(sequenceBytes)))
+        let url = temporaryDICOMURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        try DicomDataSetWriter.write(dataSet, to: url,
+                                     options: DicomPart10WriterOptions(transferSyntax: .jpegBaseline))
+
+        let decoder = try DCMDecoder(contentsOf: url)
+        XCTAssertEqual(try XCTUnwrap(decoder.getEncapsulatedFrame(0)).data, frame)
+        XCTAssertEqual(try decoder.makeEncapsulatedPixelFrameReader().frameData(at: 0), frame)
     }
 
     func testWriterPreservesEncapsulatedPixelDataForCompressedPassThrough() throws {

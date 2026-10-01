@@ -16,9 +16,16 @@ enum DicomJXLSwiftFrameDecoder {
         guard DicomJXLSwiftRolloutMode(environment: environment) != .disabled else {
             return nil
         }
+        try Task.checkCancellation()
+        let decision = DicomCodecCapabilities.resolve(request.capabilityRequest, environment: environment)
+        guard decision.canExecute else {
+            throw DicomCodecSelectionError.unsupported(transferSyntaxUID: request.descriptor.transferSyntaxUID,
+                                                      reasons: [decision.reason ?? "No qualified decoder is available."])
+        }
         let start = Date()
         do {
             let frame = try await DicomJXLSwiftBackend().decode(request)
+            try Task.checkCancellation()
             report(DicomJXLSwiftDecodeTelemetry(
                 frameIndex: request.frameIndex,
                 compressedBytes: request.frameData.count,

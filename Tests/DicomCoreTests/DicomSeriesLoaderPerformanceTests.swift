@@ -1,6 +1,7 @@
 import XCTest
 import Darwin
 @testable import DicomCore
+import DicomTestSupport
 import simd
 
 /// Performance tests to verify that decoder caching optimization delivers expected speedup.
@@ -18,10 +19,10 @@ final class DicomSeriesLoaderPerformanceTests: XCTestCase {
     /// Expected: >95% hit rate for typical series loading workflow.
     func testDecoderCacheHitRate() {
         // Create a mock decoder that tracks instantiation count
-        var decoderInstantiationCount = 0
+        let decoderInstantiationCount = DicomTestLockedValue(0)
 
-        let mockFactory: (String) throws -> DicomDecoderProtocol = { _ in
-            decoderInstantiationCount += 1
+        let mockFactory: @Sendable (String) throws -> DicomDecoderProtocol = { _ in
+            decoderInstantiationCount.withValue { $0 += 1 }
             return MockDecoderBuilder.makeDecoder(
                 width: 512,
                 height: 512,
@@ -36,7 +37,7 @@ final class DicomSeriesLoaderPerformanceTests: XCTestCase {
         let simulatedSliceCount = 100
 
         // Reset counter
-        decoderInstantiationCount = 0
+        decoderInstantiationCount.replace(with: 0)
 
         // Simulate first pass: loadSeries() reads headers
         // Each slice creates a decoder and caches it
@@ -89,10 +90,10 @@ final class DicomSeriesLoaderPerformanceTests: XCTestCase {
         BufferPool.shared.resetStatistics()
 
         for _ in 0..<iterations {
-            var instantiationCount = 0
+            let instantiationCount = DicomTestLockedValue(0)
 
-            let mockFactory: (String) throws -> DicomDecoderProtocol = { _ in
-                instantiationCount += 1
+            let mockFactory: @Sendable (String) throws -> DicomDecoderProtocol = { _ in
+                instantiationCount.withValue { $0 += 1 }
                 return MockDecoderBuilder.makeDecoder(
                     width: 512,
                     height: 512,
@@ -108,7 +109,7 @@ final class DicomSeriesLoaderPerformanceTests: XCTestCase {
             let elapsed = CFAbsoluteTimeGetCurrent() - start
 
             totalLoadTime += elapsed
-            totalDecoderInstantiations += instantiationCount
+            totalDecoderInstantiations += instantiationCount.value
         }
 
         let avgLoadTime = totalLoadTime / Double(iterations)
@@ -138,41 +139,52 @@ final class DicomSeriesLoaderPerformanceTests: XCTestCase {
         XCTAssertLessThan(avgLoadTime, 0.001, "Loader initialization should be <1ms")
     }
 
-    // MARK: - Decoder Cache Memory Management Benchmark
+    // MARK: - Decoder Factory Lifecycle
 
-    /// Verifies that decoder cache is properly cleared after series loading.
-    /// This ensures no memory bloat when loader is reused for multiple series.
-    func testDecoderCacheMemoryManagement() {
-        var decoderInstantiations = 0
-        var activeDecoders = Set<ObjectIdentifier>()
+    /// Verifies that repeated cycles create exactly one decoder per requested slice.
+    func test_repeatedSeriesLoads_createOneDecoderPerRequestedSlice() throws {
+        let decoderState = DicomTestLockedValue((
+            instantiations: 0,
+            activeDecoders: Set<ObjectIdentifier>()
+        ))
 
-        let mockFactory: (String) throws -> DicomDecoderProtocol = { _ in
-            decoderInstantiations += 1
+        let mockFactory: @Sendable (String) throws -> DicomDecoderProtocol = { path in
             let mock = MockDecoderBuilder.makeDecoder(
                 width: 256,
                 height: 256,
-                pixelValue: 500
+                pixelValue: 500,
+                position: SIMD3<Double>(
+                    0,
+                    0,
+                    Double(URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent) ?? 0
+                )
             )
-            activeDecoders.insert(ObjectIdentifier(mock))
+            decoderState.withValue { state in
+                state.instantiations += 1
+                state.activeDecoders.insert(ObjectIdentifier(mock))
+            }
             return mock
         }
 
-        _ = DicomSeriesLoader(decoderFactory: mockFactory)
+        let loader = DicomSeriesLoader(decoderFactory: mockFactory)
 
         // Simulate multiple series loading cycles
         let seriesCycles = 3
         let slicesPerSeries = 50
 
         for cycle in 1...seriesCycles {
-            decoderInstantiations = 0
-            activeDecoders.removeAll()
-
-            // Simulate series loading (creates decoders and caches them)
-            for _ in 0..<slicesPerSeries {
-                _ = try? mockFactory("/dummy/path.dcm") // Simulate decoder creation during loadSeries
+            decoderState.replace(with: (instantiations: 0, activeDecoders: []))
+            let directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("DicomSeriesLoaderLifecycle-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: directory) }
+            for index in 0..<slicesPerSeries {
+                try Data().write(to: directory.appendingPathComponent("\(index).dcm"))
             }
 
-            let decodersForThisCycle = decoderInstantiations
+            let volume = try loader.loadSeries(in: directory)
+
+            let decodersForThisCycle = decoderState.value.instantiations
 
             print("""
             Cycle \(cycle): Created \(decodersForThisCycle) decoders for \(slicesPerSeries) slices
@@ -181,23 +193,21 @@ final class DicomSeriesLoaderPerformanceTests: XCTestCase {
             // With caching, should create exactly one decoder per slice
             XCTAssertEqual(decodersForThisCycle, slicesPerSeries,
                           "Should create one decoder per slice in cycle \(cycle)")
+            XCTAssertEqual(decoderState.value.activeDecoders.count, slicesPerSeries)
+            XCTAssertEqual(volume.depth, slicesPerSeries)
 
-            // After loadSeries completes, cache should be cleared (verified by implementation)
-            // This test verifies the expected behavior
         }
 
         print("""
 
-        ========== Decoder Cache Memory Management ==========
+        ========== Decoder Factory Lifecycle ==========
         Series loading cycles: \(seriesCycles)
         Slices per series: \(slicesPerSeries)
         Expected decoders per cycle: \(slicesPerSeries)
-        Memory management: Cache cleared after each series ✓
         =====================================================
 
         """)
 
-        XCTAssertTrue(true, "Memory management verification completed")
     }
 
     func testMemoryScaling() async throws {
@@ -260,86 +270,6 @@ final class DicomSeriesLoaderPerformanceTests: XCTestCase {
                               "Memory per file should be reasonable (<2.0MB)")
         }
 
-        XCTAssertTrue(true, "Memory scaling analysis completed")
-    }
-
-    // MARK: - Performance Impact Analysis
-
-    /// Documents the expected performance improvement from decoder caching optimization.
-    ///
-    /// ANALYSIS:
-    /// - Before optimization: Each DICOM file was decoded twice (header pass + pixel pass)
-    /// - After optimization: Each DICOM file is decoded once, decoder is cached and reused
-    /// - For a 300-slice CT series, this eliminates 300 redundant decoder instantiations
-    /// - File I/O and header parsing are the primary bottlenecks, not memory allocation
-    /// - Decoder instantiation involves file opening, header parsing, and metadata extraction
-    ///
-    /// EXPECTED IMPACT:
-    /// - Large series (200+ slices): ~2x speedup in total loading time
-    /// - Small series (<50 slices): ~1.5-1.8x speedup (overhead more significant)
-    /// - Memory usage: Unchanged (cache is cleared after loading)
-    /// - Cache hit rate: >95% for typical series loading
-    ///
-    /// MEASUREMENT METHODOLOGY:
-    /// - Baseline (without caching): 2N decoder instantiations for N slices
-    /// - Optimized (with caching): N decoder instantiations for N slices
-    /// - Speedup ratio: 2N / N = 2x theoretical maximum
-    /// - Real-world speedup: ~2x for large series (I/O dominates)
-    ///
-    /// VERIFICATION:
-    /// - This worktree contains the optimized implementation
-    /// - Cache hit rate tests verify >95% cache utilization
-    /// - Memory management tests verify cache is properly cleared
-    /// - Existing functional tests verify correctness is maintained
-    func testPerformanceImpactDocumentation() {
-        let sliceCounts = [50, 100, 200, 300, 500]
-
-        for sliceCount in sliceCounts {
-            let baselineDecoders = sliceCount * 2  // Without caching
-            let optimizedDecoders = sliceCount     // With caching
-            let theoreticalSpeedup = Double(baselineDecoders) / Double(optimizedDecoders)
-
-            // Real-world speedup is slightly less due to other operations
-            let estimatedRealWorldSpeedup = theoreticalSpeedup * 0.95
-
-            print("""
-            Slice count: \(sliceCount)
-              Baseline decoder instantiations: \(baselineDecoders)
-              Optimized decoder instantiations: \(optimizedDecoders)
-              Theoretical speedup: \(String(format: "%.1f", theoreticalSpeedup))x
-              Estimated real-world speedup: \(String(format: "%.1f", estimatedRealWorldSpeedup))x
-            """)
-        }
-
-        print("""
-
-        ========== Performance Impact Analysis ==========
-        Optimization: Decoder caching to eliminate redundant instantiation
-        Target: ~2x speedup for large series (200+ slices)
-
-        Expected Impact by Series Size:
-        - Small series (50 slices): ~1.5x speedup
-        - Medium series (100 slices): ~1.7x speedup
-        - Large series (200+ slices): ~1.9-2.0x speedup
-        - Very large series (500+ slices): ~1.9-2.0x speedup
-
-        Key Improvements:
-        - Eliminates redundant file I/O operations
-        - Reduces header parsing overhead by 50%
-        - Maintains memory efficiency (cache cleared after loading)
-        - No API changes or behavioral changes
-
-        Acceptance Criteria: ✓ MET
-        - Cache hit rate >95%: ✓ (verified in testDecoderCacheHitRate)
-        - No memory bloat: ✓ (verified in testDecoderCacheMemoryManagement)
-        - Functional correctness: ✓ (verified by existing test suite)
-        - Expected ~2x speedup for large series: ✓ (theoretical analysis confirms)
-        ================================================
-
-        """)
-
-        // This test always passes - it exists to document the performance analysis
-        XCTAssertTrue(true, "Performance impact analysis documented")
     }
 
     // MARK: - Decoder Factory Pattern Benchmark
@@ -399,12 +329,13 @@ final class DicomSeriesLoaderPerformanceTests: XCTestCase {
     /// Tests optimal case (sequential loading) and validates cache behavior.
     func testCacheEfficiencyAnalysis() {
         var cacheHits = 0
-        var cacheMisses = 0
-        var decoderInstantiations = 0
+        let decoderState = DicomTestLockedValue((cacheMisses: 0, decoderInstantiations: 0))
 
-        let mockFactory: (String) throws -> DicomDecoderProtocol = { _ in
-            decoderInstantiations += 1
-            cacheMisses += 1
+        let mockFactory: @Sendable (String) throws -> DicomDecoderProtocol = { _ in
+            decoderState.withValue { state in
+                state.decoderInstantiations += 1
+                state.cacheMisses += 1
+            }
             return MockDecoderBuilder.makeDecoder(
                 width: 128,
                 height: 128,
@@ -420,7 +351,7 @@ final class DicomSeriesLoaderPerformanceTests: XCTestCase {
             _ = try? mockFactory("/dummy/path.dcm") // Creates decoder, would be cached
         }
 
-        let firstPassDecoders = decoderInstantiations
+        let firstPassDecoders = decoderState.value.decoderInstantiations
 
         // Simulate second pass: pixel extraction (should hit cache)
         // In real implementation, this would reuse cached decoders
@@ -458,72 +389,6 @@ final class DicomSeriesLoaderPerformanceTests: XCTestCase {
                       "Cache efficiency should be 1.0 (optimal)")
     }
 
-    // MARK: - Real-World Performance Simulation
-
-    /// Simulates real-world series loading performance with realistic parameters.
-    /// Uses typical CT scan dimensions and slice counts.
-    func testRealWorldPerformanceSimulation() {
-        // Clear and reset pool statistics for clean baseline
-        BufferPool.shared.clear()
-        BufferPool.shared.resetStatistics()
-
-        let scenarios = [
-            ("Small CT scan", sliceCount: 50, width: 512, height: 512),
-            ("Medium CT scan", sliceCount: 150, width: 512, height: 512),
-            ("Large CT scan", sliceCount: 300, width: 512, height: 512),
-            ("Very large CT scan", sliceCount: 500, width: 512, height: 512),
-            ("High-res scan", sliceCount: 200, width: 1024, height: 1024)
-        ]
-
-        print("""
-
-        ========== Real-World Performance Simulation ==========
-        """)
-
-        for (name, sliceCount, width, height) in scenarios {
-            let pixelsPerSlice = width * height
-            let bytesPerSlice = pixelsPerSlice * 2 // 16-bit pixels
-            let totalBytes = bytesPerSlice * sliceCount
-            let totalMB = Double(totalBytes) / (1024.0 * 1024.0)
-
-            let baselineDecoders = sliceCount * 2
-            let optimizedDecoders = sliceCount
-            let theoreticalSpeedup = Double(baselineDecoders) / Double(optimizedDecoders)
-
-            print("""
-            \(name):
-              Dimensions: \(width)x\(height)x\(sliceCount)
-              Total data: \(String(format: "%.1f", totalMB)) MB
-              Baseline decoders: \(baselineDecoders)
-              Optimized decoders: \(optimizedDecoders)
-              Theoretical speedup: \(String(format: "%.1f", theoreticalSpeedup))x
-            """)
-        }
-
-        // Capture pool statistics
-        let stats = BufferPool.shared.statistics
-
-        print("""
-
-        Performance Impact Summary:
-        - Decoder caching eliminates 50% of decoder instantiations
-        - Speedup is consistent across different image dimensions
-        - Larger series benefit more from optimization (amortized overhead)
-        - Memory footprint remains unchanged (cache cleared after loading)
-
-        Buffer Pool Metrics:
-          Total acquires: \(stats.totalAcquires)
-          Pool hits: \(stats.hits)
-          Pool misses: \(stats.misses)
-          Hit rate: \(String(format: "%.1f", stats.hitRate))%
-          Peak pool size: \(stats.peakPoolSize)
-        =======================================================
-
-        """)
-
-        XCTAssertTrue(true, "Real-world performance simulation completed")
-    }
-
     // MARK: - Batch Loading Performance Benchmark
 
     /// Benchmarks batch loading performance with concurrent vs sequential processing.
@@ -542,7 +407,7 @@ final class DicomSeriesLoaderPerformanceTests: XCTestCase {
 
         for iteration in 1...iterations {
             // Create mock factory with simulated I/O delay
-            let mockFactory: () -> DicomDecoderProtocol = {
+            let mockFactory: @Sendable () -> DicomDecoderProtocol = {
                 let mock = MockDecoderBuilder.makeDecoder(
                     width: 512,
                     height: 512,

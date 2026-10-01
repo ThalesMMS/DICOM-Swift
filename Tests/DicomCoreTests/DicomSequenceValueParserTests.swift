@@ -2,11 +2,47 @@ import XCTest
 @testable import DicomCore
 
 final class DicomSequenceValueParserTests: XCTestCase {
+    func test_slicedData_valueReaderReceivesAbsoluteRanges() throws {
+        let storage = Data([0xEE, 0xEE, 0xEE,
+                            0xFE, 0xFF, 0x00, 0xE0, 10, 0, 0, 0,
+                            0x10, 0, 0x10, 0, 0x50, 0x4E, 2, 0, 0x41, 0x42])
+        let data = storage.dropFirst(3)
+        var ranges: [Range<Int>] = []
+        let items = try DicomSequenceValueParser.parseItems(
+            in: data, valueOffset: 0, valueLength: data.count, littleEndian: true, explicitVR: true,
+            valueDataReader: { bytes, range, _, _ in
+                ranges.append(range)
+                return Data(bytes[range])
+            }
+        )
+        let reference = try DicomSequenceValueParser.parseItems(
+            in: data, valueOffset: 0, valueLength: data.count, littleEndian: true, explicitVR: true
+        )
+        XCTAssertEqual(ranges, [19..<21])
+        XCTAssertEqual(items, reference)
+        XCTAssertEqual(items.first?.dataSet.string(for: .patientName), "AB")
+    }
+
     private let procedureCodeSequenceTag = 0x00081032
     private let modifierSequenceTag = 0x00080110
     private let codeValueTag = 0x00080100
     private let codeMeaningTag = 0x00080104
     private let privateUndefinedLengthUNTag = 0x77771001
+
+    func test_newLongVRHeaders_preserveFollowingElementAlignment() throws {
+        for (code, value) in [("UC", Data("Long text ".utf8)),
+                              ("SV", Data(repeating: 0xFF, count: 8)),
+                              ("UV", Data(repeating: 0x01, count: 8))] {
+            let vr = try XCTUnwrap(DicomVR(code: code))
+            XCTAssertTrue(vr.uses32BitLength)
+            let bytes = elementHeader(privateUndefinedLengthUNTag, vr: code,
+                                      length: UInt32(value.count), uses32BitLength: true) + value
+                + element(codeMeaningTag, vr: "LO", value: "Following")
+            let parsed = try DicomDataSetParser.dataSet(from: bytes)
+            XCTAssertEqual(parsed.element(for: privateUndefinedLengthUNTag)?.vr, vr)
+            XCTAssertEqual(parsed.string(for: codeMeaningTag), "Following")
+        }
+    }
 
     func testDataSetParserDecodesCyrillicSpecificCharacterSet() throws {
         let source = DicomDataSet(elements: [
@@ -34,7 +70,7 @@ final class DicomSequenceValueParserTests: XCTestCase {
             DicomDataElement(
                 tag: DicomTag.specificCharacterSet.rawValue,
                 vr: .CS,
-                value: .strings(["ISO 2022 IR 87"])
+                value: .strings(["", "ISO 2022 IR 87"])
             ),
             DicomDataElement(
                 tag: DicomTag.studyDescription.rawValue,
@@ -243,6 +279,199 @@ final class DicomSequenceValueParserTests: XCTestCase {
         XCTAssertEqual(parsedNested.dataSet.string(for: codeMeaningTag), "Contrast enhanced")
     }
 
+    func test_dataSetParser_definedUndefinedAndMixedDepthAtLimit_parses() throws {
+        let limits = DicomDataSetParseLimits(
+            maximumSequenceDepth: 3,
+            maximumElementCount: 4,
+            maximumItemCount: 4
+        )
+        let encodings = [
+            [false, false, false],
+            [true, true, true],
+            [false, true, false]
+        ]
+
+        for encoding in encodings {
+            XCTAssertNoThrow(try DicomDataSetParser.dataSet(
+                from: nestedSequences(undefinedLengths: encoding),
+                limits: limits
+            ))
+        }
+    }
+
+    func test_dataSetParser_definedUndefinedAndMixedDepthAboveLimit_throwsTypedError() {
+        let limits = DicomDataSetParseLimits(
+            maximumSequenceDepth: 3,
+            maximumElementCount: 4,
+            maximumItemCount: 4
+        )
+        let encodings = [
+            [false, false, false, false],
+            [true, true, true, true],
+            [false, true, false, true]
+        ]
+
+        for encoding in encodings {
+            assertParseError(
+                .maximumSequenceDepthExceeded(limit: 3),
+                data: nestedSequences(undefinedLengths: encoding),
+                limits: limits
+            )
+        }
+    }
+
+    func test_dataSetParser_implicitUndefinedLengthUNDepth_enforcesInclusiveLimit() throws {
+        let limits = DicomDataSetParseLimits(
+            maximumSequenceDepth: 2,
+            maximumElementCount: 3,
+            maximumItemCount: 3
+        )
+
+        XCTAssertNoThrow(try DicomDataSetParser.dataSet(
+            from: nestedImplicitUndefinedLengthUN(depth: 2),
+            transferSyntax: .implicitVRLittleEndian,
+            limits: limits
+        ))
+        assertParseError(
+            .maximumSequenceDepthExceeded(limit: 2),
+            data: nestedImplicitUndefinedLengthUN(depth: 3),
+            transferSyntax: .implicitVRLittleEndian,
+            limits: limits
+        )
+    }
+
+    func test_dataSetParser_elementCount_enforcesInclusiveLimit() throws {
+        let limits = DicomDataSetParseLimits(
+            maximumSequenceDepth: 0,
+            maximumElementCount: 3,
+            maximumItemCount: 0
+        )
+
+        XCTAssertNoThrow(try DicomDataSetParser.dataSet(from: emptyElements(count: 3), limits: limits))
+        assertParseError(
+            .maximumElementCountExceeded(limit: 3),
+            data: emptyElements(count: 4),
+            limits: limits
+        )
+    }
+
+    func test_dataSetParser_definedAndUndefinedItemCount_enforcesInclusiveLimit() throws {
+        let limits = DicomDataSetParseLimits(
+            maximumSequenceDepth: 1,
+            maximumElementCount: 1,
+            maximumItemCount: 3
+        )
+
+        for undefinedLength in [false, true] {
+            XCTAssertNoThrow(try DicomDataSetParser.dataSet(
+                from: sequenceWithEmptyItems(count: 3, undefinedLength: undefinedLength),
+                limits: limits
+            ))
+            assertParseError(
+                .maximumItemCountExceeded(limit: 3),
+                data: sequenceWithEmptyItems(count: 4, undefinedLength: undefinedLength),
+                limits: limits
+            )
+        }
+    }
+
+    func test_dataSetParser_elementBudgetAcrossMixedItems_isGlobal() throws {
+        let limits = DicomDataSetParseLimits(
+            maximumSequenceDepth: 1,
+            maximumElementCount: 3,
+            maximumItemCount: 2
+        )
+
+        XCTAssertNoThrow(try DicomDataSetParser.dataSet(
+            from: sequenceWithElementsPerItem([1, 1]),
+            limits: limits
+        ))
+        assertParseError(
+            .maximumElementCountExceeded(limit: 3),
+            data: sequenceWithElementsPerItem([1, 2]),
+            limits: limits
+        )
+    }
+
+    func test_dataSetParser_itemBudgetAcrossDefinedAndUndefinedSequences_isGlobal() throws {
+        let limits = DicomDataSetParseLimits(
+            maximumSequenceDepth: 1,
+            maximumElementCount: 2,
+            maximumItemCount: 3
+        )
+
+        XCTAssertNoThrow(try DicomDataSetParser.dataSet(
+            from: siblingSequencesWithItemCounts(first: 1, second: 2),
+            limits: limits
+        ))
+        assertParseError(
+            .maximumItemCountExceeded(limit: 3),
+            data: siblingSequencesWithItemCounts(first: 2, second: 2),
+            limits: limits
+        )
+    }
+
+    func test_dataSetParser_withoutExplicitLimits_rejectsDefaultDepthPlusOne() {
+        let depth = DicomDataSetParseLimits.default.maximumSequenceDepth + 1
+        let data = nestedSequences(undefinedLengths: Array(repeating: false, count: depth))
+
+        XCTAssertThrowsError(try DicomDataSetParser.dataSet(from: data)) { error in
+            XCTAssertEqual(
+                error as? DicomDataSetParseError,
+                .maximumSequenceDepthExceeded(
+                    limit: DicomDataSetParseLimits.default.maximumSequenceDepth
+                )
+            )
+        }
+    }
+
+    func test_dataSetParser_withoutExplicitLimits_rejectsDefaultElementCountPlusOne() {
+        let limit = DicomDataSetParseLimits.default.maximumElementCount
+
+        XCTAssertThrowsError(try DicomDataSetParser.dataSet(from: emptyElements(count: limit + 1))) { error in
+            XCTAssertEqual(
+                error as? DicomDataSetParseError,
+                .maximumElementCountExceeded(limit: limit)
+            )
+        }
+    }
+
+    func test_dataSetParser_withoutExplicitLimits_rejectsDefaultItemCountPlusOne() {
+        let limit = DicomDataSetParseLimits.default.maximumItemCount
+        let data = sequenceWithEmptyItems(count: limit + 1, undefinedLength: false)
+
+        XCTAssertThrowsError(try DicomDataSetParser.dataSet(from: data)) { error in
+            XCTAssertEqual(
+                error as? DicomDataSetParseError,
+                .maximumItemCountExceeded(limit: limit)
+            )
+        }
+    }
+
+    func test_dataSetParser_whenTaskIsAlreadyCancelled_throwsCancellationError() async {
+        let data = emptyElements(count: 1)
+        let task = Task<DicomDataSet, Error> {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try DicomDataSetParser.dataSet(
+                from: data,
+                limits: DicomDataSetParseLimits(
+                    maximumSequenceDepth: 0,
+                    maximumElementCount: 1,
+                    maximumItemCount: 0
+                )
+            )
+        }
+
+        do {
+            _ = try await task.value
+            XCTFail("An already-cancelled parser task should not publish a dataset")
+        } catch is CancellationError {
+            // Expected before the parser consumes the first element.
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+    }
+
     func testUndefinedLengthItemMissingDelimiterThrowsStableError() {
         var data = sequenceHeader(procedureCodeSequenceTag, length: .max)
         data += itemHeader(length: .max)
@@ -350,6 +579,93 @@ final class DicomSequenceValueParserTests: XCTestCase {
 
     private func sequence(_ tag: Int, undefinedValue: Data) -> Data {
         sequenceHeader(tag, length: .max) + undefinedValue + delimiter(0xFFFEE0DD)
+    }
+
+    private func nestedSequences(undefinedLengths: [Bool]) -> Data {
+        var nested = Data()
+        for undefinedLength in undefinedLengths.reversed() {
+            let encodedItem = undefinedLength
+                ? item(undefinedValue: nested)
+                : item(explicitValue: nested)
+            nested = undefinedLength
+                ? sequence(procedureCodeSequenceTag, undefinedValue: encodedItem)
+                : sequence(procedureCodeSequenceTag, explicitValue: encodedItem)
+        }
+        return nested
+    }
+
+    private func nestedImplicitUndefinedLengthUN(depth: Int) -> Data {
+        var nested = Data()
+        for _ in 0..<depth {
+            nested = implicitElementHeader(privateUndefinedLengthUNTag, length: .max)
+                + item(undefinedValue: nested)
+                + delimiter(0xFFFEE0DD)
+        }
+        return nested
+    }
+
+    private func emptyElements(count: Int) -> Data {
+        let encodedElement = elementHeader(codeMeaningTag, vr: "LO", length: 0, uses32BitLength: false)
+        var data = Data()
+        data.reserveCapacity(encodedElement.count * count)
+        for _ in 0..<count {
+            data.append(encodedElement)
+        }
+        return data
+    }
+
+    private func sequenceWithEmptyItems(count: Int, undefinedLength: Bool) -> Data {
+        let encodedItem = undefinedLength ? item(undefinedValue: Data()) : item(explicitValue: Data())
+        var items = Data()
+        items.reserveCapacity(encodedItem.count * count)
+        for _ in 0..<count {
+            items.append(encodedItem)
+        }
+        return undefinedLength
+            ? sequence(procedureCodeSequenceTag, undefinedValue: items)
+            : sequence(procedureCodeSequenceTag, explicitValue: items)
+    }
+
+    private func sequenceWithElementsPerItem(_ elementCounts: [Int]) -> Data {
+        let items = elementCounts.enumerated().reduce(into: Data()) { data, entry in
+            let value = emptyElements(count: entry.element)
+            data += entry.offset.isMultiple(of: 2)
+                ? item(explicitValue: value)
+                : item(undefinedValue: value)
+        }
+        return sequence(procedureCodeSequenceTag, undefinedValue: items)
+    }
+
+    private func siblingSequencesWithItemCounts(first: Int, second: Int) -> Data {
+        let firstItems = (0..<first).reduce(into: Data()) { data, _ in
+            data += item(explicitValue: Data())
+        }
+        let secondItems = (0..<second).reduce(into: Data()) { data, _ in
+            data += item(undefinedValue: Data())
+        }
+        return sequence(procedureCodeSequenceTag, explicitValue: firstItems)
+            + sequence(modifierSequenceTag, undefinedValue: secondItems)
+    }
+
+    private func assertParseError(
+        _ expected: DicomDataSetParseError,
+        data: Data,
+        transferSyntax: DicomTransferSyntax = .explicitVRLittleEndian,
+        limits: DicomDataSetParseLimits,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertThrowsError(
+            try DicomDataSetParser.dataSet(
+                from: data,
+                transferSyntax: transferSyntax,
+                limits: limits
+            ),
+            file: file,
+            line: line
+        ) { error in
+            XCTAssertEqual(error as? DicomDataSetParseError, expected, file: file, line: line)
+        }
     }
 
     private func item(explicitValue: Data) -> Data {

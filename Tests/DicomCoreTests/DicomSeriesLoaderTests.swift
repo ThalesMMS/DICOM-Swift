@@ -94,7 +94,7 @@ final class DicomSeriesLoaderTests: XCTestCase {
         let matrix = DicomSeriesLoaderSupportMatrix.standard
 
         XCTAssertEqual(matrix.supportedBitsAllocated, [8, 16, 32])
-        XCTAssertEqual(matrix.supportedBitsStored, [8, 16, 32])
+        XCTAssertEqual(matrix.supportedBitsStored, Set(1...32))
         XCTAssertEqual(matrix.supportedPixelRepresentations, [0, 1])
         XCTAssertEqual(matrix.supportedSamplesPerPixel, [1])
         XCTAssertEqual(matrix.supportedPhotometricInterpretations, ["MONOCHROME1", "MONOCHROME2"])
@@ -108,6 +108,30 @@ final class DicomSeriesLoaderTests: XCTestCase {
         XCTAssertFalse(matrix.spacingBehavior.isEmpty)
         XCTAssertFalse(matrix.orientationBehavior.isEmpty)
         XCTAssertEqual(matrix.sliceOrderingBehavior.count, 3)
+    }
+
+    func test_loadSeries_rejectsIncorrectAllocationLength() throws {
+        let directory = try makeTemporaryDirectory(prefix: "DicomSeriesLoaderTests_AllocationLength")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try createFiles(in: directory, count: 2)
+
+        for adjustment in [-2, 2] {
+            let loader = DicomSeriesLoader(decoderFactory: { path in
+                let isLateSlice = path.contains("slice_1")
+                return MockDecoderBuilder.makeDecoder(
+                    width: 2, height: 2, bitDepth: 8, pixelValue: isLateSlice ? 9 : 7,
+                    position: isLateSlice ? SIMD3<Double>(0, 0, 1) : .zero
+                )
+            }, logger: MockLogger(), allocateVoxelData: { Data(count: $0 + adjustment) })
+
+            XCTAssertThrowsError(try loader.loadSeries(in: directory)) { error in
+                guard case DicomSeriesLoaderError.invalidVoxelAllocationLength(let expected, let actual) = error else {
+                    return XCTFail("Unexpected allocation error: \(error)")
+                }
+                XCTAssertEqual(expected, 16)
+                XCTAssertEqual(actual, 16 + adjustment)
+            }
+        }
     }
 
     func testLoadSeriesSupportsUnsigned8BitGrayscaleVolume() throws {
@@ -724,10 +748,10 @@ final class DicomSeriesLoaderTests: XCTestCase {
 
     func testProgressHandlerSignature() {
         // Test that progress handler type is defined correctly
-        var progressCalls = 0
+        let progressCalls = DicomTestLockedValue(0)
 
         let handler: DicomSeriesLoader.ProgressHandler = { fraction, sliceCount, sliceData, volume in
-            progressCalls += 1
+            progressCalls.withValue { $0 += 1 }
             XCTAssertGreaterThanOrEqual(fraction, 0.0, "Fraction should be >= 0")
             XCTAssertLessThanOrEqual(fraction, 1.0, "Fraction should be <= 1")
             XCTAssertGreaterThan(sliceCount, 0, "Slice count should be positive")
@@ -750,7 +774,7 @@ final class DicomSeriesLoaderTests: XCTestCase {
         )
 
         handler(0.5, 1, Data(), testVolume)
-        XCTAssertEqual(progressCalls, 1, "Progress handler should have been called once")
+        XCTAssertEqual(progressCalls.value, 1, "Progress handler should have been called once")
     }
 
     // MARK: - Rescale Parameters Tests

@@ -757,7 +757,7 @@ issue #1077, and the Isis-level decoder parity documentation was closed by issue
 
 ### Need Help?
 
-- See <doc:GettingStarted> for basic usage examples
+- See <doc:DicomLoading> for current loading guidance
 - See <doc:Architecture> for protocol-based dependency injection
 - See <doc:PerformanceGuide> for optimization tips
 - Check the API documentation for detailed method signatures

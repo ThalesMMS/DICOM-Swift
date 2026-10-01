@@ -16,12 +16,40 @@ public struct DicomCodecWorkflowEngine: Sendable {
     public func capabilities(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> DicomCodecStructuredReport {
+        capabilities(for: DicomCompressedFrameDescriptor(
+            transferSyntaxUID: DicomTransferSyntax.explicitVRLittleEndian.rawValue,
+            rows: 2, columns: 2, bitsAllocated: 8, bitsStored: 8, highBit: 7, pixelRepresentation: 0,
+            samplesPerPixel: 1, photometricInterpretation: "MONOCHROME2", planarConfiguration: nil
+        ), environment: environment)
+    }
+
+    /// Qualifies all registered destinations against the source object's actual pixel metadata.
+    public func capabilities(
+        for data: Data,
+        intent: DicomEncodingIntent = .reversible,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) throws -> DicomCodecStructuredReport {
+        let decoder = try makeDecoder(data)
+        guard let syntax = DicomTransferSyntax(uid: decoder.transferSyntaxUID) else {
+            throw DicomCodecWorkflowError.invalidDICOM(reason: "The source transfer syntax is unrecognized.")
+        }
+        return capabilities(for: DicomTranscoder.compressedFrameDescriptor(decoder: decoder, syntax: syntax),
+                            intent: intent, environment: environment)
+    }
+
+    /// Reports the same operation decisions used by preflight for a caller-specified pixel profile.
+    public func capabilities(
+        for descriptor: DicomCompressedFrameDescriptor,
+        intent: DicomEncodingIntent = .reversible,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> DicomCodecStructuredReport {
         DicomCodecStructuredReport(
             operation: .capabilities,
             success: true,
             backends: DicomCodecCapabilities.backendStatuses(environment: environment).map {
                 backend($0, role: .available, selected: false)
-            }
+            },
+            decisions: DicomCodecCapabilities.operationMatrix(for: descriptor, intent: intent, environment: environment)
         )
     }
 
@@ -49,8 +77,16 @@ public struct DicomCodecWorkflowEngine: Sendable {
             operation: .validate,
             decoder: decoder,
             environment: environment,
-            validateEncapsulation: true
+            validateEncapsulation: true,
+            conformance: try validateInstance(data)
         )
+    }
+
+    /// Composes original Part 10 structure, metadata, available modules and actual frame evidence.
+    public func validateInstance(_ data: Data, targets: [String: DicomDataSet] = [:],
+                                 imageConditions: DicomCompositeImageModules.Conditions = .init(),
+                                 limits: DicomInstanceValidator.Limits = .init()) throws -> DicomValidationReport {
+        try DicomInstanceValidator.validate(data, targets: targets, imageConditions: imageConditions, limits: limits)
     }
 
     /// Decodes selected or all frames into a contiguous in-memory pixel artifact.
@@ -76,6 +112,8 @@ public struct DicomCodecWorkflowEngine: Sendable {
             let execution: DicomDecodedFrameExecution
             do {
                 execution = try await reader.frameExecution(at: index, environment: environment)
+            } catch is CancellationError {
+                throw CancellationError()
             } catch {
                 throw mapReadError(error, frameIndex: index, sourceUID: decoder.transferSyntaxUID)
             }
@@ -144,6 +182,8 @@ public struct DicomCodecWorkflowEngine: Sendable {
         do {
             candidate = try await reader.frameExecution(at: frameIndex, environment: candidateEnvironment)
             oracle = try await reader.frameExecution(at: frameIndex, environment: oracleEnvironment)
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             throw mapReadError(error, frameIndex: frameIndex, sourceUID: decoder.transferSyntaxUID)
         }
@@ -187,20 +227,74 @@ public struct DicomCodecWorkflowEngine: Sendable {
         _ data: Data,
         to destination: DicomTransferSyntax,
         intent: DicomEncodingIntent = .reversible,
+        jpeg2000Options: DicomJPEG2000EncodingOptions? = nil,
         environment: [String: String] = ProcessInfo.processInfo.environment,
         verifyDecodedPixels: Bool = true
     ) async throws -> DicomCodecArtifactResult {
-        let decoder = try makeDecoder(data)
-        let source = DicomTransferSyntax(uid: decoder.transferSyntaxUID) ?? .explicitVRLittleEndian
-        let plan = DicomTransferSyntaxRegistry.standard.transcodePlan(from: source, to: destination)
-        let output: Data
+        try await transcode(data, to: destination, intent: intent, jpeg2000Options: jpeg2000Options, environment: environment, verifyDecodedPixels: verifyDecodedPixels,
+                            destinationURL: nil, progress: nil)
+    }
+
+    /// The executable plan for a transcode, without decoding a frame (dry run for callers and the CLI).
+    public func plan(
+        _ data: Data,
+        to destination: DicomTransferSyntax,
+        intent: DicomEncodingIntent = .reversible,
+        jpeg2000Options: DicomJPEG2000EncodingOptions? = nil,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) throws -> DicomTranscodeExecutionPlan {
+        _ = try makeDecoder(data)
         do {
-            output = try await DicomTranscoder().transcode(data, to: destination, intent: intent)
+            return try DicomTranscoder().plan(data, to: destination, intent: intent, jpeg2000Options: jpeg2000Options, environment: environment)
         } catch let error as DicomTranscoder.TranscodeError {
             throw mapTranscodeError(error)
+        } catch let error as DicomTranscoder.ExecutionError {
+            throw DicomCodecWorkflowError.unsupported(sourceUID: "", targetUID: destination.rawValue, reasons: [error.description])
+        }
+    }
+
+    /// Plans and executes with a bounded working set; with `destinationURL` the artifact is streamed to a staged
+    /// file and published only after validation, otherwise it is returned in memory. Progress is per frame.
+    public func transcode(
+        _ data: Data,
+        to destination: DicomTransferSyntax,
+        intent: DicomEncodingIntent = .reversible,
+        jpeg2000Options: DicomJPEG2000EncodingOptions? = nil,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        verifyDecodedPixels: Bool = true,
+        destinationURL: URL?,
+        progress: (@Sendable (DicomTranscodeProgress) -> Void)?
+    ) async throws -> DicomCodecArtifactResult {
+        let decoder = try makeDecoder(data)
+        let source = DicomTransferSyntax(uid: decoder.transferSyntaxUID) ?? .explicitVRLittleEndian
+        let plan = DicomTranscoder.executionPlan(from: source, to: destination, intent: intent, jpeg2000Options: jpeg2000Options)
+        let output: Data
+        let staged = destinationURL.map { $0.deletingLastPathComponent().appendingPathComponent(".\($0.lastPathComponent).unverified-\(UUID().uuidString)") }
+        do {
+            let executionPlan = try DicomTranscoder().plan(decoder: decoder, inputBytes: data.count, to: destination, intent: intent, environment: environment, jpeg2000Options: jpeg2000Options)
+            let execution = try await DicomTranscoder().execute(executionPlan, source: data, destinationURL: staged, environment: environment, progress: progress)
+            if let staged {
+                output = try Data(contentsOf: staged, options: .mappedIfSafe)
+            } else {
+                output = execution.data ?? Data()
+            }
+        } catch is CancellationError {
+            if let staged { try? FileManager.default.removeItem(at: staged) }
+            throw CancellationError()
+        } catch let error as DicomJPEG2000EncodingError {
+            if let staged { try? FileManager.default.removeItem(at: staged) }
+            throw error
+        } catch let error as DicomTranscoder.TranscodeError {
+            if let staged { try? FileManager.default.removeItem(at: staged) }
+            throw mapTranscodeError(error)
+        } catch let error as DicomTranscoder.ExecutionError {
+            if let staged { try? FileManager.default.removeItem(at: staged) }
+            throw DicomCodecWorkflowError.artifactValidation(reason: error.description)
         } catch {
+            if let staged { try? FileManager.default.removeItem(at: staged) }
             throw DicomCodecWorkflowError.artifactValidation(reason: error.localizedDescription)
         }
+        defer { if let staged { try? FileManager.default.removeItem(at: staged) } }
 
         let outputDecoder = try makeDecoder(output)
         guard outputDecoder.transferSyntaxUID == destination.rawValue else {
@@ -223,13 +317,16 @@ public struct DicomCodecWorkflowEngine: Sendable {
         var comparisonMode: String?
         var comparisonPassed: Bool?
         if verifyDecodedPixels {
-            let sourceFrames = try await decode(data, environment: environment)
-            let outputFrames = try await decode(output, environment: environment)
             comparisonMode = intent.isLossy ? "decoded-shape" : "exact-decoded-pixels"
-            comparisonPassed = intent.isLossy
-                ? sourceFrames.report.frames.map { [$0.width, $0.height, $0.componentCount] }
+            if intent.isLossy {
+                let sourceFrames = try await decode(data, environment: environment)
+                let outputFrames = try await decode(output, environment: environment)
+                comparisonPassed = sourceFrames.report.frames.map { [$0.width, $0.height, $0.componentCount] }
                     == outputFrames.report.frames.map { [$0.width, $0.height, $0.componentCount] }
-                : sourceFrames.data == outputFrames.data
+            } else {
+                comparisonPassed = try await storedSamples(data, environment: environment)
+                    == storedSamples(output, environment: environment)
+            }
             guard comparisonPassed == true else {
                 throw DicomCodecWorkflowError.artifactValidation(
                     reason: "Decoded source/output comparison failed in \(comparisonMode ?? "unspecified") mode."
@@ -268,8 +365,20 @@ public struct DicomCodecWorkflowEngine: Sendable {
             backends: backends,
             encapsulation: outputEncapsulation.value,
             artifact: artifact,
-            diagnostics: diagnostics
+            diagnostics: diagnostics,
+            conformance: try validateInstance(output)
         )
+        if let staged, let destinationURL {
+            do {
+                if FileManager.default.fileExists(atPath: destinationURL.path) {
+                    _ = try FileManager.default.replaceItemAt(destinationURL, withItemAt: staged)
+                } else {
+                    try FileManager.default.moveItem(at: staged, to: destinationURL)
+                }
+            } catch {
+                throw DicomCodecWorkflowError.artifactValidation(reason: "validated artifact could not be published: \(error.localizedDescription)")
+            }
+        }
         return DicomCodecArtifactResult(data: output, report: report)
     }
 
@@ -280,6 +389,8 @@ public struct DicomCodecWorkflowEngine: Sendable {
         let decoder: DCMDecoder
         do {
             decoder = try DCMDecoder(data: data)
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             throw DicomCodecWorkflowError.invalidDICOM(reason: error.localizedDescription)
         }
@@ -293,7 +404,8 @@ public struct DicomCodecWorkflowEngine: Sendable {
         operation: DicomCodecStructuredReport.Operation,
         decoder: DCMDecoder,
         environment: [String: String],
-        validateEncapsulation: Bool
+        validateEncapsulation: Bool,
+        conformance: DicomValidationReport? = nil
     ) -> DicomCodecStructuredReport {
         let validation = encapsulation(decoder, validatesDeclaredCount: validateEncapsulation)
         let diagnostics = pixelDiagnostics(decoder) + validation.diagnostics
@@ -307,7 +419,13 @@ public struct DicomCodecWorkflowEngine: Sendable {
             sourceObject: object(decoder),
             backends: statuses.map { backend($0, role: .available, selected: false) },
             encapsulation: validation.value,
-            diagnostics: diagnostics
+            diagnostics: diagnostics,
+            decisions: [DicomCodecCapabilities.resolve(
+                .init(operation: .decode, descriptor: DicomTranscoder.compressedFrameDescriptor(
+                    decoder: decoder, syntax: DicomTransferSyntax(uid: decoder.transferSyntaxUID) ?? .explicitVRLittleEndian
+                )), environment: environment
+            )],
+            conformance: conformance
         )
     }
 
@@ -380,6 +498,36 @@ public struct DicomCodecWorkflowEngine: Sendable {
         diagnostics: [DicomCodecStructuredReport.Diagnostic]
     ) {
         guard decoder.compressedImage else { return (nil, true, []) }
+        if DicomJ2KPart2Profile.isPart2(decoder.transferSyntaxUID) {
+            // PS3.5 8.2.4: the fragments are component collections and the frames their components (#2331).
+            guard let descriptor = decoder.encapsulatedPixelDataDescriptor, !descriptor.fragments.isEmpty else {
+                let diagnostic = DicomCodecStructuredReport.Diagnostic(
+                    severity: .error, code: "codec.encapsulation.parser", message: "The Part 2 object carries no component collection.")
+                return (nil, false, [diagnostic])
+            }
+            let bytes = decoder.dicomDataSnapshot()
+            let declared = max(1, decoder.nImages)
+            do {
+                let fragments = try descriptor.fragments.map { fragment -> Data in
+                    guard fragment.valueRange.lowerBound >= 0, fragment.valueRange.upperBound <= bytes.count else {
+                        throw DicomJ2KPart2LayoutError.invalidCollection(fragmentIndex: 0, reason: "fragment outside Pixel Data")
+                    }
+                    return bytes.subdata(in: fragment.valueRange)
+                }
+                let layout = try DicomJ2KPart2ObjectLayout.read(fragments: fragments, declaredFrames: declared)
+                return (
+                    DicomCodecStructuredReport.Encapsulation(
+                        valid: true, declaredFrameCount: declared, mappedFrameCount: layout.frameCount,
+                        fragmentCount: descriptor.fragments.count, basicOffsetCount: descriptor.basicOffsetTable.offsets.count,
+                        extendedOffsetCount: descriptor.extendedOffsetTable?.offsets.count ?? 0),
+                    true, []
+                )
+            } catch {
+                let diagnostic = DicomCodecStructuredReport.Diagnostic(
+                    severity: .error, code: "codec.encapsulation.parser", message: (error as? LocalizedError)?.errorDescription ?? "\(error)")
+                return (nil, false, [diagnostic])
+            }
+        }
         do {
             let reader = try decoder.makeEncapsulatedPixelFrameReader()
             if validatesDeclaredCount {
@@ -500,6 +648,17 @@ public struct DicomCodecWorkflowEngine: Sendable {
             pixelByteCount: bytes.count,
             pixelHash: stableHash(bytes)
         )
+    }
+
+    /// Every frame's stored samples: bits outside Bits Stored are not pixel content (PS3.5 8.1.1) and the encoders
+    /// drop them (issue #2851), so a lossless transcode is compared on the samples themselves.
+    private func storedSamples(_ data: Data, environment: [String: String]) async throws -> Data {
+        let reader = DicomDecodedFrameReader(decoder: try makeDecoder(data))
+        var samples = Data()
+        for index in 0 ..< reader.frameCount {
+            samples.append(try await reader.frameExecution(at: index, environment: environment).frame.storedSampleData())
+        }
+        return samples
     }
 
     private func pixelData(_ pixels: DicomDecodedFramePixelBuffer) -> Data {

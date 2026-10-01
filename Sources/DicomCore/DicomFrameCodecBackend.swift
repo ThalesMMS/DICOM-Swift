@@ -8,6 +8,8 @@
 
 import Foundation
 
+typealias DicomPartialDecodeRequest = DicomCodecPartialDecodeRequest
+
 struct DicomCodecBackendIdentifier: RawRepresentable, Hashable, Codable, Sendable,
     ExpressibleByStringLiteral {
     let rawValue: String
@@ -28,11 +30,14 @@ enum DicomCodecFamily: String, CaseIterable, Codable, Hashable, Sendable {
     case jpeg2000 = "jpeg-2000"
     case htj2k
     case jpegXL = "jpeg-xl"
+    case deflatedFrames = "deflated-frames"
 
     static func family(for transferSyntax: DicomTransferSyntax) -> DicomCodecFamily? {
         switch transferSyntax {
         case .rleLossless:
             return .rle
+        case .deflatedImageFrameCompression:
+            return .deflatedFrames
         case .jpegBaseline, .jpegExtended, .jpegLossless, .jpegLosslessFirstOrder:
             return .jpeg
         case .jpegLSLossless, .jpegLSNearLossless:
@@ -46,6 +51,7 @@ enum DicomCodecFamily: String, CaseIterable, Codable, Hashable, Sendable {
             return .jpegXL
         case .implicitVRLittleEndian, .explicitVRLittleEndian, .deflatedExplicitVRLittleEndian,
              .explicitVRBigEndian, .jpipReferenced, .jpipReferencedDeflate,
+             .jpipHTJ2KReferenced, .jpipHTJ2KReferencedDeflate,
              .mpeg2MainProfileMainLevel, .mpeg2MainProfileMainLevelFragmentable,
              .mpeg2MainProfileHighLevel, .mpeg2MainProfileHighLevelFragmentable,
              .mpeg4AVCH264HighProfileLevel41, .mpeg4AVCH264HighProfileLevel41Fragmentable,
@@ -61,21 +67,6 @@ enum DicomCodecFamily: String, CaseIterable, Codable, Hashable, Sendable {
             return nil
         }
     }
-}
-
-enum DicomCodecOperation: String, Codable, Hashable, Sendable {
-    case decode
-    case encode
-}
-
-enum DicomCodecExecutionClass: String, Codable, Hashable, Sendable {
-    case cpu
-    case metal
-}
-
-enum DicomCodecOutputOwnership: String, Codable, Hashable, Sendable {
-    case ownedData = "owned-data"
-    case sharedBuffer = "shared-buffer"
 }
 
 struct DicomPartialDecodeCapabilities: Equatable, Codable, Sendable {
@@ -119,6 +110,8 @@ struct DicomFrameCodecCapabilities: Equatable, Sendable {
     let version: String?
     let isAvailable: Bool
     let unsupportedReason: String?
+    let maximumDimension: Int
+    let maximumFrameBytes: Int
 
     init(
         identifier: DicomCodecBackendIdentifier,
@@ -136,7 +129,9 @@ struct DicomFrameCodecCapabilities: Equatable, Sendable {
         source: DicomCodecBackendSource,
         version: String? = nil,
         isAvailable: Bool = true,
-        unsupportedReason: String? = nil
+        unsupportedReason: String? = nil,
+        maximumDimension: Int = 65_535,
+        maximumFrameBytes: Int = 512 * 1_024 * 1_024
     ) {
         self.identifier = identifier
         self.families = families
@@ -154,6 +149,8 @@ struct DicomFrameCodecCapabilities: Equatable, Sendable {
         self.version = version
         self.isAvailable = isAvailable
         self.unsupportedReason = unsupportedReason
+        self.maximumDimension = maximumDimension
+        self.maximumFrameBytes = maximumFrameBytes
     }
 
     func unsupportedReason(for descriptor: DicomCompressedFrameDescriptor) -> String? {
@@ -175,6 +172,10 @@ struct DicomFrameCodecCapabilities: Equatable, Sendable {
             return "Backend \(identifier.rawValue) does not support \(operation.rawValue) for transfer syntax "
                 + "\(descriptor.transferSyntaxUID)."
         }
+        if let reason = descriptor.validationReason(maximumDimension: maximumDimension,
+                                                   maximumFrameBytes: maximumFrameBytes) {
+            return reason
+        }
         guard descriptor.samplesPerPixel <= maximumComponents else {
             return "Backend \(identifier.rawValue) supports at most \(maximumComponents) components."
         }
@@ -194,7 +195,20 @@ struct DicomFrameCodecCapabilities: Equatable, Sendable {
         if let reason = unsupportedReason(for: request.descriptor) {
             return reason
         }
+        guard request.frameData.count <= maximumFrameBytes else {
+            return "The compressed frame exceeds the backend byte limit."
+        }
         guard let partialRequest = request.partialRequest else { return nil }
+        if let region = partialRequest.region,
+           region.x < 0 || region.y < 0 || region.width <= 0 || region.height <= 0
+            || region.width > request.descriptor.columns || region.height > request.descriptor.rows
+            || region.x > request.descriptor.columns - region.width
+            || region.y > request.descriptor.rows - region.height {
+            return "The partial region is outside the source frame."
+        }
+        if (partialRequest.resolutionLevel ?? 0) < 0 || (partialRequest.maximumQualityLayer ?? 0) < 0 {
+            return "Partial resolution and quality indexes must be nonnegative."
+        }
         if partialRequest.region != nil, !partialDecode.supportsRegionOfInterest {
             return "Backend \(identifier.rawValue) does not support ROI decode."
         }
@@ -218,69 +232,6 @@ struct DicomFrameCodecCapabilities: Equatable, Sendable {
     }
 }
 
-struct DicomCompressedFrameDescriptor: Equatable, Sendable {
-    let transferSyntaxUID: String
-    let rows: Int
-    let columns: Int
-    let bitsAllocated: Int
-    let bitsStored: Int
-    let highBit: Int
-    let pixelRepresentation: Int
-    let samplesPerPixel: Int
-    let photometricInterpretation: String
-    let planarConfiguration: Int?
-
-    init(
-        transferSyntaxUID: String,
-        rows: Int,
-        columns: Int,
-        bitsAllocated: Int,
-        bitsStored: Int,
-        highBit: Int,
-        pixelRepresentation: Int,
-        samplesPerPixel: Int,
-        photometricInterpretation: String,
-        planarConfiguration: Int?
-    ) {
-        self.transferSyntaxUID = transferSyntaxUID
-        self.rows = rows
-        self.columns = columns
-        self.bitsAllocated = bitsAllocated
-        self.bitsStored = bitsStored
-        self.highBit = highBit
-        self.pixelRepresentation = pixelRepresentation
-        self.samplesPerPixel = samplesPerPixel
-        self.photometricInterpretation = photometricInterpretation
-        self.planarConfiguration = planarConfiguration
-    }
-}
-
-struct DicomPartialDecodeRequest: Equatable, Sendable {
-    struct Region: Equatable, Sendable {
-        let x: Int
-        let y: Int
-        let width: Int
-        let height: Int
-
-        init(x: Int, y: Int, width: Int, height: Int) {
-            self.x = x
-            self.y = y
-            self.width = width
-            self.height = height
-        }
-    }
-
-    let region: Region?
-    let resolutionLevel: Int?
-    let maximumQualityLayer: Int?
-
-    init(region: Region? = nil, resolutionLevel: Int? = nil, maximumQualityLayer: Int? = nil) {
-        self.region = region
-        self.resolutionLevel = resolutionLevel
-        self.maximumQualityLayer = maximumQualityLayer
-    }
-}
-
 enum DicomCodecBackendPreference: Equatable, Sendable {
     case automatic
     case preferred(DicomCodecBackendIdentifier, allowsFallback: Bool)
@@ -292,6 +243,22 @@ struct DicomFrameDecodeRequest: Sendable {
     let frameIndex: Int
     let partialRequest: DicomPartialDecodeRequest?
     let backendPreference: DicomCodecBackendPreference
+
+    var capabilityRequest: DicomCodecCapabilityRequest {
+        let preferred: String?
+        let allowsFallback: Bool
+        switch backendPreference {
+        case .automatic:
+            preferred = nil
+            allowsFallback = true
+        case .preferred(let identifier, let fallback):
+            preferred = identifier.rawValue
+            allowsFallback = fallback
+        }
+        return DicomCodecCapabilityRequest(operation: .decode, descriptor: descriptor,
+                                           frameData: frameData, partialDecode: partialRequest,
+                                           preferredBackend: preferred, allowsFallback: allowsFallback)
+    }
 
     init(
         frameData: Data,
@@ -334,19 +301,24 @@ struct DicomCodecDecodedFrame: Sendable {
     let height: Int
     let bitsPerSample: Int
     let componentCount: Int
+    /// Compressed bytes the codec parsed past but never entropy-decoded (quality-limited decodes, issue #2382);
+    /// nil when the backend does not measure it.
+    let codecBytesAvoided: Int?
 
     init(
         buffer: DicomCodecFrameBuffer,
         width: Int,
         height: Int,
         bitsPerSample: Int,
-        componentCount: Int
+        componentCount: Int,
+        codecBytesAvoided: Int? = nil
     ) {
         self.buffer = buffer
         self.width = width
         self.height = height
         self.bitsPerSample = bitsPerSample
         self.componentCount = componentCount
+        self.codecBytesAvoided = codecBytesAvoided
     }
 }
 
@@ -356,19 +328,28 @@ struct DicomFrameEncodeRequest: Sendable {
     let targetTransferSyntaxUID: String
     let intent: DicomEncodingIntent
     let tileSize: (width: Int, height: Int)?
+    /// ICC Profile (0028,2000) of the source object, carried inside the
+    /// codestream by backends that support an embedded profile (JPEG XL);
+    /// a passthrough, never applied colorimetrically. Issue #2332.
+    let iccProfile: Data?
+    let jpeg2000Options: DicomJPEG2000EncodingOptions?
 
     init(
         frame: DicomCodecDecodedFrame,
         descriptor: DicomCompressedFrameDescriptor,
         targetTransferSyntaxUID: String,
         intent: DicomEncodingIntent = .reversible,
-        tileSize: (width: Int, height: Int)? = nil
+        tileSize: (width: Int, height: Int)? = nil,
+        iccProfile: Data? = nil,
+        jpeg2000Options: DicomJPEG2000EncodingOptions? = nil
     ) {
         self.frame = frame
         self.descriptor = descriptor
         self.targetTransferSyntaxUID = targetTransferSyntaxUID
         self.intent = intent
         self.tileSize = tileSize
+        self.iccProfile = iccProfile
+        self.jpeg2000Options = jpeg2000Options
     }
 }
 
@@ -547,13 +528,18 @@ struct DicomFrameCodecExecutor: Sendable {
         _ request: DicomFrameDecodeRequest,
         selection: DicomFrameCodecSelection
     ) async throws -> DicomCodecDecodedFrame {
+        try Task.checkCancellation()
         let production = try await selection.production.decode(request)
+        try Task.checkCancellation()
         guard let shadow = selection.shadow else { return production }
 
         let result: DicomCodecShadowComparison.Result
         do {
             let candidate = try await shadow.decode(request)
+            try Task.checkCancellation()
             result = Self.framesMatch(production, candidate) ? .matched : .mismatched
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             result = .failed(error.localizedDescription)
         }

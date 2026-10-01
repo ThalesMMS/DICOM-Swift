@@ -45,33 +45,49 @@ CharLS, OpenJPEG, and HTJ2K decision matrix to
 adds package-linked and system-framework paths to the existing dynamically
 loaded runtime reports.
 
-JLSwift 0.9.0 is the package-linked JPEG-LS CPU candidate. Async .80/.81 frame
-reads default to `DICOM_JLSWIFT_MODE=shadow`: CharLS pixels are returned while
-JLSwift reports duration, dimensions, and parity. Qualified shapes are aligned
-8–16-bit grayscale and RGB8. `preferred` enables those shapes with CharLS
-fallback; `disabled` is the immediate rollback. Async encoding supports .80
+The JPEG-LS codec is the own `DicomJPEGLS` target (the JLSwift 0.9.1 core vendored
+by #2328, backend `jlswift`). Async and synchronous .80/.81 reads default to
+`DICOM_JLSWIFT_MODE=preferred`: the own codec decodes qualified shapes (aligned
+8–16-bit grayscale, RGB8 with ILV none/line/sample, restart intervals) and CharLS,
+when its runtime is present, is the fallback and the independent oracle. `shadow`
+returns CharLS pixels while the own codec reports parity; `disabled` is the
+immediate rollback. Async encoding supports .80
 with reversible intent and .81 with an explicit NEAR value.
 
-JXLSwift 1.4.0 is package-linked for JPEG XL .110/.111/.112, but defaults to
-`DICOM_JXLSWIFT_MODE=disabled`. `experimental` enables qualified
-developer/export reads and explicit-intent transcodes; `.111` verifies JPEG
-Baseline reconstruction byte-for-byte. The adapter excludes 10/12-bit, custom
-ICC, and implicit DIMSE negotiation and never replaces the GDCM viewer path.
+JPEG XL .110/.111/.112 runs on the vendored `DicomJPEGXL` target (the JXLSwift
+1.4.0 core, issue #2332) whose Modular decoder was rewritten reference-exact
+against libjxl: Bits Stored 1–16 grayscale with a Pixel Representation level
+shift, RGB8 (colour above 8 bits at codec level only), palette/Squeeze/RCT streams, groups and passes, and the DICOM
+ICC Profile carried inside the codestream as a passthrough. The rollout still
+defaults to `DICOM_JXLSWIFT_MODE=disabled`; `experimental` enables reads and
+explicit-intent transcodes, `.111` verifies JPEG Baseline reconstruction
+byte-for-byte, and implicit DIMSE negotiation and the GDCM viewer path are
+untouched. See `../../../../DISTRIBUTION.md`.
 
-The JPEG 2000 package adapter is J2KSwift 11.0.2 CPU. Async frame reads
-default to `DICOM_J2KSWIFT_MODE=shadow`: OpenJPEG pixels are returned while
-J2KSwift receives the same encapsulated `Data` and reports duration,
-dimensions, and comparison outcome. `preferred` enables only qualified
-JPEG 2000 UIDs; `disabled` rolls back without rebuilding. HTJ2K remains
-shadow-only because the pinned OpenJPH fixture is not bit-exact in this
-J2KSwift release.
+The JPEG 2000 codec is the own `DicomJPEG2000` target (the J2KSwift 11.0.2
+J2KCore/J2KCodec CPU core vendored by #2329 without its GPU, NEON-only, MJ2 and
+JP3D layers; backend `j2kswift-cpu`). Frame reads default to
+`DICOM_J2KSWIFT_MODE=preferred`: the own codec decodes the qualified Part 1
+UIDs (.90/.91) and, since #2330, the HTJ2K UIDs (.201/.202/.203); OpenJPEG is
+the fallback and one independent oracle (OpenJPH is the other for HT), `shadow`
+returns OpenJPEG pixels while the own codec reports parity, and `disabled`
+rolls back without rebuilding. #2329 fixed upstream Part 1 defects exposed by
+OpenJPEG-encoded inputs (precinct partition, tile-parts, SOP/EPH, packet
+sequencing, layer-limited decodes, 8-bit 9/7) and separates JP2/JPX/JPH
+wrappers from the codestream. #2330 removed the private HT block format from the
+vendored core, added TLM/RPCL/CAP correctness and real tiles to the encoder, and
+qualifies HT decode per UID through `DicomHTJ2KProfile` (Part 15 capabilities,
+lossless-only coding, .202 progressive options).
 
 Encoding uses the same neutral backend boundary but has an independent UID
 set. `DicomTranscoder` exposes async, explicit-intent CPU routes for JPEG 2000
 .90/.91 and HTJ2K .201-.203. It converts native grayscale/RGB frames into
-J2KSwift components, then owns DICOM encapsulation and metadata updates. This
-does not qualify HTJ2K for production J2KSwift decode, does not add Part 2
-.92/.93 encoding, and cannot select Metal for reversible output.
+the vendored core's components, then owns DICOM encapsulation and metadata
+updates. Loss under the general .203 UID comes only from an explicit irreversible
+intent. #2331 adds the Part 2 .92/.93 syntaxes as Annex J component collections
+(frames as components, one fragment per collection) on the same core; they stay
+experimental because no independent Part 2 decoder is available locally. There is
+no GPU path.
 
 Concrete codec imports are allowed only in DicomCore adapter files. Toolkit-
 neutral app modules and MTKCore exchange neutral DICOM descriptors and buffers.
@@ -571,8 +587,8 @@ User Request
 
 ## See Also
 
-- <doc:GettingStarted>
-- <doc:PerformanceOptimization>
+- <doc:DicomLoading>
+- <doc:PerformanceGuide>
 - ``DCMDecoder``
 - ``DCMWindowingProcessor``
 - ``DicomSeriesLoader``

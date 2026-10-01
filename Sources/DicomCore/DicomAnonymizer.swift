@@ -327,7 +327,7 @@ public struct DicomAnonymizer {
                 maximumLength: DicomRewritePolicy.maximumUIDRootLength
             )
         }
-        let source = Self.datasetCarryingPixelBytes(from: decoder)
+        let source = try DicomPart10PixelDataPreserver.dataSet(from: decoder)
         let warnings = Self.pixelDataWarnings(in: source)
 
         var state = RewriteState(policy: policy, source: source)
@@ -575,52 +575,6 @@ public struct DicomAnonymizer {
             second = (second &* 31) &+ UInt64(byte)
         }
         return "\(root).\(first).\(second)"
-    }
-
-    /// The decoder's dataset with Pixel Data carried byte-for-byte:
-    /// encapsulated payloads copy the raw item-structured region (Basic
-    /// Offset Table, fragments, and delimiter) for the writer's
-    /// pass-through; native values copy their raw bytes.
-    static func datasetCarryingPixelBytes(from decoder: DCMDecoder) -> DicomDataSet {
-        var source = decoder.dataSet
-        if decoder.compressedImage,
-           let encapsulated = rawEncapsulatedPixelDataRegion(from: decoder) {
-            source.set(DicomDataElement(tag: DicomTag.pixelData.rawValue, vr: .OB, value: .bytes(encapsulated)))
-        } else if let descriptor = decoder.pixelDataDescriptor {
-            let fileData = decoder.dicomDataSnapshot()
-            let end = descriptor.pixelDataOffset + descriptor.totalPixelBytes
-            if descriptor.pixelDataOffset >= 0, end <= fileData.count {
-                source.set(DicomDataElement(
-                    tag: DicomTag.pixelData.rawValue,
-                    vr: descriptor.bitsAllocated > 8 ? .OW : .OB,
-                    value: .bytes(Data(fileData[descriptor.pixelDataOffset..<end]))
-                ))
-            }
-        }
-        return source
-    }
-
-    /// Extracts the raw encapsulated Pixel Data value region (Basic Offset
-    /// Table item through the sequence delimiter) for byte-exact copying.
-    static func rawEncapsulatedPixelDataRegion(from decoder: DCMDecoder) -> Data? {
-        guard let descriptor = decoder.encapsulatedPixelDataDescriptor else {
-            return nil
-        }
-        let fileData = decoder.dicomDataSnapshot()
-        let start = decoder.offset
-        guard start >= 0, start < fileData.count else { return nil }
-
-        // The region ends after the sequence delimiter that follows the
-        // last fragment (or the offset table when there are none).
-        var scan = descriptor.fragments.map(\.itemRange.upperBound).max() ?? start
-        while scan + 8 <= fileData.count {
-            if fileData[scan] == 0xFE, fileData[scan + 1] == 0xFF,
-               fileData[scan + 2] == 0xDD, fileData[scan + 3] == 0xE0 {
-                return Data(fileData[start..<(scan + 8)])
-            }
-            scan += 1
-        }
-        return nil
     }
 
     private static func tagPathComponent(_ tag: Int) -> String {

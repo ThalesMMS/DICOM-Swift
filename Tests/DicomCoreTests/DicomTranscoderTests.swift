@@ -17,6 +17,92 @@ import DicomTestSupport
 @testable import DicomCore
 
 final class DicomTranscoderTests: XCTestCase {
+    @MainActor
+    func test_oddJPEGExtendedTable_roundTripsCanonicalAndLegacyLengths() async throws {
+        var odd = try Self.makeBaselineJPEG()
+        if odd.count.isMultiple(of: 2) {
+            // A one-byte JPEG comment changes parity without changing image samples.
+            odd.insert(contentsOf: [0xFF, 0xFE, 0, 3, 0x41], at: 2)
+        }
+        var even = odd
+        even.insert(contentsOf: [0xFF, 0xFE, 0, 3, 0x42], at: 2)
+        let frames = [odd, even]
+        let encapsulation = try DicomTranscoder.encapsulate(fragments: frames, forceExtendedOffsets: true)
+        var dataSet = EncapsulatedFixtureFactory.makeDataSet(
+            transferSyntax: .jpegBaseline, fragments: frames, declaredFrames: 2,
+            rows: 2, columns: 2, bitsAllocated: 8, bitsStored: 8, highBit: 7,
+            photometricInterpretation: "MONOCHROME2", pixelRepresentation: 0
+        )
+        DicomTranscoder.replaceEncapsulatedPixelData(in: &dataSet, with: encapsulation)
+        let reference = try Self.open(Self.makeJPEGBaselineFile())
+        let referencePixels = try XCTUnwrap(reference.getPixels8())
+        XCTAssertEqual(referencePixels.count, 4)
+        for legacy in [false, true] {
+            if legacy {
+                var lengths = Data()
+                for frame in frames {
+                    let stored = UInt64(frame.count + frame.count % 2)
+                    withUnsafeBytes(of: stored.littleEndian) { lengths.append(contentsOf: $0) }
+                }
+                dataSet.set(.init(tag: DicomTag.extendedOffsetTableLengths.rawValue, vr: .OV, value: .bytes(lengths)))
+            }
+            let part10 = try DicomDataSetWriter.part10Data(from: dataSet, options: .init(transferSyntax: .jpegBaseline))
+            let decoder = try Self.open(part10)
+            let descriptor = try XCTUnwrap(decoder.encapsulatedPixelDataDescriptor)
+            XCTAssertTrue(descriptor.diagnostics.isEmpty)
+            XCTAssertEqual(descriptor.extendedOffsetTable?.lengths,
+                           frames.map { UInt64($0.count + (legacy ? $0.count % 2 : 0)) })
+            XCTAssertEqual(try XCTUnwrap(decoder.getPixels8()), referencePixels)
+            let report = try DicomInstanceValidator.validate(part10)
+            XCTAssertEqual(report[.structure], .passed)
+            XCTAssertFalse(report.diagnostics.contains { $0.code == .pixelDataLengthMismatch })
+            let session = try await DicomSourceFrameSession.open(source: DicomByteSource(data: part10))
+            for index in frames.indices {
+                let bytes = try await session.frameData(at: index)
+                XCTAssertEqual(bytes, frames[index] + (legacy && index == 0 ? Data([0]) : Data()))
+            }
+            await session.close()
+            if let folder = ProcessInfo.processInfo.environment["DICOM_EOT_WRITER_CORPUS_DIRECTORY"] {
+                let directory = URL(fileURLWithPath: folder, isDirectory: true)
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                try part10.write(to: directory.appendingPathComponent(legacy ? "legacy.dcm" : "canonical.dcm"))
+                for index in frames.indices {
+                    try frames[index].write(to: directory.appendingPathComponent("frame\(index).jpg"))
+                }
+            }
+        }
+    }
+
+    func test_explicitLossForTheSameGeneralUID_recompressesAndReportsTheActualRoute() async throws {
+        let environment = ["DICOM_J2KSWIFT_MODE": "preferred", "DICOM_JXLSWIFT_MODE": "experimental"]
+        let native = try Self.makeNativeFile(storedValues: [-1000, -500, 0, 250])
+        let engine = DicomCodecWorkflowEngine()
+        for syntax in [DicomTransferSyntax.jpeg2000, .htj2k, .jpegXL] {
+            let reversible = try await engine.transcode(native, to: syntax, environment: environment)
+            let source = try Self.open(reversible.data)
+            let result = try await engine.transcode(reversible.data, to: syntax,
+                                                    intent: .irreversible(quality: 0.8), environment: environment)
+            let output = try Self.open(result.data)
+            XCTAssertEqual(result.report.transcodeRoute, "recompress", syntax.rawValue)
+            XCTAssertEqual(output.info(for: .lossyImageCompression), "01", syntax.rawValue)
+            XCTAssertNotEqual(output.info(for: .sopInstanceUID), source.info(for: .sopInstanceUID), syntax.rawValue)
+        }
+    }
+
+    func test_lossyIntentForNativeOutput_isRejectedByPreflightAndExecution() async throws {
+        let native = try Self.makeNativeFile(storedValues: [1, 2, 3, 4])
+        let preflight = try DicomTranscoder().preflight(native, to: .explicitVRLittleEndian,
+                                                       intent: .irreversible(quality: 0.8))
+        XCTAssertFalse(preflight.canExecute)
+        do {
+            _ = try await DicomTranscoder().transcode(native, to: .explicitVRLittleEndian,
+                                                      intent: .irreversible(quality: 0.8))
+            XCTFail("Native output cannot fulfill lossy intent")
+        } catch is DicomTranscoder.TranscodeError {
+            // Typed refusal agrees with preflight.
+        }
+    }
+
     // MARK: - Native-to-native rewrite and compressed pass-through
 
     func testNativeToNativeRewritePreservesMetadataAndPixels() throws {
@@ -29,6 +115,60 @@ final class DicomTranscoderTests: XCTestCase {
         XCTAssertEqual(decoder.intValue(for: .bitsStored), 16)
         XCTAssertEqual(Self.storedInt16Pixels(decoder), [-1000, -500, 0, 250],
                        "stored pixel values must survive the rewrite")
+    }
+
+    func testNativeRewriteDoesNotInventPixelDataForStructuredReport() throws {
+        let sopClassUID = "1.2.840.10008.5.1.4.1.1.88.11"
+        let sopInstanceUID = "2.25.1869"
+        let source = try DicomDataSetWriter.part10Data(
+            from: DicomDataSet(elements: [
+                DicomDataElement(tag: DicomTag.sopClassUID.rawValue, vr: .UI, value: .strings([sopClassUID])),
+                DicomDataElement(tag: DicomTag.sopInstanceUID.rawValue, vr: .UI, value: .strings([sopInstanceUID])),
+                DicomDataElement(tag: DicomTag.modality.rawValue, vr: .CS, value: .strings(["SR"]))
+            ]),
+            options: DicomPart10WriterOptions(
+                transferSyntax: .implicitVRLittleEndian,
+                mediaStorageSOPClassUID: sopClassUID,
+                mediaStorageSOPInstanceUID: sopInstanceUID
+            )
+        )
+
+        let output = try DicomTranscoder().transcode(source, to: .explicitVRLittleEndian)
+        let sourceDecoder = try Self.open(source)
+        let outputDecoder = try Self.open(output)
+
+        XCTAssertFalse(sourceDecoder.dataSet.contains(.pixelData))
+        XCTAssertFalse(outputDecoder.dataSet.contains(.pixelData))
+        XCTAssertEqual(outputDecoder.info(for: .modality), "SR")
+        XCTAssertEqual(outputDecoder.info(for: .sopInstanceUID), sopInstanceUID)
+    }
+
+    func testImplicitUnknownElementPreservesRawBytesDuringExplicitRewrite() throws {
+        let sopClassUID = "1.2.840.10008.5.1.4.1.1.88.11"
+        let sopInstanceUID = "2.25.18690001"
+        let privateTag = 0x0011_1010
+        let rawValue = Data([0x00, 0x01, 0xFF, 0x20])
+        let source = try DicomDataSetWriter.part10Data(
+            from: DicomDataSet(elements: [
+                DicomDataElement(tag: DicomTag.sopClassUID.rawValue, vr: .UI, value: .strings([sopClassUID])),
+                DicomDataElement(tag: DicomTag.sopInstanceUID.rawValue, vr: .UI, value: .strings([sopInstanceUID])),
+                DicomDataElement(tag: privateTag, vr: .OB, value: .bytes(rawValue))
+            ]),
+            options: DicomPart10WriterOptions(
+                transferSyntax: .implicitVRLittleEndian,
+                mediaStorageSOPClassUID: sopClassUID,
+                mediaStorageSOPInstanceUID: sopInstanceUID
+            )
+        )
+
+        let sourceElement = try XCTUnwrap(Self.open(source).dataSet.element(for: privateTag))
+        XCTAssertEqual(sourceElement.vr, .implicitRaw)
+        XCTAssertEqual(sourceElement.bytesValue, rawValue)
+
+        let output = try DicomTranscoder().transcode(source, to: .explicitVRLittleEndian)
+        let outputElement = try XCTUnwrap(Self.open(output).dataSet.element(for: privateTag))
+        XCTAssertEqual(outputElement.vr, .UN)
+        XCTAssertEqual(outputElement.bytesValue, rawValue)
     }
 
     func testCompressedPassThroughPreservesEncapsulatedBytes() throws {
@@ -140,6 +280,7 @@ final class DicomTranscoderTests: XCTestCase {
     }
 
     func testAsyncJLSwiftLosslessRouteEncapsulatesEveryFrame() async throws {
+        let environment = [DicomJLSwiftRolloutMode.environmentKey: "forced-for-tests"]
         let source = try Self.makeNative8BitFile(framePixels: [
             [1, 2, 3, 4],
             [250, 100, 50, 0]
@@ -148,7 +289,8 @@ final class DicomTranscoderTests: XCTestCase {
         let compressed = try await DicomTranscoder().transcode(
             source,
             to: .jpegLSLossless,
-            intent: .reversible
+            intent: .reversible,
+            environment: environment
         )
         let decoder = try Self.open(compressed)
         XCTAssertEqual(decoder.info(for: .transferSyntaxUID), DicomTransferSyntax.jpegLSLossless.rawValue)
@@ -157,7 +299,7 @@ final class DicomTranscoderTests: XCTestCase {
         let reader = DicomDecodedFrameReader(decoder: decoder)
         let expectedFrames: [[UInt8]] = [[1, 2, 3, 4], [250, 100, 50, 0]]
         for (index, expected) in expectedFrames.enumerated() {
-            let frame = try await reader.frame(at: index)
+            let frame = try await reader.frameExecution(at: index, environment: environment).frame
             guard case .gray8(let pixels) = frame.pixels else {
                 return XCTFail("Expected gray8 output for frame \(index)")
             }
@@ -166,6 +308,7 @@ final class DicomTranscoderTests: XCTestCase {
     }
 
     func testAsyncJLSwiftNearLosslessRoutePreservesBoundAndLossyMetadata() async throws {
+        let environment = [DicomJLSwiftRolloutMode.environmentKey: "forced-for-tests"]
         let near = 2
         let sourcePixels: [UInt8] = [10, 12, 50, 52]
         let source = try Self.makeNative8BitFile(framePixels: [sourcePixels])
@@ -174,7 +317,8 @@ final class DicomTranscoderTests: XCTestCase {
         let compressed = try await DicomTranscoder().transcode(
             source,
             to: .jpegLSNearLossless,
-            intent: .jpegLSNearLossless(near: near)
+            intent: .jpegLSNearLossless(near: near),
+            environment: environment
         )
         let decoder = try Self.open(compressed)
         XCTAssertEqual(decoder.info(for: .transferSyntaxUID), DicomTransferSyntax.jpegLSNearLossless.rawValue)
@@ -182,7 +326,9 @@ final class DicomTranscoderTests: XCTestCase {
         XCTAssertTrue(decoder.info(for: .lossyImageCompressionMethod).contains("ISO_14495_1"))
         XCTAssertNotEqual(decoder.info(for: .sopInstanceUID), sourceSOPInstanceUID)
 
-        let frame = try await DicomDecodedFrameReader(decoder: decoder).frame(at: 0)
+        let frame = try await DicomDecodedFrameReader(decoder: decoder)
+            .frameExecution(at: 0, environment: environment)
+            .frame
         guard case .gray8(let pixels) = frame.pixels else {
             return XCTFail("Expected gray8 near-lossless output")
         }
@@ -340,6 +486,24 @@ final class DicomTranscoderTests: XCTestCase {
 
     // MARK: - Unsupported routes stay typed
 
+    func test_unsupportedCompressionDiagnostic_namesExecutableCodecFamilies() throws {
+        let native = try Self.makeNativeFile(storedValues: [1, 2, 3, 4])
+        let decoder = try DCMDecoder(data: native)
+        XCTAssertThrowsError(try DicomTranscoder().resolveExecutionRoute(
+            decoder: decoder, source: .explicitVRLittleEndian, destination: .mpeg2MainProfileMainLevel,
+            intent: .reversible, environment: [:]
+        )) { error in
+            guard case DicomTranscoder.TranscodeError.routeUnsupported(_, _, let diagnostics) = error else {
+                return XCTFail("Expected an unsupported encoder route, got \(error)")
+            }
+            let message = diagnostics.joined(separator: " ")
+            for family in ["JPEG,", "JPEG-LS", "JPEG 2000/HTJ2K", "JPEG 2000 Part 2", "RLE", "JPEG XL"] {
+                XCTAssertTrue(message.contains(family))
+            }
+            XCTAssertFalse(message.contains("only executable lossless"))
+        }
+    }
+
     func testUnsupportedEncoderRoutesFailTypedBeforeOutput() throws {
         let native = try Self.makeNativeFile(storedValues: [1, 2, 3, 4])
         XCTAssertThrowsError(try DicomTranscoder().transcode(native, to: .jpeg2000Lossless)) { error in
@@ -363,7 +527,235 @@ final class DicomTranscoderTests: XCTestCase {
             guard case DicomTranscoder.TranscodeError.routeUnsupported(_, _, let diagnostics) = error else {
                 return XCTFail("expected routeUnsupported, got \(error)")
             }
-            XCTAssertTrue(diagnostics.joined().contains("Explicit VR Little Endian"))
+            XCTAssertTrue(diagnostics.joined().contains("native little-endian"))
+        }
+    }
+
+    func test_preflightAndExecution_shareRouteAndIntentRejections() async throws {
+        let native = try Self.makeNative8BitFile(framePixels: [[1, 2, 3, 4]])
+        let jpeg = try Self.makeJPEGBaselineFile()
+        let cases: [(Data, DicomTransferSyntax, DicomEncodingIntent, [String: String])] = [
+            (native, .jpegXLLossless, .reversible, ["DICOM_JXLSWIFT_MODE": "disabled"]),
+            (jpeg, .explicitVRBigEndian, .reversible, [:]),
+            (native, .jpegLSNearLossless, .irreversible(quality: 0.8), [:]),
+            (native, .jpeg2000Lossless, .jpegLSNearLossless(near: 2), [:]),
+            (jpeg, .jpegXLJPEGRecompression, .irreversible(quality: 0.8),
+             ["DICOM_JXLSWIFT_MODE": "experimental"])
+        ]
+        for (source, destination, intent, environment) in cases {
+            let preflight = try DicomTranscoder().preflight(
+                source, to: destination, intent: intent, environment: environment, verifyDecodedPixels: false
+            )
+            XCTAssertFalse(preflight.canExecute, destination.rawValue)
+            do {
+                _ = try await DicomTranscoder().transcode(
+                    source, to: destination, intent: intent, environment: environment
+                )
+                XCTFail("Expected rejection for \(destination.rawValue)")
+            } catch {
+                XCTAssertEqual(preflight.unavailableReason, error.localizedDescription, destination.rawValue)
+            }
+        }
+    }
+
+    func test_preferredHTJ2KWithoutOpenJPEG_usesTheOwnDecoder() async throws {
+        // #2330: the own HT decoder is qualified, so the absent OpenJPEG runtime no longer blocks HTJ2K decompression.
+        let native = try Self.makeNative8BitFile(framePixels: [[1, 2, 3, 4]])
+        let environment = [
+            "DICOM_J2KSWIFT_MODE": "preferred",
+            "DICOM_DECODER_OPENJPEG_LIBRARY_PATH": "/nonexistent/isis-2317-openjpeg.dylib"
+        ]
+        for syntax in [DicomTransferSyntax.htj2kLossless, .htj2kLosslessRPCL, .htj2k] {
+            let compressed = try await DicomTranscoder().transcode(
+                native, to: syntax, intent: .reversible, environment: environment
+            )
+            let preflight = try DicomTranscoder().preflight(
+                compressed, to: .explicitVRLittleEndian, environment: environment,
+                verifyDecodedPixels: false
+            )
+            XCTAssertTrue(preflight.canExecute, "\(syntax.rawValue): \(preflight.unavailableReason ?? "")")
+            let decompressed = try await DicomTranscoder().transcode(
+                compressed, to: .explicitVRLittleEndian, intent: .reversible, environment: environment
+            )
+            XCTAssertEqual(try Self.open(decompressed).getAllFrames()?.first?.data, Data([1, 2, 3, 4]), syntax.rawValue)
+        }
+    }
+
+    func test_preflightAllowsExplicitNearIntent_supportedByAsyncExecution() async throws {
+        let source = try Self.makeNative8BitFile(framePixels: [[10, 12, 50, 52]])
+        let environment = ["DICOM_JLSWIFT_MODE": "preferred"]
+        let intent = DicomEncodingIntent.jpegLSNearLossless(near: 2)
+        XCTAssertTrue(try DicomTranscoder().preflight(
+            source, to: .jpegLSNearLossless, intent: intent, environment: environment
+        ).canExecute)
+        let output = try await DicomTranscoder().transcode(
+            source, to: .jpegLSNearLossless, intent: intent, environment: environment
+        )
+        let decoder = try Self.open(output)
+        XCTAssertEqual(decoder.info(for: .lossyImageCompression), "01")
+        XCTAssertNotEqual(decoder.info(for: .sopInstanceUID), try Self.open(source).info(for: .sopInstanceUID))
+        let frame = try await DicomDecodedFrameReader(decoder: decoder).frameExecution(
+            at: 0, environment: environment
+        ).frame
+        guard case .gray8(let pixels) = frame.pixels else { return XCTFail("Expected grayscale pixels") }
+        for (actual, expected) in zip(pixels, [10, 12, 50, 52]) {
+            XCTAssertLessThanOrEqual(abs(Int(actual) - expected), 2)
+        }
+    }
+
+    func test_preflightWithoutOutputVerification_requiresTheSourceDecoderForRecompression() async throws {
+        let native = try Self.makeNative8BitFile(framePixels: [[1, 2, 3, 4]])
+        let source = try await DicomTranscoder().transcode(
+            native, to: .jpegXLLossless, intent: .reversible,
+            environment: ["DICOM_JXLSWIFT_MODE": "experimental"]
+        )
+        let disabled = ["DICOM_JXLSWIFT_MODE": "disabled", "DICOM_JLSWIFT_MODE": "preferred"]
+        let preflight = try DicomTranscoder().preflight(
+            source, to: .jpegLSLossless, environment: disabled, verifyDecodedPixels: false
+        )
+        XCTAssertFalse(preflight.canExecute)
+        do {
+            _ = try await DicomTranscoder().transcode(
+                source, to: .jpegLSLossless, intent: .reversible, environment: disabled
+            )
+            XCTFail("The disabled JPEG XL source decoder must prevent recompression")
+        } catch {
+            XCTAssertNotNil(error as? DicomTranscoder.TranscodeError)
+        }
+        let passThrough = try DicomTranscoder().preflight(
+            source, to: .jpegXLLossless, environment: disabled, verifyDecodedPixels: false
+        )
+        XCTAssertTrue(passThrough.canExecute, "Byte preservation does not require decoding")
+        let carried = try await DicomTranscoder().transcode(
+            source, to: .jpegXLLossless, intent: .reversible, environment: disabled
+        )
+        XCTAssertEqual(try Self.open(carried).makeEncapsulatedPixelFrameReader().frameData(at: 0),
+                       try Self.open(source).makeEncapsulatedPixelFrameReader().frameData(at: 0))
+    }
+
+    func test_preflightQualifiedLosslessFamilies_preservePixelsAndMetadata() async throws {
+        let source = try Self.makeNative8BitFile(framePixels: [[1, 2, 3, 4], [250, 100, 50, 0]])
+        let environment = [
+            "DICOM_JLSWIFT_MODE": "preferred", "DICOM_J2KSWIFT_MODE": "forced-for-tests",
+            "DICOM_JXLSWIFT_MODE": "experimental"
+        ]
+        let original = try Self.open(source)
+        for destination in [DicomTransferSyntax.jpegLSLossless, .jpeg2000Lossless, .jpegXLLossless] {
+            XCTAssertTrue(try DicomTranscoder().preflight(
+                source, to: destination, environment: environment
+            ).canExecute, destination.rawValue)
+            let encoded = try await DicomTranscoder().transcode(
+                source, to: destination, intent: .reversible, environment: environment
+            )
+            let decoded = try Self.open(try await DicomTranscoder().transcode(
+                encoded, to: .explicitVRLittleEndian, intent: .reversible, environment: environment
+            ))
+            XCTAssertEqual(decoded.info(for: .sopInstanceUID), original.info(for: .sopInstanceUID))
+            XCTAssertEqual(decoded.intValue(for: .numberOfFrames), 2)
+            XCTAssertEqual(decoded.dataSet[.pixelData]?.bytesValue, original.dataSet[.pixelData]?.bytesValue)
+        }
+    }
+
+    func test_syncAndAsyncNativeRoutes_preserveTheSamePixelsAndMetadata() async throws {
+        let native = try Self.makeNativeFile(storedValues: [-1000, -500, 0, 250])
+        let compressed = try Self.makeJPEGLosslessFile(storedValues: [100, 200, 300, 400])
+        for source in [native, compressed] {
+            let synchronous = try Self.open(DicomTranscoder().transcode(source, to: .explicitVRLittleEndian))
+            let asynchronous = try Self.open(try await DicomTranscoder().transcode(
+                source, to: .explicitVRLittleEndian, intent: .reversible, environment: [:]
+            ))
+            XCTAssertEqual(synchronous.dataSet[.pixelData]?.bytesValue, asynchronous.dataSet[.pixelData]?.bytesValue)
+            XCTAssertEqual(synchronous.info(for: .sopInstanceUID), asynchronous.info(for: .sopInstanceUID))
+            XCTAssertEqual(synchronous.info(for: .patientName), asynchronous.info(for: .patientName))
+        }
+    }
+
+    func test_syncAndAsyncDecompression_removeEncapsulatedOffsetTables() async throws {
+        let stored = [100, 200, 300, 400]
+        let decoder = try Self.open(Self.makeJPEGLosslessFile(storedValues: stored))
+        let frame = try decoder.makeEncapsulatedPixelFrameReader().frameData(at: 0)
+        let encapsulation = try DicomTranscoder.encapsulate(fragments: [frame], forceExtendedOffsets: true)
+        var dataSet = decoder.dataSet
+        dataSet.set(DicomDataElement(tag: DicomTag.pixelData.rawValue, vr: .OB,
+                                     value: .bytes(encapsulation.pixelData)))
+        dataSet.set(DicomDataElement(tag: DicomTag.extendedOffsetTable.rawValue, vr: .OV,
+                                     value: .bytes(try XCTUnwrap(encapsulation.extendedOffsetTable))))
+        dataSet.set(DicomDataElement(tag: DicomTag.extendedOffsetTableLengths.rawValue, vr: .OV,
+                                     value: .bytes(try XCTUnwrap(encapsulation.extendedOffsetTableLengths))))
+        let source = try DicomDataSetWriter.part10Data(
+            from: dataSet, options: .init(transferSyntax: .jpegLosslessFirstOrder)
+        )
+        let synchronous = try DicomTranscoder().transcode(source, to: .explicitVRLittleEndian)
+        let asynchronous = try await DicomTranscoder().transcode(
+            source, to: .explicitVRLittleEndian, intent: .reversible, environment: [:]
+        )
+        for (name, output) in [("sync", synchronous), ("async", asynchronous)] {
+            let result = try Self.open(output)
+            XCTAssertFalse(result.dataSet.contains(.extendedOffsetTable), name)
+            XCTAssertFalse(result.dataSet.contains(.extendedOffsetTableLengths), name)
+            XCTAssertEqual(try XCTUnwrap(result.getPixels16()).map(Int.init), stored, name)
+        }
+    }
+
+    func test_preflightAndDecompression_agreeAcrossJPEGLSRolloutModes() async throws {
+        let pixels: [UInt8] = [1, 2, 3, 4]
+        let native = try Self.makeNative8BitFile(framePixels: [pixels])
+        let source = try await DicomTranscoder().transcode(
+            native, to: .jpegLSLossless, intent: .reversible, environment: ["DICOM_JLSWIFT_MODE": "preferred"]
+        )
+        for mode in ["disabled", "shadow", "preferred", "forced-for-tests"] {
+            let environment = [
+                "DICOM_JLSWIFT_MODE": mode,
+                "DICOM_DECODER_CHARLS_LIBRARY_PATH": "/nonexistent/libcharls.dylib"
+            ]
+            let expected = mode == "preferred" || mode == "forced-for-tests"
+            let preflight = try DicomTranscoder().preflight(
+                source, to: .explicitVRLittleEndian, environment: environment, verifyDecodedPixels: false
+            )
+            XCTAssertEqual(preflight.canExecute, expected, mode)
+            do {
+                let output = try await DicomTranscoder().transcode(
+                    source, to: .explicitVRLittleEndian, intent: .reversible, environment: environment
+                )
+                XCTAssertTrue(expected, mode)
+                XCTAssertEqual(try Self.open(output).getPixels8(), pixels, mode)
+            } catch {
+                XCTAssertFalse(expected, mode)
+                XCTAssertNotNil(error as? DicomTranscoder.TranscodeError)
+            }
+        }
+    }
+
+    func test_syncAndAsyncColorDecompression_writeRGBMetadataForDecodedPixels() async throws {
+        let pixels = Data([UInt8(255), 0, 0, 0, 255, 0, 0, 0, 255, 100, 150, 200])
+        let provider = try XCTUnwrap(CGDataProvider(data: pixels as CFData))
+        let image = try XCTUnwrap(CGImage(
+            width: 2, height: 2, bitsPerComponent: 8, bitsPerPixel: 24, bytesPerRow: 6,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
+            provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent
+        ))
+        let jpeg = NSMutableData()
+        let writer = try XCTUnwrap(CGImageDestinationCreateWithData(jpeg, "public.jpeg" as CFString, 1, nil))
+        CGImageDestinationAddImage(writer, image, [kCGImageDestinationLossyCompressionQuality: 1.0] as CFDictionary)
+        XCTAssertTrue(CGImageDestinationFinalize(writer))
+        let dataSet = EncapsulatedFixtureFactory.makeDataSet(
+            transferSyntax: .jpegBaseline, fragments: [jpeg as Data], declaredFrames: 1,
+            rows: 2, columns: 2, bitsAllocated: 8, bitsStored: 8, highBit: 7,
+            samplesPerPixel: 3, photometricInterpretation: "YBR_FULL_422", pixelRepresentation: 0
+        )
+        let source = try DicomDataSetWriter.part10Data(from: dataSet, options: .init(transferSyntax: .jpegBaseline))
+        let decoder = try Self.open(source)
+        let frame = try await DicomDecodedFrameReader(decoder: decoder).frame(at: 0)
+        guard case .rgb8(let expected) = frame.pixels else { return XCTFail("Expected decoded RGB") }
+        let synchronous = try DicomTranscoder().transcode(source, to: .explicitVRLittleEndian)
+        let asynchronous = try await DicomTranscoder().transcode(
+            source, to: .explicitVRLittleEndian, intent: .reversible, environment: [:]
+        )
+        for (name, output) in [("sync", synchronous), ("async", asynchronous)] {
+            let result = try Self.open(output)
+            XCTAssertEqual(result.photometricInterpretation, "RGB", name)
+            XCTAssertEqual(result.intValue(for: .planarConfiguration), 0, name)
+            XCTAssertEqual(try result.displayRGBPixelBuffer(frame: 0).rgbData, Data(expected), name)
         }
     }
 

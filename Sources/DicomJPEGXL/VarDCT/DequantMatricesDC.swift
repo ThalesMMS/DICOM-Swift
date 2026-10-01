@@ -1,0 +1,242 @@
+// DequantMatricesDC — VarDCT's DC-coefficient dequantisers.
+//
+// One float per channel (3 total). Multiplies the integer DC
+// value out of the modular sub-image by the per-channel
+// `dc_quant` scale to produce a float DC amplitude. Bitstream:
+// 1-bit `all_default` flag, then 3 `F16` floats if not default.
+//
+// Spec: ISO/IEC 18181-1 §K.7.3. libjxl: `lib/jxl/quant_weights.cc::
+// DequantMatrices::DecodeDC`.
+//
+// **Status**: parser-only. The full DequantMatrices.Decode (the
+// AC quant matrices) is the much larger sibling that comes after.
+
+import Foundation
+
+package struct DequantMatricesDC: Sendable {
+    /// Per-channel DC quant scale. libjxl multiplies the F16 read
+    /// value by `1.0f / 128.0f`; the default values are
+    /// `[1.0/128, 1.0/128, 1.0/128]` (no per-channel adjustment).
+    package var dcQuant: (Float, Float, Float)
+
+    /// libjxl `kDCQuant`: 1/4096, 1/512, 1/256 (`quant_weights.h`).
+    package static let defaultDcQuant: (Float, Float, Float) = (1.0 / 4096.0, 1.0 / 512.0, 1.0 / 256.0)
+
+    package init(dcQuant: (Float, Float, Float) = DequantMatricesDC.defaultDcQuant) {
+        self.dcQuant = dcQuant
+    }
+
+    /// Reciprocals — what callers actually multiply by during DC
+    /// dequantisation. Cached so `[Float]` and `[Float]` aren't
+    /// computed per-pixel.
+    package var invDcQuant: (Float, Float, Float) {
+        return (1.0 / dcQuant.0, 1.0 / dcQuant.1, 1.0 / dcQuant.2)
+    }
+
+    /// Construct a `DequantMatricesDC` for the JPEG → JXL
+    /// coefficient bridge from the per-channel DC dequant scales
+    /// that v0.12.0m's `buildJXLBridgeRAWQuantPayload` computed.
+    /// Each scale is `255 × 8 / qt[0]` per JXL channel — the
+    /// inverse of the JPEG DC quant factor in the same
+    /// `(255 × 8)` scale the existing decoder formula expects.
+    ///
+    /// **Status (v0.12.0x → v0.12.0fo).** Foundation helper for
+    /// the bridge LfGlobal writer.
+    ///
+    /// **v0.12.0fo fix**: libjxl `quant_weights.h::SetDCQuant`
+    /// **inverts** the input `dcquantization` value before storing
+    /// in `dc_quant_[c]`:
+    ///
+    /// ```cpp
+    /// dc_quant_[c] = 1.0f / dc[c];        // dc[c] = 255 * 8 / qt[0]
+    /// inv_dc_quant_[c] = dc[c];
+    /// ```
+    ///
+    /// The `DequantMatricesDC` struct's `dcQuant.c` field models
+    /// libjxl's internal `dc_quant_[c]` (the field that gets
+    /// F16-encoded as `dc_quant_[c] * 128`). So `jpegBridgeScales:`
+    /// applies the same inversion: stores `1 / dcQuantization[c]`,
+    /// not the value as-is. Without the inversion the F16 storage
+    /// is ~58 000× too large for typical `qt[0]` values, sending
+    /// the DC dequant cascade into saturation (every decoded
+    /// pixel becomes 0xFF saturated white for any non-zero DC).
+    package init(jpegBridgeScales dcQuantization: [Float]) {
+        precondition(dcQuantization.count == 3,
+            "DequantMatricesDC(jpegBridgeScales:): need 3 entries")
+        self.dcQuant = (
+            1.0 / dcQuantization[0],
+            1.0 / dcQuantization[1],
+            1.0 / dcQuantization[2])
+    }
+
+    package static func read(from r: inout BitReader) throws -> DequantMatricesDC {
+        let allDefault: Bool
+        do { allDefault = try r.readBit() }
+        catch let e as BitstreamError {
+            throw DequantMatricesDCError.bitstream(e)
+        }
+        if allDefault {
+            return DequantMatricesDC()
+        }
+        var values: (Float, Float, Float) = (0, 0, 0)
+        for c in 0..<3 {
+            let bits16: UInt32
+            do { bits16 = try r.read(bits: 16) }
+            catch let e as BitstreamError {
+                throw DequantMatricesDCError.bitstream(e)
+            }
+            let f = halfToFloat(UInt16(bits16)) * (1.0 / 128.0)
+            // libjxl rejects subnormal/zero: dc_quant must be > kAlmostZero.
+            guard f > 1e-8 else {
+                throw DequantMatricesDCError.invalidDcQuant(c, value: f)
+            }
+            switch c {
+            case 0: values.0 = f
+            case 1: values.1 = f
+            default: values.2 = f
+            }
+        }
+        return DequantMatricesDC(dcQuant: values)
+    }
+
+    /// Write the spec's 1-bit `all_default` flag + (if not
+    /// default) 3 F16 DC quant scales — inverse of `read(from:)`.
+    /// Inverts the `f * (1.0 / 128.0)` the reader applies, so
+    /// the stored F16 carries `dcQuant_c * 128`.
+    ///
+    /// Default detection: emits the all-default path iff all
+    /// three `dcQuant` components match the spec default of
+    /// `1/128`. The bridge constructs non-default values via
+    /// `init(jpegBridgeScales:)`, so it always hits the F16
+    /// branch.
+    package func write(to w: inout BitWriter) {
+        let eps: Float = 1e-9
+        let allDefault =
+            abs(dcQuant.0 - Self.defaultDcQuant.0) < eps
+            && abs(dcQuant.1 - Self.defaultDcQuant.1) < eps
+            && abs(dcQuant.2 - Self.defaultDcQuant.2) < eps
+        w.writeBit(allDefault)
+        if allDefault { return }
+        // Stored F16 = dcQuant * 128 (inverts reader's × 1/128).
+        let storedC0 = floatToHalf(dcQuant.0 * 128.0)
+        let storedC1 = floatToHalf(dcQuant.1 * 128.0)
+        let storedC2 = floatToHalf(dcQuant.2 * 128.0)
+        w.write(bits: 16, value: UInt32(storedC0))
+        w.write(bits: 16, value: UInt32(storedC1))
+        w.write(bits: 16, value: UInt32(storedC2))
+    }
+}
+
+package enum DequantMatricesDCError: Error, Sendable {
+    case bitstream(BitstreamError)
+    case invalidDcQuant(Int, value: Float)
+}
+
+/// `DequantMatrices.Decode` — the AC quant matrices for all 17
+/// strategies. libjxl reads a 1-bit `all_default` flag; when set,
+/// every strategy uses its `QuantEncoding::Library<0>()` predefined
+/// table (the spec-default parametric distance bands lifted in
+/// `DefaultQuantBands`). When clear, 17 sequential `QuantEncoding`
+/// blobs follow, each with one of 8 quant modes — the dominant
+/// piece of section-0 bitstream complexity.
+///
+/// **Status**: all-default reader + `notDefault` throw for the
+/// long-form path, plus a full reader (v0.12.0gs) that loops over
+/// 17 quant tables and reads per-slot `QuantEncoding` entries when
+/// the `all_default` bit is 0.
+package enum DequantMatricesAC {
+
+    /// Number of quant tables in the JXL spec (DCT, ID, DCT2x2, …,
+    /// DCT128X256 = 17). libjxl `quant_weights.h`:
+    /// `kNumQuantTables == 17`.
+    package static let kNumQuantTables: Int = 17
+
+    /// Per-slot required size in BLOCKS (libjxl `quant_weights.h:
+    /// required_size_x`). Multiply by 8 to get pixel dimensions.
+    package static let requiredSizeXBlocks: [Int] = [
+        1, 1, 1, 1, 2, 4, 1, 1, 2, 1, 1, 8, 4, 16, 8, 32, 16,
+    ]
+    package static let requiredSizeYBlocks: [Int] = [
+        1, 1, 1, 1, 2, 4, 2, 4, 4, 1, 1, 8, 8, 16, 16, 32, 32,
+    ]
+
+    /// Read the 1-bit `all_default` flag. Returns `true` if every
+    /// AC strategy uses its library default; throws `notDefault`
+    /// otherwise.
+    package static func readDefaultOrThrow(
+        from r: inout BitReader
+    ) throws -> Bool {
+        let allDefault: Bool
+        do { allDefault = try r.readBit() }
+        catch let e as BitstreamError {
+            throw DequantMatricesACError.bitstream(e)
+        }
+        if allDefault { return true }
+        throw DequantMatricesACError.notDefault
+    }
+
+    /// Read the full DequantMatrices section: 1-bit `all_default`
+    /// flag, then 17 per-slot `QuantEncoding` entries when the
+    /// flag is 0. Returns `(allDefault, encodings)` where
+    /// `encodings.count == 17` either way (defaults to library
+    /// when `allDefault == true`).
+    ///
+    /// `globalTree`/`globalPostHeader`/`globalPostCodebook` are
+    /// the LfGlobal modular state, needed for slot entries that
+    /// use `kQuantModeRAW` (their quant matrix lives in a modular
+    /// sub-image).
+    package static func read(
+        from r: inout BitReader,
+        globalTree: ModularTree? = nil,
+        globalPostHeader: EntropySectionHeader? = nil,
+        globalPostCodebook: MultiClusterCodebook? = nil,
+        numDcGroups: Int = 0
+    ) throws -> (allDefault: Bool, encodings: [QuantEncoding]) {
+        let allDefault: Bool
+        do { allDefault = try r.readBit() }
+        catch let e as BitstreamError {
+            throw DequantMatricesACError.bitstream(e)
+        }
+        if allDefault {
+            // Library defaults everywhere — caller derives the
+            // dequant matrices from the spec's library tables.
+            let libDefault = QuantEncoding(
+                mode: .library, predefined: 0,
+                idWeights: nil, dct2Weights: nil,
+                dct4Multipliers: nil, dct4x8Multipliers: nil,
+                afvWeights: nil,
+                dctParams: nil, dctParamsAfv4x4: nil)
+            return (true, Array(
+                repeating: libDefault, count: kNumQuantTables))
+        }
+        // Non-default — loop 17 times reading per-slot encodings.
+        var encodings: [QuantEncoding] = []
+        encodings.reserveCapacity(kNumQuantTables)
+        for i in 0..<kNumQuantTables {
+            let xBlocks = requiredSizeXBlocks[i]
+            let yBlocks = requiredSizeYBlocks[i]
+            do {
+                let enc = try QuantEncoding.read(
+                    from: &r,
+                    requiredSizeX: xBlocks * 8,
+                    requiredSizeY: yBlocks * 8,
+                    globalTree: globalTree,
+                    globalPostHeader: globalPostHeader,
+                    globalPostCodebook: globalPostCodebook,
+                    slotIndex: i,
+                    numDcGroups: numDcGroups)
+                encodings.append(enc)
+            } catch let e as QuantEncodingError {
+                throw DequantMatricesACError.perSlotRead(
+                    slot: i, error: e)
+            }
+        }
+        return (false, encodings)
+    }
+}
+
+package enum DequantMatricesACError: Error, Sendable {
+    case bitstream(BitstreamError)
+    case notDefault
+    case perSlotRead(slot: Int, error: QuantEncodingError)
+}

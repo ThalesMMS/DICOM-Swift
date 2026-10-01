@@ -1,3 +1,5 @@
+import Dispatch
+import os
 import XCTest
 import DicomTestSupport
 @testable import DicomCore
@@ -8,11 +10,77 @@ import DicomTestSupport
 @available(*, deprecated)
 final class DCMDecoderAsyncTests: XCTestCase {
 
+    func testThrowingOperationCancelledDuringSynchronousWorkDoesNotPublishLateResult() async {
+        let started = OSAllocatedUnfairLock(initialState: false)
+        let release = DispatchSemaphore(value: 0)
+        let task = Task {
+            try await DCMDecoderAsyncOperation.perform(priority: .userInitiated) {
+                started.withLock { $0 = true }
+                release.wait()
+                return 42
+            }
+        }
+        let didStart = await waitForOperationToStart(started)
+        guard didStart else {
+            task.cancel()
+            release.signal()
+            XCTFail("The synchronous operation did not start")
+            return
+        }
+
+        task.cancel()
+        release.signal()
+
+        do {
+            _ = try await task.value
+            XCTFail("A cancelled operation should not publish its completed value")
+        } catch is CancellationError {
+            // Expected cooperative cancellation after synchronous work.
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+    }
+
+    func testNonThrowingOperationCancelledDuringSynchronousWorkReturnsCancellationValue() async {
+        let started = OSAllocatedUnfairLock(initialState: false)
+        let release = DispatchSemaphore(value: 0)
+        let task = Task {
+            await DCMDecoderAsyncOperation.perform(priority: .userInitiated, cancellationValue: -1) {
+                started.withLock { $0 = true }
+                release.wait()
+                return 42
+            }
+        }
+        let didStart = await waitForOperationToStart(started)
+        guard didStart else {
+            task.cancel()
+            release.signal()
+            XCTFail("The synchronous operation did not start")
+            return
+        }
+
+        task.cancel()
+        release.signal()
+
+        let value = await task.value
+        XCTAssertEqual(value, -1)
+    }
+
+    private func waitForOperationToStart(_ started: OSAllocatedUnfairLock<Bool>) async -> Bool {
+        for _ in 0..<200 {
+            if started.withLock({ $0 }) {
+                return true
+            }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return started.withLock { $0 }
+    }
+
     // MARK: - Test Setup
 
     /// Get path to fixtures directory
     private func getFixturesPath() -> URL {
-        return URL(fileURLWithPath: #file)
+        return URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .appendingPathComponent("Fixtures")
     }
@@ -251,6 +319,22 @@ final class DCMDecoderAsyncTests: XCTestCase {
 
         XCTAssertTrue(success, "Async file loading should succeed")
         XCTAssertTrue(decoder.dicomFileReadSuccess, "Decoder should have file read success")
+    }
+
+    func testLoadDICOMFileAsyncReturnsFalseWhenCallerIsAlreadyCancelled() async throws {
+        let url = try getSingleTestFileURL()
+        let decoder = DCMDecoder()
+        let task = Task {
+            withUnsafeCurrentTask { currentTask in
+                currentTask?.cancel()
+            }
+            return await decoder.loadDICOMFileAsync(url.path)
+        }
+
+        let success = await task.value
+
+        XCTAssertFalse(success)
+        XCTAssertFalse(decoder.dicomFileReadSuccess)
     }
 
     func testGetDownsampledPixels16Async() async throws {

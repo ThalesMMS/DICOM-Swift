@@ -1,0 +1,38 @@
+{
+  "repository": "https://github.com/Raster-Lab/J2KSwift",
+  "commit": "b1949084eeedaafb40bff8f1745bbab19e4bc36d",
+  "license": "MIT",
+  "purpose": "Pinned upstream codestreams and Kakadu reference pixels for quality-layer regression tests; no DICOM patient metadata.",
+  "files": [
+    {
+      "file": "ct512_L2.j2k",
+      "upstreamPath": "Tests/Fixtures/MultiLayer/ct512_L2.j2k",
+      "sha256": "07af94ddfe2eeb1cae0f76834d42460c6f285ba5dd7195430054063001bcf865",
+      "bytes": 150324
+    },
+    {
+      "file": "ct512_L4.j2k",
+      "upstreamPath": "Tests/Fixtures/MultiLayer/ct512_L4.j2k",
+      "sha256": "de142753c3e9bdf8972b4d64755488420bd379b5a946fdc715d0fe0658d08d33",
+      "bytes": 150563
+    },
+    {
+      "file": "ct512_L4_kdu_layers1.pgm",
+      "upstreamPath": "Tests/Fixtures/MultiLayer/ct512_L4_kdu_layers1.pgm",
+      "sha256": "172b5618f86d04e7763c1112aeb993d80f9474aba6ab3ae4bc3e0ebe596000b9",
+      "bytes": 524305
+    },
+    {
+      "file": "ct512_L4_kdu_layers2.pgm",
+      "upstreamPath": "Tests/Fixtures/MultiLayer/ct512_L4_kdu_layers2.pgm",
+      "sha256": "6614f0f811950fe4f27d2bc24d8620b2d029722347714aac10e652bb32293847",
+      "bytes": 524305
+    },
+    {
+      "file": "ct512_L4_kdu_layers3.pgm",
+      "upstreamPath": "Tests/Fixtures/MultiLayer/ct512_L4_kdu_layers3.pgm",
+      "sha256": "640bc92ae34f3924f3cba709ff5a6cefb65372f515ff562580b5aeaec720916f",
+      "bytes": 524305
+    }
+  ]
+}

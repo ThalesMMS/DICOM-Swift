@@ -447,8 +447,11 @@ final class DCMPixelReaderPerformanceTests: XCTestCase {
 
             totalTime += CFAbsoluteTimeGetCurrent() - start
 
-            XCTAssertNotNil(result)
-            XCTAssertEqual(result?.pixels16?.count, pixelsToRead)
+            guard let result else {
+                XCTFail("Streaming read should return a result")
+                return
+            }
+            XCTAssertEqual(result.pixels16?.count, pixelsToRead)
         }
 
         let avgTime = (totalTime / Double(iterations)) * 1000
@@ -552,10 +555,10 @@ final class DCMPixelReaderPerformanceTests: XCTestCase {
         XCTAssertEqual(stats.totalAcquires, 0, "Combined signed 16-bit reads should not acquire pooled buffers")
     }
 
-    // MARK: - Memory Efficiency Tests
+    // MARK: - Repeated Read Tests
 
-    /// Tests memory efficiency and validates no memory leaks in pixel reading.
-    func testMemoryEfficiency() {
+    /// Verifies repeated large pixel reads keep returning complete buffers.
+    func test_repeatedLargeReads_returnCompleteBuffers() {
         let width = largeWidth
         let height = largeHeight
         let numPixels = width * height
@@ -570,7 +573,7 @@ final class DCMPixelReaderPerformanceTests: XCTestCase {
             }
         }
 
-        // Perform multiple allocations to detect memory leaks
+        // Perform multiple allocations to cover repeated buffer creation and release.
         let iterations = 50
         for _ in 0..<iterations {
             let result = DCMPixelReader.readPixels(
@@ -591,65 +594,11 @@ final class DCMPixelReaderPerformanceTests: XCTestCase {
 
         print("""
 
-        ========== Memory Efficiency Test ==========
+        ========== Repeated Large Reads ==========
         Completed \(iterations) iterations of \(numPixels / 1_000_000)M pixel allocations
-        No memory leaks detected (test would fail/timeout if leaking)
         ============================================
 
         """)
 
-        XCTAssertTrue(true, "Memory efficiency test completed")
-    }
-
-    // MARK: - Performance Impact Documentation
-
-    /// Documents the performance improvements from vectorization.
-    ///
-    /// OPTIMIZATION SUMMARY:
-    /// 1. Big Endian Conversion: Uses Swift's byteSwapped which compiles to hardware byte-swap instructions
-    /// 2. Signed Normalization: Uses vDSP_vflt16, vDSP_vsadd, vDSP_vclip, vDSP_vfixu16 for SIMD processing
-    /// 3. MONOCHROME1 Inversion: Uses vDSP_vneg, vDSP_vsadd, vDSP_vclip for vectorized inversion
-    /// 4. Unaligned Copy: Uses memcpy which is optimized for both aligned and unaligned access
-    ///
-    /// EXPECTED SPEEDUP:
-    /// - Big endian: 3-8x faster than byte-by-byte loops
-    /// - Signed normalization: 4-8x faster than scalar pixel-by-pixel conversion
-    /// - MONOCHROME1 inversion: 4-8x faster than scalar loops
-    /// - Memory copy operations: Near-optimal performance using system-optimized memcpy
-    ///
-    /// SIMD VECTORIZATION:
-    /// - Modern CPUs process 4-8 pixels per cycle using SIMD (vs 1 for scalar)
-    /// - Medical images (2048x2048 = 4M pixels) benefit significantly
-    /// - Typical improvement: milliseconds saved per image (important for series loading)
-    func testPerformanceImpactDocumentation() {
-        print("""
-
-        ========== Vectorization Performance Impact ==========
-        Optimizations Implemented:
-        1. Big Endian: byteSwapped (hardware instructions)
-        2. Signed Normalization: vDSP (SIMD operations)
-        3. MONOCHROME1 Inversion: vDSP (SIMD operations)
-        4. Memory Copy: memcpy (system-optimized)
-
-        Expected Performance:
-        - Standard (512x512): <10ms per image
-        - Large (2048x2048): <100ms per image
-        - Streaming reads: <50ms for 2M pixels
-
-        SIMD Benefits:
-        - 4-8 pixels processed per CPU cycle
-        - Significant speedup for large medical images
-        - Reduced series loading time for CT/MR studies
-
-        Acceptance Criteria: ✓ MET
-        - Big endian conversion: 3-8x speedup
-        - Signed normalization: 4-8x speedup
-        - MONOCHROME1 inversion: 4-8x speedup
-        - All existing tests pass
-        =======================================================
-
-        """)
-
-        XCTAssertTrue(true, "Performance impact documentation complete")
     }
 }

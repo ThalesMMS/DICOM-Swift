@@ -109,7 +109,8 @@ internal final class PaletteTagHandler: TagHandler {
         case Tag.redPaletteDescriptor.rawValue,
              Tag.greenPaletteDescriptor.rawValue,
              Tag.bluePaletteDescriptor.rawValue:
-            let descriptor = readDescriptor(reader: reader, length: elementLength, location: &location)
+            let signed = parser.currentVR == .SS || (parser.currentVR == .implicitRaw && context.pixelRepresentation == 1)
+            let descriptor = readDescriptor(reader: reader, length: elementLength, signed: signed, location: &location)
             switch tag {
             case Tag.redPaletteDescriptor.rawValue:
                 context.redPaletteDescriptor = descriptor
@@ -149,6 +150,29 @@ internal final class PaletteTagHandler: TagHandler {
                 }
             }
 
+        case Tag.segmentedRedPalette.rawValue,
+             Tag.segmentedGreenPalette.rawValue,
+             Tag.segmentedBluePalette.rawValue:
+            let plainTag = tag - 0x20
+            let descriptor = descriptor(for: plainTag, context: context)
+            let start = location
+            defer { location = start + elementLength }
+            guard let descriptor, elementLength.isMultiple(of: 2) else { return true }
+            // Each supported segment emits entries using at most four words per output entry.
+            guard elementLength / 2 <= descriptor.entryCount * 4 else { return true }
+            let words = (0..<(elementLength / 2)).map { _ in reader.readShort(location: &location) }
+            guard let expanded = try? DicomSegmentedPaletteExpander.expand(
+                words: words, entryCount: descriptor.entryCount
+            ) else { return true }
+            let table = expanded.map { descriptor.bitsPerEntry <= 8 ? UInt8(truncatingIfNeeded: $0) : UInt8($0 >> 8) }
+            switch tag {
+            case Tag.segmentedRedPalette.rawValue: context.reds = table
+            case Tag.segmentedGreenPalette.rawValue: context.greens = table
+            case Tag.segmentedBluePalette.rawValue: context.blues = table
+            default: break
+            }
+            addInfoInt(tag, table.count)
+
         default:
             location += elementLength
         }
@@ -159,6 +183,7 @@ internal final class PaletteTagHandler: TagHandler {
     private func readDescriptor(
         reader: DCMBinaryReader,
         length: Int,
+        signed: Bool,
         location: inout Int
     ) -> DicomLUTDescriptor? {
         guard length >= 6 else {
@@ -168,7 +193,8 @@ internal final class PaletteTagHandler: TagHandler {
 
         let start = location
         let storedEntryCount = Int(reader.readShort(location: &location))
-        let firstMappedValue = Int(reader.readShort(location: &location))
+        let firstMappedWord = reader.readShort(location: &location)
+        let firstMappedValue = signed ? Int(Int16(bitPattern: firstMappedWord)) : Int(firstMappedWord)
         let bitsPerEntry = Int(reader.readShort(location: &location))
         if length > location - start {
             location += length - (location - start)

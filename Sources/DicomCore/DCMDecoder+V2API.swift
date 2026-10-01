@@ -28,8 +28,6 @@ extension DCMDecoder {
         return RescaleParameters(intercept: parameters.intercept, slope: parameters.slope)
     }
 
-    /// Applies rescale slope and intercept to a pixel value
-    /// - Parameter pixelValue: Raw pixel value
     /// Apply DICOM rescale slope and intercept to a raw pixel value.
     /// - Parameter pixelValue: The input pixel sample value before rescale.
     /// - Returns: The rescaled pixel value computed as `rescaleSlope * pixelValue + rescaleIntercept`.

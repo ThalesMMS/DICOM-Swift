@@ -1,0 +1,9501 @@
+{
+ "attributes": [
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Affected SOP Instance UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00001000"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": false,
+   "name": "Requested SOP Instance UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00001001"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": false,
+   "name": "Media Storage SOP Instance UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00020003"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": false,
+   "name": "Referenced SOP Instance UID in File",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00041511"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "Instance Creation Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00080012"
+  },
+  {
+   "basic": "X/Z/D",
+   "inStandardIOD": true,
+   "name": "Instance Creation Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00080013"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Instance Creator UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00080014"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Instance Coercion DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00080015"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Acquisition UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00080017"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "SOP Instance UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00080018"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Pyramid UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00080019"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Study Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00080020"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "Series Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00080021"
+  },
+  {
+   "basic": "X/Z",
+   "inStandardIOD": true,
+   "name": "Acquisition Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00080022"
+  },
+  {
+   "basic": "Z/D",
+   "inStandardIOD": true,
+   "name": "Content Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00080023"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Overlay Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "00080024"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Curve Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "00080025"
+  },
+  {
+   "basic": "X/Z/D",
+   "inStandardIOD": true,
+   "name": "Acquisition DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0008002A"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Study Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00080030"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "Series Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00080031"
+  },
+  {
+   "basic": "X/Z",
+   "inStandardIOD": true,
+   "name": "Acquisition Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00080032"
+  },
+  {
+   "basic": "Z/D",
+   "inStandardIOD": true,
+   "name": "Content Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00080033"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Overlay Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "00080034"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Curve Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "00080035"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Accession Number",
+   "retired": false,
+   "tag": "00080050"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Retrieve AE Title",
+   "options": {
+    "retainDeviceIdentity": "C"
+   },
+   "retired": false,
+   "tag": "00080054"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Station AE Title",
+   "options": {
+    "retainDeviceIdentity": "C"
+   },
+   "retired": false,
+   "tag": "00080055"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": false,
+   "name": "Failed SOP Instance UID List",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00080058"
+  },
+  {
+   "basic": "X/Z/D",
+   "inStandardIOD": true,
+   "name": "Institution Name",
+   "options": {
+    "retainInstitutionIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00080080"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Institution Address",
+   "options": {
+    "retainInstitutionIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00080081"
+  },
+  {
+   "basic": "X/Z/D",
+   "inStandardIOD": true,
+   "name": "Institution Code Sequence",
+   "options": {
+    "retainInstitutionIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00080082"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Referring Physician's Name",
+   "retired": false,
+   "tag": "00080090"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Referring Physician's Address",
+   "retired": false,
+   "tag": "00080092"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Referring Physician's Telephone Numbers",
+   "retired": false,
+   "tag": "00080094"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Referring Physician Identification Sequence",
+   "retired": false,
+   "tag": "00080096"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Consulting Physician's Name",
+   "retired": false,
+   "tag": "0008009C"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Consulting Physician Identification Sequence",
+   "retired": false,
+   "tag": "0008009D"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Context Group Version",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00080106"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Context Group Local Version",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00080107"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Timezone Offset From UTC",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00080201"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Network ID",
+   "options": {
+    "retainDeviceIdentity": "C"
+   },
+   "retired": true,
+   "tag": "00081000"
+  },
+  {
+   "basic": "X/Z/D",
+   "inStandardIOD": true,
+   "name": "Station Name",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00081010"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Study Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00081030"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Series Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "0008103E"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Institutional Department Name",
+   "options": {
+    "retainInstitutionIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00081040"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Institutional Department Type Code Sequence",
+   "options": {
+    "retainInstitutionIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00081041"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Physician(s) of Record",
+   "retired": false,
+   "tag": "00081048"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Physician(s) of Record Identification Sequence",
+   "retired": false,
+   "tag": "00081049"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Performing Physician's Name",
+   "retired": false,
+   "tag": "00081050"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Performing Physician Identification Sequence",
+   "retired": false,
+   "tag": "00081052"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Name of Physician(s) Reading Study",
+   "retired": false,
+   "tag": "00081060"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Physician(s) Reading Study Identification Sequence",
+   "retired": false,
+   "tag": "00081062"
+  },
+  {
+   "basic": "X/Z/D",
+   "inStandardIOD": true,
+   "name": "Operators' Name",
+   "retired": false,
+   "tag": "00081070"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "Operator Identification Sequence",
+   "retired": false,
+   "tag": "00081072"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Admitting Diagnoses Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00081080"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Admitting Diagnoses Code Sequence",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00081084"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Pyramid Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00081088"
+  },
+  {
+   "basic": "X/Z",
+   "inStandardIOD": true,
+   "name": "Referenced Study Sequence",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00081110"
+  },
+  {
+   "basic": "X/Z/D",
+   "inStandardIOD": true,
+   "name": "Referenced Performed Procedure Step Sequence",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00081111"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Referenced Patient Sequence",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00081120"
+  },
+  {
+   "basic": "X/Z/U*",
+   "inStandardIOD": true,
+   "name": "Referenced Image Sequence",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00081140"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Referenced SOP Instance UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00081155"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": false,
+   "name": "Transaction UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00081195"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Principal Diagnosis Code Sequence",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00081301"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Primary Diagnosis Code Sequence",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00081302"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Secondary Diagnoses Code Sequence",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00081303"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Histological Diagnoses Code Sequence",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00081304"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Derivation Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00082111"
+  },
+  {
+   "basic": "X/Z/U*",
+   "inStandardIOD": true,
+   "name": "Source Image Sequence",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00082112"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Irradiation Event UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00083010"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Identifying Comments",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": true,
+   "tag": "00084000"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Patient's Name",
+   "retired": false,
+   "tag": "00100010"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Person Names to Use Sequence",
+   "retired": false,
+   "tag": "00100011"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Name to Use",
+   "retired": false,
+   "tag": "00100012"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Name to Use Comment",
+   "retired": false,
+   "tag": "00100013"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Third Person Pronouns Sequence",
+   "retired": false,
+   "tag": "00100014"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Pronoun Code Sequence",
+   "retired": false,
+   "tag": "00100015"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Pronoun Comment",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00100016"
+  },
+  {
+   "basic": "Z/D",
+   "inStandardIOD": true,
+   "name": "Patient ID",
+   "retired": false,
+   "tag": "00100020"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Issuer of Patient ID",
+   "retired": false,
+   "tag": "00100021"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Patient's Birth Date",
+   "retired": false,
+   "tag": "00100030"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Patient's Birth Time",
+   "retired": false,
+   "tag": "00100032"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Patient's Sex",
+   "options": {
+    "retainPatientCharacteristics": "K"
+   },
+   "retired": false,
+   "tag": "00100040"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Gender Identity Sequence",
+   "retired": false,
+   "tag": "00100041"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Sex Parameters for Clinical Use Category Comment",
+   "options": {
+    "cleanDescriptors": "C",
+    "retainPatientCharacteristics": "C"
+   },
+   "retired": false,
+   "tag": "00100042"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Sex Parameters for Clinical Use Category Sequence",
+   "options": {
+    "retainPatientCharacteristics": "K"
+   },
+   "retired": false,
+   "tag": "00100043"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Gender Identity Code Sequence",
+   "retired": false,
+   "tag": "00100044"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Gender Identity Comment",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00100045"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Sex Parameters for Clinical Use Category Code Sequence",
+   "options": {
+    "retainPatientCharacteristics": "K"
+   },
+   "retired": false,
+   "tag": "00100046"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Sex Parameters for Clinical Use Category Reference",
+   "options": {
+    "retainPatientCharacteristics": "K"
+   },
+   "retired": false,
+   "tag": "00100047"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Patient's Insurance Plan Code Sequence",
+   "retired": false,
+   "tag": "00100050"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Patient's Primary Language Code Sequence",
+   "retired": false,
+   "tag": "00100101"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Patient's Primary Language Modifier Code Sequence",
+   "retired": false,
+   "tag": "00100102"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Other Patient IDs",
+   "retired": true,
+   "tag": "00101000"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Other Patient Names",
+   "retired": false,
+   "tag": "00101001"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Other Patient IDs Sequence",
+   "retired": false,
+   "tag": "00101002"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Patient's Birth Name",
+   "retired": false,
+   "tag": "00101005"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Patient's Age",
+   "options": {
+    "retainPatientCharacteristics": "K"
+   },
+   "retired": false,
+   "tag": "00101010"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Patient's Size",
+   "options": {
+    "retainPatientCharacteristics": "K"
+   },
+   "retired": false,
+   "tag": "00101020"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Patient's Weight",
+   "options": {
+    "retainPatientCharacteristics": "K"
+   },
+   "retired": false,
+   "tag": "00101030"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Patient's Address",
+   "retired": false,
+   "tag": "00101040"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Insurance Plan Identification",
+   "retired": true,
+   "tag": "00101050"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Patient's Mother's Birth Name",
+   "retired": false,
+   "tag": "00101060"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Military Rank",
+   "retired": false,
+   "tag": "00101080"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Branch of Service",
+   "retired": false,
+   "tag": "00101081"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Medical Record Locator",
+   "retired": true,
+   "tag": "00101090"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Referenced Patient Photo Sequence",
+   "retired": false,
+   "tag": "00101100"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Medical Alerts",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00102000"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Allergies",
+   "options": {
+    "cleanDescriptors": "C",
+    "retainPatientCharacteristics": "C"
+   },
+   "retired": false,
+   "tag": "00102110"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Country of Residence",
+   "retired": false,
+   "tag": "00102150"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Region of Residence",
+   "retired": false,
+   "tag": "00102152"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Patient's Telephone Numbers",
+   "retired": false,
+   "tag": "00102154"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Patient's Telecom Information",
+   "retired": false,
+   "tag": "00102155"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Ethnic Group",
+   "options": {
+    "retainPatientCharacteristics": "K"
+   },
+   "retired": true,
+   "tag": "00102160"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Ethnic Group Code Sequence",
+   "options": {
+    "retainPatientCharacteristics": "K"
+   },
+   "retired": false,
+   "tag": "00102161"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Ethnic Groups",
+   "options": {
+    "retainPatientCharacteristics": "K"
+   },
+   "retired": false,
+   "tag": "00102162"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Occupation",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00102180"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Smoking Status",
+   "options": {
+    "retainPatientCharacteristics": "K"
+   },
+   "retired": false,
+   "tag": "001021A0"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Additional Patient History",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "001021B0"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Pregnancy Status",
+   "options": {
+    "retainPatientCharacteristics": "K"
+   },
+   "retired": false,
+   "tag": "001021C0"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Last Menstrual Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "001021D0"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Patient's Religious Preference",
+   "retired": false,
+   "tag": "001021F0"
+  },
+  {
+   "basic": "X/Z",
+   "inStandardIOD": true,
+   "name": "Patient's Sex Neutered",
+   "options": {
+    "retainPatientCharacteristics": "K"
+   },
+   "retired": false,
+   "tag": "00102203"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Responsible Person",
+   "retired": false,
+   "tag": "00102297"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Responsible Organization",
+   "retired": false,
+   "tag": "00102299"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Patient Comments",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00104000"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Clinical Trial Sponsor Name",
+   "retired": false,
+   "tag": "00120010"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Clinical Trial Protocol ID",
+   "retired": false,
+   "tag": "00120020"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Clinical Trial Protocol Name",
+   "retired": false,
+   "tag": "00120021"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Issuer of Clinical Trial Protocol ID",
+   "retired": false,
+   "tag": "00120022"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Other Clinical Trial Protocol IDs Sequence",
+   "retired": false,
+   "tag": "00120023"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Clinical Trial Site ID",
+   "options": {
+    "retainInstitutionIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00120030"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Clinical Trial Site Name",
+   "options": {
+    "retainInstitutionIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00120031"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Issuer of Clinical Trial Site ID",
+   "retired": false,
+   "tag": "00120032"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Clinical Trial Subject ID",
+   "retired": false,
+   "tag": "00120040"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Issuer of Clinical Trial Subject ID",
+   "retired": false,
+   "tag": "00120041"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Clinical Trial Subject Reading ID",
+   "retired": false,
+   "tag": "00120042"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Issuer of Clinical Trial Subject Reading ID",
+   "retired": false,
+   "tag": "00120043"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Clinical Trial Time Point ID",
+   "retired": false,
+   "tag": "00120050"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Clinical Trial Time Point Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00120051"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Issuer of Clinical Trial Time Point ID",
+   "retired": false,
+   "tag": "00120055"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Clinical Trial Coordinating Center Name",
+   "options": {
+    "retainInstitutionIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00120060"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Clinical Trial Series ID",
+   "retired": false,
+   "tag": "00120071"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Clinical Trial Series Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00120072"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Issuer of Clinical Trial Series ID",
+   "retired": false,
+   "tag": "00120073"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Clinical Trial Protocol Ethics Committee Name",
+   "options": {
+    "retainInstitutionIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00120081"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Clinical Trial Protocol Ethics Committee Approval Number",
+   "retired": false,
+   "tag": "00120082"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Ethics Committee Approval Effectiveness Start Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00120086"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Ethics Committee Approval Effectiveness End Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00120087"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Calibration Time",
+   "options": {
+    "retainDeviceIdentity": "K",
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0014407C"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Calibration Date",
+   "options": {
+    "retainDeviceIdentity": "K",
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0014407E"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Maker Note",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "0016002B"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Device Setting Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "0016004B"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Camera Owner Name",
+   "retired": false,
+   "tag": "0016004D"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Lens Specification",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "0016004E"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Lens Make",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "0016004F"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Lens Model",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00160050"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Lens Serial Number",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00160051"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Version ID",
+   "retired": false,
+   "tag": "00160070"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Latitude​ Ref",
+   "retired": false,
+   "tag": "00160071"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Latitude​",
+   "retired": false,
+   "tag": "00160072"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Longitude Ref",
+   "retired": false,
+   "tag": "00160073"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Longitude",
+   "retired": false,
+   "tag": "00160074"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Altitude​ Ref",
+   "retired": false,
+   "tag": "00160075"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Altitude​",
+   "retired": false,
+   "tag": "00160076"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Time​ Stamp",
+   "retired": false,
+   "tag": "00160077"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Satellites",
+   "retired": false,
+   "tag": "00160078"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Status",
+   "retired": false,
+   "tag": "00160079"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Measure ​Mode",
+   "retired": false,
+   "tag": "0016007A"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS DOP",
+   "retired": false,
+   "tag": "0016007B"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Speed​ Ref",
+   "retired": false,
+   "tag": "0016007C"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Speed​",
+   "retired": false,
+   "tag": "0016007D"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Track ​Ref",
+   "retired": false,
+   "tag": "0016007E"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Track",
+   "retired": false,
+   "tag": "0016007F"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Img​ Direction Ref",
+   "retired": false,
+   "tag": "00160080"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Img ​Direction",
+   "retired": false,
+   "tag": "00160081"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Map​ Datum",
+   "retired": false,
+   "tag": "00160082"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Dest​ Latitude Ref",
+   "retired": false,
+   "tag": "00160083"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Dest​ Latitude",
+   "retired": false,
+   "tag": "00160084"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Dest ​Longitude Ref",
+   "retired": false,
+   "tag": "00160085"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Dest ​Longitude",
+   "retired": false,
+   "tag": "00160086"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Dest​ Bearing Ref",
+   "retired": false,
+   "tag": "00160087"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Dest ​Bearing",
+   "retired": false,
+   "tag": "00160088"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Dest ​Distance Ref",
+   "retired": false,
+   "tag": "00160089"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Dest ​Distance",
+   "retired": false,
+   "tag": "0016008A"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Processing​ Method",
+   "retired": false,
+   "tag": "0016008B"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Area ​Information",
+   "retired": false,
+   "tag": "0016008C"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Date​ Stamp",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0016008D"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "GPS Differential",
+   "retired": false,
+   "tag": "0016008E"
+  },
+  {
+   "basic": "Z/D",
+   "inStandardIOD": true,
+   "name": "Contrast/Bolus Agent",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00180010"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Intervention Drug Stop Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00180027"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Intervention Drug Start Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00180035"
+  },
+  {
+   "basic": "X/Z/D",
+   "inStandardIOD": true,
+   "name": "Device Serial Number",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00181000"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Device UID",
+   "options": {
+    "retainDeviceIdentity": "K",
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00181002"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Plate ID",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00181004"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Generator ID",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00181005"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Cassette ID",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00181007"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Gantry ID",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00181008"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Unique Device Identifier",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00181009"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "UDI Sequence",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "0018100A"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Manufacturer's Device Class UID",
+   "options": {
+    "retainDeviceIdentity": "K",
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "0018100B"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Secondary Capture Device ID",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00181010"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Hardcopy Creation Device ID",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": true,
+   "tag": "00181011"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Date of Secondary Capture",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00181012"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Time of Secondary Capture",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00181014"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "Protocol Name",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00181030"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Contrast/Bolus Start Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00181042"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Contrast/Bolus Stop Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00181043"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Radiopharmaceutical Start Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00181072"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Radiopharmaceutical Stop Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00181073"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Radiopharmaceutical Start DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00181078"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Radiopharmaceutical Stop DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00181079"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Acquisition Field Of View Label",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "001811BB"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Date of Last Calibration",
+   "options": {
+    "retainDeviceIdentity": "K",
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00181200"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Time of Last Calibration",
+   "options": {
+    "retainDeviceIdentity": "K",
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00181201"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "DateTime of Last Calibration",
+   "options": {
+    "retainDeviceIdentity": "K",
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00181202"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Calibration DateTime",
+   "options": {
+    "retainDeviceIdentity": "K",
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00181203"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Date of Manufacture",
+   "options": {
+    "retainDeviceIdentity": "K",
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00181204"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Date of Installation",
+   "options": {
+    "retainDeviceIdentity": "K",
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00181205"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "Acquisition Device Processing Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00181400"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Target UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00182042"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Acquisition Comments",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": true,
+   "tag": "00184000"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Transducer Identification Sequence",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00185011"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "Detector ID",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "0018700A"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "Date of Last Detector Calibration",
+   "options": {
+    "retainDeviceIdentity": "K",
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0018700C"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "Time of Last Detector Calibration",
+   "options": {
+    "retainDeviceIdentity": "K",
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0018700E"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Frame Acquisition DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00189074"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Frame Reference DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00189151"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Respiratory Motion Compensation Technique Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00189185"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "X-Ray Source ID",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00189367"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Source Start DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00189369"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Source End DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0018936A"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "X-Ray Detector ID",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00189371"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "X-Ray Detector Label",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00189373"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Multi-energy Acquisition Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "0018937B"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Decomposition Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "0018937F"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Acquisition Protocol Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00189424"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "Start Acquisition DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00189516"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "End Acquisition DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00189517"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Functional Sync Pulse",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00189623"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Decay Correction DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00189701"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Exclusion Start DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00189804"
+  },
+  {
+   "basic": "Z/D",
+   "inStandardIOD": true,
+   "name": "Instruction Performed DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00189919"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Requested Series Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00189937"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Contribution DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0018A002"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Contribution Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "0018A003"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Study Instance UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "0020000D"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Series Instance UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "0020000E"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Study ID",
+   "retired": false,
+   "tag": "00200010"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Pyramid Label",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00200027"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Frame of Reference UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00200052"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Synchronization Frame of Reference UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00200200"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Modifying Device ID",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": true,
+   "tag": "00203401"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Modified Image Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "00203403"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Modified Image Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "00203405"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Modified Image Description",
+   "retired": true,
+   "tag": "00203406"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Image Comments",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00204000"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Frame Comments",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00209158"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Concatenation UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00209161"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Dimension Organization UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00209164"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Palette Color Lookup Table UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00281199"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": false,
+   "name": "Large Palette Color Lookup Table UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": true,
+   "tag": "00281214"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Image Presentation Comments",
+   "retired": true,
+   "tag": "00284000"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Study ID Issuer",
+   "retired": true,
+   "tag": "00320012"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Study Verified Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "00320032"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Study Verified Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "00320033"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Study Read Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "00320034"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Study Read Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "00320035"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Study Start Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "00321000"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Study Start Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "00321001"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Study Stop Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "00321010"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Study Stop Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "00321011"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Study Location",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": true,
+   "tag": "00321020"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Study Location AE Title",
+   "options": {
+    "retainDeviceIdentity": "C"
+   },
+   "retired": true,
+   "tag": "00321021"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Reason for Study",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": true,
+   "tag": "00321030"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Requesting Physician",
+   "retired": false,
+   "tag": "00321032"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Requesting Service",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00321033"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Study Arrival Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "00321040"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Study Arrival Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "00321041"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Study Completion Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "00321050"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Study Completion Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "00321051"
+  },
+  {
+   "basic": "X/Z",
+   "inStandardIOD": true,
+   "name": "Requested Procedure Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00321060"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Reason for Visit",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00321066"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Reason for Visit Code Sequence",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00321067"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Requested Contrast Agent",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00321070"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Study Comments",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": true,
+   "tag": "00324000"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Flow Identifier Sequence",
+   "retired": false,
+   "tag": "00340001"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Flow Identifier",
+   "retired": false,
+   "tag": "00340002"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Source Identifier",
+   "retired": false,
+   "tag": "00340005"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Frame Origin Timestamp",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00340007"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Referenced Patient Alias Sequence",
+   "retired": true,
+   "tag": "00380004"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Admission ID",
+   "retired": false,
+   "tag": "00380010"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Issuer of Admission ID",
+   "retired": true,
+   "tag": "00380011"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Issuer of Admission ID Sequence",
+   "retired": false,
+   "tag": "00380014"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Admission Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "0038001A"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Admission Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "0038001B"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Discharge Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "0038001C"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Discharge Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "0038001D"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Patient Institution Residence",
+   "retired": true,
+   "tag": "0038001E"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Admitting Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00380020"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Admitting Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00380021"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Discharge Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "00380030"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Discharge Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "00380032"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Discharge Diagnosis Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": true,
+   "tag": "00380040"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Special Needs",
+   "options": {
+    "retainPatientCharacteristics": "C"
+   },
+   "retired": false,
+   "tag": "00380050"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Service Episode ID",
+   "retired": false,
+   "tag": "00380060"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Issuer of Service Episode ID",
+   "retired": true,
+   "tag": "00380061"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Service Episode Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00380062"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Issuer of Service Episode ID Sequence",
+   "retired": false,
+   "tag": "00380064"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Current Patient Location",
+   "retired": false,
+   "tag": "00380300"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Patient's Institution Residence",
+   "retired": false,
+   "tag": "00380400"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Patient State",
+   "options": {
+    "cleanDescriptors": "C",
+    "retainPatientCharacteristics": "C"
+   },
+   "retired": false,
+   "tag": "00380500"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Visit Comments",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00384000"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Multiplex Group Label",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "003A0020"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Channel Label",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "003A0203"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Channel Derivation Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "003A020C"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Multiplex Group UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "003A0310"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Impedance Measurement DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "003A0314"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "​Waveform Filter Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "003A0329"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Filter Lookup Table Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "003A032B"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Station AE Title",
+   "options": {
+    "retainDeviceIdentity": "C"
+   },
+   "retired": false,
+   "tag": "00400001"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Procedure Step Start Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00400002"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Procedure Step Start Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00400003"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Procedure Step End Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00400004"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Procedure Step End Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00400005"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Performing Physician's Name",
+   "retired": false,
+   "tag": "00400006"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Scheduled Procedure Step Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00400007"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Scheduled Procedure Step ID",
+   "retired": false,
+   "tag": "00400009"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Performing Physician Identification Sequence",
+   "retired": false,
+   "tag": "0040000B"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Station Name",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00400010"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Procedure Step Location",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00400011"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Pre-Medication",
+   "options": {
+    "retainPatientCharacteristics": "C"
+   },
+   "retired": false,
+   "tag": "00400012"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Performed Station AE Title",
+   "options": {
+    "retainDeviceIdentity": "C"
+   },
+   "retired": false,
+   "tag": "00400241"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Performed Station Name",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00400242"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Performed Location",
+   "retired": false,
+   "tag": "00400243"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Performed Procedure Step Start Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00400244"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Performed Procedure Step Start Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00400245"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Performed Procedure Step End Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00400250"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Performed Procedure Step End Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00400251"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Performed Procedure Step ID",
+   "retired": false,
+   "tag": "00400253"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Performed Procedure Step Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00400254"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Request Attributes Sequence",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00400275"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Comments on the Performed Procedure Step",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00400280"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Comments on Radiation Dose",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00400310"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Specimen Accession Number",
+   "retired": true,
+   "tag": "0040050A"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Container Identifier",
+   "retired": false,
+   "tag": "00400512"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Issuer of the Container Identifier Sequence",
+   "retired": false,
+   "tag": "00400513"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Container Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "0040051A"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Specimen Identifier",
+   "retired": false,
+   "tag": "00400551"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Specimen UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00400554"
+  },
+  {
+   "basic": "X/Z",
+   "inStandardIOD": true,
+   "name": "Acquisition Context Sequence",
+   "options": {
+    "cleanStructuredContent": "C"
+   },
+   "retired": false,
+   "tag": "00400555"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Acquisition Context Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00400556"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Issuer of the Specimen Identifier Sequence",
+   "retired": false,
+   "tag": "00400562"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Specimen Short Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00400600"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Specimen Detailed Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00400602"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Specimen Preparation Sequence",
+   "options": {
+    "cleanStructuredContent": "C"
+   },
+   "retired": false,
+   "tag": "00400610"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Slide Identifier",
+   "retired": true,
+   "tag": "004006FA"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Requested Procedure ID",
+   "retired": false,
+   "tag": "00401001"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Reason for the Requested Procedure",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00401002"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Patient Transport Arrangements",
+   "retired": false,
+   "tag": "00401004"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Requested Procedure Location",
+   "retired": false,
+   "tag": "00401005"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Reason for Requested Procedure Code Sequence",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "0040100A"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Names of Intended Recipients of Results",
+   "retired": false,
+   "tag": "00401010"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Intended Recipients of Results Identification Sequence",
+   "retired": false,
+   "tag": "00401011"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Person Identification Code Sequence",
+   "retired": false,
+   "tag": "00401101"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Person's Address",
+   "retired": false,
+   "tag": "00401102"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Person's Telephone Numbers",
+   "retired": false,
+   "tag": "00401103"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Person's Telecom Information",
+   "retired": false,
+   "tag": "00401104"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Requested Procedure Comments",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00401400"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Reason for the Imaging Service Request",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": true,
+   "tag": "00402001"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Issue Date of Imaging Service Request",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00402004"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Issue Time of Imaging Service Request",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00402005"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Order Entered By",
+   "retired": false,
+   "tag": "00402008"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Order Enterer's Location",
+   "retired": false,
+   "tag": "00402009"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Order Callback Phone Number",
+   "retired": false,
+   "tag": "00402010"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Order Callback Telecom Information",
+   "retired": false,
+   "tag": "00402011"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Placer Order Number / Imaging Service Request",
+   "retired": false,
+   "tag": "00402016"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Filler Order Number / Imaging Service Request",
+   "retired": false,
+   "tag": "00402017"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Imaging Service Request Comments",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00402400"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Confidentiality Constraint on Patient Data Description",
+   "retired": false,
+   "tag": "00403001"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Procedure Step Start DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00404005"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Procedure Step Expiration DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00404008"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Procedure Step Modification DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00404010"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Expected Completion DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00404011"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": false,
+   "name": "Referenced General Purpose Scheduled Procedure Step Transaction UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": true,
+   "tag": "00404023"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Station Name Code Sequence",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00404025"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Station Geographic Location Code Sequence",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00404027"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Performed Station Name Code Sequence",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00404028"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Performed Station Geographic Location Code Sequence",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00404030"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Scheduled Human Performers Sequence",
+   "retired": false,
+   "tag": "00404034"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Actual Human Performers Sequence",
+   "retired": false,
+   "tag": "00404035"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Human Performer's Organization",
+   "retired": false,
+   "tag": "00404036"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Human Performer's Name",
+   "retired": false,
+   "tag": "00404037"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Performed Procedure Step Start DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00404050"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Performed Procedure Step End DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00404051"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Procedure Step Cancellation DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00404052"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Findings Group Recording Date (Trial)",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "0040A023"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Findings Group Recording Time (Trial)",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "0040A024"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Verifying Organization",
+   "retired": false,
+   "tag": "0040A027"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Verification DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0040A030"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "Observation DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0040A032"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Observation Start DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0040A033"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Effective Start DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0040A034"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Effective Stop DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0040A035"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Verifying Observer Sequence",
+   "retired": false,
+   "tag": "0040A073"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Verifying Observer Name",
+   "retired": false,
+   "tag": "0040A075"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Author Observer Sequence",
+   "retired": false,
+   "tag": "0040A078"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Participant Sequence",
+   "retired": false,
+   "tag": "0040A07A"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Custodial Organization Sequence",
+   "retired": false,
+   "tag": "0040A07C"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Participation DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0040A082"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Verifying Observer Identification Code Sequence",
+   "retired": false,
+   "tag": "0040A088"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Date of Document or Verbal Transaction (Trial)",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "0040A110"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Time of Document Creation or Verbal Transaction (Trial)",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "0040A112"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0040A120"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0040A121"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0040A122"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Person Name",
+   "retired": false,
+   "tag": "0040A123"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "UID",
+   "retired": false,
+   "tag": "0040A124"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Referenced DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0040A13A"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Observation UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "0040A171"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": false,
+   "name": "Referenced Observation UID (Trial)",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": true,
+   "tag": "0040A172"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Observation Date (Trial)",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "0040A192"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Observation Time (Trial)",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "0040A193"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Current Observer (Trial)",
+   "retired": true,
+   "tag": "0040A307"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Verbal Source (Trial)",
+   "retired": true,
+   "tag": "0040A352"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Address (Trial)",
+   "retired": true,
+   "tag": "0040A353"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Telephone Number (Trial)",
+   "retired": true,
+   "tag": "0040A354"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Verbal Source Identifier Code Sequence (Trial)",
+   "retired": true,
+   "tag": "0040A358"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": false,
+   "name": "Observation Subject UID (Trial)",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": true,
+   "tag": "0040A402"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Content Sequence",
+   "options": {
+    "cleanStructuredContent": "C"
+   },
+   "retired": false,
+   "tag": "0040A730"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "Waveform Annotation Sequence",
+   "options": {
+    "cleanStructuredContent": "C"
+   },
+   "retired": false,
+   "tag": "0040B020"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Annotation DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0040B034"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Segment Definition DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0040B036"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Montage Name",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "0040B03B"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Montage Channel Label",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "0040B03F"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Template Version",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "0040DB06"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Template Local Version",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "0040DB07"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": false,
+   "name": "Template Extension Organization UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": true,
+   "tag": "0040DB0C"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": false,
+   "name": "Template Extension Creator UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": true,
+   "tag": "0040DB0D"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "HL7 Document Effective Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0040E004"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Display URI",
+   "retired": false,
+   "tag": "0040E012"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Encapsulated Document",
+   "retired": false,
+   "tag": "00420011"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Approval Status DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00440004"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Product Expiration DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0044000B"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Substance Administration DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00440010"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Assertion DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00440104"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Assertion Expiration DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00440105"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Container Component ID",
+   "retired": false,
+   "tag": "0050001B"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Device Description",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "00500020"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Long Device Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00500021"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Tracking UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00620021"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Source Frame of Reference UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00640003"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Effective DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00686226"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Information Issue DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00686270"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Annotation Group UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "006A0003"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Annotation Group Label",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "006A0005"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Annotation Group Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "006A0006"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Graphic Annotation Sequence",
+   "options": {
+    "cleanGraphics": "C"
+   },
+   "retired": false,
+   "tag": "00700001"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Unformatted Text Value",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00700006"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Presentation Creation Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00700082"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Presentation Creation Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00700083"
+  },
+  {
+   "basic": "Z/D",
+   "inStandardIOD": true,
+   "name": "Content Creator's Name",
+   "retired": false,
+   "tag": "00700084"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Content Creator's Identification Code Sequence",
+   "retired": false,
+   "tag": "00700086"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Fiducial UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "0070031A"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Presentation Display Collection UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00701101"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Presentation Sequence Collection UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00701102"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Hanging Protocol Creation DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0072000A"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Selector AE Value",
+   "options": {
+    "retainDeviceIdentity": "C"
+   },
+   "retired": false,
+   "tag": "0072005E"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Selector AS Value",
+   "options": {
+    "retainPatientCharacteristics": "K"
+   },
+   "retired": false,
+   "tag": "0072005F"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Selector DA Value",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00720061"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Selector DT Value",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "00720063"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Selector OB Value",
+   "retired": false,
+   "tag": "00720065"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Selector LO Value",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00720066"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Selector LT Value",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00720068"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Selector PN Value",
+   "retired": false,
+   "tag": "0072006A"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Selector TM Value",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "0072006B"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Selector SH Value",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "0072006C"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Selector UN Value",
+   "retired": false,
+   "tag": "0072006D"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Selector ST Value",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "0072006E"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Selector UT Value",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "00720070"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Selector UR Value",
+   "retired": false,
+   "tag": "00720071"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Receiving AE",
+   "options": {
+    "retainDeviceIdentity": "C"
+   },
+   "retired": false,
+   "tag": "00741234"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Requesting AE",
+   "options": {
+    "retainDeviceIdentity": "C"
+   },
+   "retired": false,
+   "tag": "00741236"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Storage Media File-set UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "00880140"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Icon Image Sequence (see Note 11)",
+   "retired": false,
+   "tag": "00880200"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Topic Title",
+   "retired": true,
+   "tag": "00880904"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Topic Subject",
+   "retired": true,
+   "tag": "00880906"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Topic Author",
+   "retired": true,
+   "tag": "00880910"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Topic Keywords",
+   "retired": true,
+   "tag": "00880912"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "SOP Authorization DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "01000420"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Digital Signature UID",
+   "retired": false,
+   "tag": "04000100"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Digital Signature DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "04000105"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Certificate of Signer",
+   "retired": false,
+   "tag": "04000115"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Certified Timestamp",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "04000310"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Referenced Digital Signature Sequence",
+   "retired": false,
+   "tag": "04000402"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Referenced SOP Instance MAC Sequence",
+   "retired": false,
+   "tag": "04000403"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "MAC",
+   "retired": false,
+   "tag": "04000404"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Modified Attributes Sequence",
+   "retired": false,
+   "tag": "04000550"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Nonconforming Modified Attributes Sequence",
+   "retired": false,
+   "tag": "04000551"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Nonconforming Data Element Value",
+   "retired": false,
+   "tag": "04000552"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Original Attributes Sequence",
+   "retired": false,
+   "tag": "04000561"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Attribute Modification DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "04000562"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Modifying System",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "04000563"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Source of Previous Values",
+   "options": {
+    "retainInstitutionIdentity": "K"
+   },
+   "retired": false,
+   "tag": "04000564"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Reason for the Attribute Modification",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "04000565"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Instance Origin Status",
+   "retired": false,
+   "tag": "04000600"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Text String",
+   "retired": false,
+   "tag": "20300020"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Creation Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "21000040"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Creation Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "21000050"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Originator",
+   "options": {
+    "retainDeviceIdentity": "C"
+   },
+   "retired": false,
+   "tag": "21000070"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Destination AE",
+   "options": {
+    "retainDeviceIdentity": "C"
+   },
+   "retired": false,
+   "tag": "21000140"
+  },
+  {
+   "basic": "X/Z",
+   "inStandardIOD": true,
+   "name": "Label Text",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "22000002"
+  },
+  {
+   "basic": "X/Z",
+   "inStandardIOD": true,
+   "name": "Barcode Value",
+   "retired": false,
+   "tag": "22000005"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Position Acquisition Template Name",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "30020121"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Position Acquisition Template Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "30020123"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Structure Set Label",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "30060002"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Structure Set Name",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "30060004"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Structure Set Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "30060006"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Structure Set Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "30060008"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Structure Set Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "30060009"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Referenced Frame of Reference UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "30060024"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "ROI Name",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "30060026"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "ROI Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "30060028"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "ROI DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "3006002D"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "ROI Observation DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "3006002E"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "ROI Generation Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "30060038"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "ROI Creator Sequence",
+   "retired": false,
+   "tag": "3006004D"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "ROI Interpreter Sequence",
+   "retired": false,
+   "tag": "3006004E"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "ROI Observation Label",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": true,
+   "tag": "30060085"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "ROI Observation Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": true,
+   "tag": "30060088"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "ROI Interpreter",
+   "retired": false,
+   "tag": "300600A6"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": false,
+   "name": "Related Frame of Reference UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": true,
+   "tag": "300600C2"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Treatment Control Point Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "30080024"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Treatment Control Point Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "30080025"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "First Treatment Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "30080054"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "Most Recent Treatment Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "30080056"
+  },
+  {
+   "basic": "X/Z",
+   "inStandardIOD": true,
+   "name": "Source Serial Number",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "30080105"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Safe Position Exit Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "30080162"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Safe Position Exit Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "30080164"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Safe Position Return Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "30080166"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Safe Position Return Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "30080168"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "Treatment Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "30080250"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "Treatment Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "30080251"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "RT Plan Label",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A0002"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "RT Plan Name",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A0003"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "RT Plan Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A0004"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "RT Plan Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "300A0006"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "RT Plan Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "300A0007"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Treatment Sites",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": true,
+   "tag": "300A000B"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Prescription Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A000E"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Dose Reference UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "300A0013"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Dose Reference Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A0016"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Table Top Position Alignment UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "300A0054"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Fraction Group Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A0072"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Referenced Dose Reference UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "300A0083"
+  },
+  {
+   "basic": "X/Z",
+   "inStandardIOD": true,
+   "name": "Treatment Machine Name",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "300A00B2"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Beam Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A00C3"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Bolus Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A00DD"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Fixation Device Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A0196"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Shielding Device Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A01A6"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Setup Technique Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A01B2"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Source Manufacturer",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "300A0216"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Source Strength Reference Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "300A022C"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Source Strength Reference Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "300A022E"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Compensator Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A02EB"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Treatment Position Group Label",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A0608"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Treatment Position Group UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "300A0609"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "RT Accessory Holder Slot ID",
+   "retired": false,
+   "tag": "300A0611"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "RT Accessory Device Slot ID",
+   "retired": false,
+   "tag": "300A0615"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Radiation Dose Identification Label",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A0619"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Radiation Dose In-Vivo Measurement Label",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A0623"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "RT Tolerance Set Label",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A062A"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": false,
+   "name": "Patient Setup UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": true,
+   "tag": "300A0650"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Equipment Frame of Reference Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A0676"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Radiation Generation Mode Label",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A067C"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Radiation Generation Mode Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A067D"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Treatment Session UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "300A0700"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Treatment Tolerance Violation Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A0734"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Treatment Tolerance Violation DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "300A0736"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Recorded RT Control Point DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "300A073A"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Interlock DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "300A0741"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Interlock Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A0742"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Override DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "300A0760"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Interlock Origin Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A0783"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Referenced Treatment Position Group UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "300A0785"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Patient Treatment Preparation Procedure Parameter Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A078E"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Patient Treatment Preparation Method Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A0792"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Patient Setup Photo Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A0794"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Displacement Reference Label",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300A079A"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Reason for Omission Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "300C0113"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Beam Hold Transition DateTime",
+   "options": {
+    "retainDeviceIdentity": "K",
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "300C0127"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Review Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "300E0004"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Review Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "300E0005"
+  },
+  {
+   "basic": "X/Z",
+   "inStandardIOD": true,
+   "name": "Reviewer Name",
+   "retired": false,
+   "tag": "300E0008"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Conceptual Volume UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "30100006"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Referenced Conceptual Volume UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "3010000B"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Conceptual Volume Combination Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "3010000F"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Constituent Conceptual Volume UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "30100013"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Source Conceptual Volume UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "30100015"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Conceptual Volume Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "30100017"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Device Alternate Identifier",
+   "retired": false,
+   "tag": "3010001B"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Device Label",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "3010002D"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Referenced Fiducials UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "30100031"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "User Content Label",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "30100033"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "User Content Long Label",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "30100034"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Entity Label",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "30100035"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Entity Name",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "30100036"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Entity Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "30100037"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "Entity Long Label",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "30100038"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "RT Treatment Phase UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "3010003B"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Manufacturer's Device Identifier",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "tag": "30100043"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "Intended Phase Start Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "3010004C"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "Intended Phase End Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "3010004D"
+  },
+  {
+   "basic": "D",
+   "inStandardIOD": true,
+   "name": "RT Prescription Label",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "30100054"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "RT Treatment Approach Label",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "30100056"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "RT Physician Intent Narrative",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "3010005A"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Reason for Superseding",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "3010005C"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Prior Treatment Dose Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "30100061"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Dosimetric Objective UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "3010006E"
+  },
+  {
+   "basic": "U",
+   "inStandardIOD": true,
+   "name": "Referenced Dosimetric Objective UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "tag": "3010006F"
+  },
+  {
+   "basic": "X/D",
+   "inStandardIOD": true,
+   "name": "Treatment Site",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "30100077"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Treatment Technique Notes",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "3010007A"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Prescription Notes",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "3010007B"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Fractionation Notes",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "3010007F"
+  },
+  {
+   "basic": "Z",
+   "inStandardIOD": true,
+   "name": "Prescription Notes Sequence",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "tag": "30100081"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Intended Fraction Start Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "tag": "30100085"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Arbitrary",
+   "retired": true,
+   "tag": "40000010"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Text Comments",
+   "retired": true,
+   "tag": "40004000"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Results ID",
+   "retired": true,
+   "tag": "40080040"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Results ID Issuer",
+   "retired": true,
+   "tag": "40080042"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Interpretation Recorded Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "40080100"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Interpretation Recorded Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "40080101"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Interpretation Recorder",
+   "retired": true,
+   "tag": "40080102"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Interpretation Transcription Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "40080108"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Interpretation Transcription Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "40080109"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Interpretation Transcriber",
+   "retired": true,
+   "tag": "4008010A"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Interpretation Text",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": true,
+   "tag": "4008010B"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Interpretation Author",
+   "retired": true,
+   "tag": "4008010C"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Interpretation Approver Sequence",
+   "retired": true,
+   "tag": "40080111"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Interpretation Approval Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "40080112"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Interpretation Approval Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": true,
+   "tag": "40080113"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Physician Approving Interpretation",
+   "retired": true,
+   "tag": "40080114"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Interpretation Diagnosis Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": true,
+   "tag": "40080115"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Results Distribution List Sequence",
+   "retired": true,
+   "tag": "40080118"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Distribution Name",
+   "retired": true,
+   "tag": "40080119"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Distribution Address",
+   "retired": true,
+   "tag": "4008011A"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Interpretation ID",
+   "retired": true,
+   "tag": "40080200"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Interpretation ID Issuer",
+   "retired": true,
+   "tag": "40080202"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Impressions",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": true,
+   "tag": "40080300"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Results Comments",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": true,
+   "tag": "40084000"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Curve Data",
+   "options": {
+    "cleanGraphics": "C"
+   },
+   "retired": true,
+   "tag": "50xxxxxx"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Overlay Data",
+   "options": {
+    "cleanGraphics": "C"
+   },
+   "retired": false,
+   "tag": "60xx3000"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Overlay Comments",
+   "options": {
+    "cleanGraphics": "C"
+   },
+   "retired": true,
+   "tag": "60xx4000"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Digital Signatures Sequence",
+   "retired": false,
+   "tag": "FFFAFFFA"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": true,
+   "name": "Data Set Trailing Padding",
+   "retired": false,
+   "tag": "FFFCFFFC"
+  },
+  {
+   "basic": "X",
+   "inStandardIOD": false,
+   "name": "Private Attributes",
+   "options": {
+    "retainSafePrivate": "C"
+   },
+   "retired": false,
+   "tag": "private"
+  }
+ ],
+ "optionColumns": [
+  "retainSafePrivate",
+  "retainUIDs",
+  "retainDeviceIdentity",
+  "retainInstitutionIdentity",
+  "retainPatientCharacteristics",
+  "retainLongitudinalFullDates",
+  "retainLongitudinalModifiedDates",
+  "cleanDescriptors",
+  "cleanStructuredContent",
+  "cleanGraphics"
+ ],
+ "safePrivateAttributes": [
+  {
+   "creator": "ELSCINT1",
+   "element": "00E1xx21",
+   "meaning": "DLP",
+   "vm": "1",
+   "vr": "DS"
+  },
+  {
+   "creator": "ELSCINT1",
+   "element": "00E1xx50",
+   "meaning": "Acquisition Duration",
+   "vm": "1",
+   "vr": "DS"
+  },
+  {
+   "creator": "ELSCINT1",
+   "element": "01E1xx26",
+   "meaning": "Phantom Type",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "ELSCINT1",
+   "element": "01F1xx01",
+   "meaning": "Acquisition Type",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "ELSCINT1",
+   "element": "01F1xx07",
+   "meaning": "Table Velocity",
+   "vm": "1",
+   "vr": "DS"
+  },
+  {
+   "creator": "ELSCINT1",
+   "element": "01F1xx26",
+   "meaning": "Pitch",
+   "vm": "1",
+   "vr": "DS"
+  },
+  {
+   "creator": "ELSCINT1",
+   "element": "01F1xx27",
+   "meaning": "Rotation Time",
+   "vm": "1",
+   "vr": "DS"
+  },
+  {
+   "creator": "GEIIS PACS",
+   "element": "0903xx10",
+   "meaning": "Reject Image Flag",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "GEIIS PACS",
+   "element": "0903xx11",
+   "meaning": "Significant Flag",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "GEIIS PACS",
+   "element": "0903xx12",
+   "meaning": "Confidential Flag",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "GEMS_ACQU_01",
+   "element": "0019xx23",
+   "meaning": "Table Speed [mm/rotation]",
+   "vm": "1",
+   "vr": "DS"
+  },
+  {
+   "creator": "GEMS_ACQU_01",
+   "element": "0019xx24",
+   "meaning": "Mid Scan Time [sec]",
+   "vm": "1",
+   "vr": "DS"
+  },
+  {
+   "creator": "GEMS_ACQU_01",
+   "element": "0019xx27",
+   "meaning": "Rotation Speed (Gantry Period)",
+   "vm": "1",
+   "vr": "DS"
+  },
+  {
+   "creator": "GEMS_ACQU_01",
+   "element": "0019xx9E",
+   "meaning": "Internal Pulse Sequence Name",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "GEMS_HELIOS_01",
+   "element": "0045xx01",
+   "meaning": "Number of Macro Rows in Detector",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "GEMS_HELIOS_01",
+   "element": "0045xx02",
+   "meaning": "Macro width at ISO Center",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "GEMS_PARM_01",
+   "element": "0043xx27",
+   "meaning": "Scan Pitch Ratio in the form \"n.nnn:1\"",
+   "vm": "1",
+   "vr": "SH"
+  },
+  {
+   "creator": "GEMS_PARM_01",
+   "element": "0043xx39",
+   "meaning": "1stvalue is B Value",
+   "vm": "4",
+   "vr": "IS"
+  },
+  {
+   "creator": "GEMS_PARM_01",
+   "element": "0043xx6F",
+   "meaning": "Scanner Table Entry + Gradient Coil Selected",
+   "vm": "3-4",
+   "vr": "DS"
+  },
+  {
+   "creator": "GEMS_SERS_01",
+   "element": "0025xx07",
+   "meaning": "Images in Series",
+   "vm": "1",
+   "vr": "SL"
+  },
+  {
+   "creator": "HOLOGIC, Inc.",
+   "element": "7E01xx01",
+   "meaning": "Codec Version",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "HOLOGIC, Inc.",
+   "element": "7E01xx02",
+   "meaning": "Codec Content Type",
+   "vm": "1",
+   "vr": "SH"
+  },
+  {
+   "creator": "HOLOGIC, Inc.",
+   "element": "7E01xx10",
+   "meaning": "High Resolution Data Sequence",
+   "vm": "1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "HOLOGIC, Inc.",
+   "element": "7E01xx11",
+   "meaning": "Low Resolution Data Sequence",
+   "vm": "1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "HOLOGIC, Inc.",
+   "element": "7E01xx12",
+   "meaning": "Codec Content",
+   "vm": "1",
+   "vr": "OB"
+  },
+  {
+   "creator": "NQHeader",
+   "element": "0099xx01",
+   "meaning": "Version",
+   "vm": "1",
+   "vr": "UI"
+  },
+  {
+   "creator": "NQHeader",
+   "element": "0099xx02",
+   "meaning": "Analyzed Series UID",
+   "vm": "1",
+   "vr": "UI"
+  },
+  {
+   "creator": "NQHeader",
+   "element": "0099xx04",
+   "meaning": "Return Code",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "NQHeader",
+   "element": "0099xx05",
+   "meaning": "Return Message",
+   "vm": "1",
+   "vr": "LT"
+  },
+  {
+   "creator": "NQHeader",
+   "element": "0099xx10",
+   "meaning": "MI",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQHeader",
+   "element": "0099xx20",
+   "meaning": "Units",
+   "vm": "1",
+   "vr": "SH"
+  },
+  {
+   "creator": "NQHeader",
+   "element": "0099xx21",
+   "meaning": "ICV",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQLeft",
+   "element": "0199xx01",
+   "meaning": "Left Cortical White Matter",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQLeft",
+   "element": "0199xx02",
+   "meaning": "Left Cortical Gray Matter",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQLeft",
+   "element": "0199xx03",
+   "meaning": "Left 3rd Ventricle",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQLeft",
+   "element": "0199xx04",
+   "meaning": "Left 4th Ventricle",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQLeft",
+   "element": "0199xx05",
+   "meaning": "Left 5th Ventricle",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQLeft",
+   "element": "0199xx06",
+   "meaning": "Left Lateral Ventricle",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQLeft",
+   "element": "0199xx07",
+   "meaning": "Left Inferior Lateral Ventricle",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQLeft",
+   "element": "0199xx08",
+   "meaning": "Left Inferior CSF",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQLeft",
+   "element": "0199xx09",
+   "meaning": "Left Cerebellar White Matter",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQLeft",
+   "element": "0199xx0A",
+   "meaning": "Left Cerebellar Gray Matter",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQLeft",
+   "element": "0199xx0B",
+   "meaning": "Left Hippocampus",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQLeft",
+   "element": "0199xx0C",
+   "meaning": "Left Amygdala",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQLeft",
+   "element": "0199xx0D",
+   "meaning": "Left Thalamus",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQLeft",
+   "element": "0199xx0E",
+   "meaning": "Left Caudate",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQLeft",
+   "element": "0199xx0F",
+   "meaning": "Left Putamen",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQLeft",
+   "element": "0199xx10",
+   "meaning": "Left Pallidum",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQLeft",
+   "element": "0199xx11",
+   "meaning": "Left Ventral Diencephalon",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQLeft",
+   "element": "0199xx12",
+   "meaning": "Left Nucleus Accumbens",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQLeft",
+   "element": "0199xx13",
+   "meaning": "Left Brain Stem",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQLeft",
+   "element": "0199xx14",
+   "meaning": "Left Exterior CSF",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQLeft",
+   "element": "0199xx15",
+   "meaning": "Left WM Hypo",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQLeft",
+   "element": "0199xx16",
+   "meaning": "Left Other",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQRight",
+   "element": "0299xx01",
+   "meaning": "Right Cortical White Matter",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQRight",
+   "element": "0299xx02",
+   "meaning": "Right Cortical Gray Matter",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQRight",
+   "element": "0299xx03",
+   "meaning": "Right 3rd Ventricle",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQRight",
+   "element": "0299xx04",
+   "meaning": "Right 4th Ventricle",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQRight",
+   "element": "0299xx05",
+   "meaning": "Right 5th Ventricle",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQRight",
+   "element": "0299xx06",
+   "meaning": "Right Lateral Ventricle",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQRight",
+   "element": "0299xx07",
+   "meaning": "Right Inferior Lateral Ventricle",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQRight",
+   "element": "0299xx08",
+   "meaning": "Right Inferior CSF",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQRight",
+   "element": "0299xx09",
+   "meaning": "Right Cerebellar White Matter",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQRight",
+   "element": "0299xx0A",
+   "meaning": "Right Cerebellar Gray Matter",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQRight",
+   "element": "0299xx0B",
+   "meaning": "Right Hippocampus",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQRight",
+   "element": "0299xx0C",
+   "meaning": "Right Amygdala",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQRight",
+   "element": "0299xx0D",
+   "meaning": "Right Thalamus",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQRight",
+   "element": "0299xx0E",
+   "meaning": "Right Caudate",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQRight",
+   "element": "0299xx0F",
+   "meaning": "Right Putamen",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQRight",
+   "element": "0299xx10",
+   "meaning": "Right Pallidum",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQRight",
+   "element": "0299xx11",
+   "meaning": "Right Ventral Diencephalon",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQRight",
+   "element": "0299xx12",
+   "meaning": "Right Nucleus Accumbens",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQRight",
+   "element": "0299xx13",
+   "meaning": "Right Brain Stem",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQRight",
+   "element": "0299xx14",
+   "meaning": "Right Exterior CSF",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQRight",
+   "element": "0299xx15",
+   "meaning": "Right WM Hypo",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "NQRight",
+   "element": "0299xx16",
+   "meaning": "Right Other",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx01",
+   "meaning": "MR Image Chemical Shift",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx02",
+   "meaning": "MR Image Chemical Shift Number",
+   "vm": "1",
+   "vr": "IS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx03",
+   "meaning": "MR Image Diffusion B-Factor",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx04",
+   "meaning": "MR Image Diffusion Direction",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx05",
+   "meaning": "Graphic Annotation Parent ID",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx06",
+   "meaning": "MR Image Enhanced",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx07",
+   "meaning": "MR Image Type Edes",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx08",
+   "meaning": "MR Image Phase Number",
+   "vm": "1",
+   "vr": "IS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx09",
+   "meaning": "MR Image Prepulse Delay",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx0A",
+   "meaning": "Image Plane Number",
+   "vm": "1",
+   "vr": "IS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx0B",
+   "meaning": "Image Plane Orientation",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx0C",
+   "meaning": "MR Series Arrhythmia Rejection",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx0E",
+   "meaning": "MR Series Cardiac Cycled",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx0F",
+   "meaning": "MR Series Cardiac Gate Width",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx10",
+   "meaning": "MR Series Cardiac Sync",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx11",
+   "meaning": "MR Series Diffusion Echo Time",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx12",
+   "meaning": "MR Series Dynamic Series",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx13",
+   "meaning": "MR Series Epi Factor",
+   "vm": "1",
+   "vr": "SL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx14",
+   "meaning": "MR Series Nr Of Echoes",
+   "vm": "1",
+   "vr": "SL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx15",
+   "meaning": "MR Series Nr Of Locations",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx16",
+   "meaning": "MR Series Nr Of Phase Contrast Directions",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx17",
+   "meaning": "MR Series Nr Of Phases",
+   "vm": "1",
+   "vr": "SL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx18",
+   "meaning": "MR Series Nr Of Slices",
+   "vm": "1",
+   "vr": "SL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx19",
+   "meaning": "MR Series Partial Matrix Scanned",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx1A",
+   "meaning": "MR Series Pc Velocity",
+   "vm": "3",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx1B",
+   "meaning": "MR Series Prepulse Delay",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx1C",
+   "meaning": "MR Series Prepulse Type",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx1D",
+   "meaning": "MR Series Reconstruction Number",
+   "vm": "1",
+   "vr": "IS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx1E",
+   "meaning": "MR Series Reformat Accuracy",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx1F",
+   "meaning": "MR Series Respiration Sync",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx21",
+   "meaning": "MR Series Sel Part Inversion Recovery",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx22",
+   "meaning": "MR Series Water Fat Shift",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx23",
+   "meaning": "MR Series Flip Angle",
+   "vm": "1",
+   "vr": "DS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx24",
+   "meaning": "MR Series Is Interactive",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx25",
+   "meaning": "MR Series Echo Time Display",
+   "vm": "1",
+   "vr": "SH"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx26",
+   "meaning": "Presentation State Subtraction Active",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx27",
+   "meaning": "Edge Enhancement Kernel Size",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx28",
+   "meaning": "Edge Enhancement Gain Factor Sub",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx29",
+   "meaning": "Edge Enhancement Gain Factor",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx2A",
+   "meaning": "Edge Enhancement Taste Adapt Sub",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx2B",
+   "meaning": "Edge Enhancement Taste Adapt",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx2C",
+   "meaning": "Harmonization Factor",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx2D",
+   "meaning": "Stack Number Of Slices",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx2E",
+   "meaning": "Harmonization Kernel Size",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx2F",
+   "meaning": "Harmonization Gain",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx30",
+   "meaning": "Log Subtraction Gain Step Taste",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx31",
+   "meaning": "Mixing Nr Of Mask Image Numbers",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx32",
+   "meaning": "Stack Radial Angle",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx33",
+   "meaning": "Stack Radial Axis",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx34",
+   "meaning": "Mixing Mask Operation Type",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx35",
+   "meaning": "Stack Slice Number",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx36",
+   "meaning": "Stack Type",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx37",
+   "meaning": "Mixing Operation Type",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx38",
+   "meaning": "Overlay Mix Factor",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx39",
+   "meaning": "Overscan Factor",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx3A",
+   "meaning": "Pixel Shift",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx3B",
+   "meaning": "Pixel Shift Split Line Coordinates",
+   "vm": "4",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx3C",
+   "meaning": "Pixel Shift Shift Vectora",
+   "vm": "2",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx3D",
+   "meaning": "Contour Fill Color",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx3E",
+   "meaning": "Pixel Shift Shift Vectorb",
+   "vm": "2",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx3F",
+   "meaning": "Displayed Area Zoom Interpolation Meth",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx40",
+   "meaning": "Pixel Shift Split Screen",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx41",
+   "meaning": "Subtraction Land Marking Factor",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx42",
+   "meaning": "Subtraction Land Marking Active",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx43",
+   "meaning": "Ellips Displ Shut Major Ax Frst End Pnt",
+   "vm": "2",
+   "vr": "IS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx44",
+   "meaning": "Ellips Displ Shut Major Ax Scnd End Pnt",
+   "vm": "2",
+   "vr": "IS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx45",
+   "meaning": "Ellips Displ Shut Other Ax Frst End Pnt",
+   "vm": "2",
+   "vr": "IS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx46",
+   "meaning": "Graphic Line Style",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx47",
+   "meaning": "Graphic Line Width",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx48",
+   "meaning": "Graphic Annotation Id",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx49",
+   "meaning": "Trace First Image",
+   "vm": "1",
+   "vr": "IS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx4A",
+   "meaning": "Trace Taste",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx4B",
+   "meaning": "Interpolation Method",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx4C",
+   "meaning": "Poly Line Begin Point Style",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx4D",
+   "meaning": "Poly Line End Point Style",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx4E",
+   "meaning": "Window Smoothing Taste",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx4F",
+   "meaning": "Harmonization Offset",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx50",
+   "meaning": "Graphic Marker Type",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx51",
+   "meaning": "Overlay Plane Id",
+   "vm": "1",
+   "vr": "IS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx53",
+   "meaning": "Presentation Gl Trafo Invert",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx54",
+   "meaning": "Contour Fill Transparency",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx55",
+   "meaning": "Graphic Line Color",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx56",
+   "meaning": "Graphic Type",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx57",
+   "meaning": "Log Subtraction Taste",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx58",
+   "meaning": "Series Xray Contrast Transfer Taste",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx59",
+   "meaning": "Curve Id",
+   "vm": "1",
+   "vr": "IS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx5A",
+   "meaning": "Graphic Annotation Model",
+   "vm": "1",
+   "vr": "ST"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx5D",
+   "meaning": "Measurement Text Units",
+   "vm": "1",
+   "vr": "ST"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx5E",
+   "meaning": "Measurement Text Type",
+   "vm": "1",
+   "vr": "ST"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx5F",
+   "meaning": "Stack Sequence",
+   "vm": "1-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx60",
+   "meaning": "MR Series Nr Of Stacks",
+   "vm": "1",
+   "vr": "SL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx61",
+   "meaning": "Series Transmitted",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx62",
+   "meaning": "Series Committed",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx63",
+   "meaning": "Examination Source",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx64",
+   "meaning": "Text Type",
+   "vm": "1",
+   "vr": "SH"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx65",
+   "meaning": "Overlay Plane Sequence",
+   "vm": "1-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx66",
+   "meaning": "Image Curve",
+   "vm": "1-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx67",
+   "meaning": "Linear Presentation Gl Trafo Shape Sub",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx68",
+   "meaning": "Modality Gl Trafo Sequence",
+   "vm": "1-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx69",
+   "meaning": "Display Shutter Sequence",
+   "vm": "1-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx6A",
+   "meaning": "Spatial Transformation Sequence",
+   "vm": "1-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx6B",
+   "meaning": "Edge Enhancement Sequence",
+   "vm": "1-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx6D",
+   "meaning": "Text Font",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx6E",
+   "meaning": "Series Type",
+   "vm": "1",
+   "vr": "SH"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx6F",
+   "meaning": "Mixing Sequence",
+   "vm": "1-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx71",
+   "meaning": "Graphic Constraint",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx72",
+   "meaning": "Ellips Displ Shut Other Ax Scnd End Pnt",
+   "vm": "2",
+   "vr": "IS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx73",
+   "meaning": "Referenced Mask Image Sequence",
+   "vm": "1-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx74",
+   "meaning": "Window Center Sub",
+   "vm": "1-n",
+   "vr": "DS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx75",
+   "meaning": "Window Width Sub",
+   "vm": "1-n",
+   "vr": "DS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx76",
+   "meaning": "Presentation State Xray Contrast Transfer Taste",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx77",
+   "meaning": "Gl Trafo Type",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx79",
+   "meaning": "Harmonisation Sequence",
+   "vm": "1-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx7A",
+   "meaning": "Window Rounding Factor",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx7B",
+   "meaning": "MR Series Acquisition Number",
+   "vm": "1",
+   "vr": "IS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx7C",
+   "meaning": "Frame Number",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx7D",
+   "meaning": "Frame Pixel Data",
+   "vm": "1",
+   "vr": "OW/OB"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx7E",
+   "meaning": "Edge Enhancement Gain Taste",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx7F",
+   "meaning": "Edge Enhancement Gain Taste Sub",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx80",
+   "meaning": "Text Anchor Point Alignment",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx81",
+   "meaning": "MR Series Nr Of Dynamic Scans",
+   "vm": "1",
+   "vr": "IS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx82",
+   "meaning": "MR Series Echo Train Length",
+   "vm": "1",
+   "vr": "IS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx83",
+   "meaning": "MR Series Imaging Frequency",
+   "vm": "1",
+   "vr": "DS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx84",
+   "meaning": "MR Series Inversion Time",
+   "vm": "1",
+   "vr": "DS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx85",
+   "meaning": "MR Series Magnetic Field Strength",
+   "vm": "1",
+   "vr": "DS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx86",
+   "meaning": "MR Series Nr Of Phase Encoding Steps",
+   "vm": "1",
+   "vr": "IS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx87",
+   "meaning": "MR Series Nucleus",
+   "vm": "1",
+   "vr": "SH"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx88",
+   "meaning": "MR Series Number Of Averages",
+   "vm": "1",
+   "vr": "DS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx89",
+   "meaning": "MR Series Percent Phase Field Of View",
+   "vm": "1",
+   "vr": "DS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx8A",
+   "meaning": "MR Series Percent Sampling",
+   "vm": "1",
+   "vr": "DS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx8B",
+   "meaning": "MR Series Transmitting Coil",
+   "vm": "1",
+   "vr": "SH"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx8C",
+   "meaning": "Needs Processing",
+   "vm": "0-n",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx90",
+   "meaning": "Text Foreground Color",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx91",
+   "meaning": "Text Background Color",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx92",
+   "meaning": "Text Shadow Color",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx93",
+   "meaning": "Text Style",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx94",
+   "meaning": "Processing Order Specialization",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx9A",
+   "meaning": "Graphic Number Sequence",
+   "vm": "1-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx9B",
+   "meaning": "Graphic Number",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx9D",
+   "meaning": "Subtraction Type",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xx9F",
+   "meaning": "Pixel Processing Kernel Size",
+   "vm": "2",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxA1",
+   "meaning": "Is Raw Image",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxA2",
+   "meaning": "Log Subtraction Curve Taste",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxA3",
+   "meaning": "Text Color Foreground",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxA4",
+   "meaning": "Text Color Background",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxA5",
+   "meaning": "Text Color Shadow",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxC0",
+   "meaning": "Content Item Identifier",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxC1",
+   "meaning": "Nested Object Type Name",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxC2",
+   "meaning": "Subtraction Rescale Factor",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxC3",
+   "meaning": "Subtraction Offset",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxC5",
+   "meaning": "Mask Image Lut Sequence",
+   "vm": "0-1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxC6",
+   "meaning": "Gain Lut Sequence",
+   "vm": "0-1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxC7",
+   "meaning": "Contrast Image Lut Sequence",
+   "vm": "0-1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxCA",
+   "meaning": "Reversed Modality Lut",
+   "vm": "1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxCB",
+   "meaning": "Redundant Overlay Plane Id",
+   "vm": "1",
+   "vr": "IS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxD0",
+   "meaning": "Frame Index Pointer",
+   "vm": "1-n",
+   "vr": "AT"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxD1",
+   "meaning": "Index Number Vector",
+   "vm": "1-n",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxD2",
+   "meaning": "Frame Detector Number",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxD3",
+   "meaning": "Frame Phase Number",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxD4",
+   "meaning": "Frame Rotation Number",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxD5",
+   "meaning": "Frame Rr Interval Number",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxD6",
+   "meaning": "Frame Time Slot Number",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxD7",
+   "meaning": "Frame Slice Number",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxD8",
+   "meaning": "Frame Angular View Number",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxD9",
+   "meaning": "Frame Time Slice Number",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxDA",
+   "meaning": "Is Arrowhead",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxDB",
+   "meaning": "PET Rr Interval Index",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxDC",
+   "meaning": "PET Time Slot Index",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxDD",
+   "meaning": "PET Time Slice Index",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxDE",
+   "meaning": "PET Slice Index",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxDF",
+   "meaning": "Voxel Number",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxE9",
+   "meaning": "Per Frame Voxels Functional Group",
+   "vm": "0-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxF1",
+   "meaning": "MR Image Prospective Motion Correction",
+   "vm": "6",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxF2",
+   "meaning": "MR Image Retrospective Motion Correction",
+   "vm": "1-n",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxF3",
+   "meaning": "Dynamic Linear Voigl Trafo",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxF4",
+   "meaning": "Color Key",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxF5",
+   "meaning": "Rotated Text Allowed",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxF6",
+   "meaning": "Number Of Represented Images",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxF7",
+   "meaning": "Data Type Icons",
+   "vm": "0-n",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxF9",
+   "meaning": "Flagging Sequence",
+   "vm": "0-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxFB",
+   "meaning": "Bookmark Sequence",
+   "vm": "0-1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxFC",
+   "meaning": "Ris Code Sequence",
+   "vm": "0-1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxFD",
+   "meaning": "Workflow Step Sequence",
+   "vm": "0-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 001",
+   "element": "2001xxFF",
+   "meaning": "Volume Pixel",
+   "vm": "1",
+   "vr": "OW/OB"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx01",
+   "meaning": "Edr Setgp",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx02",
+   "meaning": "Edr Setsk",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx03",
+   "meaning": "Um Rank Type",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx04",
+   "meaning": "Um Rank Number",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx05",
+   "meaning": "Um Rank Enhancement",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx06",
+   "meaning": "Um Kernel Size",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx07",
+   "meaning": "Um Gamma Type",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx08",
+   "meaning": "Um Gamma Angle",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx09",
+   "meaning": "Um Gamma Shift",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx0A",
+   "meaning": "Um Gamma Center",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx0B",
+   "meaning": "Drr Contrast Equalization",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx0C",
+   "meaning": "Drr Contrast Equalization Kernel Size",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx0D",
+   "meaning": "Drr Sharp Lut Type",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx0E",
+   "meaning": "Drr Sharpening",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx0F",
+   "meaning": "Drr Sharp Kernel Size",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx10",
+   "meaning": "Drr Window Width",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx11",
+   "meaning": "Drr Window Level",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx12",
+   "meaning": "Drr Lut Type",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx13",
+   "meaning": "Unique Processing Mode",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx14",
+   "meaning": "Unique Contrast Balance",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx15",
+   "meaning": "Unique Center Density",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx16",
+   "meaning": "Unique Bright Density",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx17",
+   "meaning": "Unique Detail Contrast",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx18",
+   "meaning": "Unique Density Curve",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx19",
+   "meaning": "Unique Density Min",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx1A",
+   "meaning": "Unique Density Max",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx1B",
+   "meaning": "Unique Gamma",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx1C",
+   "meaning": "Unique Gamma Min",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx1D",
+   "meaning": "Unique Gamma Max",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx1E",
+   "meaning": "Unique Structure Preference",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx1F",
+   "meaning": "Unique Noise Limit",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx20",
+   "meaning": "Unique Noise Band",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx21",
+   "meaning": "Unique Noise Step",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx22",
+   "meaning": "Unique Noise Compensation",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx23",
+   "meaning": "Unique Structure Boost",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx24",
+   "meaning": "Unique Strong Contrast Limit",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx25",
+   "meaning": "Unique Strong Contrast Factor",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx26",
+   "meaning": "Unique Structure Boost Offset",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx27",
+   "meaning": "Unique Weak Contrast Limit",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx28",
+   "meaning": "Unique Smooth Gain",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx29",
+   "meaning": "Unique Level",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx2A",
+   "meaning": "Unique Gain Up Single",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx2B",
+   "meaning": "Unique Smh Limit One",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx2C",
+   "meaning": "Unique Film Density Min",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx2D",
+   "meaning": "Unique Film Density Max",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx2E",
+   "meaning": "Unique Version",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx2F",
+   "meaning": "Ranger Version",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx30",
+   "meaning": "Ranger Mode",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx31",
+   "meaning": "Ranger Field1",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx32",
+   "meaning": "Ranger Field2",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx33",
+   "meaning": "Ranger Percentile Key1",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx34",
+   "meaning": "Ranger Percentile Key2",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx35",
+   "meaning": "Ranger Dose1",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx36",
+   "meaning": "Ranger Dose2",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx37",
+   "meaning": "Ranger Manual Dose1",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx38",
+   "meaning": "Ranger Manual Dose2",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx39",
+   "meaning": "Unique Rox Shape",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx3A",
+   "meaning": "Ranger Set Sequence",
+   "vm": "1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx3B",
+   "meaning": "Rox Sequence",
+   "vm": "0-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx3C",
+   "meaning": "Xray Edge Enhancement Sequence",
+   "vm": "1-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx3D",
+   "meaning": "Edr Lut Sequence",
+   "vm": "0-1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx3E",
+   "meaning": "Unique Dose Decades",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx3F",
+   "meaning": "Unique Dose Unit",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx40",
+   "meaning": "Unique Density Unit",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx50",
+   "meaning": "Workflow Status",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx52",
+   "meaning": "Workflow Step Id",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx53",
+   "meaning": "Workflow Step Status",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx57",
+   "meaning": "Workflow Step Input Sequence",
+   "vm": "0-1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx58",
+   "meaning": "Workflow Step Output Sequence",
+   "vm": "0-1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx5A",
+   "meaning": "Workflow Step Type",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx5C",
+   "meaning": "Workflow Id",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx5D",
+   "meaning": "Pixel Data Representation Rows",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx5E",
+   "meaning": "Pixel Data Representation Columns",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx5F",
+   "meaning": "Private Dicom Extension Sequence",
+   "vm": "0-1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx63",
+   "meaning": "Isyntax Reference",
+   "vm": "1",
+   "vr": "ST"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx64",
+   "meaning": "Workflow Step Job Params Sequence",
+   "vm": "0-1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx65",
+   "meaning": "Preserve Aspect",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx66",
+   "meaning": "Interpolated",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx67",
+   "meaning": "Error Flag",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx68",
+   "meaning": "Error Message Id",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx6B",
+   "meaning": "Suitable For",
+   "vm": "0-n",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx71",
+   "meaning": "Submit Mpps Job",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx72",
+   "meaning": "Displayed Area Bottom Right Hand Corner Fraction",
+   "vm": "2",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx73",
+   "meaning": "Displayed Area Top Left Hand Corner Fraction",
+   "vm": "2",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx74",
+   "meaning": "Interpolation Mode",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 002",
+   "element": "2001xx75",
+   "meaning": "Graphic Annotation Id Reference",
+   "vm": "0-n",
+   "vr": "SS"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx01",
+   "meaning": "View Geometry",
+   "vm": "1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx02",
+   "meaning": "Frame Geometry Origin",
+   "vm": "3",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx03",
+   "meaning": "Frame Geometry Extent",
+   "vm": "2",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx04",
+   "meaning": "Frame Geometry Orientation",
+   "vm": "6",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx05",
+   "meaning": "Visual Sequence",
+   "vm": "1-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx06",
+   "meaning": "Cut Sequence",
+   "vm": "0-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx07",
+   "meaning": "Visual Opacity",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx08",
+   "meaning": "Opacity Map Sequence",
+   "vm": "1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx0A",
+   "meaning": "Light Sequence",
+   "vm": "1-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx0B",
+   "meaning": "Color Map Sequence",
+   "vm": "1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx0D",
+   "meaning": "Visual Threshold",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx0E",
+   "meaning": "Scene Sequence",
+   "vm": "0-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx0F",
+   "meaning": "Frame Geometry Slab",
+   "vm": "2",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx12",
+   "meaning": "Gradient Map Sequence",
+   "vm": "1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx17",
+   "meaning": "Display Rows",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx18",
+   "meaning": "Display Columns",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx19",
+   "meaning": "Frame Geometry Type",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx1A",
+   "meaning": "Light Intensity",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx1B",
+   "meaning": "Light Color",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx1C",
+   "meaning": "Light Origin",
+   "vm": "3",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx1D",
+   "meaning": "Light Direction",
+   "vm": "3",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx1E",
+   "meaning": "Color Map Samples",
+   "vm": "4-n",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx1F",
+   "meaning": "Opacity Map Samples",
+   "vm": "2-n",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx21",
+   "meaning": "Visual Color",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx22",
+   "meaning": "Illumination Ambient",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx23",
+   "meaning": "Illumination Diffuse",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx24",
+   "meaning": "Illumination Specular",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx25",
+   "meaning": "Illumination Specular Power",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx26",
+   "meaning": "Depth Cue Begin",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx27",
+   "meaning": "Depth Cue Lambda",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx28",
+   "meaning": "Depth Cue Function",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx2A",
+   "meaning": "Cut Set Type",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx2B",
+   "meaning": "Cut Plane Origin",
+   "vm": "3",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx2C",
+   "meaning": "Cut Plane Normal",
+   "vm": "3",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx2D",
+   "meaning": "Volume Definition Number",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx2E",
+   "meaning": "Volume Mask Sequence",
+   "vm": "0-1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx2F",
+   "meaning": "Volume Mask Data",
+   "vm": "1",
+   "vr": "OB"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx30",
+   "meaning": "Volume Mask Offset",
+   "vm": "3",
+   "vr": "SL"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx31",
+   "meaning": "Volume Mask Size",
+   "vm": "3",
+   "vr": "SL"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx32",
+   "meaning": "Volume Mask Alignment",
+   "vm": "2",
+   "vr": "SL"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx36",
+   "meaning": "Light Anchor",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx37",
+   "meaning": "Cone Geometry Origin",
+   "vm": "3",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx38",
+   "meaning": "Cone Geometry Orientation",
+   "vm": "9",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx39",
+   "meaning": "Cone Geometry View Distance",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx3A",
+   "meaning": "Cone Geometry Slab Extent",
+   "vm": "2",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx3B",
+   "meaning": "Cone Geometry Field Of View",
+   "vm": "2",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx3C",
+   "meaning": "Intensity Map Sequence",
+   "vm": "1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx3D",
+   "meaning": "Intensity Map Samples",
+   "vm": "1-n",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx3E",
+   "meaning": "Mesh Sequence",
+   "vm": "0-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx40",
+   "meaning": "Mesh Color",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx41",
+   "meaning": "Mesh Draw Style",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx42",
+   "meaning": "Mesh Section Sequence",
+   "vm": "0-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx44",
+   "meaning": "Mesh Section Vertex Connectivity",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx45",
+   "meaning": "Mesh Section Vertex Size",
+   "vm": "1",
+   "vr": "SL"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx46",
+   "meaning": "Mesh Section Vertex Format",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx47",
+   "meaning": "Mesh Section Vertex Data",
+   "vm": "1-n",
+   "vr": "OB"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx49",
+   "meaning": "Referenced Volume Definition Sequence",
+   "vm": "1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx4A",
+   "meaning": "Mesh Section Index Data",
+   "vm": "1-n",
+   "vr": "OB"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx4B",
+   "meaning": "Mesh Section Index Size",
+   "vm": "1",
+   "vr": "SL"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xx4C",
+   "meaning": "Shutter Interaction Type",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xxA1",
+   "meaning": "Volume Type",
+   "vm": "1-2",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xxA2",
+   "meaning": "Volume Origin",
+   "vm": "3",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xxA3",
+   "meaning": "Volume Axis",
+   "vm": "9",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xxA4",
+   "meaning": "Volume Pixel Spacing",
+   "vm": "2",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xxA5",
+   "meaning": "Volume Slice Spacing",
+   "vm": "1-n",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xxA6",
+   "meaning": "Volume Slices",
+   "vm": "1",
+   "vr": "US"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xxA8",
+   "meaning": "Referenced Volume Definition Number",
+   "vm": "1-n",
+   "vr": "IS"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xxA9",
+   "meaning": "Linear Modality Gl Trafo Sequence",
+   "vm": "0-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xxAA",
+   "meaning": "Volume Slice Offsets",
+   "vm": "1-n",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 097",
+   "element": "2001xxAB",
+   "meaning": "Number Of Volume Definitions",
+   "vm": "1",
+   "vr": "IS"
+  },
+  {
+   "creator": "Philips Imaging DD 129",
+   "element": "2001xx00",
+   "meaning": "Presentation State Sequence",
+   "vm": "1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 129",
+   "element": "2001xx01",
+   "meaning": "Embedded Original Presentation State Sequence",
+   "vm": "1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 129",
+   "element": "2001xx02",
+   "meaning": "Planar Intersection Sequence",
+   "vm": "0-1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 129",
+   "element": "2001xx03",
+   "meaning": "Plane Separator Line Color",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips Imaging DD 129",
+   "element": "2001xx04",
+   "meaning": "Plane Sequence",
+   "vm": "1-n",
+   "vr": "SQ"
+  },
+  {
+   "creator": "Philips Imaging DD 129",
+   "element": "2001xx05",
+   "meaning": "Plane Equation",
+   "vm": "4",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 129",
+   "element": "2001xx06",
+   "meaning": "Plane Opacity",
+   "vm": "1",
+   "vr": "FD"
+  },
+  {
+   "creator": "Philips Imaging DD 129",
+   "element": "2001xx07",
+   "meaning": "Plane Enabled",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 129",
+   "element": "2001xx08",
+   "meaning": "Plane Selected",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "Philips Imaging DD 129",
+   "element": "2001xx09",
+   "meaning": "Plane Highlight Color",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "Philips MR Imaging DD 001",
+   "element": "2005xx0D",
+   "meaning": "Scale Intercept",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips MR Imaging DD 001",
+   "element": "2005xx0E",
+   "meaning": "Scale Slope",
+   "vm": "1",
+   "vr": "FL"
+  },
+  {
+   "creator": "Philips PET Private Group",
+   "element": "7053xx00",
+   "meaning": "SUV Factor - Multiplying Stored Pixel Values by Rescale Slope then this factor results in SUVbw in g/l",
+   "vm": "1",
+   "vr": "DS"
+  },
+  {
+   "creator": "Philips PET Private Group",
+   "element": "7053xx09",
+   "meaning": "Activity Concentration Factor - Multiplying Stored Pixel Values by Rescale Slope then this factor results in MBq/ml.",
+   "vm": "1",
+   "vr": "DS"
+  },
+  {
+   "creator": "Philips ST80i",
+   "element": "0025xx01",
+   "meaning": "ST80i Stress Study file data",
+   "vm": "1",
+   "vr": "OW"
+  },
+  {
+   "creator": "SIEMENS MR HEADER",
+   "element": "0019xx0C",
+   "meaning": "B Value",
+   "vm": "1",
+   "vr": "IS"
+  },
+  {
+   "creator": "SIEMENS MR HEADER",
+   "element": "0019xx0D",
+   "meaning": "Diffusion Directionality",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "SIEMENS MR HEADER",
+   "element": "0019xx0E",
+   "meaning": "Diffusion Gradient Direction",
+   "vm": "3",
+   "vr": "FD"
+  },
+  {
+   "creator": "SIEMENS MR HEADER",
+   "element": "0019xx27",
+   "meaning": "B Matrix",
+   "vm": "6",
+   "vr": "FD"
+  },
+  {
+   "creator": "SIEMENS SYNGO ULTRA-SOUND TOYON DATA STREAMING",
+   "element": "7FD1xx01",
+   "meaning": "Padding",
+   "vm": "1",
+   "vr": "OB"
+  },
+  {
+   "creator": "SIEMENS SYNGO ULTRA-SOUND TOYON DATA STREAMING",
+   "element": "7FD1xx09",
+   "meaning": "Version ID",
+   "vm": "1",
+   "vr": "UI"
+  },
+  {
+   "creator": "SIEMENS SYNGO ULTRA-SOUND TOYON DATA STREAMING",
+   "element": "7FD1xx10",
+   "meaning": "Volume Payload",
+   "vm": "1",
+   "vr": "OB"
+  },
+  {
+   "creator": "SIEMENS SYNGO ULTRA-SOUND TOYON DATA STREAMING",
+   "element": "7FD1xx11",
+   "meaning": "After Payload",
+   "vm": "1",
+   "vr": "OB"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0119xx00",
+   "meaning": "Acoustic Meta Information Version",
+   "vm": "1",
+   "vr": "LO"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0119xx01",
+   "meaning": "Common Acoustic Meta Information",
+   "vm": "1",
+   "vr": "OB"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0119xx02",
+   "meaning": "Multi Stream Sequence",
+   "vm": "1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0119xx03",
+   "meaning": "Acoustic Data Sequence",
+   "vm": "1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0119xx04",
+   "meaning": "Per Transaction Acoustic Control Information",
+   "vm": "1",
+   "vr": "OB"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0119xx05",
+   "meaning": "Acoustic Data Offset",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0119xx06",
+   "meaning": "Acoustic Data Length",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0119xx07",
+   "meaning": "Footer Offset",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0119xx08",
+   "meaning": "Footer Length",
+   "vm": "1",
+   "vr": "UL"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0119xx09",
+   "meaning": "Acoustic Stream Number",
+   "vm": "1",
+   "vr": "SS"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0119xx10",
+   "meaning": "Acoustic Stream Type",
+   "vm": "1",
+   "vr": "SH"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0119xx11",
+   "meaning": "Stage Timer Time",
+   "vm": "1",
+   "vr": ""
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0119xx12",
+   "meaning": "Stop Watch Time",
+   "vm": "1",
+   "vr": ""
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0119xx13",
+   "meaning": "Volume Rate",
+   "vm": "1",
+   "vr": "IS"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0119xx21",
+   "meaning": "",
+   "vm": "1",
+   "vr": "SH"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0129xx00",
+   "meaning": "MPR View Sequence",
+   "vm": "1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0129xx02",
+   "meaning": "Bookmark UID",
+   "vm": "1",
+   "vr": "UI"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0129xx03",
+   "meaning": "Plane Origin Vector",
+   "vm": "1",
+   "vr": ""
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0129xx04",
+   "meaning": "Row Vector",
+   "vm": "1",
+   "vr": ""
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0129xx05",
+   "meaning": "Column Vector",
+   "vm": "1",
+   "vr": ""
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0129xx06",
+   "meaning": "Visualization Sequence",
+   "vm": "1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0129xx07",
+   "meaning": "Bookmark UID",
+   "vm": "1",
+   "vr": "UI"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0129xx08",
+   "meaning": "Visualization Information",
+   "vm": "1",
+   "vr": "OB"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0129xx09",
+   "meaning": "Application State Sequence",
+   "vm": "1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0129xx10",
+   "meaning": "Application State Information",
+   "vm": "1",
+   "vr": "OB"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0129xx11",
+   "meaning": "Referenced Bookmark Sequence",
+   "vm": "1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0129xx12",
+   "meaning": "Referenced Bookmark UID",
+   "vm": "1",
+   "vr": "UI"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0129xx20",
+   "meaning": "Cine Parameters Sequence",
+   "vm": "1",
+   "vr": "SQ"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0129xx21",
+   "meaning": "Cine Parameters Schema",
+   "vm": "1",
+   "vr": "OB"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0129xx22",
+   "meaning": "Values of Cine Parameters",
+   "vm": "1",
+   "vr": "OB"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0129xx29",
+   "meaning": "",
+   "vm": "1",
+   "vr": "OB"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0129xx30",
+   "meaning": "Raw Data Object Type",
+   "vm": "1",
+   "vr": "CS"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0139xx01",
+   "meaning": "Physio Capture ROI",
+   "vm": "1",
+   "vr": "SL"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0149xx01",
+   "meaning": "Vector of BROI Points",
+   "vm": "1-n",
+   "vr": "FD"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0149xx02",
+   "meaning": "Start/End Timestamps of Strip Stream",
+   "vm": "1-n",
+   "vr": "FD"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "0149xx03",
+   "meaning": "Timestamps of Visible R-waves",
+   "vm": "1-n",
+   "vr": "FD"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "7FD1xx01",
+   "meaning": "Acoustic Image and Footer Data",
+   "vm": "1",
+   "vr": "OB"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "7FD1xx09",
+   "meaning": "Volume Version ID",
+   "vm": "1",
+   "vr": "UI"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "7FD1xx10",
+   "meaning": "Volume Payload",
+   "vm": "1",
+   "vr": "OB"
+  },
+  {
+   "creator": "SIEMENS Ultrasound SC2000",
+   "element": "7FD1xx11",
+   "meaning": "After Payload",
+   "vm": "1",
+   "vr": "OB"
+  }
+ ],
+ "sourceSHA256": "77d60b856faf4223ab40a398c53130fc0ee9490d0d811ee3536e6d25c02ac717",
+ "standard": "PS3.15",
+ "version": "2026c"
+}

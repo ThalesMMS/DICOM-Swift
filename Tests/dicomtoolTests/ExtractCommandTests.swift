@@ -5,7 +5,38 @@ import XCTest
 import DicomCore
 
 final class ExtractCommandTests: XCTestCase {
-    func testExtractCommandExportsAllFramesWithMetadata() throws {
+    func test_boundedExport_matchesImagesAndOriginalFrameSidecars() async throws {
+        let input = try makeTemporaryDICOM(pixelValues: [0, 100, 200, 300, 400, 500], rows: 1, columns: 2, frames: 3)
+        defer { try? FileManager.default.removeItem(at: input) }
+        let legacy = try temporaryDirectory()
+        let bounded = try temporaryDirectory()
+        for (directory, flags) in [(legacy, [String]()), (bounded, ["--bounded"])] {
+            var command = try ExtractCommand.parse([input.path, "--output", directory.path, "--all-frames", "--metadata"] + flags)
+            try await command.run()
+        }
+        for index in 0..<3 {
+            let name = DicomImageExporter.fileName(baseName: input.deletingPathExtension().lastPathComponent,
+                                                   frameIndex: index, frameCount: 3, format: .png)
+            XCTAssertEqual(try Data(contentsOf: legacy.appendingPathComponent(name)),
+                           try Data(contentsOf: bounded.appendingPathComponent(name)))
+            let actual = try Data(contentsOf: bounded.appendingPathComponent(name + ".json"))
+            XCTAssertEqual(try Data(contentsOf: legacy.appendingPathComponent(name + ".json")), actual)
+            let metadata = try XCTUnwrap(JSONSerialization.jsonObject(with: actual) as? [String: Any])
+            XCTAssertEqual(metadata["frameIndex"] as? Int, index)
+            XCTAssertEqual(metadata["numberOfFrames"] as? Int, 3)
+        }
+    }
+
+    func test_boundedExport_rejectsOverflowingFrameIndexBeforeArithmetic() async throws {
+        let input = try makeTemporaryDICOM(pixelValues: [0, 100], rows: 1, columns: 2)
+        defer { try? FileManager.default.removeItem(at: input) }
+        var command = try ExtractCommand.parse([input.path, "--output", temporaryDirectory().appendingPathComponent("bad.png").path,
+                                                "--bounded", "--frame", String(Int.max)])
+        do { try await command.run(); XCTFail("Invalid frame accepted") }
+        catch { XCTAssertEqual(error as? DicomImageExportError, .invalidFrame(index: Int.max, frameCount: 1)) }
+    }
+
+    func testExtractCommandExportsAllFramesWithMetadata() async throws {
         let dicomURL = try makeTemporaryDICOM(
             pixelValues: [0, 100, 200, 300, 400, 500],
             rows: 1,
@@ -23,7 +54,7 @@ final class ExtractCommandTests: XCTestCase {
             "--overwrite"
         ])
 
-        try command.run()
+        try await command.run()
 
         XCTAssertTrue(FileManager.default.fileExists(
             atPath: outputDirectory.appendingPathComponent("\(dicomURL.deletingPathExtension().lastPathComponent)_frame0001.png").path
@@ -39,7 +70,7 @@ final class ExtractCommandTests: XCTestCase {
         ))
     }
 
-    func testExtractCommandExportsSelectedFrameAsJPEG() throws {
+    func testExtractCommandExportsSelectedFrameAsJPEG() async throws {
         let dicomURL = try makeTemporaryDICOM(
             pixelValues: [0, 100, 200, 300],
             rows: 1,
@@ -58,7 +89,7 @@ final class ExtractCommandTests: XCTestCase {
             "--overwrite"
         ])
 
-        try command.run()
+        try await command.run()
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: outputURL.path))
     }

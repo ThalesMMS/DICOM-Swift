@@ -1,0 +1,42 @@
+{
+  "resourceType": "Observation",
+  "id": "decimals",
+  "status": "final",
+  "code": {
+    "coding": [
+      {
+        "system": "http://loinc.org",
+        "code": "29463-7"
+      }
+    ]
+  },
+  "effectiveDateTime": "2026-09-12T10:15:30.250+02:00",
+  "valueQuantity": {
+    "value": 70.10,
+    "unit": "kg",
+    "system": "http://unitsofmeasure.org",
+    "code": "kg"
+  },
+  "component": [
+    {
+      "code": {
+        "text": "ratio"
+      },
+      "valueQuantity": {
+        "value": 1.0E-3
+      }
+    },
+    {
+      "code": {
+        "text": "count"
+      },
+      "valueInteger": 12
+    },
+    {
+      "code": {
+        "text": "flag"
+      },
+      "valueBoolean": false
+    }
+  ]
+}

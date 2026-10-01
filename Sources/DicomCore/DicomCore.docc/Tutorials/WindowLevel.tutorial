@@ -4,7 +4,6 @@
 
         Learn how to apply window/level adjustments to convert 16-bit DICOM pixel data into displayable 8-bit images. You'll explore embedded settings, optimal calculations, medical presets, GPU acceleration, and quality metrics.
 
-        @Image(source: "window-level-intro.png", alt: "Window/Level visualization")
     }
 
     @Section(title: "Understanding Window/Level") {
@@ -13,7 +12,6 @@
 
             In DICOM images, pixel values often range from -1024 to +3071 (for CT) or beyond. Window/level maps this wide range to displayable 8-bit values (0-255), allowing you to highlight specific tissue types or anatomical structures.
 
-            @Image(source: "window-level-concept.png", alt: "Window/level concept")
         }
 
         @Steps {
@@ -23,7 +21,6 @@
                 Most medical images (CT, MR) use 16-bit grayscale pixels with values that need windowing before display.
 
                 @Code(name: "WindowLevelExample.swift", file: WindowLevelExample.swift) {
-                    @Image(source: "load-pixels.png", alt: "Load pixel data")
                 }
             }
 
@@ -33,7 +30,6 @@
                 DICOM files often include manufacturer-recommended window/level settings stored as metadata.
 
                 @Code(name: "WindowLevelExample.swift", file: WindowLevelExample.swift) {
-                    @Image(source: "get-settings.png", alt: "Get window settings")
                 }
             }
 
@@ -43,7 +39,6 @@
                 The `applyWindowLevel` method performs the mapping: pixels outside the window become 0 or 255, pixels within are linearly scaled.
 
                 @Code(name: "WindowLevelExample.swift", file: WindowLevelExample.swift) {
-                    @Image(source: "apply-window.png", alt: "Apply window/level")
                 }
             }
 
@@ -53,7 +48,6 @@
                 Different anatomical structures require different window settings. For example, brain tissue uses a narrow window (80) centered at 40.
 
                 @Code(name: "WindowLevelExample.swift", file: WindowLevelExample.swift) {
-                    @Image(source: "custom-window.png", alt: "Custom window values")
                 }
             }
         }
@@ -65,7 +59,6 @@
 
             The optimal window calculation analyzes your image's histogram to find settings that maximize contrast and visualization quality.
 
-            @Image(source: "optimal-calc.png", alt: "Optimal calculation")
         }
 
         @Steps {
@@ -75,7 +68,6 @@
                 The `calculateOptimalWindowLevelV2` method analyzes the pixel distribution and returns a `WindowSettings` struct.
 
                 @Code(name: "WindowLevelExample.swift", file: WindowLevelExample.swift) {
-                    @Image(source: "calc-optimal.png", alt: "Calculate optimal")
                 }
             }
 
@@ -85,7 +77,6 @@
                 The decoder provides a shorthand method that returns the same optimal settings.
 
                 @Code(name: "WindowLevelExample.swift", file: WindowLevelExample.swift) {
-                    @Image(source: "decoder-optimal.png", alt: "Decoder convenience")
                 }
             }
         }
@@ -97,7 +88,6 @@
 
             The library includes 13 medical presets including lung, bone, soft tissue, brain, liver, mediastinum, and more. Each preset is tuned to highlight specific anatomy in CT images.
 
-            @Image(source: "medical-presets.png", alt: "Medical presets")
         }
 
         @Steps {
@@ -107,7 +97,6 @@
                 Use the `getPresetValuesV2` method with the `WindowPreset` enum to get type-safe preset values.
 
                 @Code(name: "WindowLevelExample.swift", file: WindowLevelExample.swift) {
-                    @Image(source: "apply-presets.png", alt: "Apply presets")
                 }
             }
 
@@ -117,7 +106,6 @@
                 The `ctPresets` property returns all CT-specific presets, and `allPresets` includes all available options.
 
                 @Code(name: "WindowLevelExample.swift", file: WindowLevelExample.swift) {
-                    @Image(source: "explore-presets.png", alt: "Explore presets")
                 }
             }
 
@@ -127,7 +115,6 @@
                 The library can suggest appropriate presets based on modality (CT, MR, etc.) and body part examined.
 
                 @Code(name: "WindowLevelExample.swift", file: WindowLevelExample.swift) {
-                    @Image(source: "suggest-presets.png", alt: "Suggest presets")
                 }
             }
 
@@ -137,7 +124,6 @@
                 You can query presets using string names, which is useful for UI dropdowns or user input.
 
                 @Code(name: "WindowLevelExample.swift", file: WindowLevelExample.swift) {
-                    @Image(source: "lookup-preset.png", alt: "Lookup by name")
                 }
             }
         }
@@ -149,7 +135,6 @@
 
             For images ≥800×800 pixels, GPU acceleration provides up to 3.94× speedup compared to CPU processing. The library automatically handles fallback if Metal is unavailable.
 
-            @Image(source: "gpu-acceleration.png", alt: "GPU acceleration")
         }
 
         @Steps {
@@ -159,7 +144,6 @@
                 Set `processingMode: .metal` to force GPU-based windowing. The system gracefully falls back to CPU if Metal is unavailable.
 
                 @Code(name: "WindowLevelExample.swift", file: WindowLevelExample.swift) {
-                    @Image(source: "gpu-mode.png", alt: "GPU mode")
                 }
             }
 
@@ -169,7 +153,6 @@
                 Set `processingMode: .auto` to let the library choose the best backend: Metal for large images (≥800×800), vDSP for smaller ones.
 
                 @Code(name: "WindowLevelExample.swift", file: WindowLevelExample.swift) {
-                    @Image(source: "auto-mode.png", alt: "Auto mode")
                 }
             }
 
@@ -179,7 +162,6 @@
                 Set `processingMode: .vdsp` to use the CPU-based vDSP backend, useful for small images or when consistent behavior is required.
 
                 @Code(name: "WindowLevelExample.swift", file: WindowLevelExample.swift) {
-                    @Image(source: "cpu-mode.png", alt: "CPU mode")
                 }
             }
         }
@@ -191,7 +173,6 @@
 
             Quality metrics help assess image quality, validate imaging protocols, and detect potential issues with scan parameters.
 
-            @Image(source: "quality-metrics.png", alt: "Quality metrics")
         }
 
         @Steps {
@@ -201,7 +182,6 @@
                 The `calculateQualityMetrics` method returns mean, standard deviation, min, max, SNR, and contrast values.
 
                 @Code(name: "WindowLevelExample.swift", file: WindowLevelExample.swift) {
-                    @Image(source: "calc-metrics.png", alt: "Calculate metrics")
                 }
             }
 
@@ -211,7 +191,6 @@
                 Process an entire series of images to compare quality across slices or detect outliers.
 
                 @Code(name: "WindowLevelExample.swift", file: WindowLevelExample.swift) {
-                    @Image(source: "batch-metrics.png", alt: "Batch metrics")
                 }
             }
         }
@@ -223,7 +202,6 @@
 
             Batch processing is essential for handling DICOM series (multiple slices) or comparing settings across different studies.
 
-            @Image(source: "batch-processing.png", alt: "Batch processing")
         }
 
         @Steps {
@@ -233,7 +211,6 @@
                 The `batchCalculateOptimalWindowLevelV2` method processes multiple images and returns an array of `WindowSettings`.
 
                 @Code(name: "WindowLevelExample.swift", file: WindowLevelExample.swift) {
-                    @Image(source: "batch-optimal.png", alt: "Batch optimal")
                 }
             }
         }
@@ -245,7 +222,6 @@
 
             This is useful for labeling custom settings, validating user input, or reverse-engineering window values from displayed images.
 
-            @Image(source: "preset-matching.png", alt: "Preset matching")
         }
 
         @Steps {
@@ -255,7 +231,6 @@
                 The `getPresetName` method compares settings against all known presets with a configurable tolerance.
 
                 @Code(name: "WindowLevelExample.swift", file: WindowLevelExample.swift) {
-                    @Image(source: "identify-preset.png", alt: "Identify preset")
                 }
             }
 
@@ -265,7 +240,6 @@
                 Adjust the tolerance parameter to control how closely settings must match a preset.
 
                 @Code(name: "WindowLevelExample.swift", file: WindowLevelExample.swift) {
-                    @Image(source: "strict-match.png", alt: "Strict matching")
                 }
             }
         }
@@ -277,7 +251,6 @@
 
             This workflow demonstrates loading, analyzing, suggesting presets, applying optimal windowing, and validating results.
 
-            @Image(source: "complete-workflow.png", alt: "Complete workflow")
         }
 
         @Steps {
@@ -287,7 +260,6 @@
                 This example shows how to load a file, calculate metrics, get suggestions, apply windowing with GPU acceleration, and identify matching presets.
 
                 @Code(name: "WindowLevelExample.swift", file: WindowLevelExample.swift) {
-                    @Image(source: "full-pipeline.png", alt: "Full pipeline")
                 }
             }
         }

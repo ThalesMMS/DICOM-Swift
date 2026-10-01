@@ -89,9 +89,14 @@ public struct DicomMediaCatalogInstance: Equatable, Sendable {
             return "RTDOSE"
         case DicomRTPlan.storageSOPClassUID:
             return "RTPLAN"
+        case DicomSpatialRegistrationDocument.storageSOPClassUID:
+            return "REG"
         case DicomParametricMap.storageSOPClassUID:
             return "Parametric Map"
         default:
+            if DicomGrayscalePresentationState.supportedStorageSOPClassUIDs.contains(sopClassUID) {
+                return "Presentation State"
+            }
             if DicomSRDocument.structuredReportSOPClassUIDs.contains(sopClassUID) {
                 return sopClassUID == DicomSRDocument.keyObjectSelectionDocumentStorageSOPClassUID ? "KOS" : "SR"
             }
@@ -113,8 +118,10 @@ public struct DicomMediaCatalogInstance: Equatable, Sendable {
         DicomRTStructureSet.storageSOPClassUID,
         DicomRTDoseVolume.storageSOPClassUID,
         DicomRTPlan.storageSOPClassUID,
+        DicomSpatialRegistrationDocument.storageSOPClassUID,
         DicomParametricMap.storageSOPClassUID
     ])
+    .union(DicomGrayscalePresentationState.supportedStorageSOPClassUIDs)
     .union(DicomSRDocument.structuredReportSOPClassUIDs)
     .union(DicomEncapsulatedDocument.supportedStorageSOPClassUIDs)
     .union(DicomWaveform.supportedStorageSOPClassUIDs)

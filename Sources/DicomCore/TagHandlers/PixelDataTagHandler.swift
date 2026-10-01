@@ -106,6 +106,7 @@ internal final class PixelDataTagHandler: TagHandler {
         // Record the file offset where pixel data begins
         // This enables lazy loading when getPixels16() or getPixels8() is called
         context.offset = location
+        context.pixelDataVR = parser.currentVR
 
         // Add offset to metadata dictionary for client access via info(for:)
         addInfoInt(tag, location)

@@ -764,40 +764,6 @@ final class DCMDecoderStreamingTests: XCTestCase {
                           "Memory growth should be minimal across multiple range accesses")
     }
 
-    /// Documents the memory characteristics and benefits of streaming access.
-    func testMemoryUsageDocumentation() {
-        // This test always passes - it exists to document the memory characteristics
-        XCTAssertTrue(true, "Memory usage characteristics documented")
-
-        print("""
-
-        ========== Streaming Access Memory Characteristics ==========
-
-        MEMORY BENEFITS:
-        - Streaming allows processing large DICOM files without loading entire pixel buffer
-        - Range-based access loads only requested pixels, not full image
-        - Ideal for: ROI analysis, progressive loading, memory-constrained environments
-
-        TYPICAL MEMORY USAGE:
-        - Full buffer (4096x4096, 16-bit): ~33MB
-        - Streaming (1% range): <1MB
-        - Memory reduction: 30-50x for small ranges
-
-        ACCEPTANCE CRITERIA:
-        - Memory usage <200MB for large files: ✓ (verified in testMemoryUsageLargeFileStreaming)
-        - No memory accumulation across accesses: ✓ (verified in testMemoryUsageMultipleSmallRanges)
-        - Streaming uses <50% memory vs full buffer: ✓ (verified in testMemoryUsageStreamingVsFullBuffer)
-
-        USE CASES:
-        - Preview generation: Load small subset for thumbnail
-        - ROI analysis: Process only region of interest
-        - Slice-by-slice processing: Stream one slice at a time from volume
-        - Tile-based rendering: Load visible tiles only
-        ==============================================================
-
-        """)
-    }
-
     // MARK: - Helper Methods
 
     /// Returns current memory usage in bytes.

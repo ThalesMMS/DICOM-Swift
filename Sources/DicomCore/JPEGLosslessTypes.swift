@@ -98,6 +98,11 @@ internal struct HuffmanTable: Sendable {
     var maxCode: [Int] = []
     /// Index into symbolValues for each bit length [1...16]
     var valPtr: [Int] = []
+    /// Direct lookup for codes of up to `lookupBits` bits: index = the next `lookupBits` bits of the stream,
+    /// value = `length << 8 | symbol`, or 0 when the code is longer (the canonical search then applies).
+    var lookup: [UInt16] = []
+
+    static let lookupBits = 9
 }
 
 /// Result of JPEG Lossless decoding operation

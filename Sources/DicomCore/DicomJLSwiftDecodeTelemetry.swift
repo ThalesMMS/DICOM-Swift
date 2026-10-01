@@ -5,9 +5,11 @@
 
 struct DicomJLSwiftDecodeTelemetry: Equatable, Sendable {
     enum Outcome: Equatable, Sendable {
+        case skipped(String)
         case succeeded
         case matched
         case mismatched
+        case cancelled
         case failed(String)
         case fellBack(String)
     }

@@ -1,0 +1,714 @@
+{
+  "version": 1,
+  "issue": 2367,
+  "policy": "Correctness (#2366) is evaluated before speed; a workload with a failed correctness check is a failure regardless of timing. Missing measurements are recorded as not-executed with a reason and never estimated; absence of GPU or oracle is not a pass. Numbers describe the named host, build, corpus (digests) and configuration only. Budgets are release-build budgets; a debug build multiplies them by debugBudgetMultiplier and records that in the workload parameters.",
+  "stages": [
+    "open-metadata",
+    "bytes-read",
+    "decode",
+    "normalize",
+    "gpu-normalize",
+    "first-frame",
+    "final-refine",
+    "measure",
+    "export",
+    "storage",
+    "concurrent",
+    "network-retrieve",
+    "network-store",
+    "mpr-3d",
+    "mesh-metrics",
+    "landmark-registration",
+    "affine-resampling"
+  ],
+  "modes": [
+    "cold-sdk-first-call",
+    "prewarmed-first-clinical-call",
+    "warm-isolated",
+    "warm-sustained",
+    "concurrent-clinical-workload",
+    "fallback-path"
+  ],
+  "fixtures": [
+    {
+      "id": "ct-512x512-16bit",
+      "generator": "xorshift-ct-v1",
+      "geometry": "512x512x1",
+      "format": "MONOCHROME2 16-bit (12 stored) Explicit VR LE",
+      "parameters": {
+        "profile": "CT-like single frame",
+        "seed": "593756161"
+      },
+      "sha256": "900eb59b3f94940167be3f5a15135b28c55c47615aa6e3a6f8a9835d1b6aa7da"
+    },
+    {
+      "id": "ct-multiframe-256x256x16",
+      "generator": "xorshift-ct-v1",
+      "geometry": "256x256x16",
+      "format": "MONOCHROME2 16-bit (12 stored) Explicit VR LE",
+      "parameters": {
+        "profile": "CT-like multi-frame",
+        "seed": "593756162"
+      },
+      "sha256": "9e0e8d9c48181e757bbe13f5c1414d6022da84861d78d94909420b0cbbed4402"
+    },
+    {
+      "id": "rgb-512x512-8bit",
+      "generator": "xorshift-rgb-v1",
+      "geometry": "512x512x1",
+      "format": "RGB 8-bit Explicit VR LE",
+      "parameters": {
+        "profile": "RGB secondary capture",
+        "seed": "593756163"
+      },
+      "sha256": "e073eff8e928e197abde1740c6dec44eb1751e9c7cdcfcf78dcf242833e20909"
+    },
+    {
+      "id": "ct-512x512-16bit-jpegls",
+      "generator": "xorshift-ct-v1+transcode",
+      "geometry": "512x512x1",
+      "format": "JPEG-LS lossless 1.2.840.10008.1.2.4.80",
+      "parameters": {
+        "transferSyntax": "1.2.840.10008.1.2.4.80"
+      },
+      "sha256": "f7bfe149de4f088aa4df45225e711cbe831574a7547194e95798139ab78bea9e"
+    },
+    {
+      "id": "ct-512x512-16bit-htj2k",
+      "generator": "xorshift-ct-v1+transcode",
+      "geometry": "512x512x1",
+      "format": "HTJ2K lossless 1.2.840.10008.1.2.4.201",
+      "parameters": {
+        "transferSyntax": "1.2.840.10008.1.2.4.201"
+      },
+      "sha256": "54746a29d3c4456b29ce5200fd07a5599abdbffc6fda0a0f138c59986a43a637"
+    },
+    {
+      "id": "ct-512x512-16bit-rle",
+      "generator": "xorshift-ct-v1+transcode",
+      "geometry": "512x512x1",
+      "format": "RLE lossless 1.2.840.10008.1.2.5",
+      "parameters": {
+        "transferSyntax": "1.2.840.10008.1.2.5"
+      },
+      "sha256": "bc2f49845e4c628b9c87c897ff3a1296db620755a6868a7155224dfb999edf0c"
+    }
+  ],
+  "workloads": [
+    {
+      "id": "open-metadata-ct",
+      "stage": "open-metadata",
+      "fixtureID": "ct-512x512-16bit",
+      "description": "Bounded Part 10 header read (DicomSourceMetadata.readPart10) reporting the bytes copied",
+      "modes": [
+        "cold-sdk-first-call",
+        "prewarmed-first-clinical-call",
+        "warm-isolated",
+        "warm-sustained"
+      ],
+      "warmupIterations": 1,
+      "iterations": 6,
+      "correctness": "SOP Instance UID and geometry equal the generator's values; bytes read are reported",
+      "requires": [],
+      "collector": "dicom-clinical-path-workloads",
+      "budget": {
+        "warningSeconds": 0.05,
+        "failureSeconds": 0.2
+      }
+    },
+    {
+      "id": "open-metadata-multiframe",
+      "stage": "open-metadata",
+      "fixtureID": "ct-multiframe-256x256x16",
+      "description": "Bounded header read of a 16-frame object stopping before the 2 MiB pixel payload",
+      "modes": [
+        "prewarmed-first-clinical-call",
+        "warm-isolated",
+        "warm-sustained"
+      ],
+      "warmupIterations": 1,
+      "iterations": 6,
+      "correctness": "metadata bytes copied stay below the pixel payload size",
+      "requires": [],
+      "collector": "dicom-clinical-path-workloads",
+      "budget": {
+        "warningSeconds": 0.05,
+        "failureSeconds": 0.2
+      }
+    },
+    {
+      "id": "decode-native-ct",
+      "stage": "decode",
+      "fixtureID": "ct-512x512-16bit",
+      "description": "Full-frame native decode through DicomDecodedFrameReader",
+      "modes": [
+        "cold-sdk-first-call",
+        "prewarmed-first-clinical-call",
+        "warm-isolated",
+        "warm-sustained"
+      ],
+      "warmupIterations": 1,
+      "iterations": 6,
+      "correctness": "SHA-256 of decoded 16-bit samples equals the generator digest",
+      "requires": [],
+      "collector": "dicom-clinical-path-workloads",
+      "budget": {
+        "warningSeconds": 0.05,
+        "failureSeconds": 0.25
+      }
+    },
+    {
+      "id": "decode-multiframe",
+      "stage": "decode",
+      "fixtureID": "ct-multiframe-256x256x16",
+      "description": "All 16 frames decoded through DicomDecodedFrameReader",
+      "modes": [
+        "prewarmed-first-clinical-call",
+        "warm-isolated",
+        "warm-sustained"
+      ],
+      "warmupIterations": 1,
+      "iterations": 6,
+      "correctness": "SHA-256 of the concatenated frames equals the generator digest",
+      "requires": [],
+      "collector": "dicom-clinical-path-workloads",
+      "budget": {
+        "warningSeconds": 0.2,
+        "failureSeconds": 0.8
+      }
+    },
+    {
+      "id": "decode-rgb",
+      "stage": "decode",
+      "fixtureID": "rgb-512x512-8bit",
+      "description": "RGB interleaved decode",
+      "modes": [
+        "prewarmed-first-clinical-call",
+        "warm-isolated",
+        "warm-sustained"
+      ],
+      "warmupIterations": 1,
+      "iterations": 6,
+      "correctness": "SHA-256 of decoded interleaved samples equals the generator digest",
+      "requires": [],
+      "collector": "dicom-clinical-path-workloads",
+      "budget": {
+        "warningSeconds": 0.05,
+        "failureSeconds": 0.25
+      }
+    },
+    {
+      "id": "decode-jpegls",
+      "stage": "decode",
+      "fixtureID": "ct-512x512-16bit-jpegls",
+      "description": "Own JPEG-LS decoder (lossless)",
+      "modes": [
+        "prewarmed-first-clinical-call",
+        "warm-isolated",
+        "warm-sustained"
+      ],
+      "warmupIterations": 1,
+      "iterations": 6,
+      "correctness": "decoded samples equal the native generator digest (exact)",
+      "requires": [],
+      "collector": "dicom-clinical-path-workloads",
+      "budget": {
+        "warningSeconds": 0.3,
+        "failureSeconds": 1.0
+      }
+    },
+    {
+      "id": "decode-htj2k",
+      "stage": "decode",
+      "fixtureID": "ct-512x512-16bit-htj2k",
+      "description": "Own HTJ2K decoder (lossless)",
+      "modes": [
+        "prewarmed-first-clinical-call",
+        "warm-isolated",
+        "warm-sustained"
+      ],
+      "warmupIterations": 1,
+      "iterations": 6,
+      "correctness": "decoded samples equal the native generator digest (exact)",
+      "requires": [],
+      "collector": "dicom-clinical-path-workloads",
+      "budget": {
+        "warningSeconds": 0.6,
+        "failureSeconds": 2.0
+      }
+    },
+    {
+      "id": "decode-rle",
+      "stage": "decode",
+      "fixtureID": "ct-512x512-16bit-rle",
+      "description": "Own RLE decoder",
+      "modes": [
+        "prewarmed-first-clinical-call",
+        "warm-isolated",
+        "warm-sustained"
+      ],
+      "warmupIterations": 1,
+      "iterations": 6,
+      "correctness": "decoded samples equal the native generator digest (exact)",
+      "requires": [],
+      "collector": "dicom-clinical-path-workloads",
+      "budget": {
+        "warningSeconds": 0.1,
+        "failureSeconds": 0.4
+      }
+    },
+    {
+      "id": "normalize-vdsp",
+      "stage": "normalize",
+      "fixtureID": "ct-512x512-16bit",
+      "description": "Window/level 16-bit to 8-bit on the CPU (vDSP)",
+      "modes": [
+        "cold-sdk-first-call",
+        "prewarmed-first-clinical-call",
+        "warm-isolated",
+        "warm-sustained"
+      ],
+      "warmupIterations": 1,
+      "iterations": 6,
+      "correctness": "SHA-256 of the 8-bit output equals the value recorded by the first run of the same build; 512x512 bytes produced",
+      "requires": [],
+      "collector": "dicom-clinical-path-workloads",
+      "budget": {
+        "warningSeconds": 0.02,
+        "failureSeconds": 0.1
+      }
+    },
+    {
+      "id": "gpu-normalize-metal",
+      "stage": "gpu-normalize",
+      "fixtureID": "ct-512x512-16bit",
+      "description": "Window/level through the Metal compute path",
+      "modes": [
+        "cold-sdk-first-call",
+        "prewarmed-first-clinical-call",
+        "warm-isolated",
+        "warm-sustained"
+      ],
+      "warmupIterations": 1,
+      "iterations": 6,
+      "correctness": "8-bit output within +-1 of the vDSP output for every pixel",
+      "requires": [
+        "metalDevice"
+      ],
+      "collector": "dicom-clinical-path-workloads",
+      "budget": {
+        "warningSeconds": 0.05,
+        "failureSeconds": 0.2
+      }
+    },
+    {
+      "id": "first-frame-thumbnail",
+      "stage": "first-frame",
+      "fixtureID": "ct-512x512-16bit",
+      "description": "Decode + window + 64x64 PNG export (preview)",
+      "modes": [
+        "cold-sdk-first-call",
+        "prewarmed-first-clinical-call",
+        "warm-isolated",
+        "warm-sustained"
+      ],
+      "warmupIterations": 1,
+      "iterations": 6,
+      "correctness": "PNG decodes to 64x64",
+      "requires": [],
+      "collector": "dicom-clinical-path-workloads",
+      "budget": {
+        "warningSeconds": 0.1,
+        "failureSeconds": 0.4
+      }
+    },
+    {
+      "id": "final-refine-full",
+      "stage": "final-refine",
+      "fixtureID": "ct-512x512-16bit",
+      "description": "Decode + window + full-size PNG export (final)",
+      "modes": [
+        "cold-sdk-first-call",
+        "prewarmed-first-clinical-call",
+        "warm-isolated",
+        "warm-sustained"
+      ],
+      "warmupIterations": 1,
+      "iterations": 6,
+      "correctness": "PNG decodes to 512x512",
+      "requires": [],
+      "collector": "dicom-clinical-path-workloads",
+      "budget": {
+        "warningSeconds": 0.2,
+        "failureSeconds": 0.8
+      }
+    },
+    {
+      "id": "measure-stats",
+      "stage": "measure",
+      "fixtureID": "ct-512x512-16bit",
+      "description": "Pixel statistics over the full frame (DicomPixelMeasurement)",
+      "modes": [
+        "cold-sdk-first-call",
+        "prewarmed-first-clinical-call",
+        "warm-isolated",
+        "warm-sustained"
+      ],
+      "warmupIterations": 1,
+      "iterations": 6,
+      "correctness": "mean equals the analytic mean of the generated samples within 1e-6",
+      "requires": [],
+      "collector": "dicom-clinical-path-workloads",
+      "budget": {
+        "warningSeconds": 0.05,
+        "failureSeconds": 0.2
+      }
+    },
+    {
+      "id": "export-png",
+      "stage": "export",
+      "fixtureID": "rgb-512x512-8bit",
+      "description": "RGB PNG export",
+      "modes": [
+        "cold-sdk-first-call",
+        "prewarmed-first-clinical-call",
+        "warm-isolated",
+        "warm-sustained"
+      ],
+      "warmupIterations": 1,
+      "iterations": 6,
+      "correctness": "PNG decodes to 512x512 RGB",
+      "requires": [],
+      "collector": "dicom-clinical-path-workloads",
+      "budget": {
+        "warningSeconds": 0.2,
+        "failureSeconds": 0.8
+      }
+    },
+    {
+      "id": "storage-write-reopen",
+      "stage": "storage",
+      "fixtureID": "ct-512x512-16bit",
+      "description": "Part 10 write to disk and bounded reopen",
+      "modes": [
+        "cold-sdk-first-call",
+        "prewarmed-first-clinical-call",
+        "warm-isolated",
+        "warm-sustained"
+      ],
+      "warmupIterations": 1,
+      "iterations": 6,
+      "correctness": "reopened SOP Instance UID equals the source",
+      "requires": [],
+      "collector": "dicom-clinical-path-workloads",
+      "budget": {
+        "warningSeconds": 0.05,
+        "failureSeconds": 0.3
+      }
+    },
+    {
+      "id": "concurrent-decode-transcode",
+      "stage": "concurrent",
+      "fixtureID": "ct-512x512-16bit",
+      "description": "Four concurrent native decodes plus one JPEG-LS transcode under one TaskGroup",
+      "modes": [
+        "concurrent-clinical-workload"
+      ],
+      "warmupIterations": 1,
+      "iterations": 5,
+      "correctness": "every decode digest equals the generator digest; transcode output decodes back to the same digest",
+      "requires": [],
+      "collector": "dicom-clinical-path-workloads",
+      "budget": {
+        "warningSeconds": 1.0,
+        "failureSeconds": 4.0,
+        "peakRSSWarningBytes": 2147483648,
+        "peakRSSFailureBytes": 4294967296
+      }
+    },
+    {
+      "id": "network-retrieve-loopback",
+      "stage": "network-retrieve",
+      "fixtureID": "ct-512x512-16bit",
+      "description": "WADO-RS instance retrieve from the shared loopback listener",
+      "modes": [
+        "cold-sdk-first-call",
+        "prewarmed-first-clinical-call",
+        "warm-isolated",
+        "warm-sustained"
+      ],
+      "warmupIterations": 1,
+      "iterations": 6,
+      "correctness": "retrieved Part 10 bytes equal the stored object (SHA-256)",
+      "requires": [],
+      "collector": "dicom-clinical-path-network-workloads",
+      "budget": {
+        "warningSeconds": 0.3,
+        "failureSeconds": 1.5
+      }
+    },
+    {
+      "id": "network-store-loopback",
+      "stage": "network-store",
+      "fixtureID": "ct-512x512-16bit",
+      "description": "STOW-RS store to the shared loopback listener",
+      "modes": [
+        "cold-sdk-first-call",
+        "prewarmed-first-clinical-call",
+        "warm-isolated",
+        "warm-sustained"
+      ],
+      "warmupIterations": 1,
+      "iterations": 6,
+      "correctness": "one accepted instance; stored bytes equal the source object",
+      "requires": [],
+      "collector": "dicom-clinical-path-network-workloads",
+      "budget": {
+        "warningSeconds": 0.3,
+        "failureSeconds": 1.5
+      }
+    }
+  ],
+  "externalCollectors": [
+    {
+      "stem": "mtk-clinical-performance",
+      "package": "MTK",
+      "stages": [
+        "mpr-3d",
+        "upload",
+        "render-stages"
+      ],
+      "status": "required-by-tier",
+      "note": "MPR reslice, volume raycast, texture upload, snapshot readback and sustained resource counters from ClinicalViewportGridResourceStressTests (Metal host)."
+    },
+    {
+      "stem": "mtk-mesh-metrics-performance",
+      "package": "MTK",
+      "stages": [
+        "mesh-metrics"
+      ],
+      "status": "required-by-tier",
+      "note": "#2346 surface metrics on an analytic cube: correctness against the analytic volume/area first, then timing percentiles."
+    },
+    {
+      "stem": "mtk-landmark-registration-performance",
+      "package": "MTK",
+      "stages": [
+        "landmark-registration"
+      ],
+      "status": "required-by-tier",
+      "note": "#2371 landmark rigid/affine registration on the pinned numpy corpus: residuals and condition numbers first, inverted-direction misuse must fail, then timing percentiles."
+    },
+    {
+      "stem": "mtk-affine-resampling-performance",
+      "package": "MTK",
+      "stages": [
+        "affine-resampling"
+      ],
+      "status": "required-by-tier",
+      "note": "#2372 affine resampling of an analytic ramp: per-voxel error first, the mm/voxel swap must fail, then timing percentiles."
+    },
+    {
+      "stem": "dicom-j2k-performance",
+      "package": "DICOM-Swift",
+      "stages": [
+        "decode",
+        "fallback-path"
+      ],
+      "status": "required-by-tier",
+      "note": "J2KSwift versus OpenJPEG warm/cold decode and the OpenJPEG fallback route."
+    },
+    {
+      "stem": "dicom-jpegls-performance",
+      "package": "DICOM-Swift",
+      "stages": [
+        "decode",
+        "fallback-path"
+      ],
+      "status": "required-by-tier",
+      "note": "JLSwift versus CharLS and the CharLS fallback route."
+    },
+    {
+      "stem": "dicom-jpip-performance",
+      "package": "DICOM-Swift",
+      "stages": [
+        "network-retrieve",
+        "first-frame",
+        "final-refine"
+      ],
+      "status": "required-by-tier",
+      "note": "JPIP layer progression, preview versus final and byte accounting."
+    },
+    {
+      "stem": "jp3d-artifact-performance",
+      "package": "Packages",
+      "stages": [
+        "storage",
+        "decode"
+      ],
+      "status": "nightly-release",
+      "note": "Derived-volume cache generation, cold/warm load and raw fallback."
+    },
+    {
+      "stem": "packages-budgets",
+      "package": "Packages",
+      "stages": [
+        "concurrent",
+        "memory-pressure",
+        "multi-viewport"
+      ],
+      "status": "nightly-release",
+      "note": "ConcurrentImagingMemoryBudgetTests, OwnCodecMemoryBudgetTests, ImagingMemoryBudgetTests and DICOMwebRetrieveBudgetTests verify the #2340/#2341 budgets under multi-viewport, shadow/prefetch/transcode concurrency and memory pressure; they assert budgets rather than emit a report triplet."
+    }
+  ],
+  "voxeliaWorkloads": [
+    {
+      "id": "mesh-metrics-analytic-cube",
+      "childIssue": 2346,
+      "status": "executed",
+      "tolerance": "volume 1000 mm3 +-20 (half-voxel marching-cubes chamfer), area 600 mm2 +-40; no per-facet average hides a wrong facet because the closed/oriented certification is required",
+      "collector": "mtk-mesh-metrics-performance",
+      "note": "Reference Voxelia bfb7daccd601c7ffa45d4ee6c875018d2d8372ed is code, not README; the comparison is analytic."
+    },
+    {
+      "id": "landmark-registration-residuals",
+      "childIssue": 2371,
+      "status": "executed",
+      "tolerance": "rigid/affine residual and condition number per landmark set; inverted rotation must fail",
+      "collector": "mtk-landmark-registration-performance",
+      "note": "Closed by #2371: LandmarkRegistrationEstimator against Tools/Scripts/landmark_registration_oracle.py (numpy Kabsch/lstsq); the comparison is to the pinned corpus, not to Voxelia."
+    },
+    {
+      "id": "affine-scalar-resampling",
+      "childIssue": 2372,
+      "status": "executed",
+      "tolerance": "per-voxel error against an analytic ramp; mm/voxel swap must fail",
+      "collector": "mtk-affine-resampling-performance",
+      "note": "Closed by #2372: AffineGridResampler (binary64) against an analytic ramp; the swapped-units matrix is rejected by the error, not by an estimate."
+    },
+    {
+      "id": "gaussian-physical-units",
+      "childIssue": 2373,
+      "status": "executed",
+      "tolerance": "Discrete ceil(3*sigmaMM/spacingMM) Gaussian versus independent exhaustive tensor-kernel convolution; weights sum to 1 within 1e-12, Double bound 1e-10*max(1,maxAbsInput*sumAbsWeights), Float32 1e-5+1e-6*abs(reference); integer nearest/ties-away within 0.5 LSB.",
+      "collector": "isis-volumetric-convolution",
+      "note": "Standalone local XCTest selections volumetric-convolution-core and volumetric-convolution-consumer executed for #2373, including numeric MPR/3D consumer and restoration. No comparative performance baseline or execution by the complete clinical-path tier runner is claimed; Docs/QA/VolumetricConvolution.md."
+    },
+    {
+      "id": "segmentation-distances",
+      "childIssue": 2374,
+      "status": "executed",
+      "tolerance": "Dice/ASSD/Hausdorff/HD95 against analytic spheres; direction flip must fail",
+      "collector": "isis-segmentation-distances",
+      "note": "Measured by #2374: standalone PhysicalSegmentationMetricsWorkloadTests, 256^3 identical 40mm sphere and flipped-grid rejection; independent small-mask physical searches and analytic offsets in PhysicalSegmentationMetricsTests. JSON output and command in TESTING.md; this standalone observation is not collected by the complete tier runner."
+    },
+    {
+      "id": "regional-256-512-16mib",
+      "childIssue": 2375,
+      "status": "executed",
+      "tolerance": "256^3/512^3 on disk with 16 MiB working budget; attributed allocations, RSS and GPU reported separately; a call that materialises everything must not pass as regional",
+      "collector": "isis-regional-volume-disk",
+      "note": "Standalone local Release RegionalVolumeWorkloadTests executed for 256-cubed and 512-cubed, first-pass OS cache uncontrolled and warm reopen, all-voxel independent analytic oracle, 16 MiB admission, exact I/O/allocation/RSS/hash/time JSON. Existing MPR/3D consumer executed separately. No claim that the complete clinical-path tier runner collected these measurements. Docs/QA/RegionalVolumes.md."
+    }
+  ],
+  "noisePolicy": {
+    "maximumCoefficientOfVariationPercent": 25,
+    "minimumMeaningfulDeltaPercent": 5,
+    "minimumIterationsForComparison": 5
+  },
+  "promotionProfiles": [
+    {
+      "id": "codec-default",
+      "description": "Promotion of an own decoder as the default route: correctness first, then no sustained regression beyond 10% (rollback beyond 20%) on decode workloads.",
+      "requiredWorkloads": [
+        {
+          "workloadID": "decode-native-ct",
+          "modes": [
+            "warm-sustained"
+          ]
+        },
+        {
+          "workloadID": "decode-jpegls",
+          "modes": [
+            "warm-sustained"
+          ]
+        },
+        {
+          "workloadID": "decode-htj2k",
+          "modes": [
+            "warm-sustained"
+          ]
+        },
+        {
+          "workloadID": "decode-rle",
+          "modes": [
+            "warm-sustained"
+          ]
+        }
+      ],
+      "maximumRegressionPercent": 10,
+      "rollbackRegressionPercent": 20,
+      "minimumIterations": 5
+    },
+    {
+      "id": "viewer-2d",
+      "description": "2D viewer path: open, decode, normalize, first frame and final refinement; preview speed never compensates a slow or wrong final.",
+      "requiredWorkloads": [
+        {
+          "workloadID": "open-metadata-ct",
+          "modes": [
+            "prewarmed-first-clinical-call",
+            "warm-sustained"
+          ]
+        },
+        {
+          "workloadID": "decode-native-ct",
+          "modes": [
+            "prewarmed-first-clinical-call",
+            "warm-sustained"
+          ]
+        },
+        {
+          "workloadID": "normalize-vdsp",
+          "modes": [
+            "prewarmed-first-clinical-call",
+            "warm-sustained"
+          ]
+        },
+        {
+          "workloadID": "first-frame-thumbnail",
+          "modes": [
+            "prewarmed-first-clinical-call",
+            "warm-sustained"
+          ]
+        },
+        {
+          "workloadID": "final-refine-full",
+          "modes": [
+            "prewarmed-first-clinical-call",
+            "warm-sustained"
+          ]
+        }
+      ],
+      "maximumRegressionPercent": 10,
+      "rollbackRegressionPercent": 20,
+      "minimumIterations": 5
+    },
+    {
+      "id": "archive-and-network",
+      "description": "Storage and loopback DICOMweb workloads.",
+      "requiredWorkloads": [
+        {
+          "workloadID": "storage-write-reopen",
+          "modes": [
+            "warm-sustained"
+          ]
+        }
+      ],
+      "maximumRegressionPercent": 15,
+      "rollbackRegressionPercent": 30,
+      "minimumIterations": 5
+    }
+  ],
+  "debugBudgetMultiplier": 5
+}

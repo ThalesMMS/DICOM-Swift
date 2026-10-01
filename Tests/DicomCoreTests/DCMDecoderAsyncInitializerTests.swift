@@ -119,6 +119,34 @@ final class DCMDecoderAsyncInitializerTests: XCTestCase {
 
     // MARK: - Async Throwing Initializer Error Tests
 
+    func testAsyncThrowingEntryPointsReturnCancellationErrorWhenCallerIsAlreadyCancelled() async {
+        let url = URL(fileURLWithPath: "/nonexistent/cancelled-before-load.dcm")
+        let entryPoints: [(String, @Sendable () async throws -> DCMDecoder)] = [
+            ("URL initializer", { try await DCMDecoder(contentsOf: url) }),
+            ("path initializer", { try await DCMDecoder(contentsOfFile: url.path) }),
+            ("URL factory", { try await DCMDecoder.load(from: url) }),
+            ("path factory", { try await DCMDecoder.load(fromFile: url.path) })
+        ]
+
+        for (name, entryPoint) in entryPoints {
+            let task = Task {
+                withUnsafeCurrentTask { currentTask in
+                    currentTask?.cancel()
+                }
+                return try await entryPoint()
+            }
+
+            do {
+                _ = try await task.value
+                XCTFail("A cancelled \(name) should not publish a decoder")
+            } catch is CancellationError {
+                // Expected cooperative cancellation.
+            } catch {
+                XCTFail("Expected CancellationError from \(name), got \(error)")
+            }
+        }
+    }
+
     func testAsyncThrowingInitializerWithURLThrowsForNonExistentFile() async {
         // Create URL for non-existent file
         let nonExistentURL = URL(fileURLWithPath: "/nonexistent/file.dcm")
@@ -286,10 +314,12 @@ final class DCMDecoderAsyncInitializerTests: XCTestCase {
         do {
             _ = try await DCMDecoder(contentsOf: nonExistentURL)
             XCTFail("Should have thrown an error")
+        } catch let error as DICOMError {
+            guard case .fileNotFound = error else {
+                return XCTFail("Expected fileNotFound, got \(error)")
+            }
         } catch {
-            // Expected - no decoder instance should exist
-            // If we got here, the async throwing init worked correctly
-            XCTAssertTrue(true, "Async throwing initializer correctly prevented object creation")
+            XCTFail("Expected DICOMError.fileNotFound, got \(error)")
         }
     }
 

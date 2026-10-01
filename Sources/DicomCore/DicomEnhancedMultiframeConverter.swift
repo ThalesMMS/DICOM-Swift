@@ -121,6 +121,7 @@ public struct DicomEnhancedMultiframeConverter: Sendable {
         case missingFunctionalGroups
         case incompleteFunctionalGroups(expected: Int, actual: Int)
         case unsupportedDimensionOrganization
+        case unresolvedSelection
         case incompleteGeometry(frameNumber: Int)
         case inconsistentOrientation(frameNumber: Int)
         case duplicateSlicePosition
@@ -147,6 +148,8 @@ public struct DicomEnhancedMultiframeConverter: Sendable {
                 return "Per-Frame Functional Groups cover \(actual) of \(expected) frames."
             case .unsupportedDimensionOrganization:
                 return "Only one Stack ID plus In-Stack Position Number dimension is supported."
+            case .unresolvedSelection:
+                return "The requested dimension selection is missing or has duplicate frame coordinates."
             case .incompleteGeometry(let frameNumber):
                 return "Frame \(frameNumber) has incomplete plane geometry or Pixel Measures."
             case .inconsistentOrientation(let frameNumber):
@@ -169,6 +172,12 @@ public struct DicomEnhancedMultiframeConverter: Sendable {
 
     private static let enhancedCTSOPClassUID = "1.2.840.10008.5.1.4.1.1.2.1"
     private static let enhancedMRSOPClassUID = "1.2.840.10008.5.1.4.1.1.4.1"
+    private static let legacyConvertedCTSOPClassUID = "1.2.840.10008.5.1.4.1.1.2.2"
+    private static let legacyConvertedMRSOPClassUID = "1.2.840.10008.5.1.4.1.1.4.4"
+    /// Unassigned Shared / Per-Frame Converted Attributes (PS3.3 C.7.6.16.2.24/25): classic attributes a legacy
+    /// conversion could not place, restored to the derived classic instance.
+    private static let unassignedSharedConvertedAttributesSequence = 0x0020_9170
+    private static let unassignedPerFrameConvertedAttributesSequence = 0x0020_9171
     private static let ctImageStorageSOPClassUID = "1.2.840.10008.5.1.4.1.1.2"
     private static let mrImageStorageSOPClassUID = "1.2.840.10008.5.1.4.1.1.4"
 
@@ -176,24 +185,32 @@ public struct DicomEnhancedMultiframeConverter: Sendable {
     public init() {}
 
     /// Converts an Enhanced Part 10 file using generated or supplied output identifiers.
-    public func convert(contentsOf url: URL, identifiers: Identifiers? = nil) throws -> Result {
-        try retainedResult(decoder: DCMDecoder(contentsOf: url), identifiers: identifiers)
+    public func convert(
+        contentsOf url: URL, identifiers: Identifiers? = nil,
+        selection: DicomEnhancedFramePartition.Selection? = nil
+    ) throws -> Result {
+        try retainedResult(decoder: DCMDecoder(contentsOf: url), identifiers: identifiers, selection: selection)
     }
 
     /// Converts Enhanced Part 10 bytes using generated or supplied output identifiers.
-    public func convert(_ part10Data: Data, identifiers: Identifiers? = nil) throws -> Result {
-        try retainedResult(decoder: DCMDecoder(data: part10Data), identifiers: identifiers)
+    public func convert(
+        _ part10Data: Data, identifiers: Identifiers? = nil,
+        selection: DicomEnhancedFramePartition.Selection? = nil
+    ) throws -> Result {
+        try retainedResult(decoder: DCMDecoder(data: part10Data), identifiers: identifiers, selection: selection)
     }
 
     /// Converts a file incrementally, emitting each validated instance before the next frame is processed.
     public func convert(
         contentsOf url: URL,
         identifiers: Identifiers? = nil,
+        selection: DicomEnhancedFramePartition.Selection? = nil,
         instanceHandler: (ValidatedInstance) throws -> Void
     ) throws -> ConversionSummary {
         try convert(
             decoder: DCMDecoder(contentsOf: url),
             identifiers: identifiers,
+            selection: selection,
             instanceHandler: instanceHandler
         )
     }
@@ -210,9 +227,11 @@ public struct DicomEnhancedMultiframeConverter: Sendable {
         containsReference(in: try DCMDecoder(data: part10Data).dataSet, toSOPInstanceUID: uid)
     }
 
-    private func retainedResult(decoder: DCMDecoder, identifiers: Identifiers?) throws -> Result {
+    private func retainedResult(
+        decoder: DCMDecoder, identifiers: Identifiers?, selection: DicomEnhancedFramePartition.Selection?
+    ) throws -> Result {
         var instances: [Instance] = []
-        let summary = try convert(decoder: decoder, identifiers: identifiers) { validated in
+        let summary = try convert(decoder: decoder, identifiers: identifiers, selection: selection) { validated in
             instances.append(validated.instance)
         }
         return Result(
@@ -227,14 +246,15 @@ public struct DicomEnhancedMultiframeConverter: Sendable {
     private func convert(
         decoder: DCMDecoder,
         identifiers: Identifiers?,
+        selection: DicomEnhancedFramePartition.Selection?,
         instanceHandler: (ValidatedInstance) throws -> Void
     ) throws -> ConversionSummary {
         let sourceSOPClassUID = try requiredUID(decoder.info(for: .sopClassUID), name: "SOP Class UID")
         let classicSOPClassUID: String
         switch sourceSOPClassUID {
-        case Self.enhancedCTSOPClassUID:
+        case Self.enhancedCTSOPClassUID, Self.legacyConvertedCTSOPClassUID:
             classicSOPClassUID = Self.ctImageStorageSOPClassUID
-        case Self.enhancedMRSOPClassUID:
+        case Self.enhancedMRSOPClassUID, Self.legacyConvertedMRSOPClassUID:
             classicSOPClassUID = Self.mrImageStorageSOPClassUID
         default:
             throw ConversionError.unsupportedSOPClassUID(sourceSOPClassUID)
@@ -256,7 +276,7 @@ public struct DicomEnhancedMultiframeConverter: Sendable {
                 actual: groups.perFrame.count
             )
         }
-        let orderedFrames = try validatedFrames(groups)
+        let orderedFrames = try validatedFrames(groups, selection: selection)
 
         let sourceSOPInstanceUID = try requiredUID(
             decoder.info(for: .sopInstanceUID),
@@ -288,6 +308,7 @@ public struct DicomEnhancedMultiframeConverter: Sendable {
         )
 
         for (spatialIndex, frame) in orderedFrames.enumerated() {
+            try Task.checkCancellation()
             let sourceFrameNumber = frame.index + 1
             let sopInstanceUID = outputIdentifiers.sopInstanceUIDs[spatialIndex]
             let decodedFrame: DicomDecodedFrame
@@ -309,6 +330,21 @@ public struct DicomEnhancedMultiframeConverter: Sendable {
             dataSet.set(element(.imageType, .CS, ["DERIVED", "SECONDARY"]))
             dataSet.set(element(.photometricInterpretation, .CS, [photometricInterpretation]))
             flatten(frame.functionalGroups, into: &dataSet)
+            restoreUnassignedConvertedAttributes(from: decoder.dataSet, frameIndex: frame.index, into: &dataSet)
+            if classicSOPClassUID == Self.ctImageStorageSOPClassUID, !dataSet.contains(0x00180060) {
+                let shared = decoder.dataSet[.sharedFunctionalGroupsSequence]?.sequenceItems.first
+                let perFrame = decoder.dataSet[.perFrameFunctionalGroupsSequence]?.sequenceItems ?? []
+                let frameDetails = perFrame.indices.contains(frame.index) ? perFrame[frame.index][0x00189325] : nil
+                let details = (frameDetails ?? shared?[0x00189325])?.sequenceItems ?? []
+                let voltages = details.compactMap { $0[0x00180060] }
+                if let voltage = voltages.first, voltages.count == details.count,
+                   voltages.allSatisfy({ $0.value == voltage.value }) {
+                    dataSet.set(voltage)
+                } else {
+                    // Classic CT requires Type 2 KVP presence even when the source cannot supply a single value.
+                    dataSet.set(.init(tag: 0x00180060, vr: .DS, value: .empty))
+                }
+            }
             dataSet.set(sourceImageSequence(
                 sopClassUID: sourceSOPClassUID,
                 sopInstanceUID: sourceSOPInstanceUID,
@@ -343,6 +379,7 @@ public struct DicomEnhancedMultiframeConverter: Sendable {
                 sourceSOPInstanceUID: sourceSOPInstanceUID,
                 functionalGroups: frame.functionalGroups
             )
+            try Task.checkCancellation()
             try instanceHandler(ValidatedInstance(
                 instance: Instance(
                     sourceFrameNumber: sourceFrameNumber,
@@ -435,8 +472,21 @@ public struct DicomEnhancedMultiframeConverter: Sendable {
     }
 
     private func validatedFrames(
-        _ groups: DicomEnhancedMultiframeFunctionalGroups
+        _ groups: DicomEnhancedMultiframeFunctionalGroups,
+        selection: DicomEnhancedFramePartition.Selection?
     ) throws -> [DicomEnhancedFrame] {
+        let frames: [DicomEnhancedFrame]
+        if let selection {
+            guard let partition = try DicomEnhancedFramePartition.resolve(groups).first(where: {
+                $0.selection == selection
+            }), !partition.hasDuplicateCoordinates else {
+                throw ConversionError.unresolvedSelection
+            }
+            let indices = Set(partition.frameIndices)
+            frames = groups.framesInSpatialOrder.filter { indices.contains($0.index) }
+        } else {
+            frames = groups.framesInSpatialOrder
+        }
         if let organization = groups.dimensionOrganization {
             let frameContentPointer = DicomTag.frameContentSequence.rawValue
             guard organization.organizationUIDs.count == 1,
@@ -458,7 +508,7 @@ public struct DicomEnhancedMultiframeConverter: Sendable {
 
             var stacks = Set<String>()
             var positions = Set<String>()
-            for frame in groups.frames {
+            for frame in frames {
                 guard let content = frame.functionalGroups.frameContent,
                       let stackID = nonEmpty(content.stackID ?? ""),
                       let inStackPosition = content.inStackPositionNumber,
@@ -466,7 +516,7 @@ public struct DicomEnhancedMultiframeConverter: Sendable {
                       content.frameAcquisitionNumber == nil,
                       content.dimensionIndexValues.count == 2,
                       content.dimensionIndexValues.allSatisfy({ $0 > 0 }),
-                      content.dimensionIndexValues[positionIndex] == inStackPosition else {
+                      inStackPosition > 0 else {
                     throw ConversionError.unsupportedDimensionOrganization
                 }
                 let stack = "\(content.dimensionIndexValues[stackIndex])|\(stackID)"
@@ -478,7 +528,7 @@ public struct DicomEnhancedMultiframeConverter: Sendable {
             guard stacks.count == 1 else {
                 throw ConversionError.unsupportedDimensionOrganization
             }
-        } else if groups.frames.contains(where: { frame in
+        } else if frames.contains(where: { frame in
             guard let content = frame.functionalGroups.frameContent else { return false }
             return nonEmpty(content.stackID ?? "") != nil
                 || content.inStackPositionNumber != nil
@@ -489,7 +539,7 @@ public struct DicomEnhancedMultiframeConverter: Sendable {
             throw ConversionError.unsupportedDimensionOrganization
         }
 
-        let ordered = groups.framesInSpatialOrder
+        let ordered = frames
         var referenceOrientation: DicomPlaneOrientation?
         var previousPosition: Double?
         for frame in ordered {
@@ -568,6 +618,33 @@ public struct DicomEnhancedMultiframeConverter: Sendable {
             } else {
                 dataSet.remove(.voiLUTFunction)
             }
+        }
+    }
+
+    /// Elements of the Unassigned Shared/Per-Frame Converted Attributes functional groups become classic top-level
+    /// attributes again; identity, pixel-structure and multi-frame elements are never taken from them.
+    private func restoreUnassignedConvertedAttributes(from source: DicomDataSet, frameIndex: Int, into dataSet: inout DicomDataSet) {
+        let shared = source[.sharedFunctionalGroupsSequence]?.sequenceItems.first?[Self.unassignedSharedConvertedAttributesSequence]?.sequenceItems.first?.dataSet.elements ?? []
+        let perFrameItems = source[.perFrameFunctionalGroupsSequence]?.sequenceItems ?? []
+        let perFrame = perFrameItems.indices.contains(frameIndex)
+            ? perFrameItems[frameIndex][Self.unassignedPerFrameConvertedAttributesSequence]?.sequenceItems.first?.dataSet.elements ?? []
+            : []
+        let protected: Set<Int> = [
+            DicomTag.sopClassUID.rawValue, DicomTag.sopInstanceUID.rawValue, DicomTag.seriesInstanceUID.rawValue, DicomTag.studyInstanceUID.rawValue,
+            DicomTag.frameOfReferenceUID.rawValue, DicomTag.instanceNumber.rawValue, DicomTag.imageType.rawValue, DicomTag.pixelData.rawValue,
+            DicomTag.numberOfFrames.rawValue, DicomTag.rows.rawValue, DicomTag.columns.rawValue, DicomTag.bitsAllocated.rawValue,
+            DicomTag.bitsStored.rawValue, DicomTag.highBit.rawValue, DicomTag.pixelRepresentation.rawValue, DicomTag.samplesPerPixel.rawValue,
+            DicomTag.photometricInterpretation.rawValue, DicomTag.sharedFunctionalGroupsSequence.rawValue, DicomTag.perFrameFunctionalGroupsSequence.rawValue,
+            DicomTag.sourceImageSequence.rawValue
+        ]
+        for element in shared + perFrame where !protected.contains(element.tag) && element.group != 0x0002 && element.element != 0 {
+            dataSet.set(element)
+        }
+        // Rescale Type travels with the Pixel Value Transformation group but has no typed field in the flattened form.
+        let sharedTransformation = source[.sharedFunctionalGroupsSequence]?.sequenceItems.first?[.pixelValueTransformationSequence]?.sequenceItems.first
+        let frameTransformation = perFrameItems.indices.contains(frameIndex) ? perFrameItems[frameIndex][.pixelValueTransformationSequence]?.sequenceItems.first : nil
+        if let rescaleType = (frameTransformation ?? sharedTransformation)?[.rescaleType] {
+            dataSet.set(rescaleType)
         }
     }
 

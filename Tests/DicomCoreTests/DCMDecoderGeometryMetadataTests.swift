@@ -145,15 +145,16 @@ final class DCMDecoderGeometryMetadataTests: XCTestCase {
     func testImagePlaneGeometryTags() {
         let decoder = DCMDecoder()
 
-        // Test all image plane geometry tags
-        _ = decoder.info(for: 0x00200032)  // Image Position (Patient)
-        _ = decoder.info(for: 0x00200037)  // Image Orientation (Patient)
-        _ = decoder.info(for: 0x00280030)  // Pixel Spacing
-        _ = decoder.info(for: 0x00180050)  // Slice Thickness
-        _ = decoder.info(for: 0x00180088)  // Spacing Between Slices
-        _ = decoder.info(for: 0x00201041)  // Slice Location
+        let geometryTags = [
+            0x0020_0032,  // Image Position (Patient)
+            0x0020_0037,  // Image Orientation (Patient)
+            0x0028_0030,  // Pixel Spacing
+            0x0018_0050,  // Slice Thickness
+            0x0018_0088,  // Spacing Between Slices
+            0x0020_1041   // Slice Location
+        ]
 
-        XCTAssertTrue(true, "All geometry tag accesses should not crash")
+        XCTAssertTrue(geometryTags.allSatisfy { decoder.info(for: $0).isEmpty })
     }
 
     func testSpatialResolutionDefaults() {

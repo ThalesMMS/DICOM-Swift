@@ -2,6 +2,92 @@ import XCTest
 @testable import DicomCore
 
 final class DicomDisplayTransformTests: XCTestCase {
+    func test_storedPixelValues_enforcesOutputByteBudget() throws {
+        let url = try makeTemporaryDICOM(pixelValues: [0, 100, 1024, 2048], extraElements: [])
+        defer { try? FileManager.default.removeItem(at: url) }
+        let decoder = try DCMDecoder(contentsOf: url)
+        let requiredBytes = 4 * MemoryLayout<Int>.stride
+        XCTAssertNil(decoder.storedPixelValues(maximumOutputBytes: requiredBytes - 1))
+        XCTAssertNil(decoder.storedPixelValues(maximumOutputBytes: -1))
+        XCTAssertEqual(decoder.storedPixelValues(maximumOutputBytes: requiredBytes), [0, 100, 1024, 2048])
+        XCTAssertNil(decoder.storedPixelValues(frame: 1, maximumOutputBytes: requiredBytes))
+        XCTAssertNil(decoder.storedPixelValues(sample: 1, maximumOutputBytes: requiredBytes))
+    }
+
+    func test_eightBitLookupTable_acceptsByteAndWordEntries() throws {
+        for (bytes, littleEndian): ([UInt8], Bool) in [
+            ([1, 64, 128, 255], true), ([1, 0, 64, 0, 128, 0, 255, 0], true),
+            ([0, 1, 0, 64, 0, 128, 0, 255], false)
+        ] {
+            let dataSet = DicomDataSet(elements: [us(.lutDescriptor, [4, 0, 8]), self.bytes(.lutData, vr: .OW, Data(bytes))])
+            let table = try XCTUnwrap(DicomLookupTableParser.lookupTable(from: dataSet, typeTag: nil, littleEndian: littleEndian))
+            XCTAssertEqual(table.data, [1, 64, 128, 255])
+        }
+    }
+
+    func test_presentationTable_clampsEntriesToDescriptorBitDepth() throws {
+        let descriptor = try XCTUnwrap(DicomLUTDescriptor(storedEntryCount: 4, firstMappedValue: 0, bitsPerEntry: 8))
+        let table = DicomLookupTable(descriptor: descriptor, explanation: nil, lutType: nil,
+                                    data: [0, 128, 256, UInt16.max])
+        let profile = DicomDisplayTransformProfile(presentationLUT: table)
+        let selection = DicomDisplaySelection.customWindow(WindowSettings(center: 2, width: 4))
+        XCTAssertEqual([0.0, 1, 2, 3].map {
+            profile.displayValue(forStoredPixelValue: $0, selection: selection)
+        }, [0, 128, 255, 255])
+    }
+
+    func test_linearWindowAndInversion_quantizesExactBytes() {
+        let selection = DicomDisplaySelection.customWindow(WindowSettings(center: 2, width: 4))
+        let profile = DicomDisplayTransformProfile()
+        let inverse = DicomDisplayTransformProfile(presentationLUTShape: .inverse)
+        // lower = 0, denominator = 3: floor([0, 1/3, 2/3, 1] * 255).
+        XCTAssertEqual([0.0, 1, 2, 3].map { profile.displayValue(forStoredPixelValue: $0, selection: selection) },
+                       [0, 85, 170, 255])
+        XCTAssertEqual(inverse.displayValue(forStoredPixelValue: 0.5, selection: selection), 213)
+        let threshold = DicomDisplaySelection.customWindow(WindowSettings(center: 2, width: 1))
+        XCTAssertEqual(profile.displayValue(forStoredPixelValue: 1.5, selection: threshold), 0)
+        XCTAssertEqual(profile.displayValue(forStoredPixelValue: 1.5001, selection: threshold), 255)
+    }
+
+    func test_presentationTable_appliesAfterMonochromeInversionAndIgnoresShape() throws {
+        let descriptor = try XCTUnwrap(DicomLUTDescriptor(storedEntryCount: 4, firstMappedValue: 7, bitsPerEntry: 8))
+        let table = DicomLookupTable(descriptor: descriptor, explanation: "Presentation", lutType: nil,
+                                    data: [0, 32, 128, 255])
+        let profile = DicomDisplayTransformProfile(presentationLUTShape: .inverse,
+                                                   photometricInterpretation: "MONOCHROME1", presentationLUT: table)
+        let selection = DicomDisplaySelection.customWindow(WindowSettings(center: 2, width: 4))
+        XCTAssertEqual([0.0, 1, 2, 3].map { profile.displayValue(forStoredPixelValue: $0, selection: selection) },
+                       [255, 128, 32, 0])
+    }
+
+    func test_presentationTable_indexesFullVOIRangeAndTruncatesOutput() throws {
+        let descriptor = try XCTUnwrap(DicomLUTDescriptor(storedEntryCount: 4, firstMappedValue: 7, bitsPerEntry: 16))
+        let table = DicomLookupTable(descriptor: descriptor, explanation: nil, lutType: nil,
+                                    data: [0, 10000, 40000, 65535])
+        let selection = DicomDisplaySelection.customWindow(WindowSettings(center: 2, width: 4))
+        for (photometric, expected): (String, [UInt8]) in [
+            ("MONOCHROME2", [0, 38, 155, 255, 255]),
+            ("MONOCHROME1", [255, 255, 155, 38, 0])
+        ] {
+            let profile = DicomDisplayTransformProfile(presentationLUTShape: .inverse,
+                photometricInterpretation: photometric, presentationLUT: table)
+            XCTAssertEqual([0.0, 0.5, 1.5, 2.5, 3].map {
+                profile.displayValue(forStoredPixelValue: $0, selection: selection)
+            }, expected.map(Optional.some))
+        }
+    }
+
+    func test_presentationTable_preservesAdjacentTwelveBitInputs() throws {
+        let descriptor = try XCTUnwrap(DicomLUTDescriptor(storedEntryCount: 4096, firstMappedValue: 0, bitsPerEntry: 8))
+        let table = DicomLookupTable(descriptor: descriptor, explanation: nil, lutType: nil,
+                                    data: (0..<4096).map { $0.isMultiple(of: 2) ? 0 : 255 })
+        let profile = DicomDisplayTransformProfile(presentationLUT: table)
+        let selection = DicomDisplaySelection.customWindow(WindowSettings(center: 2048, width: 4096))
+        XCTAssertEqual([1000.0, 1001, 1002, 1003].map {
+            profile.displayValue(forStoredPixelValue: $0, selection: selection)
+        }, [0, 255, 0, 255])
+    }
+
     func testRawAndModalityValuesUseDecoderDisplayProfile() throws {
         let url = try makeTemporaryDICOM(
             pixelValues: [0, 100, 1024, 2048],

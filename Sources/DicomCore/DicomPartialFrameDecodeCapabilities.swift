@@ -16,6 +16,10 @@ public struct DicomPartialFrameDecodeCapabilities: Sendable, Equatable {
     public let maximumResolutionReductionLevel: Int?
     /// Number of quality layers declared by the codestream.
     public let qualityLayerCount: Int?
+    /// Packet bytes per quality layer when a tier-2 index was taken (`DicomDecodedFrameReader.qualityLayerIndex`);
+    /// nil for the header-only probe. The fraction of the first layer is the incremental-cost signal a consumer
+    /// uses before scheduling a low-layer preview (issue #2382).
+    public let qualityLayerByteTotals: [Int]?
 
     /// Creates an explicit capability report.
     public init(
@@ -25,7 +29,8 @@ public struct DicomPartialFrameDecodeCapabilities: Sendable, Equatable {
         supportsCombinedRegionAndResolution: Bool,
         supportsQualityWithSpatialReduction: Bool,
         maximumResolutionReductionLevel: Int?,
-        qualityLayerCount: Int?
+        qualityLayerCount: Int?,
+        qualityLayerByteTotals: [Int]? = nil
     ) {
         self.supportsRegion = supportsRegion
         self.supportsResolutionReduction = supportsResolutionReduction
@@ -34,6 +39,15 @@ public struct DicomPartialFrameDecodeCapabilities: Sendable, Equatable {
         self.supportsQualityWithSpatialReduction = supportsQualityWithSpatialReduction
         self.maximumResolutionReductionLevel = maximumResolutionReductionLevel
         self.qualityLayerCount = qualityLayerCount
+        self.qualityLayerByteTotals = qualityLayerByteTotals
+    }
+
+    /// Fraction of the packet bytes held by layers `0...layer`, when the index exists.
+    public func byteFraction(throughLayer layer: Int) -> Double? {
+        guard let totals = qualityLayerByteTotals, totals.indices.contains(layer) else { return nil }
+        let total = totals.reduce(0, +)
+        guard total > 0 else { return nil }
+        return Double(totals.prefix(layer + 1).reduce(0, +)) / Double(total)
     }
 
     /// Capability report for a syntax or runtime without direct partial decode.

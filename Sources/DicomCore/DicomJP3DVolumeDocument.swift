@@ -60,6 +60,9 @@ public struct DicomJP3DVolumeDocument: Sendable {
     }
 
     public let compressedData: Data
+    /// The component collections of the object (one fragment each, PS3.5 8.2.4); a single collection when the
+    /// document was built from raw codestream data.
+    public let fragments: [Data]
     public let transferSyntax: DicomTransferSyntax
     public let geometry: DicomJP3DVolumeGeometry
     public let sourceURL: URL?
@@ -68,6 +71,14 @@ public struct DicomJP3DVolumeDocument: Sendable {
                 transferSyntax: DicomTransferSyntax,
                 geometry: DicomJP3DVolumeGeometry,
                 sourceURL: URL? = nil) throws {
+        try self.init(fragments: [compressedData], transferSyntax: transferSyntax, geometry: geometry, sourceURL: sourceURL)
+    }
+
+    public init(fragments: [Data],
+                transferSyntax: DicomTransferSyntax,
+                geometry: DicomJP3DVolumeGeometry,
+                sourceURL: URL? = nil) throws {
+        let compressedData = fragments.reduce(into: Data()) { $0.append($1) }
         guard transferSyntax.isJPEG2000Part2Multicomponent else {
             throw DICOMError.unsupportedTransferSyntax(syntax: transferSyntax.rawValue)
         }
@@ -84,6 +95,7 @@ public struct DicomJP3DVolumeDocument: Sendable {
         }
 
         self.compressedData = compressedData
+        self.fragments = fragments
         self.transferSyntax = transferSyntax
         self.geometry = geometry
         self.sourceURL = sourceURL
@@ -99,15 +111,20 @@ public struct DicomJP3DVolumeDocument: Sendable {
             try Self.makeDocumentSnapshot(from: decoder)
         }
         try self.init(
-            compressedData: snapshot.compressedData,
+            fragments: snapshot.fragments,
             transferSyntax: snapshot.transferSyntax,
             geometry: snapshot.geometry,
             sourceURL: sourceURL
         )
     }
 
-    public func decodedVolume() throws -> DicomSeriesVolume {
-        let decoded = try DicomJPEG2000Codec.decodeVolume(compressedData)
+    /// Decodes the volume: the own DicomJPEG2000 codec applies the Annex J transformation of every collection
+    /// (#2331); `DICOM_J2KSWIFT_MODE=disabled` falls back to the OpenJPEG volume path, which only handles plain
+    /// multi-component codestreams (it cannot undo an Annex J transformation).
+    public func decodedVolume(environment: [String: String] = ProcessInfo.processInfo.environment) throws -> DicomSeriesVolume {
+        let decoded = DicomJ2KSwiftRolloutMode(environment: environment) == .disabled
+            ? try DicomJPEG2000Codec.decodeVolume(compressedData)
+            : try Self.decodeVolumeWithOwnCodec(fragments: fragments, transferSyntax: transferSyntax)
         guard decoded.width == geometry.dimensions.width,
               decoded.height == geometry.dimensions.height,
               decoded.depth == geometry.dimensions.depth else {
@@ -153,7 +170,7 @@ public struct DicomJP3DVolumeDocument: Sendable {
 }
 
 private struct DicomJP3DDocumentSnapshot {
-    let compressedData: Data
+    let fragments: [Data]
     let transferSyntax: DicomTransferSyntax
     let geometry: DicomJP3DVolumeGeometry
 }
@@ -170,17 +187,17 @@ private extension DicomJP3DVolumeDocument {
             throw DICOMError.invalidPixelData(reason: "JP3D DICOM object has no encapsulated component collection")
         }
 
-        var compressedData = Data()
+        var fragments: [Data] = []
         for fragment in descriptor.fragments {
             guard fragment.valueRange.lowerBound >= 0,
                   fragment.valueRange.upperBound <= decoder.dicomData.count else {
                 throw DICOMError.invalidPixelData(reason: "JP3D fragment range is outside Pixel Data")
             }
-            compressedData.append(Data(decoder.dicomData[fragment.valueRange]))
+            fragments.append(Data(decoder.dicomData[fragment.valueRange]))
         }
 
         return DicomJP3DDocumentSnapshot(
-            compressedData: compressedData,
+            fragments: fragments,
             transferSyntax: transferSyntax,
             geometry: makeGeometry(from: decoder)
         )
@@ -248,5 +265,41 @@ private extension DicomTransferSyntax {
         default:
             return false
         }
+    }
+}
+
+extension DicomJP3DVolumeDocument {
+    /// Own decode of every collection; components become 16-bit little-endian slices in fragment order.
+    static func decodeVolumeWithOwnCodec(fragments: [Data], transferSyntax: DicomTransferSyntax) throws -> DicomJPEG2000Codec.DecodedVolume {
+        let backend = DicomJ2KSwiftBackend()
+        var voxels = Data()
+        var width = 0, height = 0, depth = 0, bitsPerSample = 0
+        var isSigned = false
+        for (index, fragment) in fragments.enumerated() {
+            let collection: DicomJ2KDecodedCollection
+            do { collection = try backend.decodeCollectionSynchronously(fragment, transferSyntaxUID: transferSyntax.rawValue) } catch {
+                throw DICOMError.imageProcessingFailed(operation: "JPEG 2000 Part 2 collection \(index) decode", reason: error.localizedDescription)
+            }
+            if index == 0 {
+                width = collection.width; height = collection.height; bitsPerSample = collection.bitsPerSample; isSigned = collection.isSigned
+                voxels.reserveCapacity(collection.frames.reduce(0) { $0 + $1.count * (bitsPerSample <= 8 ? 2 : 1) })
+            } else {
+                guard collection.width == width, collection.height == height, collection.bitsPerSample == bitsPerSample, collection.isSigned == isSigned else {
+                    throw DICOMError.invalidPixelData(reason: "JPEG 2000 Part 2 collections do not share geometry, precision and sign")
+                }
+            }
+            for frame in collection.frames {
+                if bitsPerSample > 8 {
+                    voxels.append(frame)
+                } else {
+                    var expanded = [UInt8](repeating: 0, count: frame.count * 2)
+                    for (index, byte) in frame.enumerated() { expanded[index * 2] = byte }
+                    voxels.append(contentsOf: expanded)
+                }
+            }
+            depth += collection.frames.count
+        }
+        guard depth > 0 else { throw DICOMError.invalidPixelData(reason: "JPEG 2000 Part 2 object has no component") }
+        return DicomJPEG2000Codec.DecodedVolume(voxels: voxels, width: width, height: height, depth: depth, bitsPerSample: bitsPerSample, isSigned: isSigned)
     }
 }

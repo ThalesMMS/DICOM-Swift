@@ -1,5 +1,6 @@
 import XCTest
 @testable import DicomCore
+import DicomTestSupport
 
 final class DCMDecoderConcurrencyTests: XCTestCase {
 
@@ -9,9 +10,8 @@ final class DCMDecoderConcurrencyTests: XCTestCase {
         // Test that multiple decoder instances can be created and used concurrently
         let expectation = XCTestExpectation(description: "Multiple decoders created concurrently")
         let iterations = 10
-        var completedCount = 0
+        let completedCount = DicomTestLockedValue(0)
         let queue = DispatchQueue.global(qos: .userInitiated)
-        let countLock = NSLock()
 
         for i in 0..<iterations {
             queue.async {
@@ -26,17 +26,18 @@ final class DCMDecoderConcurrencyTests: XCTestCase {
                 XCTAssertFalse(status.isValid, "Decoder \(i) validation should fail initially")
 
                 // Increment completed count safely
-                countLock.lock()
-                completedCount += 1
-                if completedCount == iterations {
+                let isComplete = completedCount.withValue { count in
+                    count += 1
+                    return count == iterations
+                }
+                if isComplete {
                     expectation.fulfill()
                 }
-                countLock.unlock()
             }
         }
 
         wait(for: [expectation], timeout: 5.0)
-        XCTAssertEqual(completedCount, iterations, "All decoder instances should complete")
+        XCTAssertEqual(completedCount.value, iterations, "All decoder instances should complete")
     }
 
     func testConcurrentDecoderPropertyAccess() {
@@ -44,9 +45,8 @@ final class DCMDecoderConcurrencyTests: XCTestCase {
         let decoder = DCMDecoder()
         let expectation = XCTestExpectation(description: "Concurrent property access")
         let iterations = 20
-        var completedCount = 0
+        let completedCount = DicomTestLockedValue(0)
         let queue = DispatchQueue.global(qos: .userInitiated)
-        let countLock = NSLock()
 
         for _ in 0..<iterations {
             queue.async {
@@ -62,17 +62,18 @@ final class DCMDecoderConcurrencyTests: XCTestCase {
                 _ = decoder.isColorImage
 
                 // Increment completed count safely
-                countLock.lock()
-                completedCount += 1
-                if completedCount == iterations {
+                let isComplete = completedCount.withValue { count in
+                    count += 1
+                    return count == iterations
+                }
+                if isComplete {
                     expectation.fulfill()
                 }
-                countLock.unlock()
             }
         }
 
         wait(for: [expectation], timeout: 5.0)
-        XCTAssertEqual(completedCount, iterations, "All property access operations should complete")
+        XCTAssertEqual(completedCount.value, iterations, "All property access operations should complete")
     }
 
     func testConcurrentValidationStatusChecks() {
@@ -80,9 +81,8 @@ final class DCMDecoderConcurrencyTests: XCTestCase {
         let decoder = DCMDecoder()
         let expectation = XCTestExpectation(description: "Concurrent validation checks")
         let iterations = 15
-        var completedCount = 0
+        let completedCount = DicomTestLockedValue(0)
         let queue = DispatchQueue.global(qos: .userInitiated)
-        let countLock = NSLock()
 
         for i in 0..<iterations {
             queue.async {
@@ -95,17 +95,18 @@ final class DCMDecoderConcurrencyTests: XCTestCase {
                 XCTAssertFalse(decoder.isValid(), "Thread \(i): decoder should not be valid")
 
                 // Increment completed count safely
-                countLock.lock()
-                completedCount += 1
-                if completedCount == iterations {
+                let isComplete = completedCount.withValue { count in
+                    count += 1
+                    return count == iterations
+                }
+                if isComplete {
                     expectation.fulfill()
                 }
-                countLock.unlock()
             }
         }
 
         wait(for: [expectation], timeout: 5.0)
-        XCTAssertEqual(completedCount, iterations, "All validation checks should complete")
+        XCTAssertEqual(completedCount.value, iterations, "All validation checks should complete")
     }
 
     func testConcurrentMetadataAccess() {
@@ -113,9 +114,8 @@ final class DCMDecoderConcurrencyTests: XCTestCase {
         let decoder = DCMDecoder()
         let expectation = XCTestExpectation(description: "Concurrent metadata access")
         let iterations = 20
-        var completedCount = 0
+        let completedCount = DicomTestLockedValue(0)
         let queue = DispatchQueue.global(qos: .userInitiated)
-        let countLock = NSLock()
 
         // Common DICOM tags to query
         let tags = [
@@ -142,17 +142,18 @@ final class DCMDecoderConcurrencyTests: XCTestCase {
                 _ = decoder.getSeriesInfo()
 
                 // Increment completed count safely
-                countLock.lock()
-                completedCount += 1
-                if completedCount == iterations {
+                let isComplete = completedCount.withValue { count in
+                    count += 1
+                    return count == iterations
+                }
+                if isComplete {
                     expectation.fulfill()
                 }
-                countLock.unlock()
             }
         }
 
         wait(for: [expectation], timeout: 5.0)
-        XCTAssertEqual(completedCount, iterations, "All metadata access operations should complete")
+        XCTAssertEqual(completedCount.value, iterations, "All metadata access operations should complete")
     }
 
     func testConcurrentPixelDataAccess() {
@@ -160,9 +161,8 @@ final class DCMDecoderConcurrencyTests: XCTestCase {
         let decoder = DCMDecoder()
         let expectation = XCTestExpectation(description: "Concurrent pixel access")
         let iterations = 15
-        var completedCount = 0
+        let completedCount = DicomTestLockedValue(0)
         let queue = DispatchQueue.global(qos: .userInitiated)
-        let countLock = NSLock()
 
         for i in 0..<iterations {
             queue.async {
@@ -175,17 +175,18 @@ final class DCMDecoderConcurrencyTests: XCTestCase {
                 XCTAssertNil(pixels16, "Thread \(i): pixels16 should be nil")
 
                 // Increment completed count safely
-                countLock.lock()
-                completedCount += 1
-                if completedCount == iterations {
+                let isComplete = completedCount.withValue { count in
+                    count += 1
+                    return count == iterations
+                }
+                if isComplete {
                     expectation.fulfill()
                 }
-                countLock.unlock()
             }
         }
 
         wait(for: [expectation], timeout: 5.0)
-        XCTAssertEqual(completedCount, iterations, "All pixel access operations should complete")
+        XCTAssertEqual(completedCount.value, iterations, "All pixel access operations should complete")
     }
 
     func testConcurrentPixelAndMetadataAccess() {
@@ -194,9 +195,8 @@ final class DCMDecoderConcurrencyTests: XCTestCase {
         let decoder = DCMDecoder()
         let expectation = XCTestExpectation(description: "Concurrent pixel and metadata access")
         let iterations = 30
-        var completedCount = 0
+        let completedCount = DicomTestLockedValue(0)
         let queue = DispatchQueue.global(qos: .userInitiated)
-        let countLock = NSLock()
 
         for i in 0..<iterations {
             queue.async {
@@ -249,17 +249,22 @@ final class DCMDecoderConcurrencyTests: XCTestCase {
                 }
 
                 // Increment completed count safely
-                countLock.lock()
-                completedCount += 1
-                if completedCount == iterations {
+                let isComplete = completedCount.withValue { count in
+                    count += 1
+                    return count == iterations
+                }
+                if isComplete {
                     expectation.fulfill()
                 }
-                countLock.unlock()
             }
         }
 
         wait(for: [expectation], timeout: 10.0)
-        XCTAssertEqual(completedCount, iterations, "All concurrent pixel and metadata access operations should complete")
+        XCTAssertEqual(
+            completedCount.value,
+            iterations,
+            "All concurrent pixel and metadata access operations should complete"
+        )
     }
 
     // MARK: - Mixed Operations Tests
@@ -269,9 +274,8 @@ final class DCMDecoderConcurrencyTests: XCTestCase {
         let decoder = DCMDecoder()
         let expectation = XCTestExpectation(description: "Concurrent mixed operations")
         let iterations = 25
-        var completedCount = 0
+        let completedCount = DicomTestLockedValue(0)
         let queue = DispatchQueue.global(qos: .userInitiated)
-        let countLock = NSLock()
 
         for i in 0..<iterations {
             queue.async {
@@ -299,17 +303,18 @@ final class DCMDecoderConcurrencyTests: XCTestCase {
                 }
 
                 // Increment completed count safely
-                countLock.lock()
-                completedCount += 1
-                if completedCount == iterations {
+                let isComplete = completedCount.withValue { count in
+                    count += 1
+                    return count == iterations
+                }
+                if isComplete {
                     expectation.fulfill()
                 }
-                countLock.unlock()
             }
         }
 
         wait(for: [expectation], timeout: 5.0)
-        XCTAssertEqual(completedCount, iterations, "All mixed operations should complete")
+        XCTAssertEqual(completedCount.value, iterations, "All mixed operations should complete")
     }
 
     // MARK: - Async API Tests
@@ -319,10 +324,8 @@ final class DCMDecoderConcurrencyTests: XCTestCase {
         let decoder = DCMDecoder()
         let expectation = XCTestExpectation(description: "Concurrent pixel access")
         let iterations = 10
-        var completedCount = 0
-        var attemptedCount = 0
+        let counts = DicomTestLockedValue((completed: 0, attempted: 0))
         let queue = DispatchQueue.global(qos: .userInitiated)
-        let countLock = NSLock()
 
         for _ in 0..<iterations {
             queue.async {
@@ -333,20 +336,21 @@ final class DCMDecoderConcurrencyTests: XCTestCase {
                 // Should be nil since no file is loaded
                 let success = pixels16 == nil && pixels8 == nil
 
-                countLock.lock()
-                if success {
-                    completedCount += 1
+                let isComplete = counts.withValue { counts in
+                    if success {
+                        counts.completed += 1
+                    }
+                    counts.attempted += 1
+                    return counts.attempted == iterations
                 }
-                attemptedCount += 1
-                if attemptedCount == iterations {
+                if isComplete {
                     expectation.fulfill()
                 }
-                countLock.unlock()
             }
         }
 
         wait(for: [expectation], timeout: 5.0)
-        XCTAssertEqual(completedCount, iterations, "All concurrent pixel access tasks should succeed")
+        XCTAssertEqual(counts.value.completed, iterations, "All concurrent pixel access tasks should succeed")
     }
 
     // MARK: - Performance Tests
@@ -358,9 +362,8 @@ final class DCMDecoderConcurrencyTests: XCTestCase {
         measure {
             let expectation = XCTestExpectation(description: "Performance test")
             let iterations = 100
-            var completedCount = 0
+            let completedCount = DicomTestLockedValue(0)
             let queue = DispatchQueue.global(qos: .userInitiated)
-            let countLock = NSLock()
 
             for _ in 0..<iterations {
                 queue.async {
@@ -368,12 +371,13 @@ final class DCMDecoderConcurrencyTests: XCTestCase {
                     _ = decoder.width
                     _ = decoder.info(for: 0x00100010)
 
-                    countLock.lock()
-                    completedCount += 1
-                    if completedCount == iterations {
+                    let isComplete = completedCount.withValue { count in
+                        count += 1
+                        return count == iterations
+                    }
+                    if isComplete {
                         expectation.fulfill()
                     }
-                    countLock.unlock()
                 }
             }
 

@@ -406,15 +406,21 @@ internal final class DCMPixelReader {
                 logger?.warning("Invalid offset or insufficient data. offset=\(offset), needed=\(numPixels), available=\(max(0, data.count - offset))")
                 return result
             }
-            result.pixels8 = Array(data[offset..<offset + numPixels])
+            var pixels8 = Array(data[offset..<offset + numPixels])
+            if pixelRepresentation == 1 {
+                // Same contract as the 16-bit path and the compressed decoders: signed samples are
+                // offset to unsigned before the MONOCHROME1 inversion, so stored bytes round-trip.
+                result.signedImage = true
+                for index in 0..<numPixels {
+                    pixels8[index] = UInt8(Int(Int8(bitPattern: pixels8[index])) - Int(Int8.min))
+                }
+            }
 
             // Handle MONOCHROME1 (white is zero) - common for X-rays
             if photometricInterpretation == "MONOCHROME1" {
-                if var p8 = result.pixels8 {
-                    invertMonochrome1Vectorized(buffer: &p8, count: numPixels)
-                    result.pixels8 = p8
-                }
+                invertMonochrome1Vectorized(buffer: &pixels8, count: numPixels)
             }
+            result.pixels8 = pixels8
 
             let elapsed = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
             logger?.debug("[PERF] readPixels (8-bit): \(String(format: "%.2f", elapsed))ms | size: \(width)x\(height)")

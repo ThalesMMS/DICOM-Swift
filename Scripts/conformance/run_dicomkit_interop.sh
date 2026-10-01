@@ -127,7 +127,7 @@ for fixture in "$EXPORTS"/*.dcm; do
   "$DICOMKIT_BIN/dicom-validate" "$fixture" --level 1 --format json >/dev/null
 done
 emit_result dicomswift-object-export passed "$((SECONDS - CURRENT_STARTED))" \
-  "DICOMKit level 1 validation passed for SEG, RTSTRUCT, RTDOSE, GSPS, SR TID 1500, and KOS" \
+  "DICOMKit level 1 validation passed for the GSPS source CT, SEG, RTSTRUCT, RTDOSE, GSPS, SR TID 1500, and KOS" \
   "" "$DICOMSWIFT_VERSION" "$PINNED_COMMIT"
 CURRENT_CASE=""
 

@@ -1,0 +1,33 @@
+{
+  "source": "HL7 CDA R2 and C-CDA R2.1 structural subset",
+  "oracle": "CDA_SDTC.xsd",
+  "templates": [
+    {"id": "2.16.840.1.113883.10.20", "name": "CDA R2 Base Document", "valid": "cda-r2-base-valid.xml", "invalid": "cda-r2-base-missing-custodian.xml"},
+    {"id": "2.16.840.1.113883.10.20.22.1.1", "name": "US Realm Header", "valid": "us-realm-header-valid.xml", "invalid": "us-realm-header-missing-custodian.xml"},
+    {"id": "2.16.840.1.113883.10.20.22.1.2", "name": "CCD", "valid": "ccd-valid.xml", "invalid": "ccd-wrong-code.xml"},
+    {"id": "2.16.840.1.113883.10.20.22.1.8", "name": "Discharge Summary", "valid": "discharge-summary-valid.xml", "invalid": "discharge-summary-dangling-link.xml"},
+    {"id": "2.16.840.1.113883.10.20.22.2.5.1", "name": "Problems Section", "valid": "problems-valid.xml", "invalid": "problems-wrong-code.xml"},
+    {"id": "2.16.840.1.113883.10.20.22.2.1.1", "name": "Medications Section", "valid": "medications-valid.xml", "invalid": "medications-missing-text.xml"},
+    {"id": "2.16.840.1.113883.10.20.22.2.6.1", "name": "Allergies Section", "valid": "allergies-valid.xml", "invalid": "allergies-wrong-code.xml"},
+    {"id": "2.16.840.1.113883.10.20.22.2.3.1", "name": "Results Section", "valid": "results-valid.xml", "invalid": "results-missing-text.xml"},
+    {"id": "2.16.840.1.113883.10.20.22.2.4.1", "name": "Vital Signs Section", "valid": "vital-signs-valid.xml", "invalid": "vital-signs-wrong-code.xml"},
+    {"id": "2.16.840.1.113883.10.20.22.2.7.1", "name": "Procedures Section", "valid": "procedures-valid.xml", "invalid": "procedures-wrong-code.xml"},
+    {"id": "2.16.840.1.113883.10.20.22.2.22.1", "name": "Encounters Section", "valid": "encounters-valid.xml", "invalid": "encounters-wrong-code.xml"},
+    {"id": "2.16.840.1.113883.10.20.22.2.10", "name": "Plan of Treatment Section", "valid": "plan-valid.xml", "invalid": "plan-wrong-code.xml"},
+    {"id": "2.16.840.1.113883.10.20.22.4.3", "name": "Problem Concern Act", "valid": "problem-concern-act-valid.xml", "invalid": "problem-concern-act-missing-id.xml"},
+    {"id": "2.16.840.1.113883.10.20.22.4.4", "name": "Problem Observation", "valid": "problem-observation-valid.xml", "invalid": "problem-observation-missing-code.xml"},
+    {"id": "2.16.840.1.113883.10.20.22.4.16", "name": "Medication Activity", "valid": "medication-activity-valid.xml", "invalid": "medication-activity-missing-status.xml"},
+    {"id": "2.16.840.1.113883.10.20.22.4.30", "name": "Allergy Concern Act", "valid": "allergy-concern-act-valid.xml", "invalid": "allergy-concern-act-missing-id.xml"},
+    {"id": "2.16.840.1.113883.10.20.22.4.7", "name": "Allergy Observation", "valid": "allergy-observation-valid.xml", "invalid": "allergy-observation-missing-code.xml"},
+    {"id": "2.16.840.1.113883.10.20.22.4.1", "name": "Result Organizer", "valid": "result-organizer-valid.xml", "invalid": "result-organizer-missing-status.xml"},
+    {"id": "2.16.840.1.113883.10.20.22.4.2", "name": "Result Observation", "valid": "result-observation-valid.xml", "invalid": "result-observation-missing-code.xml"},
+    {"id": "2.16.840.1.113883.10.20.22.4.26", "name": "Vital Signs Organizer", "valid": "vital-signs-organizer-valid.xml", "invalid": "vital-signs-organizer-missing-status.xml"},
+    {"id": "2.16.840.1.113883.10.20.22.4.27", "name": "Vital Signs Observation", "valid": "vital-signs-observation-valid.xml", "invalid": "vital-signs-observation-missing-code.xml"},
+    {"id": "2.16.840.1.113883.10.20.22.4.14", "name": "Procedure Activity", "valid": "procedure-activity-valid.xml", "invalid": "procedure-activity-missing-id.xml"}
+  ],
+  "specialInvalid": [
+    {"file": "forbidden-null-flavor.xml", "code": "nullFlavorForbidden"},
+    {"file": "cardinality-violation.xml", "code": "cardinalityViolation"},
+    {"file": "unknown-template-id.xml", "code": "unknownTemplate"}
+  ]
+}

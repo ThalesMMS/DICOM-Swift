@@ -86,14 +86,14 @@ import simd
 ///
 /// ### Loading Series
 ///
-/// - ``loadSeries(in:progress:)``
-/// - ``loadSeries(in:progress:)-async``
+/// - ``loadSeries(in:progress:)-3nsso``
+/// - ``loadSeries(in:progress:)-1oqxk``
 /// - ``loadSeriesWithProgress(in:)``
 ///
 /// ### Progress Tracking
 ///
 /// - ``ProgressHandler``
-public protocol DicomSeriesLoaderProtocol: AnyObject {
+public protocol DicomSeriesLoaderProtocol: AnyObject, Sendable {
 
     /// Progress callback handler invoked during series loading.
     /// - Parameters:
@@ -101,7 +101,7 @@ public protocol DicomSeriesLoaderProtocol: AnyObject {
     ///   - slicesCopied: Number of slices processed so far
     ///   - sliceData: Pixel data for the current slice
     ///   - volume: Partial volume descriptor with geometry metadata
-    typealias ProgressHandler = (Double, Int, Data?, DicomSeriesVolume) -> Void
+    typealias ProgressHandler = @Sendable (Double, Int, Data?, DicomSeriesVolume) -> Void
 
     /// Initializes a new series loader instance.
     init()
@@ -202,7 +202,7 @@ public protocol DicomSeriesLoaderProtocol: AnyObject {
 ///
 /// This keeps study scanning injectable without requiring ``StudyDataService`` to
 /// construct a concrete ``DicomSeriesLoader`` internally.
-public protocol DicomBatchFileLoading: AnyObject {
+public protocol DicomBatchFileLoading: AnyObject, Sendable {
     /// Load multiple DICOM files concurrently and return one result per input URL.
     /// - Parameters:
     ///   - urls: File URLs to probe.

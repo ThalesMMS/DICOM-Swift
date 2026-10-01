@@ -136,16 +136,16 @@ final class DicomDecodedSeriesTests: XCTestCase {
         let zipURL = directory.appendingPathComponent("series.zip")
         try makeZip(at: zipURL, entries: ["series/slice_0.dcm": Data("slice".utf8)])
 
-        var decodedURL: URL?
+        let decodedURL = DicomTestLockedValue<URL?>(nil)
         let loader = DicomSeriesLoader(decoderFactory: { path in
-            decodedURL = URL(fileURLWithPath: path)
+            decodedURL.replace(with: URL(fileURLWithPath: path))
             return MockDecoderBuilder.makeDecoder(width: 1, height: 1, pixelValue: 11)
         })
 
         let decoded = try loader.loadDecodedSeries(from: zipURL)
 
         XCTAssertEqual(int16Values(in: decoded.modalityVoxels), [11])
-        let extractedRoot = try XCTUnwrap(decodedURL)
+        let extractedRoot = try XCTUnwrap(decodedURL.value)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
         XCTAssertFalse(FileManager.default.fileExists(atPath: extractedRoot.path))

@@ -43,7 +43,10 @@ extension DicomSeriesLoader {
     /// VOI values remain associated with each spatially ordered slice. The
     /// volume default is the first valid Frame VOI window in spatial order,
     /// falling back to top-level Window Center/Width when none is available.
-    public func loadEnhancedMultiframeVolume(at url: URL) throws -> DicomSeriesVolume {
+    public func loadEnhancedMultiframeVolume(
+        at url: URL,
+        selection: DicomEnhancedFramePartition.Selection? = nil
+    ) throws -> DicomSeriesVolume {
         let anyDecoder = try decoderFactory(url.path)
         let format = enhancedPixelFormat(from: anyDecoder)
         guard let decoder = anyDecoder as? DCMDecoder else {
@@ -72,18 +75,143 @@ extension DicomSeriesLoader {
             throw enhancedError(format, sopClassUID: sopClassUID,
                                 reason: "the object carries no Shared or Per-Frame Functional Groups Sequence.")
         }
-        guard groups.frameCount >= format.numberOfFrames else {
+        guard groups.perFrame.isEmpty || groups.perFrame.count == format.numberOfFrames else {
             throw enhancedError(format, sopClassUID: sopClassUID,
-                                reason: "Per-Frame Functional Groups cover \(groups.frameCount) of "
+                                reason: "Per-Frame Functional Groups cover \(groups.perFrame.count) of "
                                     + "\(format.numberOfFrames) declared frames.")
         }
 
-        let orderedFrames = try validatedSingleStackFrames(
-            groups,
-            format: format,
-            sopClassUID: sopClassUID
-        )
+        let orderedFrames: [DicomEnhancedFrame]
+        if let selection {
+            let partitions = try DicomEnhancedFramePartition.resolve(groups)
+            guard let partition = partitions.first(where: { $0.selection == selection }),
+                  !partition.hasDuplicateCoordinates else {
+                throw enhancedError(format, sopClassUID: sopClassUID,
+                                    reason: "the dimension selection is absent or has duplicate coordinates.")
+            }
+            let indices = Set(partition.frameIndices)
+            orderedFrames = groups.framesInSpatialOrder.filter { indices.contains($0.index) }
+            guard Set(orderedFrames.map { $0.functionalGroups.frameContent?.stackID }).count <= 1,
+                  Set(orderedFrames.map { $0.functionalGroups.frameContent?.temporalPositionIndex }).count <= 1 else {
+                throw enhancedError(format, sopClassUID: sopClassUID,
+                                    reason: "the selection leaves an undeclared stack or temporal dimension unresolved.")
+            }
+        } else {
+            orderedFrames = try validatedSingleStackFrames(groups, format: format, sopClassUID: sopClassUID)
+        }
+        let source = try DicomEnhancedFrameSource(decoder: decoder)
+        if let concatenation = source.concatenation {
+            let collection = try DicomEnhancedFrameCollection(sources: [source])
+            guard collection.concatenations[concatenation.uid] == .complete else {
+                throw enhancedError(format, sopClassUID: sopClassUID,
+                                    reason: "this object is only part of a concatenation; supply all member objects.")
+            }
+        }
+        return try assembleEnhancedVolume(orderedFrames: orderedFrames.map { frame in
+            DicomEnhancedVolumeFrame(
+                frame: frame, decoder: decoder, url: url,
+                reference: .init(
+                    sopClassUID: source.sopClassUID, sopInstanceUID: source.sopInstanceUID,
+                    frameIndex: frame.index, concatenationUID: source.concatenation?.uid,
+                    concatenationFrameIndex: source.concatenation?.frameOffset.flatMap { offset in
+                        let (value, overflow) = offset.addingReportingOverflow(frame.index)
+                        return overflow ? nil : value
+                    }
+                )
+            )
+        })
+    }
+
+    /// Loads one dimension selection across objects. Only selected frames are decoded;
+    /// incomplete or unproven concatenations remain accessible through the frame API.
+    /// An optional host decoder returns unscaled stored samples as little-endian 8/16-bit bytes.
+    /// Geometry, selection and per-frame transforms remain validated by this loader.
+    public func loadEnhancedMultiframeVolume(
+        at urls: [URL], selection: DicomEnhancedFramePartition.Selection,
+        decodeStoredFrame: (@Sendable (DCMDecoder, Int) throws -> Data)? = nil
+    ) throws -> DicomSeriesVolume {
+        var sources: [DicomEnhancedFrameSource] = []
+        var decoders: [String: (DCMDecoder, URL)] = [:]
+        for url in urls {
+            try Task.checkCancellation()
+            let anyDecoder = try decoderFactory(url.path)
+            guard let decoder = anyDecoder as? DCMDecoder else {
+                throw enhancedError(enhancedPixelFormat(from: anyDecoder), sopClassUID: anyDecoder.info(for: .sopClassUID),
+                                    reason: "Enhanced multiframe assembly requires the package DCMDecoder.")
+            }
+            let source = try DicomEnhancedFrameSource(decoder: decoder)
+            guard decoders[source.sopInstanceUID] == nil else {
+                throw DicomEnhancedFrameCollection.ResolutionError.duplicateObjectIdentity
+            }
+            decoders[source.sopInstanceUID] = (decoder, url)
+            sources.append(source)
+        }
+        let collection = try DicomEnhancedFrameCollection(sources: sources)
+        guard let firstSource = sources.first, let firstDecoder = decoders[firstSource.sopInstanceUID]?.0 else {
+            throw DicomSeriesLoaderError.noDicomFiles
+        }
+        let format = enhancedPixelFormat(from: firstDecoder)
+        guard let partition = collection.partitions.first(where: { $0.selection == selection }),
+              !partition.hasDuplicateCoordinates,
+              partition.frames.allSatisfy({ reference in
+                  guard let uid = reference.concatenationUID else { return true }
+                  return collection.concatenations[uid] == .complete
+              }) else {
+            throw enhancedError(format, sopClassUID: firstSource.sopClassUID,
+                                reason: "the selection is absent, ambiguous, or belongs to an incomplete concatenation.")
+        }
+        let sourceByUID = Dictionary(uniqueKeysWithValues: sources.map { ($0.sopInstanceUID, $0) })
+        let frames: [DicomEnhancedVolumeFrame] = try partition.frames.map { reference in
+            guard let (decoder, url) = decoders[reference.sopInstanceUID],
+                  let source = sourceByUID[reference.sopInstanceUID] else {
+                throw DicomEnhancedFrameCollection.ResolutionError.incompatibleObjects
+            }
+            let candidate = enhancedPixelFormat(from: decoder)
+            guard candidate.samplesPerPixel == 1,
+                  candidate.photometricInterpretation == "MONOCHROME1" || candidate.photometricInterpretation == "MONOCHROME2",
+                  candidate.bitsAllocated == 8 || candidate.bitsAllocated == 16,
+                  candidate.bitsAllocated == format.bitsAllocated,
+                  candidate.bitsStored == format.bitsStored,
+                  candidate.pixelRepresentation == format.pixelRepresentation,
+                  candidate.photometricInterpretation == format.photometricInterpretation,
+                  decoder.width == firstDecoder.width, decoder.height == firstDecoder.height,
+                  decoder.info(for: .studyInstanceUID) == firstDecoder.info(for: .studyInstanceUID) else {
+                throw enhancedError(candidate, sopClassUID: source.sopClassUID,
+                                    reason: "the selected objects have incompatible pixel formats or study identities.")
+            }
+            return DicomEnhancedVolumeFrame(
+                frame: source.groups.frames[reference.frameIndex], decoder: decoder, url: url, reference: reference
+            )
+        }
+        guard Set(frames.map { $0.functionalGroups.frameContent?.stackID }).count <= 1,
+              Set(frames.map { $0.functionalGroups.frameContent?.temporalPositionIndex }).count <= 1 else {
+            throw enhancedError(format, sopClassUID: firstSource.sopClassUID,
+                                reason: "the selection leaves a stack or temporal dimension unresolved.")
+        }
+        let normal = frames.first?.functionalGroups.planeOrientation?.normal ?? SIMD3<Double>(0, 0, 1)
+        let ordered = frames.sorted {
+            let left = $0.functionalGroups.planePosition.map { simd_dot($0.imagePositionPatient, normal) } ?? 0
+            let right = $1.functionalGroups.planePosition.map { simd_dot($0.imagePositionPatient, normal) } ?? 0
+            return left < right
+        }
+        return try assembleEnhancedVolume(orderedFrames: ordered, decodeStoredFrame: decodeStoredFrame)
+    }
+
+    private func assembleEnhancedVolume(
+        orderedFrames: [DicomEnhancedVolumeFrame],
+        decodeStoredFrame: (@Sendable (DCMDecoder, Int) throws -> Data)? = nil
+    ) throws -> DicomSeriesVolume {
+        guard let first = orderedFrames.first else { throw DicomSeriesLoaderError.noDicomFiles }
+        let decoder = first.decoder
+        let format = enhancedPixelFormat(from: decoder)
+        let sopClassUID = decoder.info(for: .sopClassUID)
+        guard orderedFrames.count >= 2 else {
+            throw enhancedError(format, sopClassUID: sopClassUID,
+                                reason: "the selected partition has fewer than two frames; it remains available in 2D.")
+        }
         var referenceOrientation: DicomPlaneOrientation?
+        var referenceSpacing: SIMD2<Double>?
+        var referencePosition: SIMD3<Double>?
         var positions = [Double]()
 
         for frame in orderedFrames {
@@ -96,10 +224,24 @@ extension DicomSeriesLoader {
                 throw enhancedError(format, sopClassUID: sopClassUID,
                                     reason: "frame \(frame.index) has no Plane Position Functional Group.")
             }
-            guard functionalGroups.pixelMeasures?.pixelSpacing != nil else {
+            guard let spacing = functionalGroups.pixelMeasures?.pixelSpacing,
+                  spacing.x.isFinite, spacing.y.isFinite, spacing.x > 0, spacing.y > 0 else {
                 throw enhancedError(format, sopClassUID: sopClassUID,
                                     reason: "frame \(frame.index) has no Pixel Measures Functional Group with Pixel Spacing.")
             }
+            guard abs(simd_length(orientation.row) - 1) < 1e-4,
+                  abs(simd_length(orientation.column) - 1) < 1e-4,
+                  abs(simd_dot(orientation.row, orientation.column)) < 1e-4,
+                  position.imagePositionPatient.x.isFinite,
+                  position.imagePositionPatient.y.isFinite,
+                  position.imagePositionPatient.z.isFinite else {
+                throw DicomSeriesLoaderError.inconsistentOrientation
+            }
+            if let referenceSpacing, simd_length(referenceSpacing - spacing) > 1e-6 {
+                throw enhancedError(format, sopClassUID: sopClassUID,
+                                    reason: "the selected frames have inconsistent in-plane pixel spacing.")
+            }
+            if referenceSpacing == nil { referenceSpacing = spacing }
             if let reference = referenceOrientation {
                 guard simd_length(reference.row - orientation.row) < 1e-4,
                       simd_length(reference.column - orientation.column) < 1e-4 else {
@@ -107,6 +249,16 @@ extension DicomSeriesLoader {
                 }
             } else {
                 referenceOrientation = orientation
+            }
+            if let referencePosition {
+                let displacement = position.imagePositionPatient - referencePosition
+                let normal = simd_normalize(orientation.normal)
+                guard simd_length(displacement - simd_dot(displacement, normal) * normal) <= 0.01 else {
+                    throw enhancedError(format, sopClassUID: sopClassUID,
+                                        reason: "the selected frame origins do not form a regular orthogonal stack.")
+                }
+            } else {
+                referencePosition = position.imagePositionPatient
             }
             positions.append(simd_dot(position.imagePositionPatient, orientation.normal))
         }
@@ -138,17 +290,45 @@ extension DicomSeriesLoader {
         }
 
         // Decode frames one at a time, in spatial order, into the volume.
-        let frameReader = DicomDecodedFrameReader(decoder: decoder)
         let width = decoder.width
         let height = decoder.height
         let pixelsPerFrame = width * height
-        var voxels = Data(count: pixelsPerFrame * orderedFrames.count * MemoryLayout<Int16>.size)
+        var voxels = try allocateVoxelData(pixelsPerFrame * orderedFrames.count * MemoryLayout<Int16>.size)
         var sliceRescale = [DicomSliceRescaleParameters]()
         let fallbackRescale = decoder.rescaleParametersV2
 
         try voxels.withUnsafeMutableBytes { rawBuffer in
             let destination = rawBuffer.bindMemory(to: Int16.self)
             for (sliceIndex, frame) in orderedFrames.enumerated() {
+                try Task.checkCancellation()
+                let frameReader = DicomDecodedFrameReader(decoder: frame.decoder)
+                let url = frame.url
+                let base = sliceIndex * pixelsPerFrame
+                if let decodeStoredFrame {
+                    let bytes = try decodeStoredFrame(frame.decoder, frame.index)
+                    try Task.checkCancellation()
+                    guard bytes.count == pixelsPerFrame * (format.bitsAllocated / 8) else {
+                        throw DicomSeriesLoaderError.failedToDecode(url)
+                    }
+                    bytes.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
+                        for index in 0..<pixelsPerFrame {
+                            if format.bitsAllocated == 16 {
+                                let value = UInt16(raw[index * 2]) | (UInt16(raw[index * 2 + 1]) << 8)
+                                destination[base + index] = Int16(bitPattern: value)
+                            } else {
+                                destination[base + index] = format.pixelRepresentation == 1
+                                    ? Int16(Int8(bitPattern: raw[index])) : Int16(raw[index])
+                            }
+                        }
+                    }
+                    let transformation = frame.functionalGroups.pixelValueTransformation
+                    let fallback = frame.decoder.rescaleParametersV2
+                    sliceRescale.append(.init(
+                        slope: transformation?.rescaleSlope ?? fallback.slope,
+                        intercept: transformation?.rescaleIntercept ?? fallback.intercept
+                    ))
+                    continue
+                }
                 let decoded: DicomDecodedFrame
                 do {
                     decoded = try frameReader.frame(at: frame.index)
@@ -160,38 +340,14 @@ extension DicomSeriesLoader {
                     throw DicomSeriesLoaderError.failedToDecode(url)
                 }
 
-                let base = sliceIndex * pixelsPerFrame
-                switch decoded.pixels {
-                case .gray16(let pixels):
-                    guard pixels.count == pixelsPerFrame else { throw DicomSeriesLoaderError.failedToDecode(url) }
-                    if format.pixelRepresentation == 1 {
-                        for index in 0..<pixelsPerFrame {
-                            destination[base + index] = Int16(truncatingIfNeeded: Int32(pixels[index]) + Int32(Int16.min))
-                        }
-                    } else {
-                        for index in 0..<pixelsPerFrame {
-                            destination[base + index] = Int16(bitPattern: pixels[index])
-                        }
-                    }
-                case .gray8(let pixels):
-                    guard pixels.count == pixelsPerFrame else { throw DicomSeriesLoaderError.failedToDecode(url) }
-                    if format.pixelRepresentation == 1 {
-                        // The decoded surface offsets signed 8-bit samples by
-                        // +128; undo to recover stored values.
-                        for index in 0..<pixelsPerFrame {
-                            destination[base + index] = Int16(Int(pixels[index]) - 128)
-                        }
-                    } else {
-                        for index in 0..<pixelsPerFrame {
-                            destination[base + index] = Int16(pixels[index])
-                        }
-                    }
-                case .rgb8:
+                guard try storeGrayFrame(decoded, format: format, count: pixelsPerFrame, into: destination,
+                                         at: base, url: url) else {
                     throw enhancedError(format, sopClassUID: sopClassUID,
                                         reason: "frame \(frame.index) decoded as color; multiframe assembly is grayscale-only.")
                 }
 
                 let transformation = frame.functionalGroups.pixelValueTransformation
+                let fallbackRescale = frame.decoder.rescaleParametersV2
                 sliceRescale.append(DicomSliceRescaleParameters(
                     slope: transformation?.rescaleSlope ?? fallbackRescale.slope,
                     intercept: transformation?.rescaleIntercept ?? fallbackRescale.intercept
@@ -231,11 +387,46 @@ extension DicomSeriesLoader {
             seriesInstanceUID: nonEmptyValue(decoder.info(for: .seriesInstanceUID)),
             frameOfReferenceUID: nonEmptyValue(decoder.info(for: .frameOfReferenceUID)),
             sliceRescaleParameters: sliceRescale,
-            sliceVOIs: sliceVOIs
+            sliceVOIs: sliceVOIs,
+            enhancedFrameReferences: orderedFrames.map(\.reference)
         )
     }
 
-    private func enhancedPixelFormat(from decoder: any DicomDecoderProtocol) -> DicomSeriesLoaderPixelFormat {
+    /// Copies one decoded grayscale frame's stored values into `destination` from `base`; false for a colour frame.
+    func storeGrayFrame(_ decoded: DicomDecodedFrame, format: DicomSeriesLoaderPixelFormat, count pixelsPerFrame: Int,
+                        into destination: UnsafeMutableBufferPointer<Int16>, at base: Int, url: URL) throws -> Bool {
+        switch decoded.pixels {
+        case .gray16(let pixels):
+            guard pixels.count == pixelsPerFrame else { throw DicomSeriesLoaderError.failedToDecode(url) }
+            if format.pixelRepresentation == 1 {
+                for index in 0..<pixelsPerFrame {
+                    destination[base + index] = Int16(truncatingIfNeeded: Int32(pixels[index]) + Int32(Int16.min))
+                }
+            } else {
+                for index in 0..<pixelsPerFrame {
+                    destination[base + index] = Int16(bitPattern: pixels[index])
+                }
+            }
+        case .gray8(let pixels):
+            guard pixels.count == pixelsPerFrame else { throw DicomSeriesLoaderError.failedToDecode(url) }
+            if format.pixelRepresentation == 1 {
+                // The decoded surface offsets signed 8-bit samples by
+                // +128; undo to recover stored values.
+                for index in 0..<pixelsPerFrame {
+                    destination[base + index] = Int16(Int(pixels[index]) - 128)
+                }
+            } else {
+                for index in 0..<pixelsPerFrame {
+                    destination[base + index] = Int16(pixels[index])
+                }
+            }
+        case .rgb8:
+            return false
+        }
+        return true
+    }
+
+    func enhancedPixelFormat(from decoder: any DicomDecoderProtocol) -> DicomSeriesLoaderPixelFormat {
         let bitsStored = decoder.intValue(for: .bitsStored) ?? decoder.bitDepth
         let transferSyntaxUID = decoder.info(for: .transferSyntaxUID)
         return DicomSeriesLoaderPixelFormat(
@@ -308,7 +499,7 @@ extension DicomSeriesLoader {
                   let inStackPositionNumber = content.inStackPositionNumber,
                   content.dimensionIndexValues.count == organization.indexes.count,
                   content.dimensionIndexValues.allSatisfy({ $0 > 0 }),
-                  content.dimensionIndexValues[positionIndex] == inStackPositionNumber else {
+                  inStackPositionNumber > 0 else {
                 throw enhancedError(
                     format,
                     sopClassUID: sopClassUID,

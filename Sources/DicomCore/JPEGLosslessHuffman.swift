@@ -58,5 +58,43 @@ extension JPEGLosslessDecoder {
         table.minCode = minCode
         table.maxCode = maxCode
         table.valPtr = valPtr
+        table.lookup = Self.buildLookup(huffsize: huffsize, huffcode: huffcode, symbolValues: table.symbolValues)
+    }
+
+    /// Fills a `1 << lookupBits` table so that most symbols resolve with one peek instead of a bit-serial search.
+    private static func buildLookup(huffsize: [Int], huffcode: [Int], symbolValues: [UInt8]) -> [UInt16] {
+        let bits = HuffmanTable.lookupBits
+        var lookup = [UInt16](repeating: 0, count: 1 << bits)
+        for (index, size) in huffsize.enumerated() where size <= bits && index < symbolValues.count {
+            let base = huffcode[index] << (bits - size)
+            let entry = UInt16(size << 8) | UInt16(symbolValues[index])
+            for slot in base..<(base + (1 << (bits - size))) where slot < lookup.count {
+                lookup[slot] = entry
+            }
+        }
+        return lookup
+    }
+}
+
+/// Canonical code assignment shared by the decoder and the own encoder (T.81 Annex C, Figures C.1–C.3).
+enum JPEGLosslessHuffmanCodes {
+    struct Code: Equatable {
+        let value: Int
+        let length: Int
+    }
+
+    /// Codes in the order of `symbolValues` (BITS then HUFFVAL, as carried by a DHT segment).
+    static func canonical(symbolCounts: [UInt8]) -> [Code] {
+        var codes: [Code] = []
+        var code = 0
+        for length in 1...16 {
+            let count = length - 1 < symbolCounts.count ? Int(symbolCounts[length - 1]) : 0
+            for _ in 0..<count {
+                codes.append(Code(value: code, length: length))
+                code += 1
+            }
+            code <<= 1
+        }
+        return codes
     }
 }

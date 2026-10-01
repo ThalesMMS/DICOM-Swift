@@ -149,7 +149,8 @@ public struct DicomEncapsulatedPixelDataDescriptor: Equatable, Sendable {
                 return nil
             }
             frameFragments.append(fragment)
-            payload.append(Data(data[fragment.valueRange]))
+            let start = data.startIndex + fragment.valueRange.lowerBound
+            payload.append(contentsOf: data[start..<(start + fragment.valueRange.count)])
         }
 
         return DicomEncapsulatedPixelFrame(
@@ -174,7 +175,7 @@ public struct DicomEncapsulatedPixelDataParser: Sendable {
         guard pixelDataOffset >= 0, pixelDataOffset < data.count else {
             throw DicomEncapsulatedPixelDataError.invalidPixelDataOffset(pixelDataOffset)
         }
-        guard pixelDataOffset + Self.itemHeaderLength <= data.count else {
+        guard Self.itemHeaderLength <= data.count - pixelDataOffset else {
             throw DicomEncapsulatedPixelDataError.truncatedItemHeader(offset: pixelDataOffset)
         }
 
@@ -192,7 +193,10 @@ public struct DicomEncapsulatedPixelDataParser: Sendable {
             throw DicomEncapsulatedPixelDataError.truncatedItemValue(offset: botValueStart, length: botLength)
         }
         let botRange = botValueStart..<botValueEnd
-        let botOffsets = Self.readUInt32Values(Data(data[botRange]), diagnostics: &diagnostics)
+        let botOffsets = Self.readUInt32Values(
+            Data(data[(data.startIndex + botRange.lowerBound)..<(data.startIndex + botRange.upperBound)]),
+            diagnostics: &diagnostics
+        )
         let basicOffsetTable = DicomBasicOffsetTable(offsets: botOffsets, byteRange: botRange)
 
         cursor = botValueEnd
@@ -240,6 +244,7 @@ public struct DicomEncapsulatedPixelDataParser: Sendable {
         )
         let frameCount = max(1, numberOfFrames)
         let frameFragments = Self.mapFrames(
+            data: data,
             numberOfFrames: frameCount,
             fragments: fragments,
             basicOffsetTable: basicOffsetTable,
@@ -259,7 +264,7 @@ public struct DicomEncapsulatedPixelDataParser: Sendable {
     }
 }
 
-private extension DicomEncapsulatedPixelDataParser {
+extension DicomEncapsulatedPixelDataParser {
     static let itemTag = 0xFFFEE000
     static let sequenceDelimiterTag = 0xFFFEE0DD
     static let itemHeaderLength = 8
@@ -362,6 +367,7 @@ private extension DicomEncapsulatedPixelDataParser {
     }
 
     static func mapFrames(
+        data: Data,
         numberOfFrames: Int,
         fragments: [DicomEncapsulatedPixelDataFragment],
         basicOffsetTable: DicomBasicOffsetTable,
@@ -373,10 +379,27 @@ private extension DicomEncapsulatedPixelDataParser {
             return []
         }
 
+        let canMapExtendedOffsets = extendedOffsetTable?.offsets.count == numberOfFrames
+        let canMapBasicOffsets = !basicOffsetTable.offsets.isEmpty
+            && basicOffsetTable.offsets.count == numberOfFrames
+        var fragmentIndexByRelativeItemOffset: [Int: Int] = [:]
+        if canMapExtendedOffsets || canMapBasicOffsets {
+            fragmentIndexByRelativeItemOffset.reserveCapacity(fragments.count)
+            for fragment in fragments {
+                fragmentIndexByRelativeItemOffset[fragment.relativeItemOffset] = fragment.index
+            }
+        }
+
         if let extendedOffsetTable {
-            if extendedOffsetTable.offsets.count == numberOfFrames,
-               let mapped = mapUsingOffsets(extendedOffsetTable.offsets, fragments: fragments, diagnostics: &diagnostics) {
-                validateExtendedLengths(extendedOffsetTable.lengths, frameFragments: mapped, fragments: fragments, diagnostics: &diagnostics)
+            if canMapExtendedOffsets,
+               let mapped = mapUsingOffsets(
+                   extendedOffsetTable.offsets,
+                   fragmentCount: fragments.count,
+                   fragmentIndexByRelativeItemOffset: fragmentIndexByRelativeItemOffset,
+                   diagnostics: &diagnostics
+               ) {
+                validateExtendedLengths(extendedOffsetTable.lengths, data: data,
+                                        frameFragments: mapped, fragments: fragments, diagnostics: &diagnostics)
                 return mapped
             }
             diagnostics.append(.init(
@@ -386,8 +409,13 @@ private extension DicomEncapsulatedPixelDataParser {
         }
 
         if !basicOffsetTable.offsets.isEmpty {
-            if basicOffsetTable.offsets.count == numberOfFrames,
-               let mapped = mapUsingOffsets(basicOffsetTable.offsets.map(UInt64.init), fragments: fragments, diagnostics: &diagnostics) {
+            if canMapBasicOffsets,
+               let mapped = mapUsingOffsets(
+                   basicOffsetTable.offsets.map(UInt64.init),
+                   fragmentCount: fragments.count,
+                   fragmentIndexByRelativeItemOffset: fragmentIndexByRelativeItemOffset,
+                   diagnostics: &diagnostics
+               ) {
                 return mapped
             }
             diagnostics.append(.init(
@@ -407,6 +435,21 @@ private extension DicomEncapsulatedPixelDataParser {
         if fragments.count == numberOfFrames {
             return fragments.map { [$0.index] }
         }
+        if let grouped = groupByCodestreamMarkers(data: data, fragments: fragments) {
+            if grouped.count == numberOfFrames {
+                diagnostics.append(.init(
+                    severity: .warning,
+                    message: "Mapped \(fragments.count) fragment(s) to \(numberOfFrames) frame(s) by codestream markers."
+                ))
+                return grouped
+            }
+            diagnostics.append(.init(
+                severity: .error,
+                message: "Codestream markers delimit \(grouped.count) frame(s) in \(fragments.count) fragment(s), "
+                    + "not the \(numberOfFrames) declared."
+            ))
+            return []
+        }
 
         diagnostics.append(.init(
             severity: .error,
@@ -415,27 +458,62 @@ private extension DicomEncapsulatedPixelDataParser {
         return []
     }
 
+    /// Issue #2814: frames delimited by their codestream markers when no offset table maps them. A frame starts at
+    /// a fragment that opens with SOI (FFD8, JPEG and JPEG-LS) or SOC (FF4F, JPEG 2000 and HTJ2K) right after a
+    /// fragment that closes with EOI/EOC (FFD9, before at most one pad byte). RLE fragments, whose header never
+    /// starts with FF, are not grouped: PS3.5 gives each RLE frame one fragment. Nil when the first fragment opens
+    /// no codestream.
+    static func groupByCodestreamMarkers(data: Data, fragments: [DicomEncapsulatedPixelDataFragment]) -> [[Int]]? {
+        func byte(_ offset: Int) -> UInt8 { data[data.startIndex + offset] }
+        func opensCodestream(_ range: Range<Int>) -> Bool {
+            range.count >= 2 && byte(range.lowerBound) == 0xFF
+                && (byte(range.lowerBound + 1) == 0xD8 || byte(range.lowerBound + 1) == 0x4F)
+        }
+        func closesCodestream(_ range: Range<Int>) -> Bool {
+            let end = range.upperBound
+            if range.count >= 2, byte(end - 2) == 0xFF, byte(end - 1) == 0xD9 { return true }
+            return range.count >= 3 && byte(end - 3) == 0xFF && byte(end - 2) == 0xD9
+        }
+        guard let first = fragments.first, opensCodestream(first.valueRange) else { return nil }
+        var frames: [[Int]] = [[first.index]]
+        for (previous, fragment) in zip(fragments, fragments.dropFirst()) {
+            if closesCodestream(previous.valueRange), opensCodestream(fragment.valueRange) {
+                frames.append([fragment.index])
+            } else {
+                frames[frames.count - 1].append(fragment.index)
+            }
+        }
+        return frames
+    }
+
     static func mapUsingOffsets(
         _ offsets: [UInt64],
-        fragments: [DicomEncapsulatedPixelDataFragment],
+        fragmentCount: Int,
+        fragmentIndexByRelativeItemOffset: [Int: Int],
         diagnostics: inout [DicomEncapsulatedPixelDataDiagnostic]
     ) -> [[Int]]? {
         var startIndexes: [Int] = []
         startIndexes.reserveCapacity(offsets.count)
+        var previousStartIndex: Int?
+        var isStrictlyIncreasing = true
 
         for offset in offsets {
             guard let intOffset = Int(exactly: offset),
-                  let fragment = fragments.first(where: { $0.relativeItemOffset == intOffset }) else {
+                  let fragmentIndex = fragmentIndexByRelativeItemOffset[intOffset] else {
                 diagnostics.append(.init(
                     severity: .error,
                     message: "Offset table entry \(offset) does not point to a fragment item."
                 ))
                 return nil
             }
-            startIndexes.append(fragment.index)
+            if let previousStartIndex, fragmentIndex <= previousStartIndex {
+                isStrictlyIncreasing = false
+            }
+            startIndexes.append(fragmentIndex)
+            previousStartIndex = fragmentIndex
         }
 
-        guard startIndexes == startIndexes.sorted(), Set(startIndexes).count == startIndexes.count else {
+        guard isStrictlyIncreasing else {
             diagnostics.append(.init(
                 severity: .error,
                 message: "Offset table entries must be strictly increasing."
@@ -443,11 +521,16 @@ private extension DicomEncapsulatedPixelDataParser {
             return nil
         }
 
+        guard startIndexes.first == 0 else {
+            diagnostics.append(.init(severity: .error, message: "The first offset must point to the first fragment item."))
+            return nil
+        }
+
         var frameFragments: [[Int]] = []
         frameFragments.reserveCapacity(startIndexes.count)
         for frameIndex in 0..<startIndexes.count {
             let start = startIndexes[frameIndex]
-            let end = frameIndex + 1 < startIndexes.count ? startIndexes[frameIndex + 1] : fragments.count
+            let end = frameIndex + 1 < startIndexes.count ? startIndexes[frameIndex + 1] : fragmentCount
             guard start < end else {
                 diagnostics.append(.init(
                     severity: .error,
@@ -462,6 +545,7 @@ private extension DicomEncapsulatedPixelDataParser {
 
     static func validateExtendedLengths(
         _ lengths: [UInt64],
+        data: Data,
         frameFragments: [[Int]],
         fragments: [DicomEncapsulatedPixelDataFragment],
         diagnostics: inout [DicomEncapsulatedPixelDataDiagnostic]
@@ -471,7 +555,12 @@ private extension DicomEncapsulatedPixelDataParser {
             let actualLength = frameFragments[frameIndex].reduce(0) { partial, fragmentIndex in
                 fragments.indices.contains(fragmentIndex) ? partial + fragments[fragmentIndex].length : partial
             }
-            if UInt64(actualLength) != lengths[frameIndex] {
+            let length = lengths[frameIndex]
+            let excludesPadding = frameFragments[frameIndex].count == 1
+                && length.isMultiple(of: 2) == false
+                && actualLength > 0 && length == UInt64(actualLength - 1)
+                && data[data.startIndex + fragments[frameFragments[frameIndex][0]].valueRange.upperBound - 1] == 0
+            if UInt64(actualLength) != length, !excludesPadding {
                 diagnostics.append(.init(
                     severity: .warning,
                     message: "Extended Offset Table length for frame \(frameIndex) is \(lengths[frameIndex]) but fragments contain \(actualLength) byte(s)."

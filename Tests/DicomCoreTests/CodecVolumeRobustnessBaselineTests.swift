@@ -45,13 +45,14 @@ final class CodecVolumeRobustnessBaselineTests: XCTestCase {
 
     // MARK: - Typed unsupported/limited behavior (pre-implementation pins)
 
-    /// HTJ2K is delegated (#1231) to the preflighted OpenJPEG runtime
-    /// behind an explicit version-gated capability; the matrix row says so.
-    func testHTJ2KIsDelegatedBehindTheVersionGatedCapability() {
+    /// HTJ2K rows name the own DicomJPEG2000 HT decoder (#2330) and keep the
+    /// version-gated OpenJPEG runtime (#1231) as the documented fallback.
+    func testHTJ2KRowsNameTheOwnDecoderAndTheVersionGatedFallback() {
         let registry = DicomTransferSyntaxRegistry.standard
         for syntax in [DicomTransferSyntax.htj2kLossless, .htj2kLosslessRPCL, .htj2k] {
             let support = registry.compressedPixelSupport(for: syntax)
-            XCTAssertEqual(support?.status, .delegated, "\(syntax) is delegated to OpenJPEG >= 2.5")
+            XCTAssertEqual(support?.status, .delegated, "\(syntax) is decoded by a codec backend")
+            XCTAssertTrue(support?.diagnostic.contains("j2kswift-cpu") == true, "\(syntax) diagnostic must name the own decoder")
             XCTAssertTrue(support?.diagnostic.contains("2.5") == true, "\(syntax) diagnostic must name the version gate")
         }
     }

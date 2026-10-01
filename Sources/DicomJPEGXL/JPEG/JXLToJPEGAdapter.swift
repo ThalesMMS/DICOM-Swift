@@ -1,0 +1,490 @@
+// `JPEG/JXLToJPEGAdapter.swift` — reverse direction of the JPEG
+// coefficient bridge. Inverse of `JPEGToJXLAdapter`. Takes a JXL
+// frame produced by the forward bridge plus its accompanying `jbrd`
+// box and produces JPEG bytes that match the source JPEG byte-for-
+// byte (when the source went through the forward bridge).
+//
+// Conceptual data flow:
+//
+// ```
+// JXL bytes ──┬─► JXLDecoder.decode → coefficient planes (Y/Cb/Cr)
+//             │
+// jbrd box ───┼─► JBRDBox: marker order, quant tables, Huffman tables,
+//             │              scan info, padding bits
+//             │
+//             ▼
+//   JXLToJPEGAdapter.reconstruct → JPEG bytes (SOI..EOI)
+// ```
+//
+// Phase J step 5i. v0.12.0g0 scaffold.
+//
+// Implementation order (planned bites, each becomes its own commit):
+//
+//  1. **Reverse adapter (coefficient planes → JPEGCoefficientImage)**
+//     — invert `toJXLCoefficientPlanes()`. Includes:
+//       - undo the JPEG-component-to-JXL-channel remap
+//         (`remappedForJXLBridge` inverse)
+//       - undo the 8×8 transpose (`block[y*8+x] = jpeg[x*8+y]` reverse)
+//       - undo the DC offset added by `applyJPEGBridgeDC` for non-
+//         DCzero (kNone) color transforms
+//  2. **JPEG bitstream writer** — given a `JPEGCoefficientImage`
+//     plus Huffman tables from `jbrd`, emit the JPEG SOS payload
+//     (Huffman-coded DC + AC coefficients with byte-stuffing).
+//  3. **JPEG container assembly** — walk `jbrd.markerOrder` and emit
+//     SOI, COM, APP, DQT, SOF, DHT, DRI, SOS, EOI markers in the
+//     recorded order, splicing in the marker payloads from `jbrd`
+//     and the scan data from step 2.
+//  4. **Padding-bit restoration** — re-apply `jbrd.paddingBits` at
+//     the end of each scan so the encoded bits match byte-for-byte.
+
+import Foundation
+
+/// Errors raised by the reverse bridge.
+package enum JXLToJPEGAdapterError: Error, Sendable {
+    /// The JXL frame's coefficient planes don't match the shape
+    /// the jbrd box says they should have.
+    case shapeMismatch(String)
+    /// A jbrd field has an invalid value or references something
+    /// missing from the JXL frame.
+    case malformedJBRD(String)
+    /// A feature in the reverse bridge we haven't implemented yet.
+    case notImplemented(String)
+}
+
+/// Reverse-bridge entry point. Given a JXL frame (produced by the
+/// forward bridge) and its accompanying `jbrd` box, return the
+/// byte-identical JPEG bytes.
+package enum JXLToJPEGAdapter {
+
+    /// **Autonomous reverse transcode.** Reconstruct the source JPEG
+    /// from a cjxl `--lossless_jpeg=1` file with **no reference to
+    /// the original** — every input comes from the JXL itself:
+    /// `bridgeData` (coefficients + RAW quant table + chroma info,
+    /// from `JXLDecoder.decodeJPEGBridgeData`) plus the container's
+    /// jbrd box (marker order / Huffman / scan structure).
+    ///
+    /// Fills the two slots the jbrd Bundle leaves empty — the quant
+    /// table **values** (recovered from the codestream RAW slot) and
+    /// the per-component **sampling factors** (recovered from the
+    /// frame's chroma subsampling) — then delegates to
+    /// `reconstruct(coefficients:jbrd:colorTransform:)`.
+    package static func reconstruct(
+        bridgeData: JXLJPEGBridgeData,
+        jbrd: JBRDBox
+    ) throws -> Data {
+        var box = jbrd
+        let ct = bridgeData.colorTransform
+        let isGray = box.components.count == 1
+        let order = JPEGToJXLAdapter.jpegOrder(
+            colorTransform: ct, isGray: isGray)
+        let mapping = [order.0, order.1, order.2]   // jxlChannel → jpegComp
+
+        // 1. Recover JPEG quant-table values from the RAW slot.
+        //    `rawQuantTable[jxlC*64 + 8*x + y] = naturalQuant[8*y + x]`
+        //    (inverse of `buildJXLBridgeRAWQuantPayload`); then pack
+        //    natural → zig-zag and store into the quant table each
+        //    component points at.
+        if let raw = bridgeData.rawQuantTable, raw.count == 3 * 64 {
+            for jxlC in 0..<3 {
+                let jpegC = mapping[jxlC]
+                guard jpegC < box.components.count else { continue }
+                let qIdx = Int(box.components[jpegC].quantIdx)
+                guard qIdx < box.quant.count else { continue }
+                var natural = [Int32](repeating: 1, count: 64)
+                for y in 0..<8 {
+                    for x in 0..<8 {
+                        natural[8 * y + x] = raw[jxlC * 64 + 8 * x + y]
+                    }
+                }
+                var zigzag = [Int32](repeating: 0, count: 64)
+                for k in 0..<64 {
+                    zigzag[k] = natural[JPEGZigZag.order[k]]
+                }
+                box.quant[qIdx].values = zigzag
+            }
+        }
+
+        // 2. Recover per-component JPEG sampling factors from the
+        //    frame's chroma subsampling. libjxl `Set` stores
+        //    `hsample[jpeg] == 1 << RawHShift(color)`; with
+        //    `RawHShift(c) = maxHShift - HShift(c)` and the color
+        //    channel for JPEG component `jpegC` being the `jxlC`
+        //    that maps to it.
+        let cs = bridgeData.chromaSubsampling
+        for jxlC in 0..<3 {
+            let jpegC = mapping[jxlC]
+            guard jpegC < box.components.count else { continue }
+            box.components[jpegC].hSampFactor =
+                1 << (cs.maxHShift - cs.hShift(jxlC))
+            box.components[jpegC].vSampFactor =
+                1 << (cs.maxVShift - cs.vShift(jxlC))
+        }
+
+        var planes = bridgeData.planes
+        if ct == .none {
+            guard let raw = bridgeData.rawQuantTable, raw.count == 3 * 64, planes.channelCount <= 3 else {
+                throw JXLToJPEGAdapterError.malformedJBRD("missing RAW DC quantizers")
+            }
+            let quantDC = try (0..<planes.channelCount).map { channel -> UInt16 in
+                if isGray && channel != 1 { return 0 }
+                guard raw[channel * 64] > 0, let value = UInt16(exactly: raw[channel * 64]) else {
+                    throw JXLToJPEGAdapterError.malformedJBRD("invalid RAW DC quantizer")
+                }
+                return value
+            }
+            planes = planes.inverseJPEGBridgeDC(colorTransform: ct, quantDCPerChannel: quantDC)
+        }
+        return try reconstruct(
+            coefficients: planes,
+            jbrd: box,
+            colorTransform: ct,
+            imageWidth: bridgeData.width,
+            imageHeight: bridgeData.height)
+    }
+
+    /// Reconstruct the source JPEG bytes from a JXL frame + jbrd
+    /// metadata. Output matches the source JPEG **byte-for-byte**
+    /// when the jbrd's `app_data` / `com_data` / `inter_marker_data` /
+    /// `tail_data` slots have been filled (via
+    /// `JBRDBox.distributeBrotliPayload(...)` after running the
+    /// Brotli decoder on the trailing payload of the jbrd box).
+    ///
+    /// Walks `jbrd.markerOrder` and emits markers in source order:
+    /// - SOI (0xD8) — always emitted first (it's NOT in markerOrder
+    ///   per libjxl convention).
+    /// - APPn (0xE0..0xEF) — splice in `jbrd.appData[appIdx++]`.
+    /// - COM (0xFE) — splice in `jbrd.comData[comIdx++]`.
+    /// - DQT (0xDB) — emit from `coefficients` via `quantTables`.
+    /// - DRI (0xDD) — emit `jbrd.restartInterval`.
+    /// - SOFn (0xC0/0xC2/...) — emit from coefficients dimensions +
+    ///   frame components.
+    /// - DHT (0xC4) — emit from `jbrd.huffmanCode`, walking up to
+    ///   `is_last`.
+    /// - SOS (0xDA) — emit scan header from `jbrd.scanInfo[scanIdx]`
+    ///   then the entropy-coded data via `JPEGScanEncoder` using
+    ///   the jbrd's Huffman tables; restore `jbrd.paddingBits` at
+    ///   end of scan.
+    /// - 0xFF (intermarker sentinel) — splice in
+    ///   `jbrd.interMarkerData[imIdx++]`.
+    /// - EOI (0xD9) — terminate output.
+    /// - Otherwise — surface as malformed for the moment.
+    ///
+    /// `jbrd.tailData` (if any) is appended after EOI.
+    ///
+    /// **Status (v0.12.0ge — initial integration).** Implements the
+    /// common-case marker set (SOI / APPn / DQT / SOFn / DHT / SOS /
+    /// EOI). DRI, COM, intermarker, padding-bit-restoration are
+    /// straightforward extensions; multi-scan SOS (progressive)
+    /// would need a scan-encoder rewrite to handle Ss/Se/Ah/Al.
+    package static func reconstruct(
+        coefficients: JXLCoefficientPlanes,
+        jbrd: JBRDBox,
+        colorTransform: JXLBridgeColorTransform,
+        imageWidth: Int? = nil,
+        imageHeight: Int? = nil
+    ) throws -> Data {
+        guard !jbrd.markerOrder.isEmpty else {
+            throw JXLToJPEGAdapterError.malformedJBRD(
+                "markerOrder is empty")
+        }
+        let frameComponents = try buildFrameComponents(jbrd: jbrd)
+        let quantTables = try buildQuantTables(jbrd: jbrd)
+        let unremapped: JXLCoefficientPlanes
+        if frameComponents.count == 1 && coefficients.channelCount == 3 {
+            unremapped = coefficients.extractingChannel(1)
+        } else {
+            unremapped = coefficients.inverseJXLBridgeRemap(
+                colorTransform: colorTransform)
+        }
+        let width = imageWidth ?? coefficients.blocksX * 8
+        let height = imageHeight ?? coefficients.blocksY * 8
+        let image = try unremapped.toJPEGCoefficientImage(
+            width: width, height: height,
+            precision: 8, frameKind: .baselineDCT,
+            frameComponents: frameComponents,
+            quantTables: quantTables)
+        // The bundle carries neither the image size nor the block grid;
+        // both follow from the size and the sampling factors (libjxl
+        // `ProcessSOF`).
+        var box = jbrd
+        box.width = width
+        box.height = height
+        var maxH = 1, maxV = 1
+        for c in box.components {
+            maxH = max(maxH, c.hSampFactor)
+            maxV = max(maxV, c.vSampFactor)
+        }
+        let mcuRows = (height + maxV * 8 - 1) / (maxV * 8)
+        let mcuCols = (width + maxH * 8 - 1) / (maxH * 8)
+        var planes: [[Int16]] = []
+        for (i, c) in box.components.enumerated() {
+            let w = mcuCols * c.hSampFactor
+            let h = mcuRows * c.vSampFactor
+            box.components[i].widthInBlocks = UInt32(w)
+            box.components[i].heightInBlocks = UInt32(h)
+            let comp = image.quantisedComponents[i]
+            guard comp.blocksWide == w, comp.blocksHigh == h else {
+                throw JXLToJPEGAdapterError.shapeMismatch(
+                    "component \(i): JPEG XL block grid \(comp.blocksWide)x\(comp.blocksHigh) "
+                    + "does not match the JPEG grid \(w)x\(h)")
+            }
+            var plane = [Int16](repeating: 0, count: w * h * 64)
+            for bi in 0..<(w * h) {
+                let block = comp.blocks[bi].coefficients
+                for k in 0..<64 {
+                    guard let v = Int16(exactly: block[k]) else {
+                        throw JXLToJPEGAdapterError.shapeMismatch(
+                            "component \(i) block \(bi): coefficient \(block[k]) exceeds the JPEG range")
+                    }
+                    plane[bi * 64 + k] = v
+                }
+            }
+            planes.append(plane)
+        }
+        do {
+            return try JPEGReconstructionWriter.write(jbrd: box, coefficients: planes)
+        } catch let e as JPEGReconstructionError {
+            throw JXLToJPEGAdapterError.malformedJBRD("\(e)")
+        }
+    }
+
+    private static func buildFrameComponents(
+        jbrd: JBRDBox
+    ) throws -> [JPEGFrameComponent] {
+        return jbrd.components.map { c in
+            JPEGFrameComponent(
+                componentId: Int(c.id),
+                hSamplingFactor: c.hSampFactor,
+                vSamplingFactor: c.vSampFactor,
+                quantTableId: Int(c.quantIdx))
+        }
+    }
+
+    /// Build DQT tables from values supplied by the JXL frame's
+    /// quant matrices. The JBRD bundle alone has no quant values;
+    /// missing or invalid values must be rejected before emission.
+    private static func buildQuantTables(
+        jbrd: JBRDBox
+    ) throws -> [JPEGQuantTable] {
+        return try jbrd.quant.map { q in
+            // DQT values must fit the declared precision, including when supplied by a damaged RAW slot.
+            let upper: Int32 = q.precision == 0 ? 255 : 65_535
+            guard q.values.count == 64 else {
+                throw JXLToJPEGAdapterError.malformedJBRD("quant table must contain 64 values")
+            }
+            let zigzag = try q.values.map {
+                guard $0 >= 1, $0 <= upper else {
+                    throw JXLToJPEGAdapterError.malformedJBRD("quant table value outside declared precision")
+                }
+                return UInt16($0)
+            }
+            return JPEGQuantTable(
+                tableId: Int(q.index),
+                precision: q.precision == 0 ? .bits8 : .bits16,
+                zigZagValues: zigzag)
+        }
+    }
+
+    package static func reconstructMinimal(
+        coefficients: JXLCoefficientPlanes,
+        width: Int, height: Int,
+        frameComponents: [JPEGFrameComponent],
+        quantTables: [JPEGQuantTable],
+        dcHuffmanTables: [JPEGHuffmanTable],
+        acHuffmanTables: [JPEGHuffmanTable],
+        scanComponents: [JPEGScanComponentEncode],
+        colorTransform: JXLBridgeColorTransform,
+        quantDCPerChannel: [UInt16] = []
+    ) throws -> Data {
+        // 1. Undo the JXL bridge's channel remap so planes are in
+        //    JPEG component order (Y, Cb, Cr).
+        let unremapped = coefficients.inverseJXLBridgeRemap(
+            colorTransform: colorTransform)
+        // 2. Undo the DC offset if needed.
+        let unoffset: JXLCoefficientPlanes
+        if colorTransform == .none && !quantDCPerChannel.isEmpty {
+            unoffset = unremapped.inverseJPEGBridgeDC(
+                colorTransform: colorTransform,
+                quantDCPerChannel: quantDCPerChannel)
+        } else {
+            unoffset = unremapped
+        }
+        // 3. Transpose AC back and build a JPEGCoefficientImage.
+        let image = try unoffset.toJPEGCoefficientImage(
+            width: width, height: height,
+            precision: 8, frameKind: .baselineDCT,
+            frameComponents: frameComponents,
+            quantTables: quantTables)
+        // 4. Assemble the JPEG container.
+        return try JPEGContainerWriter.write(
+            image: image,
+            dcHuffmanTables: dcHuffmanTables,
+            acHuffmanTables: acHuffmanTables,
+            scanComponents: scanComponents)
+    }
+}
+
+extension JXLCoefficientPlanes {
+
+    /// Reduce to a single channel `c`. Used for grayscale frames:
+    /// libjxl stores the lone luma component in the Y (XYB index 1)
+    /// channel of an otherwise-zero 3-channel VarDCT frame, so the
+    /// reverse bridge extracts that channel for the 1-component JPEG.
+    package func extractingChannel(_ c: Int) -> JXLCoefficientPlanes {
+        precondition(c >= 0 && c < channelCount,
+            "extractingChannel: \(c) out of range \(channelCount)")
+        return JXLCoefficientPlanes(
+            blocksX: blocksX, blocksY: blocksY,
+            channelCount: 1,
+            dcPerChannel: [dcPerChannel[c]],
+            acPerChannel: [acPerChannel[c]],
+            blocksPerChannel: [blocksPerChannel[c]])
+    }
+
+    /// Invert `remappedForJXLBridge` — given planes in JXL channel
+    /// order (X=Cb, Y, B=Cr), return planes in JPEG component order
+    /// (Y, Cb, Cr) for grayscale or 3-component frames.
+    package func inverseJXLBridgeRemap(
+        colorTransform: JXLBridgeColorTransform
+    ) -> JXLCoefficientPlanes {
+        if channelCount == 1 { return self }
+        precondition(channelCount == 3,
+            "inverseJXLBridgeRemap requires 1 or 3 channels")
+        let forward = JPEGToJXLAdapter.jpegOrder(
+            colorTransform: colorTransform, isGray: false)
+        let forwardMap = [forward.0, forward.1, forward.2]
+        // Inverse: for each JPEG component `j`, find the JXL slot
+        // it ended up in. `inverseMap[j] = i` iff `forwardMap[i] = j`.
+        var inverseMap = [Int](repeating: 0, count: 3)
+        for i in 0..<3 {
+            inverseMap[forwardMap[i]] = i
+        }
+        let newDC = inverseMap.map { dcPerChannel[$0] }
+        let newAC = inverseMap.map { acPerChannel[$0] }
+        let newBpc = inverseMap.map { blocksPerChannel[$0] }
+        return JXLCoefficientPlanes(
+            blocksX: blocksX, blocksY: blocksY,
+            channelCount: channelCount,
+            dcPerChannel: newDC,
+            acPerChannel: newAC,
+            blocksPerChannel: newBpc)
+    }
+
+    /// Invert `applyJPEGBridgeDC` — for `colorTransform == .none`,
+    /// subtract the `1024 / qt[DC]` offset that the forward bridge
+    /// added. For `.ycbcr` (DCzero=true) the forward pass didn't
+    /// modify DC, so this is a no-op.
+    package func inverseJPEGBridgeDC(
+        colorTransform: JXLBridgeColorTransform,
+        quantDCPerChannel: [UInt16]
+    ) -> JXLCoefficientPlanes {
+        precondition(quantDCPerChannel.count == channelCount,
+            "inverseJPEGBridgeDC: quantDCPerChannel.count must "
+            + "equal channelCount")
+        switch colorTransform {
+        case .ycbcr:
+            return self
+        case .none:
+            var newDC = dcPerChannel
+            for c in 0..<channelCount {
+                let qDC = Int32(quantDCPerChannel[c])
+                guard qDC != 0 else { continue }
+                let offset = Int32(1024) / qDC
+                for i in 0..<newDC[c].count {
+                    newDC[c][i] &-= offset
+                }
+            }
+            return JXLCoefficientPlanes(
+                blocksX: blocksX, blocksY: blocksY,
+                channelCount: channelCount,
+                dcPerChannel: newDC,
+                acPerChannel: acPerChannel,
+                blocksPerChannel: blocksPerChannel)
+        }
+    }
+
+    /// Build a `JPEGCoefficientImage` from JXL coefficient planes by
+    /// inverting both the channel remap and the 8×8 transpose the
+    /// forward adapter applied (`ac[k=y*8+x] = jpeg[x*8+y]`).
+    ///
+    /// **Caller contract.** `self` must be in **JPEG component order**
+    /// (i.e. caller has already applied `inverseJXLBridgeRemap` if the
+    /// frame was kYCbCr-remapped) and DC values must be in JPEG raw
+    /// form (caller has applied `inverseJPEGBridgeDC` if the forward
+    /// pass added the `1024/qt[DC]` offset for `.none`).
+    ///
+    /// Inputs needed beyond `self`:
+    ///   - `width`, `height` — SOFn dimensions (from jbrd / source).
+    ///   - `frameComponents` — per-component sampling factors + quant
+    ///     bindings (mirrors what `JPEGScanHeader.parse` produced for
+    ///     the original JPEG; passed in because we don't reconstruct
+    ///     SOFn from JXL alone).
+    ///   - `quantTables` — per-table zig-zag matrices (from `jbrd`).
+    ///   - `precision`, `frameKind` — typically 8 + `.baselineDCT`.
+    ///
+    /// **v0.12.0g1.** Forward path was:
+    ///   `ac[bi][k = y*8+x] = jpeg.coefficients[x*8+y]` (transpose)
+    /// Reverse path is the inverse:
+    ///   `jpeg.coefficients[x*8+y] = ac[bi][y*8+x]`
+    /// DC is just copied straight from `dcPerChannel[c][bi]`.
+    package func toJPEGCoefficientImage(
+        width: Int, height: Int,
+        precision: Int = 8,
+        frameKind: JPEGStructure.FrameKind = .baselineDCT,
+        frameComponents: [JPEGFrameComponent],
+        quantTables: [JPEGQuantTable]
+    ) throws -> JPEGCoefficientImage {
+        guard frameComponents.count == channelCount else {
+            throw JXLToJPEGAdapterError.shapeMismatch(
+                "frameComponents.count \(frameComponents.count) ≠ "
+                + "channelCount \(channelCount)")
+        }
+        var components: [JPEGComponentBlocks] = []
+        components.reserveCapacity(channelCount)
+        for c in 0..<channelCount {
+            let bX = blocksPerChannel[c].blocksX
+            let bY = blocksPerChannel[c].blocksY
+            let total = bX * bY
+            guard dcPerChannel[c].count == total else {
+                throw JXLToJPEGAdapterError.shapeMismatch(
+                    "channel \(c): dcPerChannel.count "
+                    + "\(dcPerChannel[c].count) ≠ "
+                    + "blocksWide × blocksHigh \(total)")
+            }
+            guard acPerChannel[c].count == total else {
+                throw JXLToJPEGAdapterError.shapeMismatch(
+                    "channel \(c): acPerChannel.count "
+                    + "\(acPerChannel[c].count) ≠ "
+                    + "blocksWide × blocksHigh \(total)")
+            }
+            var blocks: [JPEGCoefficientBlock] = []
+            blocks.reserveCapacity(total)
+            for bi in 0..<total {
+                var coeffs = [Int32](repeating: 0, count: 64)
+                // DC at position 0.
+                coeffs[0] = dcPerChannel[c][bi]
+                // AC transpose-back: jpeg[x*8 + y] = ac[y*8 + x].
+                let acBlock = acPerChannel[c][bi]
+                for y in 0..<8 {
+                    for x in 0..<8 {
+                        let jxlIdx = y * 8 + x
+                        if jxlIdx == 0 { continue }
+                        coeffs[x * 8 + y] = acBlock[jxlIdx]
+                    }
+                }
+                blocks.append(JPEGCoefficientBlock(coeffs))
+            }
+            components.append(JPEGComponentBlocks(
+                componentId: frameComponents[c].componentId,
+                blocksWide: bX, blocksHigh: bY,
+                blocks: blocks))
+        }
+        return JPEGCoefficientImage(
+            width: width, height: height,
+            precision: precision,
+            frameKind: frameKind,
+            frameComponents: frameComponents,
+            quantisedComponents: components,
+            quantTables: quantTables)
+    }
+}

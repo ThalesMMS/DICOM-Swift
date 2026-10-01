@@ -142,7 +142,8 @@ public struct SiemensCSAHeader: Equatable, Sendable {
         numericValues(named: "ImageOrientationPatient")
     }
 
-    private func numericValues(named name: String) -> [Double]? {
+    /// The numbers of a CSA element, backslash-separated values flattened.
+    public func numericValues(named name: String) -> [Double]? {
         guard let tag = self[name] else { return nil }
         let values = tag.values
             .flatMap { $0.split(separator: "\\", omittingEmptySubsequences: false).map(String.init) }
