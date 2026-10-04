@@ -2,8 +2,34 @@ import Foundation
 
 extension DicomTranscoder {
     func writeCarryingDataset(decoder: DCMDecoder, destination: DicomTransferSyntax) throws -> Data {
-        let dataSet = try DicomPart10PixelDataPreserver.dataSet(from: decoder)
+        var dataSet = try DicomPart10PixelDataPreserver.dataSet(from: decoder)
+        // Native Pixel Data is carried as the file stored it: between Big and
+        // Little Endian its samples change byte order, or every value is read
+        // with its bytes swapped (3 becomes 768).
+        let source = DicomTransferSyntax(uid: decoder.info(for: .transferSyntaxUID)) ?? .explicitVRLittleEndian
+        if !decoder.compressedImage, (source == .explicitVRBigEndian) != (destination == .explicitVRBigEndian),
+           let width = decoder.pixelDataDescriptor.map({ $0.bitsAllocated / 8 }), width > 1,
+           let element = dataSet[DicomTag.pixelData], case .bytes(let bytes) = element.value {
+            dataSet.set(DicomDataElement(tag: DicomTag.pixelData.rawValue, vr: element.vr,
+                                         value: .bytes(Self.swappingByteOrder(of: bytes, width: width))))
+        }
         return try write(dataSet, decoder: decoder, transferSyntax: destination)
+    }
+
+    /// Each `width`-byte value of `bytes` with its bytes reversed; a trailing
+    /// partial value is left as it is.
+    static func swappingByteOrder(of bytes: Data, width: Int) -> Data {
+        guard width > 1 else { return bytes }
+        var swapped = Data(bytes)
+        swapped.withUnsafeMutableBytes { raw in
+            var index = 0
+            while index + width <= raw.count {
+                var low = index, high = index + width - 1
+                while low < high { raw.swapAt(low, high); low += 1; high -= 1 }
+                index += width
+            }
+        }
+        return swapped
     }
 
     func decompressToNative(decoder: DCMDecoder, source: DicomTransferSyntax,

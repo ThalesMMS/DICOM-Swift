@@ -117,6 +117,18 @@ final class DicomTranscoderTests: XCTestCase {
                        "stored pixel values must survive the rewrite")
     }
 
+    func test_byteOrderRewrite_swapsNativeSamplesBothWays() throws {
+        let values = [-1000, -500, 3, 250]
+        let source = try Self.makeNativeFile(storedValues: values)
+        let bigEndian = try DicomTranscoder().transcode(source, to: .explicitVRBigEndian)
+        let bigDecoder = try Self.open(bigEndian)
+        XCTAssertEqual(bigDecoder.info(for: .transferSyntaxUID), DicomTransferSyntax.explicitVRBigEndian.rawValue)
+        XCTAssertEqual(Self.storedInt16Pixels(bigDecoder), values, "Big Endian output must keep the sample values")
+        let littleEndian = try DicomTranscoder().transcode(bigEndian, to: .explicitVRLittleEndian)
+        XCTAssertEqual(Self.storedInt16Pixels(try Self.open(littleEndian)), values,
+                       "a Big Endian source must not come back with its sample bytes swapped (3 read as 768)")
+    }
+
     func testNativeRewriteDoesNotInventPixelDataForStructuredReport() throws {
         let sopClassUID = "1.2.840.10008.5.1.4.1.1.88.11"
         let sopInstanceUID = "2.25.1869"
