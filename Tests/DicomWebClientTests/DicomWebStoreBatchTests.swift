@@ -215,6 +215,122 @@ final class DicomWebStoreBatchTests: XCTestCase {
             "normalized_body_sha256=\(received.normalizedHash)")
     }
 
+    func test_a400WithAFailedSOPSequenceGivesEachInstanceItsFailureReason() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("stow-400-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let uids = (0..<3).map { "2.25.29450\($0)" }
+        let files = try uids.enumerated().map { index, uid in
+            let url = directory.appendingPathComponent("\(index).dcm")
+            try Self.part10(uid).write(to: url)
+            return url
+        }
+        let answer = Self.failedResponse([(uids[0], 0xC000), (uids[1], 0xA700)])
+        let server = ScriptedSTOWServer(responses: [(400, answer), (400, answer)])
+        let client = DicomWebClient(configuration: .init(baseURL: try await server.start()))
+        defer { server.stop() }
+
+        let results = await client.storeFiles(files)
+
+        XCTAssertEqual(results.map(\.state), [.failed, .failed, .unknown], "the third was not named by the answer")
+        XCTAssertEqual(results.map(\.dicomStatus), [0xC000, 0xA700, nil])
+        XCTAssertEqual(results.map(\.reason), ["Cannot understand (0xC000)", "Out of resources (0xA700)",
+                                               "The server did not report this instance."])
+        XCTAssertEqual(results.map(\.httpStatus), [400, 400, 400])
+        let result = try await client.storeInstances(files: [files[0]])
+        XCTAssertEqual(result.statusCode, 400, "the answer is returned, not thrown")
+        XCTAssertEqual(result.storeResponse?.instances.map(\.failureReason), [0xC000, 0xA700])
+    }
+
+    func test_theWarningHeaderReachesEveryResult() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("stow-warning-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let uid = "2.25.2945100"
+        let file = directory.appendingPathComponent("0.dcm")
+        try Self.part10(uid).write(to: file)
+        let warning = "299 archive.example: \"Instances coerced\""
+        let server = ScriptedSTOWServer(responses: [(200, Self.storedResponse(uid)), (200, Self.storedResponse(uid))],
+                                        warning: warning)
+        let client = DicomWebClient(configuration: .init(baseURL: try await server.start()))
+        defer { server.stop() }
+
+        let results = await client.storeFiles([file])
+        let result = try await client.storeInstances(files: [file])
+
+        XCTAssertEqual(results.map(\.state), [.stored])
+        XCTAssertEqual(results.map(\.warning), [warning])
+        XCTAssertEqual(result.warning, warning)
+    }
+
+    /// A 300 MiB instance, written in 64 KiB blocks and never held whole, goes out in one request streamed straight from
+    /// its file: no staged copy of the body appears, the Content-Length is exactly the bytes sent, and the memory
+    /// footprint stays far below the instance size. The default limits apply.
+    func test_a300MiBInstanceIsStreamedFromItsFileWithAnExactContentLength() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("stow-300mib-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let uid = "2.25.2945300"
+        let fileBytes = 300 * 1024 * 1024
+        let file = directory.appendingPathComponent("0.dcm")
+        let hash = try autoreleasepool { () throws -> SHA256.Digest in
+            var prefix = try Self.part10(uid)
+            let pixelBytes = fileBytes - prefix.count - 12
+            prefix.append(contentsOf: [0xE0, 0x7F, 0x10, 0, 0x4F, 0x42, 0, 0])
+            withUnsafeBytes(of: UInt32(pixelBytes).littleEndian) { prefix.append(contentsOf: $0) }
+            _ = FileManager.default.createFile(atPath: file.path, contents: nil)
+            let handle = try FileHandle(forWritingTo: file)
+            defer { try? handle.close() }
+            var digest = SHA256()
+            try handle.write(contentsOf: prefix)
+            digest.update(data: prefix)
+            let block = Data((0..<(64 * 1024)).map { UInt8(truncatingIfNeeded: $0 &* 29) })
+            for offset in stride(from: 0, to: pixelBytes, by: block.count) {
+                let chunk = block.prefix(min(block.count, pixelBytes - offset))
+                try handle.write(contentsOf: chunk)
+                digest.update(data: chunk)
+            }
+            return digest.finalize()
+        }
+        let server = ScriptedSTOWServer(responses: [(200, Self.storedResponse(uid))])
+        let client = DicomWebClient(configuration: .init(baseURL: try await server.start(), timeout: 120))
+        defer { server.stop() }
+        let temporary = FileManager.default.temporaryDirectory.path
+        let stagedNames = { Set((try? FileManager.default.contentsOfDirectory(atPath: temporary)) ?? [])
+            .filter { $0.hasPrefix("dicomweb-stow-") } }
+        let before = stagedNames()
+        let watcher = Task.detached { () -> Set<String> in
+            var seen = Set<String>()
+            while !Task.isCancelled {
+                seen.formUnion(stagedNames())
+                try? await Task.sleep(nanoseconds: 20_000_000)
+            }
+            return seen
+        }
+        let meter = FootprintMeter()
+        let start = DispatchTime.now().uptimeNanoseconds
+        let results = await Task.detached { await client.storeFiles([file]) }.value
+        let milliseconds = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
+        let peak = meter.stop()
+        watcher.cancel()
+        let seen = await watcher.value
+
+        XCTAssertEqual(results.map(\.state), [.stored])
+        XCTAssertEqual(server.requestCount, 1)
+        let received = try XCTUnwrap(server.receivedBody)
+        XCTAssertNil(received.error)
+        XCTAssertEqual(received.hashes, [hash])
+        XCTAssertEqual(received.byteCounts, [fileBytes])
+        let contentLength = try XCTUnwrap(received.contentLength)
+        XCTAssertEqual(received.receivedBytes, contentLength, "the Content-Length is exactly the bytes sent")
+        XCTAssertGreaterThan(contentLength, fileBytes)
+        XCTAssertLessThan(contentLength, fileBytes + 512, "only the multipart framing is added")
+        XCTAssertTrue(seen.subtracting(before).isEmpty, "no temporary copy of the body was written")
+        XCTAssertLessThan(peak, 64 * 1024 * 1024, "footprint growth must stay far below the 300 MiB instance")
+        print("DICOMWEB_STOW_STREAMED_300MIB file_bytes=\(fileBytes) content_length=\(contentLength) " +
+            "elapsed_ms=\(milliseconds) footprint_growth_bytes=\(peak)")
+    }
+
     private static func part10(_ uid: String) throws -> Data {
         try DicomDataSetWriter.part10Data(from: DicomDataSet(elements: [
             .init(tag: DicomTag.sopClassUID.rawValue, vr: .UI, value: .strings(["1.2.840.10008.5.1.4.1.1.7"])),
@@ -228,6 +344,12 @@ final class DicomWebStoreBatchTests: XCTestCase {
     private static func storedResponse(_ uid: String) -> Data {
         Data(("[{\"00081199\":{\"vr\":\"SQ\",\"Value\":[{\"00081150\":{\"vr\":\"UI\",\"Value\":[\"1.2.840.10008.5.1.4.1.1.7\"]},"
             + "\"00081155\":{\"vr\":\"UI\",\"Value\":[\"\(uid)\"]}}]}}]").utf8)
+    }
+
+    private static func failedResponse(_ refused: [(uid: String, reason: Int)]) -> Data {
+        let items = refused.map { #"{"00081150":{"vr":"UI","Value":["1.2.840.10008.5.1.4.1.1.7"]},"#
+            + #""00081155":{"vr":"UI","Value":["\#($0.uid)"]},"00081197":{"vr":"US","Value":[\#($0.reason)]}}"# }
+        return Data(("[{\"00081198\":{\"vr\":\"SQ\",\"Value\":[" + items.joined(separator: ",") + "]}}]").utf8)
     }
 
     private static func partialResponse(stored: String, refused: String, reason: Int) -> Data {
@@ -251,13 +373,15 @@ private final class ScriptedSTOWServer: @unchecked Sendable {
     private var connections: [NWConnection] = []
     private var served = 0
     private var lastBody: RequestBody?
+    private let warning: String?
 
     var receivedBody: RequestBody? { lock.withLock { lastBody } }
 
     var requestCount: Int { lock.withLock { served } }
 
-    init(responses: [(Int, Data)]) {
+    init(responses: [(Int, Data)], warning: String? = nil) {
         self.responses = responses
+        self.warning = warning
         let parameters = NWParameters.tcp
         parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)
         listener = try! NWListener(using: parameters)
@@ -298,6 +422,7 @@ private final class ScriptedSTOWServer: @unchecked Sendable {
                         return responses.isEmpty ? (500, Data()) : responses.removeFirst()
                     }
                     let header = "HTTP/1.1 \(status) Scripted\r\nContent-Type: application/dicom+json\r\n"
+                        + (warning.map { "Warning: \($0)\r\n" } ?? "")
                         + "Content-Length: \(response.count)\r\n\r\n"
                     connection.send(content: Data(header.utf8) + response, completion: .contentProcessed { _ in })
                     if !complete && error == nil { read(on: connection, body: RequestBody()) }
@@ -321,6 +446,9 @@ private final class ScriptedSTOWServer: @unchecked Sendable {
         private var prefix = Data()
         private var type = ""
         var remaining: Int?
+        /// The request's Content-Length and the body bytes that arrived for it.
+        var contentLength: Int?
+        var receivedBytes = 0
         var error: (any Error)?
         var byteCounts: [Int] = []
         var hashes: [SHA256.Digest] = []
@@ -336,13 +464,16 @@ private final class ScriptedSTOWServer: @unchecked Sendable {
                 let lines = String(decoding: header[..<end.lowerBound], as: UTF8.self).components(separatedBy: "\r\n")
                 let length = try XCTUnwrap(lines.first { $0.lowercased().hasPrefix("content-length:") })
                 remaining = try XCTUnwrap(Int(length.dropFirst("content-length:".count).trimmingCharacters(in: .whitespaces)))
+                contentLength = remaining
                 let contentType = try XCTUnwrap(lines.first { $0.lowercased().hasPrefix("content-type:") })
                     .dropFirst("content-type:".count).trimmingCharacters(in: .whitespaces)
-                parser = try DicomWebMultipartStreamParser(contentType: contentType)
+                parser = try DicomWebMultipartStreamParser(contentType: contentType,
+                    limits: .init(maximumPartBytes: 512 * 1024 * 1024))
                 payload = Data(header[end.upperBound...])
                 header.removeAll()
             }
             remaining = try XCTUnwrap(remaining) - payload.count
+            receivedBytes += payload.count
             try inspect(try parser!.feed(payload))
         }
 

@@ -14,6 +14,8 @@ public struct DicomWebHTTPRequest: Sendable {
     public var headers: [String: String]
     public var body: Data?
     public var bodyFileURL: URL?
+    /// A body sent from its segments, by a `DicomWebStreamedBodyTransport`; other transports never receive one.
+    public var streamedBody: DicomWebHTTPRequestBody? = nil
     public var originPolicy: DicomWebOriginPolicy?
     /// When set, a transport must connect to this numeric address while preserving the URL's Host and TLS identity,
     /// or reject the request. Resolving the URL's hostname again would invalidate the caller's address policy.
@@ -81,6 +83,8 @@ public final class URLSessionDicomWebHTTPTransport: DicomWebHTTPTransport {
 public struct DicomWebClientConfiguration: Equatable, Sendable {
     /// Default maximum complete in-memory STOW multipart request size (128 MiB).
     public static let defaultMaximumSTOWRequestBodyBytes = 128 * 1_024 * 1_024
+    /// Default maximum size of one file sent by a file-backed STOW-RS (4 GiB).
+    public static let defaultMaximumSTOWInstanceBytes = 4 * 1_024 * 1_024 * 1_024
 
     public var allowedOrigins: Set<URL> = []
     public var multipartLimits = DicomWebMultipartLimits()
@@ -99,8 +103,13 @@ public struct DicomWebClientConfiguration: Equatable, Sendable {
     public var followsRedirects = true
     /// Which failed requests are repeated, and how long to wait between attempts. The default never repeats.
     public var retryPolicy = DicomWebRetryPolicy.none
-    /// Maximum complete STOW multipart body size, including MIME framing and payloads.
+    /// Maximum complete STOW multipart body size, including MIME framing and payloads, for a body the client holds in
+    /// memory or writes to a temporary file: instances given as data or data sets, and stored files sent through a
+    /// transport that is not a `DicomWebStreamedBodyTransport`.
     public var maximumSTOWRequestBodyBytes: Int
+    /// Maximum size of one stored file sent by `storeInstances(files:)` or `storeFiles`. Files streamed straight from
+    /// disk are bounded only by this limit, not by `maximumSTOWRequestBodyBytes`.
+    public var maximumSTOWInstanceBytes = Self.defaultMaximumSTOWInstanceBytes
     /// Additional BulkDataURI origins. Scheme, host and effective port must match; headers stay on the base origin.
     public var allowedBulkDataOrigins: [URL]
 
@@ -245,6 +254,8 @@ public struct DicomWebStoreResult: Equatable, Sendable {
     public var responseData: Data
     public var responseParts: [DicomWebMultipartPart]
     public var storeResponse: DicomWebStoreResponse?
+    /// The response's `Warning` header.
+    public var warning: String? = nil
     public var acceptedInstanceCount: Int { storeResponse?.acceptedInstanceCount ?? 0 }
     @available(*, deprecated, renamed: "acceptedInstanceCount")
     public var storedInstanceCount: Int {
@@ -674,8 +685,9 @@ public struct DicomWebClient: Sendable {
     }
 
     private func streamRequest(_ method: DicomWebHTTPMethod, url: URL, headers: [String: String],
-                               body: Data? = nil, bodyFileURL: URL? = nil,
-                               acceptedStatuses: Set<Int> = []) async throws -> DicomWebHTTPStreamedResponse {
+                               body: Data? = nil, bodyFileURL: URL? = nil, streamedBody: DicomWebHTTPRequestBody? = nil,
+                               accepts: (DicomWebHTTPStreamedResponse) -> Bool = { _ in false })
+        async throws -> DicomWebHTTPStreamedResponse {
         try Task.checkCancellation()
         try configuration.originPolicy.validate(url)
         var allHeaders = configuration.originPolicy.forwardsCredentials(to: url) ? configuration.headers : [:]
@@ -686,8 +698,9 @@ public struct DicomWebClient: Sendable {
         request.originPolicy = configuration.originPolicy
         request.credentialHeaderNames = Set(configuration.headers.keys.map { $0.lowercased() })
         request.bodyFileURL = bodyFileURL
+        request.streamedBody = streamedBody
         let response = try await transport.stream(request)
-        guard (200..<300).contains(response.statusCode) || acceptedStatuses.contains(response.statusCode) else {
+        guard (200..<300).contains(response.statusCode) || accepts(response) else {
             defer { response.cancel() }
             throw DicomWebError(statusCode: response.statusCode, headers: response.headers,
                                 body: await Self.bodyPreview(of: response), credentials: configuration.headers)
@@ -911,12 +924,14 @@ public struct DicomWebClient: Sendable {
         _ = try DicomWebSTOWMultipartBodyBuilder.serializedByteCount(
             instances: instances, boundary: boundary, maximumBytes: configuration.maximumSTOWRequestBodyBytes)
         let prepared = try DicomWebSTOWMultipartBodyBuilder.prepare(instances: instances)
-        return try await storeMultipart(boundary: boundary, studyInstanceUID: studyInstanceUID) { writer, sink in
+        return try await storeMultipart(boundary: boundary, studyInstanceUID: studyInstanceUID,
+                                        maximumBytes: configuration.maximumSTOWRequestBodyBytes) { writer, body in
             for instance in prepared {
                 let type = instance.contentType + (instance.transferSyntax.map { "; transfer-syntax=\($0)" } ?? "")
-                try writer.beginPart(headers: [("Content-Type", type)], contentLength: instance.data.count, sink: sink)
-                try writer.payload(instance.data, sink: sink)
-                try writer.endPart(sink: sink)
+                try writer.beginPart(headers: [("Content-Type", type)], contentLength: instance.data.count) { body.append($0) }
+                try writer.payload(byteCount: instance.data.count)
+                body.append(.data(instance.data))
+                try writer.endPart { body.append($0) }
             }
         }
     }
@@ -925,41 +940,55 @@ public struct DicomWebClient: Sendable {
                                transferSyntax: DicomTransferSyntax = .explicitVRLittleEndian) async throws -> DicomWebStoreResult {
         guard !dataSets.isEmpty else { throw DicomWebClientError.emptyStoreRequest }
         let boundary = "dicomweb-\(UUID().uuidString)"
-        return try await storeMultipart(boundary: boundary, studyInstanceUID: studyInstanceUID) { writer, sink in
+        return try await storeMultipart(boundary: boundary, studyInstanceUID: studyInstanceUID,
+                                        maximumBytes: configuration.maximumSTOWRequestBodyBytes) { writer, body in
             for dataSet in dataSets {
                 try Task.checkCancellation()
                 let payload = try DicomDataSetWriter.part10Data(from: dataSet,
                     options: DicomPart10WriterOptions(transferSyntax: transferSyntax))
                 try writer.beginPart(headers: [("Content-Type", "application/dicom; transfer-syntax=\(transferSyntax.rawValue)")],
-                                     contentLength: payload.count, sink: sink)
-                try writer.payload(payload, sink: sink)
-                try writer.endPart(sink: sink)
+                                     contentLength: payload.count) { body.append($0) }
+                try writer.payload(byteCount: payload.count)
+                body.append(.data(payload))
+                try writer.endPart { body.append($0) }
             }
         }
     }
 
+    /// Sends `files` in one STOW-RS request. Through a `DicomWebStreamedBodyTransport` the body is read straight from
+    /// the files, each at most `maximumSTOWInstanceBytes`; any other transport receives it staged in a temporary
+    /// file, within `maximumSTOWRequestBodyBytes`.
     public func storeInstances(files: [URL], studyInstanceUID: String? = nil) async throws -> DicomWebStoreResult {
         guard !files.isEmpty else { throw DicomWebClientError.emptyStoreRequest }
         let boundary = "dicomweb-\(UUID().uuidString)"
-        return try await storeMultipart(boundary: boundary, studyInstanceUID: studyInstanceUID) { writer, sink in
+        let streams = transport is any DicomWebStreamedBodyTransport
+        return try await storeMultipart(boundary: boundary, studyInstanceUID: studyInstanceUID,
+                                        maximumBytes: streams ? .max : configuration.maximumSTOWRequestBodyBytes) { writer, body in
             for (index, file) in files.enumerated() {
                 try Task.checkCancellation()
                 let handle = try FileHandle(forReadingFrom: file)
                 defer { try? handle.close() }
                 let size = try handle.seekToEnd()
-                guard let length = Int(exactly: size), length <= configuration.maximumSTOWRequestBodyBytes else {
+                guard let length = Int(exactly: size), length <= maximumStoreFileBytes else {
                     throw DicomWebClientError.storeRequestBodyTooLarge(byteCount: Int(clamping: size),
-                                                                     limit: configuration.maximumSTOWRequestBodyBytes)
+                                                                     limit: maximumStoreFileBytes)
                 }
                 let prefix = try Self.fileMetaPrefix(of: handle, length: length, instanceIndex: index)
                 let prepared = try DicomWebSTOWMultipartBodyBuilder.prepare(instances: [.init(data: prefix, transferSyntax: nil)])
                 let type = "application/dicom" + (prepared[0].transferSyntax.map { "; transfer-syntax=\($0)" } ?? "")
-                try handle.seek(toOffset: 0)
-                try writer.beginPart(headers: [("Content-Type", type)], contentLength: length, sink: sink)
-                try writer.payload(file: handle, sink: sink)
-                try writer.endPart(sink: sink)
+                try writer.beginPart(headers: [("Content-Type", type)], contentLength: length) { body.append($0) }
+                try writer.payload(byteCount: length)
+                body.append(.file(file, length: length))
+                try writer.endPart { body.append($0) }
             }
         }
+    }
+
+    /// The largest stored file a file-backed STOW-RS sends: `maximumSTOWInstanceBytes`, and also
+    /// `maximumSTOWRequestBodyBytes` when the transport needs the body staged in a temporary file.
+    var maximumStoreFileBytes: Int {
+        transport is any DicomWebStreamedBodyTransport ? configuration.maximumSTOWInstanceBytes
+            : min(configuration.maximumSTOWInstanceBytes, configuration.maximumSTOWRequestBodyBytes)
     }
 
     /// Maximum bytes following the File Meta Information Group Length element, independent of the file/body size.
@@ -988,26 +1017,33 @@ public struct DicomWebClient: Sendable {
         return prefix
     }
 
-    private func storeMultipart(boundary: String, studyInstanceUID: String?,
-                                write: (inout DicomWebMultipartStreamWriter, DicomWebByteSink) throws -> Void) async throws -> DicomWebStoreResult {
-        let file = FileManager.default.temporaryDirectory.appendingPathComponent("dicomweb-stow-\(UUID().uuidString)")
-        guard FileManager.default.createFile(atPath: file.path, contents: nil,
-                                             attributes: [.posixPermissions: 0o600]) else { throw DicomWebError(kind: .server) }
-        defer { try? FileManager.default.removeItem(at: file) }
-        let handle = try FileHandle(forWritingTo: file)
-        defer { try? handle.close() }
-        var writer = try DicomWebMultipartStreamWriter(boundary: boundary, maximumBytes: configuration.maximumSTOWRequestBodyBytes)
-        try write(&writer) { try handle.write(contentsOf: $0) }
-        try writer.finish { try handle.write(contentsOf: $0) }
-        let length = try handle.offset()
-        try handle.close()
-        // Every attempt opens `file` again from its start; it is removed only after the last one.
+    /// Sends the multipart body `write` describes. A `DicomWebStreamedBodyTransport` reads it from its segments on
+    /// every attempt; any other transport gets it in a temporary file, opened again from its start on every attempt
+    /// and removed after the last one. A 4xx answered with a DICOM JSON or XML store response (PS3.18 Annex I), such as
+    /// a 400 whose Failed SOP Sequence gives each instance's Failure Reason, is returned as a result like a 409;
+    /// 401, 403, 404 and 429 still throw, since they say nothing about the instances.
+    private func storeMultipart(boundary: String, studyInstanceUID: String?, maximumBytes: Int,
+                                write: (inout DicomWebMultipartStreamWriter, inout DicomWebHTTPRequestBody) throws -> Void)
+        async throws -> DicomWebStoreResult {
+        var writer = try DicomWebMultipartStreamWriter(boundary: boundary, maximumBytes: maximumBytes)
+        var body = DicomWebHTTPRequestBody()
+        try write(&writer, &body)
+        try writer.finish { body.append($0) }
+        var file: URL?
+        defer { if let file { try? FileManager.default.removeItem(at: file) } }
+        if !(transport is any DicomWebStreamedBodyTransport) {
+            let staged = FileManager.default.temporaryDirectory.appendingPathComponent("dicomweb-stow-\(UUID().uuidString)")
+            guard FileManager.default.createFile(atPath: staged.path, contents: nil,
+                                                 attributes: [.posixPermissions: 0o600]) else { throw DicomWebError(kind: .server) }
+            file = staged
+            try body.write(to: staged)
+        }
+        let headers = ["Content-Type": "multipart/related; type=\"application/dicom\"; boundary=\(boundary)",
+                       "Content-Length": String(body.length), "Accept": DicomWebMediaTypeNegotiator.storeResponseAcceptHeader]
+        let url = endpoint(studyInstanceUID.map { ["studies", $0] } ?? ["studies"])
         let streamed = try await withRetries(.store) {
-            try await streamRequest(.post,
-                url: endpoint(studyInstanceUID.map { ["studies", $0] } ?? ["studies"]),
-                headers: ["Content-Type": "multipart/related; type=\"application/dicom\"; boundary=\(boundary)",
-                          "Content-Length": String(length), "Accept": DicomWebMediaTypeNegotiator.storeResponseAcceptHeader],
-                bodyFileURL: file, acceptedStatuses: [409])
+            try await streamRequest(.post, url: url, headers: headers, bodyFileURL: file,
+                                    streamedBody: file == nil ? body : nil, accepts: Self.isStoreAnswer)
         }
         let response = try await collect(streamed, maximumBytes: configuration.maximumMetadataBytes)
         let contentType = response.headers.dicomWebHeaderValue("Content-Type")
@@ -1018,8 +1054,20 @@ public struct DicomWebClient: Sendable {
         } else {
             decoded = try DicomWebStoreResponse.decode(response.body, contentType: contentType)
         }
-        return DicomWebStoreResult(statusCode: response.statusCode, responseData: response.body,
-                                   responseParts: parts, storeResponse: decoded)
+        var result = DicomWebStoreResult(statusCode: response.statusCode, responseData: response.body,
+                                         responseParts: parts, storeResponse: decoded)
+        result.warning = response.headers.dicomWebHeaderValue("Warning")
+        return result
+    }
+
+    /// Whether a STOW-RS response that is not 2xx still carries the store outcome: 409, or another 4xx with a DICOM
+    /// JSON or XML body, except the statuses that refuse the request itself.
+    private static func isStoreAnswer(_ response: DicomWebHTTPStreamedResponse) -> Bool {
+        let status = response.statusCode
+        if status == 409 { return true }
+        guard (400..<500).contains(status), ![401, 403, 404, 429].contains(status) else { return false }
+        let type = response.headers.dicomWebHeaderValue("Content-Type")?.lowercased() ?? ""
+        return type.contains("application/dicom+json") || type.contains("application/dicom+xml")
     }
 
     /// A buffered request whose refused status throws `DicomWebError` with the server's diagnostics. Only GET is

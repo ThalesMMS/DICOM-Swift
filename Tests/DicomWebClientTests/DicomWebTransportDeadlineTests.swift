@@ -59,6 +59,22 @@ final class DicomWebTransportDeadlineTests: XCTestCase {
         XCTAssertLessThan(Date().timeIntervalSince(started), 5, "the 401 arrives at once, not at the request timeout")
     }
 
+    func test_authenticationChallengeToASegmentedBodyReachesTheCallerAs401() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("stow-challenge-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: file) }
+        try Data(repeating: 0x2A, count: 4096).write(to: file)
+        let body = DicomWebHTTPRequestBody(segments: [.data(Data("head".utf8)), .file(file, length: 4096),
+                                                      .data(Data("tail".utf8))])
+        var request = DicomWebHTTPRequest(method: .post, url: base.appendingPathComponent("basic"),
+                                          headers: ["Content-Length": String(body.length)], timeout: 20)
+        request.streamedBody = body
+        let started = Date()
+        let response = try await URLSessionDicomWebHTTPTransport(session: session).stream(request)
+        response.cancel()
+        XCTAssertEqual(response.statusCode, 401)
+        XCTAssertLessThan(Date().timeIntervalSince(started), 5, "the body is read again at once, not at the timeout")
+    }
+
     func test_totalDeadlineEndsAStalledRetrieveAndLeavesNoPartialFile() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("wado-2893-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: directory) }

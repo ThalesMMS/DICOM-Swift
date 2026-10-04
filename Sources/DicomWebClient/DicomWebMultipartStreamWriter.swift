@@ -65,6 +65,19 @@ public struct DicomWebMultipartStreamWriter {
         }
     }
 
+    /// Counts `byteCount` payload bytes the caller sends by other means, such as a file streamed after the part
+    /// headers, against the part's Content-Length and the total limit.
+    mutating func payload(byteCount: Int) throws {
+        guard inPart, !finished, byteCount >= 0 else { throw DicomWebMultipartStreamError.invalidState }
+        if let remaining, byteCount > remaining { throw DicomWebMultipartStreamError.invalidContentLength }
+        try Task.checkCancellation()
+        guard total <= maximumBytes, byteCount <= maximumBytes - total else {
+            throw DicomWebMultipartStreamError.limitExceeded("maximumTotalBytes", limit: maximumBytes)
+        }
+        total += byteCount
+        if let remaining { self.remaining = remaining - byteCount }
+    }
+
     public mutating func endPart(sink: DicomWebByteSink) throws {
         guard inPart, remaining == nil || remaining == 0 else { throw DicomWebMultipartStreamError.invalidContentLength }
         try write(Data("\r\n".utf8), sink: sink)

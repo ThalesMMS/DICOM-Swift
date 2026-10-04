@@ -34,6 +34,26 @@ extension DicomWebHTTPTransport {
             guard body.count <= bufferingLimit else { throw DicomWebError(kind: .tooLarge) }
             buffered.body = body
             buffered.bodyFileURL = nil
+        } else if let streamed = request.streamedBody {
+            guard streamed.length <= bufferingLimit else { throw DicomWebError(kind: .tooLarge) }
+            let stream = streamed.makeInputStream()
+            stream.open()
+            defer { stream.close() }
+            var body = Data(count: streamed.length)
+            let count = body.withUnsafeMutableBytes { raw -> Int in
+                var total = 0
+                while total < raw.count {
+                    let read = stream.read(raw.baseAddress!.assumingMemoryBound(to: UInt8.self) + total,
+                                           maxLength: raw.count - total)
+                    guard read > 0 else { break }
+                    total += read
+                }
+                return total
+            }
+            if let error = stream.streamError { throw error }
+            guard count == streamed.length else { throw DicomWebError(kind: .invalidResponse) }
+            buffered.body = body
+            buffered.streamedBody = nil
         }
         let response = try await send(buffered)
         return .init(statusCode: response.statusCode, headers: response.headers,
@@ -44,7 +64,7 @@ extension DicomWebHTTPTransport {
     }
 }
 
-extension URLSessionDicomWebHTTPTransport {
+extension URLSessionDicomWebHTTPTransport: DicomWebStreamedBodyTransport {
     public func stream(_ request: DicomWebHTTPRequest) async throws -> DicomWebHTTPStreamedResponse {
         try Task.checkCancellation()
         guard request.connectAddress == nil else { throw DicomWebClientError.unsupportedConnectAddress }
@@ -55,9 +75,11 @@ extension URLSessionDicomWebHTTPTransport {
         urlRequest.httpShouldHandleCookies = policy.forwardsCredentials(to: request.url)
         urlRequest.httpBody = request.body
         if let file = request.bodyFileURL { urlRequest.httpBodyStream = InputStream(url: file) }
+        if let body = request.streamedBody { urlRequest.httpBodyStream = body.makeInputStream() }
         for (field, value) in request.headers { urlRequest.setValue(value, forHTTPHeaderField: field) }
         let delegate = DicomWebRedirectDelegate(policy: policy, credentialHeaderNames: request.credentialHeaderNames,
-                                                followsRedirects: request.followsRedirects, bodyFileURL: request.bodyFileURL)
+                                                followsRedirects: request.followsRedirects, bodyFileURL: request.bodyFileURL,
+                                                streamedBody: request.streamedBody)
         let watchdog = delegate.enforce(deadline: request.deadline)
         let responseBody: DicomWebResponseBody, response: URLResponse
         do {

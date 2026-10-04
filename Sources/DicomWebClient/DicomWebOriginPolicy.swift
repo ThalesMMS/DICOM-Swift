@@ -42,14 +42,15 @@ public struct DicomWebOriginPolicy: Equatable, Sendable {
 /// allows, with credentials removed off the configured origin. HTTP authentication challenges are answered with no
 /// credential, so shared credential storage is never consulted and the server's 401 reaches the caller; server trust
 /// keeps the system evaluation. The created task is kept so a deadline can cancel it.
-/// A body sent from a file is streamed; when URLSession must send it again (after an authentication challenge or a
-/// redirect), the delegate reopens the file. Without a new stream URLSession keeps asking and the request only ends
+/// A body sent from a file or from segments is streamed; when URLSession must send it again (after an authentication
+/// challenge or a redirect), the delegate reopens the file or reads the segments again from the start. Without a new stream URLSession keeps asking and the request only ends
 /// at its timeout, so a STOW-RS answered with 401 would wait out the timeout instead of reporting the 401.
 public final class DicomWebRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     let policy: DicomWebOriginPolicy
     let configuredHeaders: Set<String>
     let followsRedirects: Bool
     let bodyFileURL: URL?
+    let streamedBody: DicomWebHTTPRequestBody?
     private let lock = NSLock()
     private var task: URLSessionTask?
     private var deadlineFired = false
@@ -60,6 +61,17 @@ public final class DicomWebRedirectDelegate: NSObject, URLSessionTaskDelegate, @
         self.configuredHeaders = credentialHeaderNames
         self.followsRedirects = followsRedirects
         self.bodyFileURL = bodyFileURL
+        self.streamedBody = nil
+    }
+
+    /// A delegate whose request sends `streamedBody`, read again from its start whenever URLSession needs it.
+    public init(policy: DicomWebOriginPolicy, credentialHeaderNames: Set<String>, followsRedirects: Bool = true,
+                bodyFileURL: URL? = nil, streamedBody: DicomWebHTTPRequestBody?) {
+        self.policy = policy
+        self.configuredHeaders = credentialHeaderNames
+        self.followsRedirects = followsRedirects
+        self.bodyFileURL = bodyFileURL
+        self.streamedBody = streamedBody
     }
 
     /// Whether the deadline, not the caller, cancelled the task.
@@ -112,7 +124,7 @@ public final class DicomWebRedirectDelegate: NSObject, URLSessionTaskDelegate, @
 
     public func urlSession(_ session: URLSession, task: URLSessionTask,
                            needNewBodyStream completionHandler: @escaping @Sendable (InputStream?) -> Void) {
-        completionHandler(bodyFileURL.flatMap { InputStream(url: $0) })
+        completionHandler(streamedBody?.makeInputStream() ?? bodyFileURL.flatMap { InputStream(url: $0) })
     }
 
     public func urlSession(_ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge,

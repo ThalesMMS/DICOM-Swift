@@ -33,6 +33,8 @@ public struct DicomWebStoreFileResult: Equatable, Sendable {
     /// The URL loading error that failed the batch, when there was one. It tells a request that never reached the
     /// server (certificate refused, host unreachable) from one that ended after the upload began.
     public let transportErrorCode: URLError.Code?
+    /// The `Warning` header of the answer to this file's batch.
+    public var warning: String? = nil
 
     public init(url: URL, sopInstanceUID: String?, state: State, reason: String? = nil,
                 dicomStatus: UInt16? = nil, httpStatus: Int? = nil, transportErrorCode: URLError.Code? = nil) {
@@ -48,6 +50,11 @@ public struct DicomWebStoreFileResult: Equatable, Sendable {
     /// The outcome of instance `sopInstanceUID` in a STOW-RS answer (PS3.18 Annex I). An instance the answer does
     /// not list is unknown, whatever the status: a response that names nothing confirms nothing.
     public init(url: URL, sopInstanceUID uid: String, in result: DicomWebStoreResult) {
+        self.init(url: url, sopInstanceUID: uid, outcomeIn: result)
+        warning = result.warning
+    }
+
+    private init(url: URL, sopInstanceUID uid: String, outcomeIn result: DicomWebStoreResult) {
         let status = result.statusCode
         let matches = result.storeResponse?.instances.filter { $0.sopInstanceUID == uid } ?? []
         guard matches.count == 1, let instance = matches.first else {
@@ -83,7 +90,9 @@ extension DicomWebClient {
     /// Stores `files` with one STOW-RS request per batch, each streamed from disk, and returns one result per file in
     /// the given order (#2892). A file without valid File Meta Information is refused alone. 401, 403, 404, network,
     /// TLS, timeout and cancellation stop the remaining batches, whose files are reported as not sent; any other
-    /// failure fails only its batch. With a `retryPolicy` that repeats, a batch still refused with 429 or 503 after its
+    /// failure fails only its batch; a 4xx that carries a store response (a 400 with a Failed SOP Sequence) is mapped
+    /// instance by instance with each Failure Reason. Each file is streamed from disk with no copy of the batch when
+    /// the transport is a `DicomWebStreamedBodyTransport`, and may be up to `maximumSTOWInstanceBytes`. With a `retryPolicy` that repeats, a batch still refused with 429 or 503 after its
     /// last attempt also stops the remaining batches, rather than sending them to a server that is overloaded. Every answer, including a partial one (202, 409), is mapped instance by instance,
     /// by the SOP Instance UID of each file's File Meta Information or, when given, by `sopInstanceUIDs[i]`.
     public func storeFiles(_ files: [URL], sopInstanceUIDs: [String]? = nil, studyInstanceUID: String? = nil,
@@ -94,8 +103,7 @@ extension DicomWebClient {
         var sendable: [(index: Int, uid: String, bytes: Int)] = []
         for (index, file) in files.enumerated() {
             do {
-                let (uid, bytes) = try Self.storeCandidate(file, index: index,
-                                                           maximumBytes: configuration.maximumSTOWRequestBodyBytes)
+                let (uid, bytes) = try Self.storeCandidate(file, index: index, maximumBytes: maximumStoreFileBytes)
                 let known = sopInstanceUIDs.flatMap { index < $0.count ? $0[index] : nil }
                 sendable.append((index, known ?? uid, bytes))
             } catch {
@@ -122,9 +130,11 @@ extension DicomWebClient {
             } catch {
                 let httpStatus = (error as? DicomWebError)?.statusCode
                 for item in batch {
-                    results[item.index] = .init(url: files[item.index], sopInstanceUID: item.uid, state: .failed,
-                                                reason: Self.describe(error), httpStatus: httpStatus,
-                                                transportErrorCode: (error as? URLError)?.code)
+                    var result = DicomWebStoreFileResult(url: files[item.index], sopInstanceUID: item.uid, state: .failed,
+                                                         reason: Self.describe(error), httpStatus: httpStatus,
+                                                         transportErrorCode: (error as? URLError)?.code)
+                    result.warning = (error as? DicomWebError)?.warning
+                    results[item.index] = result
                 }
                 if isFatal(error) { stop = (Self.describe(error), httpStatus) }
             }
