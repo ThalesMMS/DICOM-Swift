@@ -349,12 +349,23 @@ extension DicomWebClientError: LocalizedError {
 
 public struct DicomWebClient: Sendable {
     public var configuration: DicomWebClientConfiguration
+    /// Credential headers asked for before each request to the configured origin, added to `configuration.headers`
+    /// and taking precedence over them; renewed once after a 401. Nil sends only `configuration.headers`.
+    public var authorizationProvider: (any DicomWebAuthorizationProvider)?
     private let transport: any DicomWebHTTPTransport
 
     public init(configuration: DicomWebClientConfiguration,
                 transport: any DicomWebHTTPTransport = URLSessionDicomWebHTTPTransport.shared) {
         self.configuration = configuration
         self.transport = transport
+    }
+
+    /// A client whose requests carry the headers `authorizationProvider` gives for each of them.
+    public init(configuration: DicomWebClientConfiguration,
+                transport: any DicomWebHTTPTransport = URLSessionDicomWebHTTPTransport.shared,
+                authorizationProvider: any DicomWebAuthorizationProvider) {
+        self.init(configuration: configuration, transport: transport)
+        self.authorizationProvider = authorizationProvider
     }
 
     public func retrieveCapabilities() async throws -> DicomWebCapabilities {
@@ -690,22 +701,52 @@ public struct DicomWebClient: Sendable {
         async throws -> DicomWebHTTPStreamedResponse {
         try Task.checkCancellation()
         try configuration.originPolicy.validate(url)
-        var allHeaders = configuration.originPolicy.forwardsCredentials(to: url) ? configuration.headers : [:]
-        for (name, value) in headers { allHeaders[name] = value }
-        var request = DicomWebHTTPRequest(method: method, url: url, headers: allHeaders, body: body, timeout: configuration.timeout)
-        request.deadline = configuration.totalDeadline.map { Date().addingTimeInterval($0) }
-        request.followsRedirects = configuration.followsRedirects
-        request.originPolicy = configuration.originPolicy
-        request.credentialHeaderNames = Set(configuration.headers.keys.map { $0.lowercased() })
-        request.bodyFileURL = bodyFileURL
-        request.streamedBody = streamedBody
-        let response = try await transport.stream(request)
+        let forwardsCredentials = configuration.originPolicy.forwardsCredentials(to: url)
+        let provider = forwardsCredentials ? authorizationProvider : nil
+        var provided = try await provider?.authorizationHeaders() ?? [:]
+        func sendOnce(_ provided: [String: String]) async throws -> DicomWebHTTPStreamedResponse {
+            var allHeaders = forwardsCredentials ? credentials(adding: provided) : [:]
+            for (name, value) in headers { allHeaders[name] = value }
+            var request = DicomWebHTTPRequest(method: method, url: url, headers: allHeaders, body: body,
+                                              timeout: configuration.timeout)
+            request.deadline = configuration.totalDeadline.map { Date().addingTimeInterval($0) }
+            request.followsRedirects = configuration.followsRedirects
+            request.originPolicy = configuration.originPolicy
+            request.credentialHeaderNames = Set(credentials(adding: provided).keys.map { $0.lowercased() })
+            request.bodyFileURL = bodyFileURL
+            request.streamedBody = streamedBody
+            return try await transport.stream(request)
+        }
+        var response = try await sendOnce(provided)
+        // A 401 may mean the provider's token was revoked or rotated before it expired: renew once and repeat once.
+        if response.statusCode == 401, let provider {
+            let renewed: Bool
+            do {
+                renewed = try await provider.renewAuthorization(afterRejecting: provided)
+            } catch {
+                response.cancel()
+                throw error
+            }
+            if renewed {
+                response.cancel()
+                provided = try await provider.authorizationHeaders()
+                response = try await sendOnce(provided)
+            }
+        }
         guard (200..<300).contains(response.statusCode) || accepts(response) else {
             defer { response.cancel() }
             throw DicomWebError(statusCode: response.statusCode, headers: response.headers,
-                                body: await Self.bodyPreview(of: response), credentials: configuration.headers)
+                                body: await Self.bodyPreview(of: response), credentials: credentials(adding: provided))
         }
         return response
+    }
+
+    /// `configuration.headers` with the provider's headers in place of any of the same name.
+    private func credentials(adding provided: [String: String]) -> [String: String] {
+        let replaced = Set(provided.keys.map { $0.lowercased() })
+        var result = configuration.headers.filter { !replaced.contains($0.key.lowercased()) }
+        for (name, value) in provided { result[name] = value }
+        return result
     }
 
     /// The start of a refused response's body, for its error. A body that fails to arrive leaves what was read.

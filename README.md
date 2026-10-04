@@ -654,7 +654,16 @@ HTTP policy; implement its `stream` method for backpressure. Its send-based
 fallback can buffer responses. The Foundation default preserves system TLS
 trust and refuses unsupported `connectAddress` with
 `DicomWebClientError.unsupportedConnectAddress`; set `followsRedirects` explicitly
-for hosts that refuse redirects. Credential storage/renewal stays in the host.
+for hosts that refuse redirects. Fixed credentials go in `headers` or come from
+`DicomWebAuthentication`; a `DicomWebAuthorizationProvider` set as the client's
+`authorizationProvider` supplies headers per request and renews them once after
+a 401, which repeats the request once.
+
+The optional `DicomWebOIDC` product signs a public client in with OpenID Connect
+(discovery, authorization code with PKCE S256, ID-token verification, shared
+refresh) and gives each key a provider for the client. It has no UI: the host
+opens the authorization URL in its own browser session and supplies the token
+store, such as one over the Keychain.
 
 `DicomCore` reexports the client for its server and workflow consumers. UPS and
 codec-dependent frame negotiation remain in Core. The repository's existing

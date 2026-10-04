@@ -22,6 +22,7 @@ let package = Package(
         .library(name: "DicomData", targets: ["DicomData"]),
         .library(name: "DicomCore", targets: ["DicomCore"]),
         .library(name: "DicomWebClient", targets: ["DicomWebClient"]),
+        .library(name: "DicomWebOIDC", targets: ["DicomWebOIDC"]),
         .library(name: "DicomWebHTTP", targets: ["DicomWebHTTP"]),
         .library(name: "DicomDocumentContent", targets: ["DicomDocumentContent"]),
         .library(name: "DicomAppleMedia", targets: ["DicomAppleMedia"]),
@@ -53,6 +54,9 @@ let package = Package(
         .target(name: "HL7v2", path: "Sources/HL7v2", swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]),
         .testTarget(name: "HL7v2Tests", dependencies: ["HL7v2"], path: "Tests/HL7v2Tests", resources: [.copy("Fixtures")]),
         .target(name: "DicomWebClient", dependencies: ["DicomData"]),
+        // OpenID Connect sign-in and token renewal for DicomWebClient, without UI or a token store of its own.
+        .target(name: "DicomWebOIDC", dependencies: ["DicomWebClient"]),
+        .testTarget(name: "DicomWebOIDCTests", dependencies: ["DicomWebOIDC", "DicomWebClient"]),
         .target(name: "DicomTestUtilities", path: "Tests/DicomTestUtilities"),
         .testTarget(name: "DicomWebClientTests", dependencies: ["DicomWebClient", "DicomData", "DicomTestUtilities"],
                     resources: [.process("Resources")],
