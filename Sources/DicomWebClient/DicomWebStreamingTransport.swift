@@ -76,7 +76,7 @@ extension URLSessionDicomWebHTTPTransport {
         if let file = request.bodyFileURL { urlRequest.httpBodyStream = InputStream(url: file) }
         for (field, value) in request.headers { urlRequest.setValue(value, forHTTPHeaderField: field) }
         let delegate = DicomWebRedirectDelegate(policy: policy, credentialHeaderNames: request.credentialHeaderNames,
-                                                followsRedirects: request.followsRedirects)
+                                                followsRedirects: request.followsRedirects, bodyFileURL: request.bodyFileURL)
         let watchdog = delegate.enforce(deadline: request.deadline)
         let bytes: URLSession.AsyncBytes, response: URLResponse
         do { (bytes, response) = try await session.bytes(for: urlRequest, delegate: delegate) } catch {
