@@ -4,7 +4,8 @@ import XCTest
 @testable import DicomWebClient
 
 /// Requests share the connections of the caller's session, and a body read more slowly than it arrives waits in a
-/// private temporary file that is gone once the body is read, cancelled or failed.
+/// private temporary file that is gone once the body is read or cancelled. A body whose connection fails yields what
+/// arrived before the failure, then the error.
 final class DicomWebConnectionReuseTests: XCTestCase {
     private var server: KeepAliveHTTPServer!
     private var base: URL!
@@ -68,11 +69,27 @@ final class DicomWebConnectionReuseTests: XCTestCase {
         XCTAssertEqual(try spillFiles(), [])
     }
 
-    func test_failedBody_removesItsSpillFile() async throws {
+    func test_failedBody_yieldsWhatArrivedBeforeTheErrorAndRemovesItsSpillFile() async throws {
         let (body, _) = try await response(path: "stall/8")
-        _ = try await spillFile()
+        let file = try await spillFile()
+        let spilled = try XCTUnwrap(FileManager.default.attributesOfItem(atPath: file.path)[.size] as? Int)
         server.dropConnections()
-        try await assertEndsWithError(body)
+
+        var offset = 0
+        var mismatches = 0
+        do {
+            while let block = try await body.next() {
+                for (index, byte) in block.enumerated()
+                where byte != KeepAliveHTTPServer.byte(at: (offset + index) % (1 << 20)) {
+                    mismatches += 1
+                }
+                offset += block.count
+            }
+            XCTFail("the body ends with the task's error")
+        } catch {}
+        // The memory holds at least 1 MiB ahead of the file, and both were filled before the connection dropped.
+        XCTAssertGreaterThanOrEqual(offset, (1 << 20) + spilled)
+        XCTAssertEqual(mismatches, 0, "the bytes arrive in order")
         XCTAssertEqual(try spillFiles(), [])
     }
 

@@ -20,7 +20,9 @@ extension URLSession {
     ///
     /// The request runs on this session, sharing its connections with the session's other requests. No delegate
     /// callback waits for the reader: a body that arrives faster than it is read is held in memory up to 1 MiB and in
-    /// a temporary file beyond that, which is deleted as soon as it has been read and when the body ends early.
+    /// a temporary file beyond that, which is deleted as soon as it has been read, when the task is cancelled and when
+    /// the body is released. A body whose connection fails still yields every block that arrived before the failure,
+    /// and then the error.
     public func dicomWebResponse(
         for request: URLRequest, delegate: DicomWebRedirectDelegate
     ) async throws -> (DicomWebResponseBody, URLResponse) {
@@ -47,8 +49,9 @@ extension URLSession {
 /// Task delegate that queues the blocks of a response body for its single reader. Suspending a data task does not
 /// stop the blocks arriving, and holding back the delegate callback would stall every other task of the session, so
 /// the blocks are always accepted: up to `maximumBufferedBytes` unread wait in memory, and the rest go to a spill file
-/// that the reader drains, in order, once the memory is empty. The file is deleted when it has been read, and when the
-/// task fails or is cancelled.
+/// that the reader drains, in order, once the memory is empty. When the task fails, the reader gets what is still
+/// queued before the error, so the parts that arrived whole before a dropped connection are not lost. The file is
+/// deleted when it has been read, when the task is cancelled and when this buffer is released.
 final class DicomWebResponseBuffer: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     static let maximumBufferedBytes = 1024 * 1024
 
@@ -167,7 +170,12 @@ final class DicomWebResponseBuffer: NSObject, URLSessionDataDelegate, @unchecked
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         lock.withLock {
-            if let error { fail(error) } else if end == nil { end = .success(()) }
+            // A cancelled task has no reader left for the queued blocks; any other failure is reported after them.
+            if let error, (error as? URLError)?.code == .cancelled {
+                fail(error)
+            } else if end == nil {
+                end = error.map { .failure($0) } ?? .success(())
+            }
             response?.resume(throwing: error ?? URLError(.badServerResponse))
             response = nil
             if let reader, let end {
