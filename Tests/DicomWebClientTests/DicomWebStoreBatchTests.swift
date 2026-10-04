@@ -35,6 +35,7 @@ final class DicomWebStoreBatchTests: XCTestCase {
         XCTAssertEqual(results[1].dicomStatus, 0xC000)
         XCTAssertEqual(results[1].reason, "Cannot understand (0xC000)")
         XCTAssertEqual(results[1].httpStatus, 202)
+        XCTAssertNil(results[1].error, "an instance the answer refuses is no request error")
         XCTAssertEqual(results[2].reason, "The file has no valid File Meta Information.")
         XCTAssertNil(results[2].sopInstanceUID)
         XCTAssertEqual(results[3].httpStatus, 401)
@@ -95,6 +96,27 @@ final class DicomWebStoreBatchTests: XCTestCase {
         XCTAssertEqual(server.requestCount, 2)
     }
 
+    func test_aRefusedBatchAndTheFilesNotSentAfterItKeepWhatTheServerSaid() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("stow-refused-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let files = try (0..<2).map { index in
+            let url = directory.appendingPathComponent("\(index).dcm")
+            try Self.part10("2.25.29402\(index)").write(to: url)
+            return url
+        }
+        let server = ScriptedSTOWServer(responses: [(401, Data("token expired".utf8))])
+        let client = DicomWebClient(configuration: .init(baseURL: try await server.start()))
+        defer { server.stop() }
+
+        let results = await client.storeFiles(files, options: .init(maximumFilesPerBatch: 1))
+
+        XCTAssertEqual(results.map(\.state), [.failed, .notSent])
+        XCTAssertEqual(results[0].error?.statusCode, 401)
+        XCTAssertEqual(results[0].error?.bodyPreview, "token expired")
+        XCTAssertEqual(results[1].error, results[0].error, "the not-sent file keeps the error that stopped the store")
+    }
+
     func test_aBatchThatNeverReachedTheServerKeepsItsURLErrorCode() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("stow-unreachable-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -109,6 +131,7 @@ final class DicomWebStoreBatchTests: XCTestCase {
         XCTAssertEqual(results.map(\.state), [.failed])
         XCTAssertNil(results[0].httpStatus)
         XCTAssertEqual(results[0].transportErrorCode, .cannotConnectToHost)
+        XCTAssertNil(results[0].error)
     }
 
     func test_batchesSplitByCountAndBytes() async throws {

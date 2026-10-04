@@ -35,6 +35,9 @@ public struct DicomWebStoreFileResult: Equatable, Sendable {
     public let transportErrorCode: URLError.Code?
     /// The `Warning` header of the answer to this file's batch.
     public var warning: String? = nil
+    /// The DICOMweb error that failed this file's batch, or that stopped the store before it, with what the server
+    /// said about it (`retryAfter`, `warning`, `bodyPreview`); nil when the batch failed or stopped otherwise.
+    public var error: DicomWebError? = nil
 
     public init(url: URL, sopInstanceUID: String?, state: State, reason: String? = nil,
                 dicomStatus: UInt16? = nil, httpStatus: Int? = nil, transportErrorCode: URLError.Code? = nil) {
@@ -111,14 +114,16 @@ extension DicomWebClient {
             }
         }
         let batches = Self.batches(sendable, options: options)
-        var stop: (reason: String, httpStatus: Int?)?
+        var stop: (reason: String, httpStatus: Int?, error: DicomWebError?)?
         var completedFiles = files.count - sendable.count
         for (number, batch) in batches.enumerated() {
-            if stop == nil, Task.isCancelled { stop = ("The store was cancelled.", nil) }
+            if stop == nil, Task.isCancelled { stop = ("The store was cancelled.", nil, nil) }
             if let stop {
                 for item in batch {
-                    results[item.index] = .init(url: files[item.index], sopInstanceUID: item.uid, state: .notSent,
-                                                reason: stop.reason, httpStatus: stop.httpStatus)
+                    var result = DicomWebStoreFileResult(url: files[item.index], sopInstanceUID: item.uid, state: .notSent,
+                                                         reason: stop.reason, httpStatus: stop.httpStatus)
+                    result.error = stop.error
+                    results[item.index] = result
                 }
                 continue
             }
@@ -128,15 +133,16 @@ extension DicomWebClient {
                     results[item.index] = .init(url: files[item.index], sopInstanceUID: item.uid, in: result)
                 }
             } catch {
-                let httpStatus = (error as? DicomWebError)?.statusCode
+                let webError = error as? DicomWebError
                 for item in batch {
                     var result = DicomWebStoreFileResult(url: files[item.index], sopInstanceUID: item.uid, state: .failed,
-                                                         reason: Self.describe(error), httpStatus: httpStatus,
+                                                         reason: Self.describe(error), httpStatus: webError?.statusCode,
                                                          transportErrorCode: (error as? URLError)?.code)
-                    result.warning = (error as? DicomWebError)?.warning
+                    result.warning = webError?.warning
+                    result.error = webError
                     results[item.index] = result
                 }
-                if isFatal(error) { stop = (Self.describe(error), httpStatus) }
+                if isFatal(error) { stop = (Self.describe(error), webError?.statusCode, webError) }
             }
             completedFiles += batch.count
             await progress?(.init(completedBatches: number + 1, totalBatches: batches.count,
