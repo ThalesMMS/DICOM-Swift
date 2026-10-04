@@ -87,7 +87,7 @@ public struct DicomWebConformanceMatrix: Equatable, Sendable {
                                client: "supported",
                                server: "supported",
                                responsibility: "DicomWebClient/DicomWebServer",
-                               notes: "Native grayscale and color frames render as JPEG, PNG, or GIF with bounded output."),
+                               notes: "Native grayscale and color frames, and compressed frames the server can decode, render as JPEG, PNG, or GIF with bounded output."),
         DicomWebConformanceRow(feature: "WADO-URI",
                                client: "supported",
                                server: "supported",

@@ -57,9 +57,25 @@ struct DicomWebRenderedFrameService {
     }
 
     private func decode(_ instance: DicomWebStoredInstance) throws -> (DCMDecoder, DicomPixelDataDescriptor) {
+        var data = instance.part10Data
+        // Compressed Pixel Data is rendered from the Explicit VR Little Endian object that a retrieve would
+        // send, decoded the same way. A syntax without a decoder stays not acceptable.
+        let native = DicomTransferSyntax.explicitVRLittleEndian.rawValue
+        if instance.transferSyntax.isEncapsulated {
+            guard DicomWebServerNativeTranscoding().canTranscode(from: instance.transferSyntax.rawValue, to: native) else {
+                throw DicomWebFrameRouteError.mediaTypeNotAcceptable
+            }
+            do {
+                data = try DicomTranscoder().transcode(data, to: .explicitVRLittleEndian)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                throw DicomWebFrameRouteError.mediaTypeNotAcceptable
+            }
+        }
         let decoder: DCMDecoder
         do {
-            decoder = try DCMDecoder(data: instance.part10Data)
+            decoder = try DCMDecoder(data: data)
         } catch is CancellationError {
             throw CancellationError()
         } catch {
