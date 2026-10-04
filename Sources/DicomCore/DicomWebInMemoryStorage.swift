@@ -188,9 +188,18 @@ extension DicomWebInMemoryStorage: DicomWebStorageProviding {
     }
     private func search(_ parameters: DicomWebSearchParameters, key: DicomTag) throws -> [DicomDataSet] {
         var identifier = DicomDataSet()
+        // A key with several values matches when any one of them does. UID lists are matched that way by the
+        // matcher itself; every other list becomes one single-valued identifier per value.
+        var alternatives: [[DicomDataSet]] = []
         for match in parameters.matches {
             guard let tag = DicomWebSearchAttributes.tag(match.attribute) else { throw DicomWebError(kind: .badRequest) }
-            identifier.set(.init(tag: tag, vr: match.vr, value: .strings(match.values)))
+            if match.vr != .UI, match.values.count > 1 {
+                alternatives.append(match.values.map {
+                    DicomDataSet(elements: [.init(tag: tag, vr: match.vr, value: .strings([$0]))])
+                })
+            } else {
+                identifier.set(.init(tag: tag, vr: match.vr, value: .strings(match.values)))
+            }
         }
         let limit = max(0, parameters.limit ?? Int.max)
         guard limit > 0 else { return [] }
@@ -216,7 +225,9 @@ extension DicomWebInMemoryStorage: DicomWebStorageProviding {
                     set.set(.init(tag: 0x00201209, vr: .IS,
                                   value: .strings([String(seriesInstanceCounts[[instance.studyInstanceUID, instance.seriesInstanceUID]] ?? 0)])))
                 }
-                guard try DicomQueryMatcher().matches(set, identifier: identifier),
+                let matcher = DicomQueryMatcher()
+                guard try matcher.matches(set, identifier: identifier),
+                      try alternatives.allSatisfy({ try $0.contains { try matcher.matches(set, identifier: $0) } }),
                       seen.insert(set.string(for: key) ?? "").inserted else { continue }
                 if offset > 0 { offset -= 1; continue }
                 selected.append(set)

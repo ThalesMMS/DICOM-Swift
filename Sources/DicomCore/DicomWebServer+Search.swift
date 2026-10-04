@@ -4,6 +4,8 @@ import Foundation
 enum DicomWebSearchAttributes {
     /// Query parameters with a meaning of their own; every other name is an attribute.
     static let reservedNames: Set<String> = ["limit", "offset", "includefield", "fuzzymatching"]
+    /// Value representations whose matching key may list several values: one of them has to match.
+    static let listVRs: Set<DicomVR> = [.CS, .UI]
     /// Value representations that attribute value matching cannot compare.
     private static let unmatchable: Set<DicomVR> = [.SQ, .OB, .OD, .OF, .OL, .OV, .OW, .UN]
 
@@ -47,9 +49,26 @@ extension DicomWebServer {
             if !ignored.contains(item.name) { ignored.append(item.name) }
             return true
         }
-        var parameters = try DicomWebSearchParameters.parse(queryItems: items, level: level, studyInstanceUID: study,
+        // A key that lists several values, as `CT,MR`, may also come as the same key repeated. The repetitions are
+        // read as that list where a list is matched, code strings and UIDs; any other repeated key is refused.
+        var merged: [URLQueryItem] = []
+        for item in items {
+            guard !DicomWebSearchAttributes.reservedNames.contains(item.name),
+                  let index = merged.firstIndex(where: { $0.name == item.name }) else { merged.append(item); continue }
+            guard let vr = DicomWebSearchAttributes.vr(item.name), DicomWebSearchAttributes.listVRs.contains(vr) else {
+                throw DicomWebServerFailure(400, "A matching key is repeated. Only code string and UID keys take "
+                    + "several values, given as a comma-separated list or as the key repeated.")
+            }
+            merged[index].value = [merged[index].value, item.value].compactMap { $0 }.joined(separator: ",")
+        }
+        var parameters = try DicomWebSearchParameters.parse(queryItems: merged, level: level, studyInstanceUID: study,
                                                             seriesInstanceUID: series,
                                                             vrForAttribute: DicomWebSearchAttributes.vr)
+        // Commas cannot occur in a code string, so a comma separates values there, as it does for UIDs.
+        parameters.matches = parameters.matches.map { match in
+            guard match.vr == .CS, match.values.count == 1, match.values[0].contains(",") else { return match }
+            return .init(match.attribute, vr: match.vr, values: match.values[0].components(separatedBy: ","))
+        }
         parameters.includeFields.removeAll { field in
             guard field != "all", DicomWebSearchAttributes.tag(field) == nil else { return false }
             if !ignored.contains(field) { ignored.append(field) }
