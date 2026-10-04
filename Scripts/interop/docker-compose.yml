@@ -55,7 +55,7 @@ services:
       - orthanc-auth-storage:/var/lib/orthanc/db
 
   dcm4chee-ldap:
-    image: ${DCM4CHEE_LDAP_IMAGE:-dcm4che/slapd-dcm4chee:2.6.10-35.0}
+    image: ${DCM4CHEE_LDAP_IMAGE:-dcm4che/slapd-dcm4chee:2.6.14-35.2}
     environment:
       ARCHIVE_HOST: dcm4chee-arc
       STORAGE_DIR: /storage/fs1
@@ -69,11 +69,14 @@ services:
       POSTGRES_DB: pacsdb
       POSTGRES_USER: pacs
       POSTGRES_PASSWORD: pacs
+      # The image's init scripts edit /var/lib/postgresql/data/postgresql.conf, so the data stays in the directory
+      # used before PostgreSQL 18 changed its default PGDATA.
+      PGDATA: /var/lib/postgresql/data
     volumes:
       - dcm4chee-db:/var/lib/postgresql/data
 
   dcm4chee-arc:
-    image: ${DCM4CHEE_ARC_IMAGE:-dcm4che/dcm4chee-arc-psql:5.35.0}
+    image: ${DCM4CHEE_ARC_IMAGE:-dcm4che/dcm4chee-arc-psql:5.35.2}
     depends_on:
       - dcm4chee-ldap
       - dcm4chee-db
@@ -85,6 +88,8 @@ services:
       WILDFLY_ADMIN_PASSWORD: admin
       WILDFLY_DEPLOY_UI: "false"
       WILDFLY_PACSDS_USE_CCM: "false"
+      LDAP_URL: ldap://dcm4chee-ldap:389
+      POSTGRES_HOST: dcm4chee-db
       POSTGRES_DB: pacsdb
       POSTGRES_USER: pacs
       POSTGRES_PASSWORD: pacs

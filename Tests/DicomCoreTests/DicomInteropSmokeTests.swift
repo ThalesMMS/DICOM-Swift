@@ -986,12 +986,13 @@ extension DicomInteropSmokeTests {
         }
     }
 
-    /// The first range asks for a transfer syntax no archive can produce. Archives refuse it with 406, or with 400
-    /// (Orthanc), so both are fallback statuses; the retrieve then asks again for the instance as stored.
+    /// The first range asks for a transfer syntax no archive can produce. Archives refuse it with 406, Orthanc with
+    /// 400 and dcm4chee 5.35 with 500 (its body names the missing presentation context), so the archive's status is
+    /// a fallback status; the retrieve then asks again for the instance as stored.
     private func assertAcceptFallback(_ client: DicomWebClient, fixture: InteropSeriesFixture,
                                       archive: String) async throws {
         let unknownSyntax = "2.25.2810999"
-        let fallbackStatuses: Set<Int> = [400, 406]
+        let fallbackStatuses: Set<Int> = archive == "dcm4chee" ? [406, 500] : [400, 406]
         do {
             try await client.retrieveInstance(
                 studyInstanceUID: fixture.studyInstanceUID, seriesInstanceUID: fixture.seriesInstanceUID,

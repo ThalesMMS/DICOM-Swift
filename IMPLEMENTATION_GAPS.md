@@ -443,10 +443,17 @@ Current tested scope:
   color LUT `BulkDataURI` values, and, on a second Orthanc, Basic
   authentication. The script rejects
   the smoke study on dcm4chee (`113039^DCM`) after each run so it can be
-  repeated. Last recorded run, 2026-10-04: Orthanc 1.13.0 with DICOMweb plugin
-  1.24 passed all 11 smoke tests in three consecutive runs. dcm4chee 5.35 was
-  not run, because that host had no container runtime; the dcm4chee cases and
-  the rejection cleanup have no recorded run.
+  repeated. Recorded runs, 2026-10-04: Orthanc 1.13.0 with DICOMweb plugin
+  1.24 passed all 11 smoke tests in three consecutive runs without Docker, and
+  dcm4chee 5.35.2 with Orthanc 1.13.0 in Docker passed them in two consecutive
+  runs, with the rejection cleanup between them. dcm4chee refuses an Accept it
+  cannot transcode with 500 instead of 406, and gives all representations of an
+  instance one `ETag` without `Vary: Accept`; since 2.0.1 the client's
+  URLSession transport neither reads nor writes the URL cache.
+- `DicomWebIndependentClientTests` (dicomweb-client 0.61.2) and
+  `DicomWebUPSRSIndependentTests` (`requests`, `websockets` 17.1) are
+  independent Python witnesses of the package's DICOMweb listener; both passed
+  without skip on 2026-10-04.
 - `Sources/DicomCore/DicomCore.docc/Articles/ConformanceStatement.md` documents
   that the DICOMweb surface is a helper API, not a complete production PACS
   client/server.
@@ -455,7 +462,6 @@ Future backend work, if a production DICOMweb stack becomes the target:
 
 - Add persistent storage, production authorization, PHI audit logging,
   deployment guidance, and operational metrics.
-- Record a dcm4chee run of the interop smoke.
 - Add JPIP proxying through DICOMweb only if the package should own that network
   path; the current JPIP design remains caller-supplied `DicomJPIPTransport`.
 

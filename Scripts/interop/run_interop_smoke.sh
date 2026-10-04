@@ -29,7 +29,10 @@ the smoke can be repeated.
 Environment overrides:
   ORTHANC_HTTP_PORT, ORTHANC_DIMSE_PORT, ORTHANC_IMAGE
   DCM4CHEE_HTTP_PORT, DCM4CHEE_DIMSE_PORT, DCM4CHEE_ARC_IMAGE
+  DCM4CHEE_LDAP_IMAGE, DCM4CHEE_DB_IMAGE, DCM4CHEE_WAIT_SECONDS
   DICOM_INTEROP_LOG_DIR, DICOM_INTEROP_PROJECT
+  DICOM_INTEROP_COMPOSE  Compose command, e.g. "docker-compose" (default: the
+                         docker compose plugin, else standalone docker-compose)
 USAGE
 }
 
@@ -61,8 +64,20 @@ done
 
 mkdir -p "${LOG_DIR}"
 
+# Prefer the `docker compose` plugin; fall back to the standalone `docker-compose`
+# binary when the plugin is not installed. DICOM_INTEROP_COMPOSE overrides both.
+if [[ -n "${DICOM_INTEROP_COMPOSE:-}" ]]; then
+  read -r -a COMPOSE_COMMAND <<<"${DICOM_INTEROP_COMPOSE}"
+elif docker compose version >/dev/null 2>&1; then
+  COMPOSE_COMMAND=(docker compose)
+elif command -v docker-compose >/dev/null 2>&1; then
+  COMPOSE_COMMAND=(docker-compose)
+else
+  COMPOSE_COMMAND=(docker compose)
+fi
+
 compose() {
-  docker compose -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" "$@"
+  "${COMPOSE_COMMAND[@]}" -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" "$@"
 }
 
 print_logs() {
@@ -114,7 +129,7 @@ wait_http() {
 
   echo "Waiting for ${name}: ${url}"
   for ((i = 1; i <= attempts; i++)); do
-    if curl -fsS "${url}" >/dev/null 2>&1; then
+    if curl -fsS -m 10 "${url}" >/dev/null 2>&1; then
       echo "${name} is ready"
       return 0
     fi
@@ -140,7 +155,10 @@ fi
 wait_http "Orthanc HTTP" "http://127.0.0.1:${ORTHANC_HTTP_PORT:-8042}/system"
 wait_http "Orthanc (auth) HTTP" "http://smoke:${ORTHANC_AUTH_PASSWORD:-smoke-secret}@127.0.0.1:${ORTHANC_AUTH_HTTP_PORT:-8043}/system"
 if [[ "${ARCHIVES}" != "orthanc" ]]; then
-  wait_http "dcm4chee HTTP" "http://127.0.0.1:${DCM4CHEE_HTTP_PORT:-8080}/dcm4chee-arc"
+  # WildFly answers before the archive is deployed; the AE list answers only once the archive has read its LDAP
+  # configuration. A first start initializes LDAP and Postgres and takes minutes.
+  wait_http "dcm4chee HTTP" "http://127.0.0.1:${DCM4CHEE_HTTP_PORT:-8080}/dcm4chee-arc/aets" \
+    "$(( ${DCM4CHEE_WAIT_SECONDS:-600} / 5 ))" 5
 fi
 
 export DICOM_INTEROP_SMOKE=1

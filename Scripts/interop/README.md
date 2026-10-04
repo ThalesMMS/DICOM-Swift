@@ -42,6 +42,12 @@ and writes failure diagnostics to `.build/interop-logs/`.
 Use `--orthanc-only` for a quicker local loop, `--keep` to leave services up for
 manual debugging, or `--no-up` to run against services you started yourself.
 
+The script runs the `docker compose` plugin when it is installed and the
+standalone `docker-compose` otherwise; `DICOM_INTEROP_COMPOSE` names another
+command. The first dcm4chee start initializes LDAP and PostgreSQL, so the script
+waits up to `DCM4CHEE_WAIT_SECONDS` (600 by default) for
+`/dcm4chee-arc/aets` to answer.
+
 Without Docker, `--no-up --orthanc-only` runs against Orthanc binaries started
 by hand: one Orthanc with the DICOMweb plugin, DICOM AET `ORTHANC`, and a
 `MTKSMOKE` modality at `127.0.0.1` on the Storage SCP port, and a second one
@@ -79,6 +85,15 @@ The compose file uses `orthancteam/orthanc` and `dcm4che/dcm4chee-arc-psql`
 families. Override image tags through `ORTHANC_IMAGE`,
 `DCM4CHEE_ARC_IMAGE`, `DCM4CHEE_DB_IMAGE`, and `DCM4CHEE_LDAP_IMAGE` when a
 specific local or CI environment needs pinned versions.
+
+The dcm4chee defaults are tags published on Docker Hub:
+`dcm4che/slapd-dcm4chee:2.6.14-35.2`, `dcm4che/postgres-dcm4chee:18.3-35` and
+`dcm4che/dcm4chee-arc-psql:5.35.2`. Keep the LDAP image's schema suffix
+(`-35.2`) matched with the archive version. PostgreSQL 18 images keep their data
+in a versioned directory by default, but the dcm4chee database init scripts edit
+`/var/lib/postgresql/data`, so the compose file sets `PGDATA` to that directory.
+The archive reaches LDAP and PostgreSQL through `LDAP_URL` and `POSTGRES_HOST`,
+which name the compose services.
 
 ## Coverage
 
@@ -126,8 +141,25 @@ Failures keep the service logs and Swift test output under
   406, so the smoke counts 400 as a fallback status; it refuses an instance of
   another study with 409 and Failure Reason 0x0110 while storing the rest of
   the request.
-- dcm4chee 5.35 has no recorded run: that host had no container runtime. The
-  dcm4chee cases and the rejection cleanup are implemented but not exercised.
+- 2026-10-04, Apple Silicon, Docker through Colima: dcm4chee 5.35.2
+  (`dcm4chee-arc-psql:5.35.2`, `slapd-dcm4chee:2.6.14-35.2`,
+  `postgres-dcm4chee:18.3-35`) and Orthanc 1.13.0 (`orthancteam/orthanc:latest`),
+  with the default `Scripts/interop/run_interop_smoke.sh`. All 11
+  `DicomInteropSmokeTests` passed, none skipped, in two consecutive runs. Each
+  run started the containers, rejected the dcm4chee smoke study (HTTP 200) and
+  stopped them; the second run stored the same instances again on the kept
+  volumes. The rejection of the other study answers 404, because dcm4chee
+  never stored that instance. Where dcm4chee differs from Orthanc:
+  - It refuses an instance of another study with 409 and Failure Reason 0xC409.
+  - It answers an Accept it cannot transcode with 500, not 406, and a body that
+    is not a valid multipart: one part without headers that names the missing
+    presentation context. The smoke counts 500 as dcm4chee's fallback status.
+  - It gives every representation of an instance the same `ETag`, sends no
+    `Vary: Accept`, and answers a conditional request with 304 whatever the
+    Accept. Up to 2.0.0, `URLSessionDicomWebHTTPTransport` let URLSession's
+    cache answer a second retrieve with the representation retrieved first,
+    without asking the server. Since 2.0.1 every request goes to the server and
+    no response is stored in the URL cache.
 
 ## Independent pynetdicom peer (Lot A1)
 
@@ -234,6 +266,20 @@ launches the probe, asserts its result and verifies that the A1 observer recorde
 `noConnection`. The interpreter is selected by `DICOM_SWIFT_PYNETDICOM_PYTHON`, defaulting
 to `/tmp/isis-2321-iod-oracle/bin/python`. An absent interpreter skips only when
 `DICOM_REQUIRE_PYNETDICOM` is not `1`; missing Python modules or a failing probe never skip.
+
+### dicomweb-client witness and recorded run
+
+`DicomWebIndependentClientTests` starts a `DicomWebHTTPListener` and runs
+`dicomweb_client_probe.py`, which uses dicomweb-client 0.61.2 for STOW-RS,
+QIDO-RS and WADO-RS against it and compares the retrieved bytes with the stored
+ones. It selects the interpreter and skips the same way as the UPS-RS witness.
+
+Recorded run, 2026-10-04, Apple Silicon: with `DICOM_SWIFT_PYNETDICOM_PYTHON`
+pointing at a virtual environment holding pydicom 3.0.2, pynetdicom 3.0.4,
+dicomweb-client 0.61.2, requests and websockets 17.1, and
+`DICOM_REQUIRE_PYNETDICOM=1`, `DicomWebIndependentClientTests` and
+`DicomWebUPSRSIndependentTests` both passed, none skipped. Neither showed a
+behaviour difference.
 
 ## Print Management SCU qualification (issue #2353, Lot A1)
 

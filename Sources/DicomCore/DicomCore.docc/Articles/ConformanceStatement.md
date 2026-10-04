@@ -198,7 +198,7 @@ remote archive qualification.
 | TLS | Client and Storage SCP listener configuration | `DicomTLSConfiguration` and `DicomTLSOptionsFactory` | Certificate, private-key, trust-store, server-name, and the DICOM PS3.15 B.12 BCP 195 RFC 8996/9325 profile are tested where Network/Security are available. TLS 1.2 is the minimum; newer protocol and cipher negotiation remains system-managed. Retired serialized profile identifiers decode as B.12. |
 | User identity | Association user identity negotiation | `DicomUserIdentity` | User identity is rejected before association setup when TLS is disabled. |
 | Pooling/retry/cancellation | Association pooling, retry policy, circuit breaker, operation handle, progress, and audit log | `DicomDIMSEAssociationPool`, `DicomNetworkRetryPolicy`, `DicomNetworkCircuitBreaker`, `DicomDIMSEOperationHandle` | Cancellation avoids retries and circuit-breaker trips; pooling keys include node, AE titles, TLS, identity, transfer syntaxes, timeout, and bandwidth settings. |
-| External archive interop | Optional smoke tests and scripts | `DicomInteropSmokeTests` and interop tooling | Orthanc/dcm4che/DICOM-Swift smoke tests require caller-provided endpoints and are not bundled production services. The DICOMweb smoke covers STOW-RS in batches with a refused instance, paged QIDO-RS, WADO-RS retrieve of a study, series and instance, frames, an Accept fallback, and `BulkDataURI` values of pixel data and palette color LUTs. |
+| External archive interop | Optional smoke tests and scripts | `DicomInteropSmokeTests` and interop tooling | Orthanc/dcm4che/DICOM-Swift smoke tests require caller-provided endpoints and are not bundled production services. The DICOMweb smoke covers STOW-RS in batches with a refused instance, paged QIDO-RS, WADO-RS retrieve of a study, series and instance, frames, an Accept fallback, and `BulkDataURI` values of pixel data and palette color LUTs. On 2026-10-04 it passed against dcm4chee 5.35.2 and Orthanc 1.13.0 in two consecutive runs, with the dcm4chee study rejected (`113039^DCM`) between them. dcm4chee refuses an Accept it cannot transcode with 500 instead of 406, and gives all representations of an instance one `ETag` without `Vary: Accept`, so the client's URLSession transport sends every request to the server and stores no response in the URL cache. |
 
 ### 1.5 Export and Non-Image Object Matrix
 
@@ -1425,6 +1425,9 @@ The independent `ups_rs_probe.py` witness uses `requests` and `websockets==17.1`
 Its Swift harness asserts all transaction results, event sequence and disconnected
 observer outcomes; the in-process tests exercise status/Warning mappings, media
 negotiation, subscription policies, deletion knowledge and client reconnect gaps.
+The dicomweb-client 0.61.2 witness (`DicomWebIndependentClientTests`) stores,
+searches and retrieves through the same listener. Both witnesses passed without
+skip on 2026-10-04 with pydicom 3.0.2, pynetdicom 3.0.4 and websockets 17.1.
 
 ## Optional Print SCP and shared CPU film compositor (Lot A2)
 
