@@ -367,6 +367,9 @@ struct WebCommand: AsyncParsableCommand {
                     securityProfile: .bcp195RFC8996)
             }
             let listener = DicomWebHTTPListener(server: .init(storage: storage, authentication: authentication,
+                // Instances stored in a syntax DICOMweb cannot send, or that a client
+                // asks for as Explicit VR Little Endian, go out rewritten or decoded.
+                transcoding: DicomWebServerNativeTranscoding(),
                 unifiedProcedureSteps: ups ? DicomUnifiedProcedureStepService(store: DicomInMemoryUnifiedProcedureStepStore()) : nil,
                 notifications: ups ? DicomWebNotificationHub() : nil,
                 principals: CommandWebPrincipals(authentication: authentication as? any DicomWebPrincipalResolving,
