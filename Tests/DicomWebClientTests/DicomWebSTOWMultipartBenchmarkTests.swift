@@ -79,10 +79,16 @@ final class DicomWebSTOWMultipartBenchmarkTests: XCTestCase {
                 Self.percentile(samples, fraction: 0.95),
                 componentBuffers,
                 identity.hash,
-                BenchmarkMemorySampler.currentPeakResidentMemoryBytes() ?? 0
+                Self.peakResidentMemoryBytes()
             )
         )
         #endif
+    }
+
+    /// Peak resident memory of the process; `ru_maxrss` is in bytes on Apple platforms.
+    private static func peakResidentMemoryBytes() -> UInt64 {
+        var usage = rusage()
+        return getrusage(RUSAGE_SELF, &usage) == 0 ? UInt64(usage.ru_maxrss) : 0
     }
 
     private static func legacyBody(instances: [DicomWebStoreInstance], boundary: String) -> Data {

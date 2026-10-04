@@ -44,25 +44,6 @@ extension DicomWebHTTPTransport {
     }
 }
 
-/// Only the stream consumer advances the byte iterator; no unbounded producer queue is created.
-private actor DicomWebByteIterator {
-    private var iterator: URLSession.AsyncBytes.AsyncIterator?
-    init(_ bytes: URLSession.AsyncBytes) { iterator = bytes.makeAsyncIterator() }
-    func next() async throws -> Data? {
-        guard var active = iterator else { return nil }
-        iterator = nil
-        var chunk = Data()
-        chunk.reserveCapacity(16 * 1024)
-        while chunk.count < 16 * 1024 {
-            try Task.checkCancellation()
-            guard let byte = try await active.next() else { break }
-            chunk.append(byte)
-        }
-        iterator = active
-        return chunk.isEmpty ? nil : chunk
-    }
-}
-
 extension URLSessionDicomWebHTTPTransport {
     public func stream(_ request: DicomWebHTTPRequest) async throws -> DicomWebHTTPStreamedResponse {
         try Task.checkCancellation()
@@ -78,23 +59,22 @@ extension URLSessionDicomWebHTTPTransport {
         let delegate = DicomWebRedirectDelegate(policy: policy, credentialHeaderNames: request.credentialHeaderNames,
                                                 followsRedirects: request.followsRedirects, bodyFileURL: request.bodyFileURL)
         let watchdog = delegate.enforce(deadline: request.deadline)
-        let bytes: URLSession.AsyncBytes, response: URLResponse
-        do { (bytes, response) = try await session.bytes(for: urlRequest, delegate: delegate) } catch {
+        let responseBody: DicomWebResponseBody, response: URLResponse
+        do {
+            (responseBody, response) = try await session.dicomWebResponse(for: urlRequest, delegate: delegate)
+        } catch {
             watchdog?.cancel()
             throw delegate.mapping(error)
         }
         guard let http = response as? HTTPURLResponse else {
             watchdog?.cancel()
-            bytes.task.cancel()
+            responseBody.task.cancel()
             throw DicomWebError(kind: .invalidResponse)
         }
-        let iterator = DicomWebByteIterator(bytes)
-        let task = bytes.task
+        let task = responseBody.task
         let body = AsyncThrowingStream<Data, Error>(unfolding: {
             do {
-                let chunk = try await withTaskCancellationHandler {
-                    try await iterator.next()
-                } onCancel: { task.cancel() }
+                let chunk = try await responseBody.next()
                 if chunk == nil { watchdog?.cancel() }
                 return chunk
             } catch {
