@@ -715,6 +715,23 @@ private final class DicomWebScriptedTransport: DicomWebHTTPTransport, @unchecked
     }
 }
 
+/// A server that ignores `offset` and `limit`: every search gets the same full page.
+private final class DicomWebFixedPageTransport: DicomWebHTTPTransport, @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+    private let body: Data
+    var requestCount: Int { lock.withLock { count } }
+
+    init(body: Data) {
+        self.body = body
+    }
+
+    func send(_ request: DicomWebHTTPRequest) async throws -> DicomWebHTTPResponse {
+        lock.withLock { count += 1 }
+        return DicomWebHTTPResponse(statusCode: 200, headers: ["Content-Type": "application/dicom+json"], body: body)
+    }
+}
+
 private final class DicomWebURLProtocolCapture: @unchecked Sendable {
     private let lock = NSLock()
     private var storedRequest: URLRequest?
@@ -880,6 +897,85 @@ extension DicomWebClientTests {
         XCTAssertTrue(transport.requests[1].url.absoluteString.contains("offset=7"))
         XCTAssertFalse(DicomWebSearchPage(dataSets: [], statusCode: 200, contentType: "application/dicom+json",
             warning: "299 archive: fuzzymatching is not supported", offset: 0, limit: 2).hasMore)
+    }
+
+    func test_searchPager_serverIgnoringOffset_stopsAfterFirstRepeatedPage() async throws {
+        let transport = DicomWebFixedPageTransport(body: Self.seriesPage(["1.1", "1.2"]))
+        let client = DicomWebClient(configuration: .init(baseURL: URL(string: "https://archive.example")!), transport: transport)
+        var pages: [DicomWebSearchPage] = []
+        for try await page in client.searchPages(parameters: .init(level: .series, limit: 2), continuesOnFullPage: true) {
+            pages.append(page)
+        }
+        XCTAssertEqual(transport.requestCount, 2)
+        XCTAssertEqual(pages.map { $0.dataSets.count }, [2, 0])
+        XCTAssertEqual(pages.map(\.stopReason), [nil, .repeatedPage])
+    }
+
+    func test_searchPager_resultRepeatedAcrossPages_isReturnedOnce() async throws {
+        let transport = DicomWebScriptedTransport(responses: [
+            .init(statusCode: 200, headers: ["Content-Type": "application/dicom+json"], body: Self.seriesPage(["1.1", "1.2"])),
+            .init(statusCode: 200, headers: ["Content-Type": "application/dicom+json"], body: Self.seriesPage(["1.2", "1.3"])),
+            .init(statusCode: 200, headers: ["Content-Type": "application/dicom+json"], body: Self.seriesPage(["1.4"]))
+        ])
+        let client = DicomWebClient(configuration: .init(baseURL: URL(string: "https://archive.example")!), transport: transport)
+        var uids: [String] = []
+        var reasons: [DicomWebSearchStopReason?] = []
+        for try await page in client.searchPages(parameters: .init(level: .series, limit: 2), continuesOnFullPage: true) {
+            uids += page.dataSets.compactMap { $0.string(for: .seriesInstanceUID) }
+            reasons.append(page.stopReason)
+        }
+        XCTAssertEqual(uids, ["1.1", "1.2", "1.3", "1.4"])
+        XCTAssertEqual(reasons, [nil, nil, nil])
+        XCTAssertTrue(transport.requests[2].url.absoluteString.contains("offset=4"))
+    }
+
+    func test_searchPager_pageAndResultLimits_stopAndSaySo() async throws {
+        let more = ["Content-Type": "application/dicom+json",
+                    "Warning": "299 archive \"There are additional results that can be requested\""]
+        func client(_ pages: [[String]]) -> (DicomWebClient, DicomWebScriptedTransport) {
+            let transport = DicomWebScriptedTransport(responses: pages.map {
+                .init(statusCode: 200, headers: more, body: Self.seriesPage($0))
+            })
+            return (DicomWebClient(configuration: .init(baseURL: URL(string: "https://archive.example")!), transport: transport), transport)
+        }
+        let (pageClient, pageTransport) = client([["1"], ["2"], ["3"]])
+        var counts: [Int] = []
+        var reasons: [DicomWebSearchStopReason?] = []
+        for try await page in pageClient.searchPages(parameters: .init(level: .series), limits: .init(maximumPages: 2)) {
+            counts.append(page.dataSets.count)
+            reasons.append(page.stopReason)
+        }
+        XCTAssertEqual(pageTransport.requests.count, 2)
+        XCTAssertEqual(counts, [1, 1])
+        XCTAssertEqual(reasons, [nil, .pageLimitReached])
+
+        let (resultClient, resultTransport) = client([["1", "2"], ["3", "4"], ["5"]])
+        counts = []
+        reasons = []
+        for try await page in resultClient.searchPages(parameters: .init(level: .series), limits: .init(maximumResults: 3)) {
+            counts.append(page.dataSets.count)
+            reasons.append(page.stopReason)
+        }
+        XCTAssertEqual(resultTransport.requests.count, 2)
+        XCTAssertEqual(counts, [2, 1])
+        XCTAssertEqual(reasons, [nil, .resultLimitReached])
+    }
+
+    func test_searchPage_warning299_isRecognizedByWarnCode() {
+        func page(_ warning: String) -> DicomWebSearchPage {
+            DicomWebSearchPage(dataSets: [], statusCode: 200, contentType: nil, warning: warning, offset: 0, limit: nil)
+        }
+        XCTAssertTrue(page("299 archive \"There are 3 additional results that can be requested\"").hasMore)
+        XCTAssertTrue(page("199 archive \"x\", 299 archive \"The results were truncated\"").hasMore)
+        XCTAssertFalse(page("199 archive \"There are additional results, 299 of them\"").hasMore)
+        XCTAssertFalse(page("110 archive \"Response is stale; 299 additional results\"").hasMore)
+        XCTAssertEqual(page("299 archive \"There are additional results\"").warning,
+                       "299 archive \"There are additional results\"")
+    }
+
+    private static func seriesPage(_ uids: [String]) -> Data {
+        let sets = uids.map { ["0020000E": ["vr": "UI", "Value": [$0]]] }
+        return try! JSONSerialization.data(withJSONObject: sets)
     }
 
     func test_metadataWith1000BulkURIs_doesNotFetchReferences() async throws {

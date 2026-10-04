@@ -466,6 +466,11 @@ public struct DicomWebClient: Sendable {
         .init(client: self, parameters: parameters, continuesOnFullPage: continuesOnFullPage)
     }
 
+    public func searchPages(parameters: DicomWebSearchParameters, continuesOnFullPage: Bool = false,
+                            limits: DicomWebSearchPagingLimits) -> DicomWebSearchPager {
+        .init(client: self, parameters: parameters, continuesOnFullPage: continuesOnFullPage, limits: limits)
+    }
+
     public func searchSeries(studyInstanceUID: String? = nil,
                              matches: [DicomWebSearchParameters.Match] = [], limit: Int? = nil,
                              offset: Int? = nil) async throws -> DicomWebSearchPage {

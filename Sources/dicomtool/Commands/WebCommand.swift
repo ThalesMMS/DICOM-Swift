@@ -66,10 +66,11 @@ struct WebCommand: AsyncParsableCommand {
             var results: [DicomDataSet] = []
             if allPages {
                 for try await page in client.searchPages(parameters: parameters) {
-                    guard page.dataSets.count <= 100_000 - results.count else {
-                        throw ValidationError("QIDO result safety limit exceeded (100000)")
+                    switch page.stopReason {
+                    case nil: results += page.dataSets
+                    case .resultLimitReached?: throw ValidationError("QIDO result safety limit exceeded (100000)")
+                    case let reason?: throw ValidationError("QIDO paging stopped at offset \(page.offset): \(reason.rawValue)")
                     }
-                    results += page.dataSets
                 }
             } else {
                 results = try await client.search(parameters: parameters).dataSets
