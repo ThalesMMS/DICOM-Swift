@@ -210,6 +210,7 @@ final class ScriptedHTTPServer: @unchecked Sendable {
     private var actions: [Action] = []
     private var requests = 0
     private var accepts: [String] = []
+    private var heads: [String] = []
     private var url: URL?
 
     var script: [Action] {
@@ -221,6 +222,9 @@ final class ScriptedHTTPServer: @unchecked Sendable {
 
     /// The Accept header of each request, in order.
     var acceptHeaders: [String] { lock.withLock { accepts } }
+
+    /// The request line and headers of each request, in order.
+    var requestHeads: [String] { lock.withLock { heads } }
 
     init() {
         let parameters = NWParameters.tcp
@@ -261,11 +265,13 @@ final class ScriptedHTTPServer: @unchecked Sendable {
                 if complete || error != nil { connection.cancel() } else { readHead(on: connection, received: head) }
                 return
             }
-            let accept = String(decoding: head, as: UTF8.self).components(separatedBy: "\r\n")
+            let text = String(decoding: head, as: UTF8.self)
+            let accept = text.components(separatedBy: "\r\n")
                 .first { $0.lowercased().hasPrefix("accept:") }
                 .map { String($0.dropFirst("accept:".count)).trimmingCharacters(in: .whitespaces) }
             let action = lock.withLock { () -> Action in
                 requests += 1
+                heads.append(text)
                 if let accept { accepts.append(accept) }
                 return actions.isEmpty ? .respond(500, [:], "unscripted") : actions.removeFirst()
             }

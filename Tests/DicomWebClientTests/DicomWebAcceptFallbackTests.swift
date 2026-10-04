@@ -10,7 +10,9 @@ final class DicomWebAcceptFallbackTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         server = ScriptedHTTPServer()
-        session = URLSession(configuration: .ephemeral)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = URLCache(memoryCapacity: 1024 * 1024, diskCapacity: 0)
+        session = URLSession(configuration: configuration)
     }
 
     override func tearDown() async throws {
@@ -77,5 +79,33 @@ final class DicomWebAcceptFallbackTests: XCTestCase {
             XCTAssertEqual(server.requestCount - before, 1)
             _ = try await client.retrieveStudy(studyInstanceUID: "2.25.1", accept: accept, sink: DicomWebMemoryRetrieveSink())
         }
+    }
+
+    /// dcm4chee gives every representation of an instance the same ETag and no `Vary: Accept`, and answers a
+    /// conditional request with 304 whatever the Accept. Revalidating from the URL cache would then hand back the
+    /// representation retrieved earlier instead of the server's refusal of the one now asked for.
+    func test_aSecondAccept_isAskedOfTheServerAndNotAnsweredFromTheURLCache() async throws {
+        server.script = [
+            .respond(200, ["Content-Type": "application/dicom", "ETag": "\"1\"",
+                           "Last-Modified": "Sun, 04 Oct 2026 19:38:00 GMT"], "DICM"),
+            .respond(304, ["ETag": "\"1\""], "")
+        ]
+        let client = try await client()
+        let stored = try DicomWebMediaTypeNegotiator.instanceAccept(transferSyntaxUIDs: ["*"])
+        let unknown = try DicomWebMediaTypeNegotiator.instanceAccept(transferSyntaxUIDs: ["2.25.2810999"])
+        _ = try await client.retrieveInstance(studyInstanceUID: "2.25.1", seriesInstanceUID: "2.25.2",
+                                              sopInstanceUID: "2.25.3", accept: stored,
+                                              sink: DicomWebMemoryRetrieveSink())
+        do {
+            let sink = DicomWebMemoryRetrieveSink()
+            _ = try await client.retrieveInstance(studyInstanceUID: "2.25.1", seriesInstanceUID: "2.25.2",
+                                                  sopInstanceUID: "2.25.3", accept: unknown, sink: sink)
+            XCTFail("the representation retrieved first was returned for another Accept: \(await sink.result())")
+        } catch let error as DicomWebError {
+            XCTAssertEqual(error.statusCode, 304)
+        }
+        XCTAssertEqual(server.requestCount, 2)
+        XCTAssertFalse(server.requestHeads.last?.lowercased().contains("if-none-match") ?? true)
+        XCTAssertFalse(server.requestHeads.last?.lowercased().contains("if-modified-since") ?? true)
     }
 }

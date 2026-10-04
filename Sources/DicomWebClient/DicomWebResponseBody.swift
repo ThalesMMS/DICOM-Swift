@@ -168,6 +168,13 @@ final class DicomWebResponseBuffer: NSObject, URLSessionDataDelegate, @unchecked
         if failed { dataTask.cancel() }
     }
 
+    /// Responses are never served from the cache (see the transport's request), and DICOM bodies are not written to
+    /// it either.
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, willCacheResponse proposedResponse: CachedURLResponse,
+                    completionHandler: @escaping @Sendable (CachedURLResponse?) -> Void) {
+        completionHandler(nil)
+    }
+
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         lock.withLock {
             // A cancelled task has no reader left for the queued blocks; any other failure is reported after them.

@@ -70,7 +70,11 @@ extension URLSessionDicomWebHTTPTransport: DicomWebStreamedBodyTransport {
         guard request.connectAddress == nil else { throw DicomWebClientError.unsupportedConnectAddress }
         let policy = request.originPolicy ?? .init(configuredURL: request.url)
         try policy.validate(request.url)
-        var urlRequest = URLRequest(url: request.url, timeoutInterval: request.timeout)
+        // Every request goes to the server. Archives such as dcm4chee give all representations of a resource one
+        // ETag and no `Vary: Accept`, so a cached or revalidated answer can be another representation than the one
+        // asked for.
+        var urlRequest = URLRequest(url: request.url, cachePolicy: .reloadIgnoringLocalCacheData,
+                                    timeoutInterval: request.timeout)
         urlRequest.httpMethod = request.method.rawValue
         urlRequest.httpShouldHandleCookies = policy.forwardsCredentials(to: request.url)
         urlRequest.httpBody = request.body
