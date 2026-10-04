@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   still percent-encoded. dcm4chee read `%2C` as part of a single value and
   found nothing. `DicomWebSearchParameters` now accepts several values for a
   key of any VR, and `dicomtool web qido --key` splits values on commas.
+- A retrieve with a `DicomWebAcceptList` also moves to the next range after a
+  500, once per retrieve and only when the refused first range names a
+  transfer syntax. Orthanc and dcm4chee answer 500, not 406, to a syntax they
+  cannot convert to. The default `fallbackStatuses` is now `[406, 500]`.
 
 ---
 

@@ -117,7 +117,7 @@ extension DicomWebMediaTypeNegotiator {
     /// when the server cannot convert. Implicit VR Little Endian throws `DicomWebImplicitVRAcceptError`; a value that
     /// is not a UID, or an empty list, throws `DicomWebError` `.badRequest`.
     public static func instanceAccept(transferSyntaxUIDs: [String],
-                                      fallbackStatuses: Set<Int> = [406]) throws -> DicomWebAcceptList {
+                                      fallbackStatuses: Set<Int> = [406, 500]) throws -> DicomWebAcceptList {
         try DicomWebAcceptList(transferSyntaxUIDs.map { uid in
             guard uid.trimmingCharacters(in: .whitespaces) != DicomTransferSyntax.implicitVRLittleEndian.rawValue else {
                 throw DicomWebImplicitVRAcceptError()

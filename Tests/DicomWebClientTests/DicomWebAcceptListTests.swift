@@ -19,7 +19,7 @@ final class DicomWebAcceptListTests: XCTestCase {
         XCTAssertEqual(accept.headerValue(droppingFirst: 1),
                        "\(Self.dicom); transfer-syntax=1.2.840.10008.1.2.1, \(Self.dicom); transfer-syntax=*; q=0.9")
         XCTAssertEqual(accept.headerValue(droppingFirst: 2), "\(Self.dicom); transfer-syntax=*")
-        XCTAssertEqual(accept.fallbackStatuses, [406])
+        XCTAssertEqual(accept.fallbackStatuses, [406, 500])
     }
 
     func test_acceptList_replacesGivenQAndKeepsQDecreasingUpToTheLimit() throws {

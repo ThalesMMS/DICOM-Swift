@@ -722,9 +722,11 @@ public struct DicomWebClient: Sendable {
     }
 
     /// The response to the first Accept of `accept` the server does not refuse with a fallback status. Only refused
-    /// requests move to the next Accept: nothing has reached the sink yet.
+    /// requests move to the next Accept: nothing has reached the sink yet. A 500 moves on once per retrieve, and only
+    /// from a first range that names a transfer syntax (`DicomWebAcceptList`).
     private func streamRequest(url: URL, accept: DicomWebAcceptList) async throws -> DicomWebHTTPStreamedResponse {
         var attempted: [String] = []
+        var movedOnAfterServerError = false
         while true {
             let header = accept.headerValue(droppingFirst: attempted.count)
             attempted.append(header)
@@ -733,6 +735,15 @@ public struct DicomWebClient: Sendable {
                     try await streamRequest(.get, url: url, headers: ["Accept": header])
                 }
             } catch let error as DicomWebError where accept.fallbackStatuses.contains(error.statusCode) {
+                if error.statusCode == 500 {
+                    let syntax = accept.ranges[attempted.count - 1].parameters["transfer-syntax"]
+                    guard !movedOnAfterServerError, let syntax, syntax != "*" else {
+                        var error = error
+                        error.attemptedAccepts = attempted
+                        throw error
+                    }
+                    movedOnAfterServerError = true
+                }
                 guard attempted.count < accept.ranges.count else {
                     var error = error
                     error.attemptedAccepts = attempted

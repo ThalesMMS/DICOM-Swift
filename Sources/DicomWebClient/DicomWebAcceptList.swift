@@ -4,20 +4,26 @@ import Foundation
 ///
 /// `headerValue` sends every range, the first without `q` (1) and each next one with a lower `q`. Some servers read
 /// only the first range, or refuse it instead of moving to the next. So when a retrieve is answered with one of
-/// `fallbackStatuses` (by default 406), the client asks again without the first range, then without the second, until
-/// the list ends; the error of the last attempt keeps every Accept sent in `DicomWebError.attemptedAccepts`. An empty
-/// `fallbackStatuses` sends the list once. A body already handed to the sink is never asked for again.
+/// `fallbackStatuses` (by default 406 and 500), the client asks again without the first range, then without the
+/// second, until the list ends; the error of the last attempt keeps every Accept sent in
+/// `DicomWebError.attemptedAccepts`. An empty `fallbackStatuses` sends the list once. A body already handed to the
+/// sink is never asked for again.
+///
+/// Orthanc and dcm4chee answer 500, not 406, to a transfer syntax they cannot convert to, and Orthanc reads only the
+/// first range. A 500 is also an ordinary server failure, so it moves on at most once per retrieve, and only when the
+/// refused first range names a transfer syntax: after `transfer-syntax=*`, a range without one, or a second 500, the
+/// retrieve ends with that error.
 public struct DicomWebAcceptList: Equatable, Sendable {
     /// The most ranges a list holds: `q` has three decimals, so 1000 ranges are the most that keep it decreasing.
     public static let maximumRangeCount = 1000
 
     public let ranges: [DicomWebMediaType]
-    /// Statuses after which a retrieve asks again with the ranges that follow.
+    /// Statuses after which a retrieve asks again with the ranges that follow; 500 under the limits above.
     public var fallbackStatuses: Set<Int>
 
     /// Throws `DicomWebError` `.badRequest` for an empty list or one longer than `maximumRangeCount`. A `q` given
     /// in a range is replaced by the one its place in the list gives.
-    public init(_ ranges: [DicomWebMediaType], fallbackStatuses: Set<Int> = [406]) throws {
+    public init(_ ranges: [DicomWebMediaType], fallbackStatuses: Set<Int> = [406, 500]) throws {
         guard !ranges.isEmpty, ranges.count <= Self.maximumRangeCount else { throw DicomWebError(kind: .badRequest) }
         self.ranges = ranges.map { DicomWebMediaType(type: $0.type, parameters: $0.parameters.filter { $0.key != "q" }) }
         self.fallbackStatuses = fallbackStatuses
