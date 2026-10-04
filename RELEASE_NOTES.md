@@ -1,3 +1,76 @@
+# 2.0.0-rc.3
+
+This source-package release candidate adds DICOMweb client, server and
+authentication work on top of 2.0.0-rc.2. It does not represent a stable
+application release. Swift tools 6.2, Swift 6 language mode and iOS, visionOS
+or macOS 26.0+ are unchanged. One product is added, `DicomWebOIDC`; the other
+announced products are unchanged.
+
+## DICOMweb client changes
+
+- STOW-RS through a `DicomWebStreamedBodyTransport`, as the built-in transport
+  is, reads each instance straight from its file, with no copy of the batch on
+  disk. Any other transport still receives the body staged in a temporary
+  file. A 4xx answer that carries a DICOM JSON or XML store response, such as a
+  400 with a Failed SOP Sequence, is returned as a result with each instance's
+  Failure Reason, like a 409; 401, 403, 404 and 429 still throw.
+- `storeFiles` results keep the answer's `Warning` header and, in the new
+  `error` property, the `DicomWebError` that failed the file's batch or stopped
+  the store before it, with what the server said about it.
+- A `DicomWebAuthorizationProvider` set as the client's `authorizationProvider`
+  supplies credential headers for each request and renews them once after a
+  401, which repeats the request once. The new `DicomWebOIDC` product signs a
+  public client in with OpenID Connect (discovery, authorization code with PKCE
+  S256, ID-token verification, shared refresh), without UI or a token store of
+  its own.
+- `DicomWebClientConfiguration.serverTrust` can add trust anchors or a leaf
+  certificate hash, keeping the host name and date checks, and `clientIdentity`
+  answers a server that requires a client certificate.
+- Rendered and thumbnail retrieves of studies, series, instances and frames
+  take window, viewport and quality options (`DicomWebRenderedOptions`). Their
+  default `Accept` now asks for one image type, because some servers refuse a
+  list. A multi-frame rendered request refused with 400, 406 or 415 is asked
+  again one frame at a time.
+- Study, series and instance metadata are decoded as their DICOM JSON arrives
+  (`DicomJSONStreamDecoder`), and invalid elements are read tolerantly within
+  the same limits.
+- Multipart parts inherit the outer `type` parameter, and delimiter candidates
+  are checked in one pass over the raw bytes.
+
+## Behaviour changes
+
+`swift package diagnose-api-breaking-changes 2.0.0-rc.2 --products
+DicomWebClient` reports no breaking change. The default rendered and thumbnail
+`Accept` headers and the store results of 4xx answers changed as described
+above.
+
+The DICOMweb server in `DicomCore` answers 405 to a method a resource does not
+serve and 204 to any search without matches. It matches any dictionary keyword
+or tag, reports the parameters it ignored with Warning 299, and can build its
+URLs from a configured public base URL or forwarded headers.
+
+Use the exact `2.0.0-rc.3` version and the consumer's own resolved lockfile.
+
+## Executed validation
+
+The release tree was exported from the canonical package and compared with the
+public mirror. Sources, tests and the manifest were identical, apart from the
+declared documentation adaptations. The export tool's `verify` operation matched
+all recorded distribution files. Apple Swift 6.4, the macOS 27.0 SDK and an
+arm64 host were used:
+
+- The existing public-API consumer passed in Debug and Release against the
+  exported tree: QIDO, bounded wire bytes, retrieve to a file sink, STOW files
+  and batches. Its build outputs and linked frameworks again excluded Core,
+  codecs, DIMSE, listener, ZIP, SwiftUI, Metal and Network framework
+  dependencies.
+- Twelve client XCTest suites, the ones changed since rc.2 plus media type,
+  and the `DicomWebOIDC` and DICOM JSON stream decoder suites, executed 113
+  cases. All 113 passed, with no failures and no skips.
+
+The full suite, the `release` gate and optional runtimes were not run for this
+candidate. The limits stated for 2.0.0-rc.1 still apply.
+
 # 2.0.0-rc.2
 
 This source-package release candidate adds DICOMweb client robustness work on
