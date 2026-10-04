@@ -10,6 +10,53 @@ struct DicomWebRenderedFrameService {
         accept: String?,
         requestURL: URL
     ) throws -> DicomWebHTTPResponse {
+        let (decoder, descriptor) = try decode(instance)
+        guard let last = frames.numbers.last, last <= descriptor.numberOfFrames else {
+            throw DicomWebFrameRouteError.frameNotFound
+        }
+
+        let selection = try DicomWebMediaTypeNegotiator.renderedSelection(
+            accept: accept,
+            representationCount: frames.numbers.count
+        )
+        let parameters = try RenderParameters(url: requestURL, mediaType: selection.mediaType)
+        let parts = try render(
+            decoder: decoder,
+            descriptor: descriptor,
+            frameNumbers: frames.numbers,
+            selection: selection,
+            parameters: parameters
+        ) { contentLocation(requestURL: requestURL, frameNumber: $0) }
+        return try response(parts: parts, selection: selection)
+    }
+
+    /// Renders the first frame of each instance, in order, as a rendered study or series answers. Further frames of
+    /// a multi-frame instance are left out.
+    func retrieve(
+        instances: [DicomWebStoredInstance],
+        accept: String?,
+        requestURL: URL
+    ) throws -> DicomWebHTTPResponse {
+        let decoded = try instances.map(decode)
+        let selection = try DicomWebMediaTypeNegotiator.renderedSelection(
+            accept: accept,
+            representationCount: instances.count
+        )
+        let parameters = try RenderParameters(url: requestURL, mediaType: selection.mediaType)
+        var parts: [DicomWebMultipartResponseBuilder.Part] = []
+        for (instance, (decoder, descriptor)) in zip(instances, decoded) {
+            parts += try render(
+                decoder: decoder,
+                descriptor: descriptor,
+                frameNumbers: [1],
+                selection: selection,
+                parameters: parameters
+            ) { _ in instanceLocation(requestURL: requestURL, instance: instance) }
+        }
+        return try response(parts: parts, selection: selection)
+    }
+
+    private func decode(_ instance: DicomWebStoredInstance) throws -> (DCMDecoder, DicomPixelDataDescriptor) {
         let decoder: DCMDecoder
         do {
             decoder = try DCMDecoder(data: instance.part10Data)
@@ -21,17 +68,19 @@ struct DicomWebRenderedFrameService {
         guard let descriptor = decoder.pixelDataDescriptor else {
             throw DicomWebFrameRouteError.mediaTypeNotAcceptable
         }
-        guard let last = frames.numbers.last, last <= descriptor.numberOfFrames else {
-            throw DicomWebFrameRouteError.frameNotFound
-        }
+        return (decoder, descriptor)
+    }
 
-        let selection = try DicomWebMediaTypeNegotiator.renderedSelection(
-            accept: accept,
-            representationCount: frames.numbers.count
-        )
-        let parameters = try RenderParameters(url: requestURL, mediaType: selection.mediaType)
+    private func render(
+        decoder: DCMDecoder,
+        descriptor: DicomPixelDataDescriptor,
+        frameNumbers: [Int],
+        selection: DicomWebMediaTypeNegotiator.Selection,
+        parameters: RenderParameters,
+        location: (Int) -> URL
+    ) throws -> [DicomWebMultipartResponseBuilder.Part] {
         let outputSize = try outputSize(parameters: parameters, descriptor: descriptor)
-        let parts = try frames.numbers.map { frameNumber -> DicomWebMultipartResponseBuilder.Part in
+        return try frameNumbers.map { frameNumber -> DicomWebMultipartResponseBuilder.Part in
             let bitmap: DicomRenderedBitmap
             do {
                 bitmap = try DicomImagePreprocessor().render(
@@ -54,11 +103,16 @@ struct DicomWebRenderedFrameService {
             return DicomWebMultipartResponseBuilder.Part(
                 contentType: selection.mediaType,
                 transferSyntaxUID: nil,
-                contentLocation: contentLocation(requestURL: requestURL, frameNumber: frameNumber),
+                contentLocation: location(frameNumber),
                 body: data
             )
         }
+    }
 
+    private func response(
+        parts: [DicomWebMultipartResponseBuilder.Part],
+        selection: DicomWebMediaTypeNegotiator.Selection
+    ) throws -> DicomWebHTTPResponse {
         if selection.isMultipart {
             let multipart = try DicomWebMultipartResponseBuilder.build(
                 parts: parts,
@@ -117,6 +171,19 @@ struct DicomWebRenderedFrameService {
         return components.url ?? requestURL
     }
 
+    /// The rendered-instance URL of `instance` under the same service root and query as `requestURL`.
+    private func instanceLocation(requestURL: URL, instance: DicomWebStoredInstance) -> URL {
+        guard var components = URLComponents(url: requestURL, resolvingAgainstBaseURL: false) else {
+            return requestURL
+        }
+        let pathComponents = components.percentEncodedPath.split(separator: "/").map(String.init)
+        guard let studies = pathComponents.lastIndex(of: "studies") else { return requestURL }
+        let resource = [instance.studyInstanceUID, "series", instance.seriesInstanceUID,
+                        "instances", instance.sopInstanceUID, "rendered"]
+        components.percentEncodedPath = "/" + (pathComponents[...studies] + resource).joined(separator: "/")
+        return components.url ?? requestURL
+    }
+
     private struct RenderParameters {
         let quality: Double
         let viewport: DicomImageSize?
@@ -160,8 +227,9 @@ struct DicomWebRenderedFrameService {
             }
 
             if let rawWindow = values["window"] {
+                // The third field names the VOI LUT function; only `linear` is rendered.
                 let fields = rawWindow.split(separator: ",", omittingEmptySubsequences: false)
-                guard fields.count == 2,
+                guard fields.count == 2 || (fields.count == 3 && fields[2] == "linear"),
                       let center = Double(fields[0]), center.isFinite,
                       let width = Double(fields[1]), width.isFinite, width > 0 else {
                     throw DicomWebFrameRouteError.invalidRenderParameter

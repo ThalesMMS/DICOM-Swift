@@ -71,27 +71,53 @@ extension DicomWebServer {
             return streamed(response)
         }
         if suffix == ["thumbnail"] || suffix == ["rendered"] || suffix.first == "frames" {
-            let stored: DicomWebStoredInstance
-            if let series, let instance { stored = try await storage.frames(study: study, series: series, instance: instance) }
-            else {
-                guard suffix == ["thumbnail"], let set = try await storage.metadata(study: study, series: series, instance: nil).first,
-                      let r = set.string(for: .seriesInstanceUID), let i = set.string(for: .sopInstanceUID) else { return streamed(notFound()) }
-                stored = try await storage.frames(study: study, series: r, instance: i)
-            }
-            _ = try await DicomRequestAuthorization.current?.check(.readBytes,
-                .instance(study: stored.studyInstanceUID, series: stored.seriesInstanceUID, instance: stored.sopInstanceUID))
             let isRaw = suffix.count == 2 && suffix[0] == "frames"
             guard isRaw || suffix == ["thumbnail"] || suffix == ["rendered"]
-                || (suffix.count == 3 && suffix[0] == "frames" && suffix[2] == "rendered") else { return streamed(notFound()) }
-            let handler = DicomWebFrameRouteHandler(configuration: configuration, instance: stored)
+                || (suffix.count == 3 && suffix[0] == "frames" && ["rendered", "thumbnail"].contains(suffix[2])) else {
+                return streamed(notFound())
+            }
             // Frame parts echo the requested URL as Content-Location, so it has to be the public one.
             var request = request
             request.url = publicURL(request)
-            let list = suffix.first == "frames" ? suffix[1] : "1"
-            var response = isRaw ? handler.retrieveRaw(studyInstanceUID: study, seriesInstanceUID: stored.seriesInstanceUID,
-                sopInstanceUID: stored.sopInstanceUID, frameList: list, request: request)
-                : handler.retrieveRendered(studyInstanceUID: study, seriesInstanceUID: stored.seriesInstanceUID,
+            var response: DicomWebHTTPResponse
+            if instance == nil, suffix == ["rendered"] {
+                let sets = try await storage.metadata(study: study, series: series, instance: nil)
+                guard !sets.isEmpty else { return streamed(notFound()) }
+                guard sets.count <= configuration.maximumFramesPerRequest else {
+                    return streamed(error(413, "The rendered resource has more instances than one response allows."))
+                }
+                var instances: [DicomWebStoredInstance] = []
+                for set in sets {
+                    guard let r = set.string(for: .seriesInstanceUID), let i = set.string(for: .sopInstanceUID) else {
+                        throw DicomWebServerFailure(500, "Metadata lacks identity.")
+                    }
+                    let stored = try await storage.frames(study: study, series: r, instance: i)
+                    _ = try await DicomRequestAuthorization.current?.check(.readBytes,
+                        .instance(study: stored.studyInstanceUID, series: stored.seriesInstanceUID, instance: stored.sopInstanceUID))
+                    instances.append(stored)
+                }
+                response = DicomWebFrameRouteHandler(configuration: configuration, instance: instances[0])
+                    .retrieveRendered(instances: instances, request: request)
+            } else {
+                let stored: DicomWebStoredInstance
+                if let series, let instance { stored = try await storage.frames(study: study, series: series, instance: instance) }
+                else {
+                    guard suffix == ["thumbnail"],
+                          let set = try await storage.metadata(study: study, series: series, instance: nil).first,
+                          let r = set.string(for: .seriesInstanceUID), let i = set.string(for: .sopInstanceUID) else {
+                        return streamed(notFound())
+                    }
+                    stored = try await storage.frames(study: study, series: r, instance: i)
+                }
+                _ = try await DicomRequestAuthorization.current?.check(.readBytes,
+                    .instance(study: stored.studyInstanceUID, series: stored.seriesInstanceUID, instance: stored.sopInstanceUID))
+                let handler = DicomWebFrameRouteHandler(configuration: configuration, instance: stored)
+                let list = suffix.first == "frames" ? suffix[1] : "1"
+                response = isRaw ? handler.retrieveRaw(studyInstanceUID: study, seriesInstanceUID: stored.seriesInstanceUID,
                     sopInstanceUID: stored.sopInstanceUID, frameList: list, request: request)
+                    : handler.retrieveRendered(studyInstanceUID: study, seriesInstanceUID: stored.seriesInstanceUID,
+                        sopInstanceUID: stored.sopInstanceUID, frameList: list, request: request)
+            }
             if let type = response.headers["Content-Type"], let media = try? DicomWebMediaType(type),
                response.statusCode == 200, !configuration.supportedMediaTypes.contains(media.parameters["type"] ?? media.type) {
                 response = error(406, "Media type disabled by configuration.")

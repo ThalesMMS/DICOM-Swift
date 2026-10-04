@@ -614,6 +614,36 @@ public struct DicomWebClient: Sendable {
                                     accept: DicomWebMediaTypeNegotiator.acceptHeader(for: .rendered))
     }
 
+    /// Retrieves the rendered study, series, instance or frame list with `options` (PS3.18 10.4.1.1). The answer is
+    /// one image, or a multipart with one image per part.
+    public func retrieveRendered(studyInstanceUID: String, seriesInstanceUID: String? = nil, sopInstanceUID: String? = nil,
+                                 frames: DicomWebFrameList? = nil,
+                                 options: DicomWebRenderedOptions) async throws -> DicomWebRetrievedObject {
+        try await retrieveImage("rendered", studyInstanceUID: studyInstanceUID, seriesInstanceUID: seriesInstanceUID,
+                                sopInstanceUID: sopInstanceUID, frames: frames, options: options)
+    }
+
+    /// Retrieves the thumbnail of a study, series, instance or frame list with `options` (PS3.18 10.4.1.2).
+    public func retrieveThumbnail(studyInstanceUID: String, seriesInstanceUID: String? = nil, sopInstanceUID: String? = nil,
+                                  frames: DicomWebFrameList? = nil,
+                                  options: DicomWebRenderedOptions) async throws -> DicomWebRetrievedObject {
+        try await retrieveImage("thumbnail", studyInstanceUID: studyInstanceUID, seriesInstanceUID: seriesInstanceUID,
+                                sopInstanceUID: sopInstanceUID, frames: frames, options: options)
+    }
+
+    private func retrieveImage(_ suffix: String, studyInstanceUID: String, seriesInstanceUID: String?,
+                               sopInstanceUID: String?, frames: DicomWebFrameList?,
+                               options: DicomWebRenderedOptions) async throws -> DicomWebRetrievedObject {
+        guard options.isValid, sopInstanceUID == nil || seriesInstanceUID != nil,
+              frames == nil || sopInstanceUID != nil else { throw DicomWebError(kind: .badRequest) }
+        var path = ["studies", studyInstanceUID]
+        if let seriesInstanceUID { path += ["series", seriesInstanceUID] }
+        if let sopInstanceUID { path += ["instances", sopInstanceUID] }
+        if let frames { path += ["frames", frames.pathComponent] }
+        return try await retrieveBuffered(url: queryURL(path: path + [suffix], query: options.queryItems),
+                                          accept: options.accept)
+    }
+
     private func retrieveBuffered(url: URL, accept: String, range: ClosedRange<Int>? = nil) async throws -> DicomWebRetrievedObject {
         var headers = ["Accept": accept]
         if let range { headers["Range"] = "bytes=\(range.lowerBound)-\(range.upperBound)" }

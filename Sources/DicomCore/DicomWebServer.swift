@@ -522,7 +522,7 @@ public final class DicomWebServer: DicomWebHTTPTransport, Sendable {
         case ["instances"]: return index < 6 ? "GET" : nil
         default:
             let frames = index == 6 && suffix.count >= 2 && suffix[0] == "frames"
-                && (suffix.count == 2 || (suffix.count == 3 && suffix[2] == "rendered"))
+                && (suffix.count == 2 || (suffix.count == 3 && ["rendered", "thumbnail"].contains(suffix[2])))
             return frames ? "GET" : nil
         }
     }

@@ -113,7 +113,9 @@ Little Endian in one multipart part with requested frames concatenated in ascend
 order. JPEG, JPEG-LS, JPEG 2000, HTJ2K, JPEG XL, and RLE Lossless encapsulated
 representations are passed through without relabeling or transcoding, one part per
 frame. Native rendered retrieval accepts JPEG, PNG, or GIF and supports JPEG
-`quality`, a width/height `viewport`, and a center/width `window`. One-bit native
+`quality`, a width/height `viewport`, and a center/width `window` with an optional
+`linear` function. A rendered study or series returns the first frame of each
+instance, and thumbnails are served for studies, series, instances and frames. One-bit native
 repacking, compressed or video rendering, viewport cropping, and annotation burn-in
 are explicit exclusions. ``DicomWebServerConfiguration`` bounds frame-list length,
 frames per request, raw response bytes, rendered pixels, and rendered response bytes.

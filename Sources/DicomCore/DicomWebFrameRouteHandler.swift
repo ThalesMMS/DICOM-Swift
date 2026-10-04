@@ -53,6 +53,22 @@ struct DicomWebFrameRouteHandler {
         }
     }
 
+    /// Renders the first frame of each of `instances`, as a rendered study or series answers.
+    func retrieveRendered(instances: [DicomWebStoredInstance], request: DicomWebHTTPRequest) -> DicomWebHTTPResponse {
+        do {
+            return try DicomWebRenderedFrameService(
+                maximumPixels: configuration.maximumRenderedPixels,
+                maximumResponseBytes: configuration.maximumRenderedResponseBytes
+            ).retrieve(
+                instances: instances,
+                accept: request.headers.dicomWebHeaderValue("Accept"),
+                requestURL: request.url
+            )
+        } catch {
+            return errorResponse(error)
+        }
+    }
+
     private func retrieve(
         studyInstanceUID: String,
         seriesInstanceUID: String,
