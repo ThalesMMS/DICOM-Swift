@@ -264,7 +264,9 @@ private actor DicomWebInstanceResponse {
         self.parts = parts; self.base = base; self.storage = storage; self.transcoder = transcoder
         let boundary = "dicomweb-\(UUID().uuidString)"
         contentType = "multipart/related; type=\"application/dicom\"; boundary=\(boundary)"
-        writer = try .init(boundary: boundary)
+        // The body is streamed one part at a time and never held whole, so the total is not capped: a cap reached
+        // here would end a 200 already under way without its closing boundary.
+        writer = try .init(boundary: boundary, maximumBytes: .max)
     }
     func next() async throws -> Data? {
         try Task.checkCancellation()
