@@ -30,15 +30,19 @@ public struct DicomWebStoreFileResult: Equatable, Sendable {
     /// Warning or Failure Reason (PS3.18 Annex I), such as 0xB000, 0xA700 or 0xC000.
     public let dicomStatus: UInt16?
     public let httpStatus: Int?
+    /// The URL loading error that failed the batch, when there was one. It tells a request that never reached the
+    /// server (certificate refused, host unreachable) from one that ended after the upload began.
+    public let transportErrorCode: URLError.Code?
 
     public init(url: URL, sopInstanceUID: String?, state: State, reason: String? = nil,
-                dicomStatus: UInt16? = nil, httpStatus: Int? = nil) {
+                dicomStatus: UInt16? = nil, httpStatus: Int? = nil, transportErrorCode: URLError.Code? = nil) {
         self.url = url
         self.sopInstanceUID = sopInstanceUID
         self.state = state
         self.reason = reason
         self.dicomStatus = dicomStatus
         self.httpStatus = httpStatus
+        self.transportErrorCode = transportErrorCode
     }
 
     /// The outcome of instance `sopInstanceUID` in a STOW-RS answer (PS3.18 Annex I). An instance the answer does
@@ -118,7 +122,8 @@ extension DicomWebClient {
                 let httpStatus = (error as? DicomWebError)?.statusCode
                 for item in batch {
                     results[item.index] = .init(url: files[item.index], sopInstanceUID: item.uid, state: .failed,
-                                                reason: Self.describe(error), httpStatus: httpStatus)
+                                                reason: Self.describe(error), httpStatus: httpStatus,
+                                                transportErrorCode: (error as? URLError)?.code)
                 }
                 if Self.isFatal(error) { stop = (Self.describe(error), httpStatus) }
             }

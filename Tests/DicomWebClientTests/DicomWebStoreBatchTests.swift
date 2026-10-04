@@ -47,6 +47,22 @@ final class DicomWebStoreBatchTests: XCTestCase {
         XCTAssertEqual(progress.last?.completedFiles, 5)
     }
 
+    func test_aBatchThatNeverReachedTheServerKeepsItsURLErrorCode() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("stow-unreachable-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("0.dcm")
+        try Self.part10("2.25.2892901").write(to: file)
+        // Nothing listens on port 1 of the loopback address.
+        let client = DicomWebClient(configuration: .init(baseURL: URL(string: "http://127.0.0.1:1/dicom-web")!, timeout: 5))
+
+        let results = await client.storeFiles([file])
+
+        XCTAssertEqual(results.map(\.state), [.failed])
+        XCTAssertNil(results[0].httpStatus)
+        XCTAssertEqual(results[0].transportErrorCode, .cannotConnectToHost)
+    }
+
     func test_batchesSplitByCountAndBytes() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("stow-2892-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
