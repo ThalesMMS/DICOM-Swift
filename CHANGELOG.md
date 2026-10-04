@@ -92,6 +92,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.1] - 2026-10-04
+
+Patch release of the `DicomWebClient` product; the executed validation and
+the known limits are in RELEASE_NOTES.md.
+
+### Fixed
+
+- `URLSessionDicomWebHTTPTransport` sends every request to the server, and
+  DICOMweb responses are no longer stored in the URL cache. dcm4chee gives all
+  representations of an instance one `ETag` without `Vary: Accept`, so a cached
+  answer could be another representation than the one asked for.
+
+### Changed
+
+- The interop compose file uses existing dcm4chee 5.35.2 tags, and
+  `run_interop_smoke.sh` falls back to the standalone `docker-compose`.
+
+---
+
 ## [2.0.0] - 2026-10-04
 
 First stable 2.x release. It consolidates 2.0.0-rc.1 to 2.0.0-rc.3; the

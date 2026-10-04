@@ -1,3 +1,67 @@
+# 2.0.1
+
+This patch release of the `DicomWebClient` product changes how the built-in
+URLSession transport uses the URL cache, found while running the interop smoke
+against dcm4chee. Swift tools 6.2, Swift 6 language mode, iOS, visionOS or
+macOS 26.0+ and the announced products are those of 2.0.0, and no public API
+changed. A `from: "2.0.0"` requirement selects 2.0.1.
+
+## Fixed
+
+- `URLSessionDicomWebHTTPTransport` sends every request to the server, and the
+  response reader that it and other transports share through
+  `URLSession.dicomWebResponse(for:delegate:)` stores no response in the URL
+  cache. dcm4chee 5.35 gives all representations of an instance one `ETag`,
+  sends no `Vary: Accept` and answers a conditional request with 304 whatever
+  the Accept. With a session that had a URL cache, as `URLSession.shared` has,
+  a retrieve asking for another transfer syntax could be answered with the
+  representation retrieved earlier without reaching the server, and DICOM
+  response bodies could be written to that cache.
+
+## Interoperability
+
+- The interop compose file now uses dcm4chee tags that exist,
+  `slapd-dcm4chee:2.6.14-35.2`, `postgres-dcm4chee:18.3-35` and
+  `dcm4chee-arc-psql:5.35.2`, points the archive at its LDAP and PostgreSQL
+  services and keeps PostgreSQL 18's data where the dcm4chee init scripts
+  expect it. `run_interop_smoke.sh` falls back to the standalone
+  `docker-compose` and waits for the archive's AE list with a deadline.
+- dcm4chee refuses an Accept it cannot transcode with 500, not 406. A caller
+  that wants the as-stored fallback from such a server adds 500 to the
+  `fallbackStatuses` of its `DicomWebAcceptList`, as the smoke does for
+  dcm4chee. It refuses an instance of another study with 409 and Failure
+  Reason 0xC409.
+
+## Executed validation
+
+Apple Swift 6.4, the macOS 27.0 SDK and an arm64 host were used. The release
+tree was exported from the canonical package; it matched the public mirror
+apart from the refreshed `DistributionContents.json`, and the export tool's
+`verify` operation matched all recorded distribution files.
+
+- `Scripts/interop/run_interop_smoke.sh`, with Docker through Colima, against
+  dcm4chee 5.35.2 and Orthanc 1.13.0: all 11 `DicomInteropSmokeTests` passed,
+  none skipped, in two consecutive runs, with the dcm4chee smoke study
+  rejected (`113039^DCM`) after each run.
+- `DicomWebIndependentClientTests` (dicomweb-client 0.61.2) and
+  `DicomWebUPSRSIndependentTests` (`requests`, `websockets` 17.1) passed with
+  `DICOM_REQUIRE_PYNETDICOM=1`, none skipped.
+- The `DicomWebClientTests` suites that run through the URLSession transport,
+  including the new URL-cache case, and `DicomInteropScriptTests` executed 89
+  cases: all passed, none skipped.
+- The existing public-API consumer passed in Debug and Release against the
+  exported tree, and its build outputs again excluded Core, codecs, DIMSE, the
+  listener, ZIP, SwiftUI, Metal and Network framework dependencies.
+- `swift package diagnose-api-breaking-changes 2.0.0 --products
+  DicomWebClient` reported no breaking change.
+
+## Known limits
+
+- dcm4chee was run with the unsecured `dcm4chee-arc-psql` image and its
+  default configuration; Keycloak-secured archives were not exercised.
+- The full suite, the `release` gate and optional runtimes were not run for
+  this release. The other limits of 2.0.0 still apply.
+
 # 2.0.0
 
 This is the first stable 2.x source-package release. It consolidates
