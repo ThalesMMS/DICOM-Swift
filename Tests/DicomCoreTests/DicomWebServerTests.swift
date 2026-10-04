@@ -1085,11 +1085,12 @@ extension DicomWebServerTests {
         }
         let limited = try await server.send(.init(method: .get, url: Self.serviceURL.appendingPathComponent("instances")))
         XCTAssertTrue(limited.headers["Warning"]?.contains("299") == true)
-        for query in ["PatientName=TEST*", "StudyDate=20200101-20300101", "0020000D=2.25.1", "fuzzymatching=true", "includefield=StudyDescription"] {
+        for query in ["PatientName=TEST*", "StudyDate=20200101-20300101", "0020000D=2.25.1", "fuzzymatching=true", "includefield=StudyDescription",
+                      "includefield=Unknown"] {
             let response = try await server.send(.init(method: .get, url: URL(string: Self.serviceURL.absoluteString + "/studies?" + query)!))
             XCTAssertEqual(response.statusCode, 200, query)
         }
-        for query in ["limit=-1", "offset=x", "PatientName=A&PatientName=B", "includefield=Unknown", "fuzzymatching=invalid"] {
+        for query in ["limit=-1", "offset=x", "PatientName=A&PatientName=B", "fuzzymatching=invalid"] {
             let response = try await server.send(.init(method: .get, url: URL(string: Self.serviceURL.absoluteString + "/studies?" + query)!))
             XCTAssertEqual(response.statusCode, 400, query)
         }
@@ -1103,8 +1104,8 @@ extension DicomWebServerTests {
             XCTAssertEqual(thumbnail.statusCode, 200)
         }
         let absent = try await server.send(.init(method: .get, url: URL(string: Self.serviceURL.absoluteString + "/studies?PatientName=absent")!))
-        XCTAssertEqual(absent.statusCode, 200)
-        XCTAssertEqual(String(decoding: absent.body, as: UTF8.self), "[]")
+        XCTAssertEqual(absent.statusCode, 204)
+        XCTAssertTrue(absent.body.isEmpty)
     }
 
     func test_streamingSTOW_arbitrarySplitsMixedFailuresAndUnsupportedMedia() async throws {

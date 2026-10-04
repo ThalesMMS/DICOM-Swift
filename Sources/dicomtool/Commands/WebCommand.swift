@@ -340,6 +340,10 @@ struct WebCommand: AsyncParsableCommand {
         @Option var tlsCertificate: String?
         @Option var tlsKey: String?
         @Option var tlsCa: String?
+        @Option(help: "Service root as clients reach it, e.g. https://pacs.example/dicom-web behind a reverse proxy")
+        var publicURL: String?
+        @Flag(help: "Take scheme and host from X-Forwarded-Proto and X-Forwarded-Host set by a trusted proxy")
+        var trustForwardedHeaders = false
 
         func start() async throws -> (DicomWebHTTPListener, URL) {
             guard bearer == nil || basic == nil else { throw ValidationError("Choose bearer or basic authentication") }
@@ -350,6 +354,15 @@ struct WebCommand: AsyncParsableCommand {
                 authentication: bearer != nil || basic != nil, lab: allowInsecureLab)
             let audit = try security.recorder()
             if allowInsecureLab { print("AUDIT exposure=labOptIn: insecure laboratory access explicitly enabled") }
+            var serverConfiguration = DicomWebServerConfiguration()
+            if let publicURL {
+                guard let url = URL(string: publicURL), ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+                      url.host?.isEmpty == false, url.query == nil else {
+                    throw ValidationError("The public URL must be an absolute http or https URL without a query")
+                }
+                serverConfiguration.publicBaseURL = url
+            }
+            serverConfiguration.trustsForwardedHeaders = trustForwardedHeaders
             let storage = try WebDirectoryStorage(directory: URL(fileURLWithPath: directory))
             var authentication: (any DicomWebAuthenticating)?
             if let bearer { authentication = DicomWebBearerAuthentication(token: bearer) }
@@ -367,7 +380,8 @@ struct WebCommand: AsyncParsableCommand {
                     material: .init(certificatePath: tlsCertificate, privateKeyPath: tlsKey, trustStorePath: tlsCa),
                     securityProfile: .bcp195RFC8996)
             }
-            let listener = DicomWebHTTPListener(server: .init(storage: storage, authentication: authentication,
+            let listener = DicomWebHTTPListener(server: .init(configuration: serverConfiguration, storage: storage,
+                authentication: authentication,
                 // Instances stored in a syntax DICOMweb cannot send, or that a client
                 // asks for as Explicit VR Little Endian, go out rewritten or decoded.
                 transcoding: DicomWebServerNativeTranscoding(),

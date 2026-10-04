@@ -16,6 +16,10 @@ struct DicomStandardDictionary {
     let edition: String?
     private let definitions: [Int: DicomDictionaryDefinition]
     private let patterns: [Pattern]
+    /// Keywords of the fixed-tag definitions; repeating-group patterns have no single tag.
+    private let tagsByKeyword: [String: Int]
+
+    func tag(forKeyword keyword: String) -> Int? { tagsByKeyword[keyword] }
 
     func definition(for tag: Int) -> DicomDictionaryDefinition? {
         guard (0...Int(UInt32.max)).contains(tag), (tag >> 16).isMultiple(of: 2) else { return nil }
@@ -36,7 +40,7 @@ struct DicomStandardDictionary {
               archive.schemaVersion == 1, archive.definitions.values.allSatisfy(\.isValid) else {
             DicomLogger.make(subsystem: "com.dicomviewer", category: "DCMDictionary")
                 .warning("Standard VR/VM definitions unavailable or invalid")
-            return .init(edition: nil, definitions: [:], patterns: [])
+            return .init(edition: nil, definitions: [:], patterns: [], tagsByKeyword: [:])
         }
         var definitions: [Int: DicomDictionaryDefinition] = [:]
         var patterns: [Pattern] = []
@@ -50,6 +54,9 @@ struct DicomStandardDictionary {
             }
         }
         patterns.sort { $0.mask.nonzeroBitCount > $1.mask.nonzeroBitCount }
-        return .init(edition: archive.dicomEdition, definitions: definitions, patterns: patterns)
+        var tagsByKeyword: [String: Int] = [:]
+        for (tag, definition) in definitions where !definition.keyword.isEmpty { tagsByKeyword[definition.keyword] = tag }
+        return .init(edition: archive.dicomEdition, definitions: definitions, patterns: patterns,
+                     tagsByKeyword: tagsByKeyword)
     }
 }

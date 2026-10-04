@@ -163,6 +163,11 @@ public final class DCMDictionary: DicomDictionaryProtocol, @unchecked Sendable {
         localDefinitions[tag] ?? DicomStandardDictionary.shared.definition(for: tag)
     }
 
+    /// Returns the tag of a standard data element keyword such as `BodyPartExamined`.
+    package func tag(forKeyword keyword: String) -> Int? {
+        DicomStandardDictionary.shared.tag(forKeyword: keyword)
+    }
+
     // MARK: - DicomDictionaryProtocol Implementation
 
     /// Returns the raw value associated with the supplied key.  The

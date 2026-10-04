@@ -1,30 +1,31 @@
 import Foundation
 
-/// Standard keywords used by Studies searches, plus arbitrary dictionary-backed numeric tags.
+/// QIDO-RS attributes: any standard data element keyword or eight-digit hexadecimal tag from the dictionary.
 enum DicomWebSearchAttributes {
-    static let keywords: [String: Int] = [
-        "PatientName": 0x00100010, "PatientID": 0x00100020, "PatientBirthDate": 0x00100030,
-        "PatientSex": 0x00100040, "StudyDate": 0x00080020, "StudyTime": 0x00080030,
-        "AccessionNumber": 0x00080050, "ModalitiesInStudy": 0x00080061, "Modality": 0x00080060,
-        "ReferringPhysicianName": 0x00080090, "InstitutionName": 0x00080080,
-        "StudyDescription": 0x00081030, "SeriesDescription": 0x0008103E,
-        "StudyInstanceUID": 0x0020000D, "SeriesInstanceUID": 0x0020000E,
-        "SOPInstanceUID": 0x00080018, "SOPClassUID": 0x00080016,
-        "StudyID": 0x00200010, "SeriesNumber": 0x00200011, "InstanceNumber": 0x00200013,
-        "NumberOfStudyRelatedSeries": 0x00201206, "NumberOfStudyRelatedInstances": 0x00201208,
-        "NumberOfSeriesRelatedInstances": 0x00201209, "Rows": 0x00280010, "Columns": 0x00280011
-    ]
+    /// Query parameters with a meaning of their own; every other name is an attribute.
+    static let reservedNames: Set<String> = ["limit", "offset", "includefield", "fuzzymatching"]
+    /// Value representations that attribute value matching cannot compare.
+    private static let unmatchable: Set<DicomVR> = [.SQ, .OB, .OD, .OF, .OL, .OV, .OW, .UN]
+
     static func tag(_ attribute: String) -> Int? {
-        keywords[attribute] ?? (attribute.count == 8 ? Int(attribute, radix: 16) : nil)
+        if attribute.count == 8, attribute.allSatisfy(\.isHexDigit) { return Int(attribute, radix: 16) }
+        return DCMDictionary().tag(forKeyword: attribute)
     }
     static func vr(_ attribute: String) -> DicomVR? {
         guard let tag = tag(attribute), let code = DCMDictionary().vrCode(forTag: tag) else { return nil }
         return DicomVR(code: code)
     }
+    /// Whether the attribute can be a matching key; sequences and binary values cannot.
+    static func isMatchable(_ attribute: String) -> Bool {
+        vr(attribute).map { !unmatchable.contains($0) } ?? false
+    }
 }
 
 extension DicomWebServer {
-    func searchParameters(_ request: DicomWebHTTPRequest, path: [String]) throws -> DicomWebSearchParameters? {
+    /// Parses a QIDO-RS request. Parameters naming no attribute this server can match are left out of the
+    /// search and returned as `ignored`, so the response can report them with Warning 299, as PS3.18 asks.
+    func searchParameters(_ request: DicomWebHTTPRequest,
+                          path: [String]) throws -> (parameters: DicomWebSearchParameters, ignored: [String])? {
         let level: DicomWebSearchParameters.Level
         var study: String?, series: String?
         switch path {
@@ -38,12 +39,27 @@ extension DicomWebServer {
                 study = path[1]; series = path[3]; level = .instance
             } else { return nil }
         }
-        return try .parse(queryItems: URLComponents(url: request.url, resolvingAgainstBaseURL: false)?.queryItems ?? [],
-                          level: level, studyInstanceUID: study, seriesInstanceUID: series,
-                          vrForAttribute: DicomWebSearchAttributes.vr)
+        var items = URLComponents(url: request.url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        var ignored: [String] = []
+        items.removeAll { item in
+            guard !DicomWebSearchAttributes.reservedNames.contains(item.name),
+                  !DicomWebSearchAttributes.isMatchable(item.name) else { return false }
+            if !ignored.contains(item.name) { ignored.append(item.name) }
+            return true
+        }
+        var parameters = try DicomWebSearchParameters.parse(queryItems: items, level: level, studyInstanceUID: study,
+                                                            seriesInstanceUID: series,
+                                                            vrForAttribute: DicomWebSearchAttributes.vr)
+        parameters.includeFields.removeAll { field in
+            guard field != "all", DicomWebSearchAttributes.tag(field) == nil else { return false }
+            if !ignored.contains(field) { ignored.append(field) }
+            return true
+        }
+        return (parameters, ignored)
     }
 
-    func search(_ request: DicomWebHTTPRequest, parameters: DicomWebSearchParameters) async throws -> DicomWebHTTPResponse {
+    func search(_ request: DicomWebHTTPRequest, parameters: DicomWebSearchParameters,
+                ignored: [String] = []) async throws -> DicomWebHTTPResponse {
         if parameters.fuzzyMatching == true, configuration.rejectUnsupportedFuzzyMatching {
             throw DicomWebServerFailure(400, "Fuzzy matching is not supported.")
         }
@@ -61,18 +77,27 @@ extension DicomWebServer {
             if parameters.level != .study { tags.formUnion([0x00080060, 0x0020000E, 0x00200011, 0x00201209]) }
             if parameters.level == .instance { tags.formUnion([0x00080016, 0x00080018, 0x00200013, 0x00280010, 0x00280011]) }
             for attribute in parameters.includeFields + parameters.matches.map(\.attribute) {
-                guard let tag = DicomWebSearchAttributes.tag(attribute) else { throw DicomWebError(kind: .badRequest) }
-                tags.insert(tag)
+                if let tag = DicomWebSearchAttributes.tag(attribute) { tags.insert(tag) }
             }
             selected = selected.map { DicomDataSet(elements: $0.elements.filter { tags.contains($0.tag) }) }
         }
         let cacheKey = request.url.absoluteString + String(describing: request.headers.sorted { $0.key < $1.key })
         if configuration.cacheEnabled, let cached = searchCache.get(cacheKey, sets: selected, remaining: remaining) { return cached }
         var response = try encode(selected, request: request)
+        // The Search status table of PS3.18 answers a search without matches with 204 and no body,
+        // whichever representation was negotiated.
+        if selected.isEmpty { response = .init(statusCode: 204, body: Data()) }
         var warnings: [String] = []
         if page.hasMore { warnings.append("There are additional results that can be requested") }
         if parameters.fuzzyMatching == true {
             warnings.append("The fuzzymatching parameter is not supported. Only literal matching has been performed.")
+        }
+        for name in ignored {
+            // Only short printable names are echoed; anything else could not travel safely in a quoted header value.
+            let printable = name.count <= 64 && name.unicodeScalars.allSatisfy {
+                (0x20..<0x7F).contains($0.value) && $0 != "\"" && $0 != "\\"
+            }
+            warnings.append(printable ? "Unsupported query parameter ignored: \(name)" : "An unsupported query parameter was ignored.")
         }
         if !warnings.isEmpty { response.headers["Warning"] = warnings.map { "299 \(baseURL(request).absoluteString) \"\($0)\"" }.joined(separator: ", ") }
         if configuration.cacheEnabled { searchCache.put(cacheKey, sets: selected, remaining: remaining, response: response) }

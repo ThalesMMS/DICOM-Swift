@@ -190,6 +190,13 @@ public struct DicomWebServerConfiguration: Equatable, Sendable {
     public var supportsFilteredWorklistSubscriptions = true
     /// Unsupported fuzzy matching may be rejected, or performed literally with Warning 299.
     public var rejectUnsupportedFuzzyMatching: Bool = false
+    /// Service root as clients reach it, for example `https://pacs.example/dicom-web` behind a reverse proxy.
+    /// RetrieveURL, BulkDataURI, Location, Content-Location and Warning agents start with it.
+    /// Nil derives the root from each request's scheme, Host and the service path.
+    public var publicBaseURL: URL? = nil
+    /// Lets `X-Forwarded-Proto` and `X-Forwarded-Host` replace the request's scheme and host when
+    /// `publicBaseURL` is nil. Enable it only when every request arrives through a proxy that sets both.
+    public var trustsForwardedHeaders: Bool = false
     public var supportedMediaTypes: [String] = ["application/dicom", "application/dicom+json",
         "application/dicom+xml", "application/octet-stream", "image/jpeg", "image/png", "image/gif",
         "image/jls", "image/jp2", "image/jphc", "image/dicom-rle", "image/jxl", "application/x-deflate"]
@@ -384,7 +391,9 @@ public final class DicomWebServer: DicomWebHTTPTransport, Sendable {
         await handleStreaming(request, body: Self.body(for: request))
     }
 
-    /// Compatibility entry point. Async callers should use send or handleStreaming.
+    /// Compatibility entry point. It blocks its thread until the response is complete, so it is unavailable to
+    /// async code, where a blocked cooperative thread can starve the task it waits for.
+    @available(*, noasync, message: "Use send(_:) or handleStreaming(_:body:) from async code.")
     public func handle(_ request: DicomWebHTTPRequest) -> DicomWebHTTPResponse {
         let result = DicomWebSynchronousResult()
         Task.detached { result.complete((try? await self.send(request)) ?? self.error(500, "Request failed.")) }
@@ -461,11 +470,16 @@ public final class DicomWebServer: DicomWebHTTPTransport, Sendable {
                 }
                 return response
             }
-            guard request.method == .get else { return streamed(notFound()) }
+            guard request.method == .get else {
+                guard let allowed = Self.allowedMethods(path) else { return streamed(notFound()) }
+                return streamed(error(405, "Method not allowed.", headers: ["Allow": allowed]))
+            }
             if path.isEmpty || path == ["conformance"] { return streamed(try capabilities(request)) }
             if path == ["wado"] { return streamed(try await wadoURI(request)) }
             if path.first == "bulkdata" { return streamed(try await bulkData(request, path: path)) }
-            if let query = try searchParameters(request, path: path) { return streamed(try await search(request, parameters: query)) }
+            if let query = try searchParameters(request, path: path) {
+                return streamed(try await search(request, parameters: query.parameters, ignored: query.ignored))
+            }
             return try await retrieve(request, path: path)
     }
 
@@ -490,11 +504,60 @@ public final class DicomWebServer: DicomWebHTTPTransport, Sendable {
         guard Array(all.prefix(base.count)) == base else { return nil }
         return Array(all.dropFirst(base.count))
     }
+    /// Methods served on a route outside UPS-RS and JPIP, or nil when the path names no resource.
+    static func allowedMethods(_ path: [String]) -> String? {
+        if path.isEmpty || path == ["conformance"] || path == ["wado"] { return "GET" }
+        if path.count == 2, path[0] == "bulkdata" { return "GET" }
+        if path == ["series"] || path == ["instances"] { return "GET" }
+        if path == ["studies"] { return "GET, POST" }
+        guard path.count >= 2, path[0] == "studies" else { return nil }
+        var index = 2
+        if path.count >= 4, path[2] == "series" { index = 4 }
+        if path.count >= 6, index == 4, path[4] == "instances" { index = 6 }
+        let suffix = Array(path.dropFirst(index))
+        switch suffix {
+        case []: return index == 2 ? "GET, POST" : "GET"
+        case ["metadata"], ["thumbnail"], ["rendered"]: return "GET"
+        case ["series"]: return index == 2 ? "GET" : nil
+        case ["instances"]: return index < 6 ? "GET" : nil
+        default:
+            let frames = index == 6 && suffix.count >= 2 && suffix[0] == "frames"
+                && (suffix.count == 2 || (suffix.count == 3 && suffix[2] == "rendered"))
+            return frames ? "GET" : nil
+        }
+    }
     func baseURL(_ request: DicomWebHTTPRequest) -> URL {
-        var components = URLComponents(url: request.url, resolvingAgainstBaseURL: false)!
+        if let publicBaseURL = configuration.publicBaseURL { return publicBaseURL }
+        guard var components = URLComponents(url: request.url, resolvingAgainstBaseURL: false) else { return request.url }
+        if configuration.trustsForwardedHeaders {
+            // A proxy chain lists the client-facing value first.
+            func forwarded(_ name: String) -> String? {
+                request.headers.dicomWebHeaderValue(name)?.split(separator: ",").first
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+            }
+            if let scheme = forwarded("X-Forwarded-Proto")?.lowercased(), scheme == "http" || scheme == "https" {
+                components.scheme = scheme
+            }
+            if let host = forwarded("X-Forwarded-Host"), let authority = URLComponents(string: "http://" + host),
+               authority.percentEncodedHost?.isEmpty == false, authority.path.isEmpty, authority.user == nil,
+               authority.password == nil, authority.query == nil, authority.fragment == nil {
+                components.percentEncodedHost = authority.percentEncodedHost
+                components.port = authority.port
+            }
+        }
         components.path = configuration.servicePath
         components.query = nil
-        return components.url!
+        components.fragment = nil
+        return components.url ?? request.url
+    }
+    /// The request URL rebased on `baseURL`, for Content-Location values that echo the requested resource.
+    func publicURL(_ request: DicomWebHTTPRequest) -> URL {
+        guard let path = path(request.url) else { return request.url }
+        var url = baseURL(request)
+        for component in path { url.appendPathComponent(component) }
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
+        components.percentEncodedQuery = URLComponents(url: request.url, resolvingAgainstBaseURL: false)?.percentEncodedQuery
+        return components.url ?? url
     }
     func error(_ status: Int, _ message: String, headers: [String: String] = [:]) -> DicomWebHTTPResponse {
         .init(statusCode: status, headers: ["Content-Type": "text/plain"].merging(headers) { _, new in new }, body: Data(message.utf8))

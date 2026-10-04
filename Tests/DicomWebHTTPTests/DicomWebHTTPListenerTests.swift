@@ -37,7 +37,7 @@ final class DicomWebHTTPListenerTests: XCTestCase {
         let root = try await listener.start()
         XCTAssertEqual(root.port, Int(configuration.port))
         let (_, response) = try await URLSession.shared.data(from: root.appendingPathComponent("dicom-web/studies"))
-        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 204) // empty archive
         await listener.stop()
     }
 
@@ -76,8 +76,10 @@ final class DicomWebHTTPListenerTests: XCTestCase {
         let root = try await listener.start()
         do {
             let (body, response) = try await URLSession.shared.data(from: root.appendingPathComponent("dicom-web/studies"))
-            XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
-            XCTAssertEqual(String(data: body, encoding: .utf8), "[]")
+            // An empty search is 204 with no body; the next request on the connection must still parse.
+            XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 204)
+            XCTAssertTrue(body.isEmpty)
+            XCTAssertNil((response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Transfer-Encoding"))
             let (_, capabilities) = try await URLSession.shared.data(from: root.appendingPathComponent("dicom-web"))
             XCTAssertEqual((capabilities as? HTTPURLResponse)?.statusCode, 200)
         } catch { await listener.stop(); throw error }
@@ -152,7 +154,7 @@ extension DicomWebHTTPListenerTests {
         let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
         do {
             let (_, response) = try await session.data(from: root.appendingPathComponent("dicom-web/studies"))
-            XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+            XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 204) // empty archive
             var pinned = DicomWebHTTPRequest(method: .post, url: root, body: Data("test".utf8), timeout: 3)
             pinned.connectAddress = "127.0.0.1"
             do {

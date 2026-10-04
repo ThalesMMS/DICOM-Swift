@@ -73,8 +73,8 @@ final class DicomWebServerAuthorizationTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(sets.first?.dataSet.string(for: .studyInstanceUID), "2.25.4")
         await policy.deny("2.25.4")
         let empty = try await server.send(request())
-        XCTAssertEqual(empty.statusCode, 200)
-        XCTAssertEqual(String(decoding: empty.body, as: UTF8.self), "[]")
+        XCTAssertEqual(empty.statusCode, 204)
+        XCTAssertTrue(empty.body.isEmpty)
     }
     func test_missingMetadataWithoutAuthorizer_remainsNotFound() async throws {
         let response = try await DicomWebServer().send(request("studies/2.25.404/metadata"))

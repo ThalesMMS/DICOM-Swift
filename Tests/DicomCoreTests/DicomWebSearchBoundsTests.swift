@@ -69,8 +69,8 @@ final class DicomWebSearchBoundsTests: XCTestCase {
         let server = DicomWebServer(storage: storage, principals: AuthorizationTestPrincipals(),
                                     authorizer: AuthorizationTestPolicy())
         let empty = try await server.send(request("studies?limit=0"))
-        XCTAssertEqual(empty.statusCode, 200)
-        XCTAssertEqual(String(decoding: empty.body, as: UTF8.self), "[]")
+        XCTAssertEqual(empty.statusCode, 204)
+        XCTAssertTrue(empty.body.isEmpty)
         let excessive = try await server.send(request("studies?limit=1&offset=\(Int.max)"))
         XCTAssertEqual(excessive.statusCode, 413)
         let requests = await storage.requests

@@ -84,6 +84,9 @@ extension DicomWebServer {
             guard isRaw || suffix == ["thumbnail"] || suffix == ["rendered"]
                 || (suffix.count == 3 && suffix[0] == "frames" && suffix[2] == "rendered") else { return streamed(notFound()) }
             let handler = DicomWebFrameRouteHandler(configuration: configuration, instance: stored)
+            // Frame parts echo the requested URL as Content-Location, so it has to be the public one.
+            var request = request
+            request.url = publicURL(request)
             let list = suffix.first == "frames" ? suffix[1] : "1"
             var response = isRaw ? handler.retrieveRaw(studyInstanceUID: study, seriesInstanceUID: stored.seriesInstanceUID,
                 sopInstanceUID: stored.sopInstanceUID, frameList: list, request: request)
@@ -178,7 +181,7 @@ extension DicomWebServer {
         guard data.count <= configuration.multipartLimits.maximumPartBytes else {
             throw DicomWebServerFailure(413, "Bulk data exceeds the configured part limit.")
         }
-        if selection.multipart { return try multipart([("application/octet-stream", request.url.absoluteString, data)]) }
+        if selection.multipart { return try multipart([("application/octet-stream", publicURL(request).absoluteString, data)]) }
         return .init(statusCode: 200, headers: ["Content-Type": selection.contentType], body: data)
     }
 

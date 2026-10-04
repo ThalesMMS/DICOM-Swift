@@ -110,13 +110,20 @@ final class DicomWebHTTPConnection: @unchecked Sendable {
                 }
                 let close = parsed.close || count + 1 == configuration.maximumRequestsPerConnection || response.statusCode >= 400
                 var headers = response.headers.filter { !["content-length", "transfer-encoding", "connection"].contains($0.key.lowercased()) }
-                headers["Transfer-Encoding"] = "chunked"
+                // 204 and 304 end at the header block (RFC 9112 6.3); a chunked terminator would be read as the next response.
+                let bodyless = response.statusCode == 204 || response.statusCode == 304
+                if !bodyless { headers["Transfer-Encoding"] = "chunked" }
                 headers["Connection"] = close ? "close" : "keep-alive"
                 guard headers.allSatisfy({ !$0.key.contains(where: { $0.isWhitespace || $0 == ":" }) && !$0.value.contains("\r") && !$0.value.contains("\n") }) else {
                     throw HTTPFailure(status: 500)
                 }
                 let head = "HTTP/1.1 \(response.statusCode) \(Self.reason(response.statusCode))\r\n" + headers.sorted { $0.key < $1.key }.map { "\($0.key): \($0.value)\r\n" }.joined() + "\r\n"
                 try await write(Data(head.utf8))
+                if bodyless {
+                    response.cancel()
+                    if close { return }
+                    continue
+                }
                 do {
                     try await withTaskCancellationHandler {
                         for try await chunk in response.body where !chunk.isEmpty {
@@ -135,8 +142,8 @@ final class DicomWebHTTPConnection: @unchecked Sendable {
         } catch {}
     }
     private static func reason(_ status: Int) -> String {
-        [200: "OK", 202: "Accepted", 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found",
-         406: "Not Acceptable", 409: "Conflict", 413: "Payload Too Large", 415: "Unsupported Media Type",
+        [200: "OK", 202: "Accepted", 204: "No Content", 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found",
+         405: "Method Not Allowed", 406: "Not Acceptable", 409: "Conflict", 413: "Payload Too Large", 415: "Unsupported Media Type",
          431: "Request Header Fields Too Large", 500: "Internal Server Error", 501: "Not Implemented"][status] ?? "Response"
     }
 }
