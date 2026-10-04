@@ -60,7 +60,7 @@ enum DicomSingleFramePart10Writer {
                 try DicomDataSetWriter.part10Data(from: $0, options: .init(transferSyntax: transferSyntax))
             }
         }
-        dataSet = try encodable(dataSet) { try DicomDataSetWriter.dataSetData(from: $0); return $0 }
+        dataSet = try encodable(dataSet) { _ = try DicomDataSetWriter.dataSetData(from: $0); return $0 }
         // Encapsulated syntax headers are Explicit VR Little Endian. Encode metadata
         // with the existing writer, then supply a standard empty BOT and single frame item.
         var encoded = try DicomDataSetWriter.dataSetData(from: dataSet)

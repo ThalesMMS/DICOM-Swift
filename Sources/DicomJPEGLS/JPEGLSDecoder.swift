@@ -90,7 +90,7 @@ public struct JPEGLSDecoder: Sendable {
     /// prediction reads it, so a caller can sign-extend in the same pass. Frames with more than one component,
     /// mapping tables or a colour transformation are refused; an interleaved single-component scan takes the
     /// general decoder and is copied.
-    public func decodeSingleComponent<Sample: FixedWidthInteger & UnsignedInteger>(
+    public func decodeSingleComponent<Sample: FixedWidthInteger & UnsignedInteger & Sendable>(
         _ data: Data,
         as sampleType: Sample.Type,
         finishRow: (@Sendable (UnsafeMutableBufferPointer<Sample>) -> Void)? = nil

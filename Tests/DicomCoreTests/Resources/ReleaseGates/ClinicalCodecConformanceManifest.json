@@ -2337,7 +2337,7 @@
       "backendID": "network-adversarial",
       "comparison": "mutated status and JSON, credential origin, unsafe URL and cancellation fail closed",
       "testIdentifier": "DicomWebClientTests.test_bulkDataOriginMutation_keepsConfiguredCredentialsOnOriginalOriginOnly|DicomWebClientTests.test_bulkDataUnsafeSchemeOrUserInfo_rejectsBeforeTransport|DicomWebClientTests.test_responseStatusAndJSONMutations_areRejectedInsteadOfBecomingSuccessfulSearches|DicomWebClientTests.test_cancelledBulkDataRequest_doesNotInvokeInjectedTransport",
-      "testPath": "Tests/DicomCoreTests/DicomWebClientTests.swift",
+      "testPath": "Tests/DicomWebClientTests/DicomWebClientTests.swift",
       "requiredGates": [
         "fixture",
         "release",
