@@ -92,6 +92,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.0] - 2026-10-04
+
+First stable 2.x release. It consolidates 2.0.0-rc.1 to 2.0.0-rc.3; the
+summary since 1.5.0, the executed validation and the known limits are in
+RELEASE_NOTES.md.
+
+### Changed
+
+- The package compiles in Swift 6 language mode. Swift tools 6.2 and iOS,
+  visionOS or macOS 26.0+ are unchanged from 1.5.0.
+- Module and API ownership are split into separate library products. The
+  DICOMweb client is the independent `DicomWebClient` product, and DICOM
+  datasets, Part 10, UIDs and DICOM JSON/XML live in `DicomData`.
+- The JPEG 2000, JPEG-LS and JPEG XL codecs are incorporated sources; the
+  J2KSwift, JLSwift and JXLSwift package dependencies are gone.
+- DICOMweb HTTP failures of the legacy study search, metadata and UPS calls
+  are reported as `DicomWebError`.
+
+### Added
+
+- DICOMweb client: file-backed and streamed STOW-RS, ordered transfer syntax
+  fallback after 406, opt-in retries, QIDO paging, bulk-data ranges, rendered
+  and thumbnail options, streamed metadata decoding, per-request
+  authorization, server trust anchors or a pinned leaf, and client
+  certificates.
+- `DicomWebOIDC`: OpenID Connect sign-in for a public client.
+- DICOMweb server in `DicomCore`: provider-backed QIDO paging, 405 and 204
+  answers, dictionary keyword matching, Warning 299 for ignored parameters,
+  and URLs from a public base URL or forwarded headers.
+
+---
+
 ## [1.0.1] - DICOM Streaming & Security
 
 ### Added

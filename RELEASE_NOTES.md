@@ -1,3 +1,130 @@
+# 2.0.0
+
+This is the first stable 2.x source-package release. It consolidates
+2.0.0-rc.1, rc.2 and rc.3, whose sections below keep the detail, and adds the
+documentation corrections made after rc.3. Since rc.3 only the text of the
+DICOMweb server's conformance matrix, its test and the documentation changed;
+the `DicomWebClient` and `DicomWebOIDC` sources are those of rc.3.
+
+## Requirements and products
+
+Swift tools 6.2 and iOS, visionOS or macOS 26.0+ remain the minimums of 1.5.0.
+The package now compiles in Swift 6 language mode instead of Swift 5.
+
+1.5.0 announced `DicomCore` and `dicomtool`. 2.0.0 announces the libraries
+`DicomData`, `DicomCore`, `DicomCodecs`, `DicomObjects`, `DicomNetwork`,
+`DicomWebClient`, `DicomWebOIDC`, `DicomWebHTTP`, `DicomDocumentContent`,
+`DicomAppleMedia`, `DicomSwiftUI`, `HL7v2`, `HL7MLLP`, `HL7v3CDA`,
+`HL7v3Transport`, `FHIR` and `ClinicalMapping`, and the executables
+`dicomtool`, `hl7tool` and `DicomSwiftUIExample`. The JPEG 2000, JPEG-LS and
+JPEG XL codecs are incorporated sources with their original notices; the
+J2KSwift, JLSwift and JXLSwift package dependencies are gone. The remaining
+package dependencies are swift-argument-parser, ZIPFoundation and
+swift-docc-plugin. No binary framework or binary release asset is required.
+
+Use `.package(url: "https://github.com/ThalesMMS/DICOM-Swift.git", from:
+"2.0.0")` and commit the consumer's own resolved lockfile. A `from: "1.0.0"`
+requirement cannot select 2.x.
+
+## Breaking changes since 1.5.0
+
+- The Swift 6 language mode and the reorganized module and API ownership
+  break source compatibility. `DicomData` owns typed datasets, Part 10, UIDs
+  and DICOM JSON/XML; `DicomWebClient` owns QIDO-RS, WADO-RS, STOW-RS,
+  multipart, authentication and the client transport and error types, which
+  `DicomCore` reexports. Review imports, concurrency diagnostics and public
+  API usage.
+- The legacy study search, metadata and UPS calls report HTTP failures as
+  `DicomWebError` instead of `DicomWebClientError.httpStatus`; read
+  `DicomWebError.statusCode`.
+- Header values send RFC 9110 token parameters, such as a transfer syntax UID
+  or `*`, unquoted. `type` remains quoted.
+- The default rendered and thumbnail `Accept` asks for one image type, and a
+  4xx answer that carries a DICOM store response is returned as store results
+  instead of thrown.
+- Between candidates, `swift package diagnose-api-breaking-changes` on the
+  `DicomWebClient` product reported two initializers that gained a defaulted
+  parameter in rc.2, `DicomWebStoreFileResult.init(...transportErrorCode:)`
+  and `DicomWebRedirectDelegate.init(...bodyFileURL:)`, and no break in rc.3.
+  Existing calls still compile.
+
+## DICOMweb client
+
+- Selecting only `DicomWebClient` keeps Core, codecs, DIMSE, the HTTP
+  listener, UI and ZIP out of the compiled client graph. `searchResponse`
+  gives bounded wire bytes without dataset normalization.
+- STOW-RS is file-backed and validates File Meta Information within its own
+  bound. Through a `DicomWebStreamedBodyTransport`, as the built-in transport
+  is, each instance is read straight from its file. `storeFiles` results keep
+  the answer's `Warning` header and the `DicomWebError` that failed a batch.
+- Retrieval checks response metadata against the Part 10 File Meta
+  Information, asks again with the next transfer syntax of an ordered
+  `DicomWebAcceptList` after a 406, keeps every bulk-data part, resolves
+  bulk-data URIs against the metadata and accepts range responses.
+- Response bodies are read in blocks, unconsumed bodies spill to a file and
+  requests to the same host share connections. `retryPolicy`, off by default,
+  retries transient failures within a bounded Retry-After.
+- QIDO paging removes duplicate results and stops on a repeated page or at its
+  paging limits. Study, series and instance metadata are decoded as their
+  DICOM JSON arrives, and invalid elements are read tolerantly within the
+  same limits.
+- Rendered and thumbnail retrieves of studies, series, instances and frames
+  take window, viewport and quality options. A multi-frame rendered request
+  refused with 400, 406 or 415 is asked again one frame at a time.
+- A `DicomWebAuthorizationProvider` supplies credentials for each request and
+  renews them once after a 401. `serverTrust` adds trust anchors or a pinned
+  leaf certificate hash, keeping host name and date checks, and
+  `clientIdentity` answers a client-certificate request. The `DicomWebOIDC`
+  product signs a public client in with OpenID Connect (authorization code
+  with PKCE S256, ID-token verification, shared refresh), with no UI or token
+  store of its own.
+
+## DICOMweb server in DicomCore
+
+The server pages study, series and instance searches through injected
+providers, answers 405 to a method a resource does not serve and 204 to a
+search without matches, matches any dictionary keyword or tag, reports ignored
+parameters with Warning 299 and can build its URLs from a public base URL or
+forwarded headers. It serves stored syntaxes it cannot send as Explicit VR
+Little Endian and can start on a fixed port and bind address. After rc.3, the
+rows of `DicomWebConformanceMatrix` for bulk data, multipart, authentication,
+pagination and error semantics, the README summary and the conformance
+statement describe this current behaviour.
+
+## Executed validation
+
+The release tree was exported from the canonical package and compared with the
+public mirror. Sources, tests and the manifest were identical, apart from the
+declared documentation adaptations. The export tool's `verify` operation matched
+all recorded distribution files. Apple Swift 6.4, the macOS 27.0 SDK and an
+arm64 host were used:
+
+- The existing public-API consumer passed in Debug and Release against the
+  exported tree: QIDO, bounded wire bytes, retrieve to a file sink, STOW files
+  and batches. Its build outputs and linked frameworks again excluded Core,
+  codecs, DIMSE, listener, ZIP, SwiftUI, Metal and Network framework
+  dependencies.
+- Fourteen client XCTest suites, the `DicomWebOIDC` and DICOM JSON stream
+  decoder suites, the documentation reconciliation suite and the server's
+  conformance matrix documentation case executed 140 cases: 139 passed, no
+  failures, and one optional external Orthanc case skipped because its
+  endpoint was not configured. That skipped case is not a pass.
+
+## Known limits
+
+- Interoperability was checked against a local Orthanc during the candidates.
+  The interop run against dcm4chee and the probe with the Python
+  dicomweb-client have not been run for this release.
+- The full suite, the `release` gate and optional runtimes were not run for
+  this release. Apple media, Metal, optional codec runtimes and external
+  corpus, oracle and service cases keep their documented conditions, and no
+  claim covers every supported platform or architecture.
+- Some v1 APIs that the migration guide planned to remove in 2.0.0, such as
+  `setDicomFilename(_:)`, `loadDICOMFileAsync(_:)`, the tuple
+  `windowSettings` property and the async pixel wrappers, are still present in
+  this release.
+- The performance limits stated for 2.0.0-rc.1 still apply.
+
 # 2.0.0-rc.3
 
 This source-package release candidate adds DICOMweb client, server and

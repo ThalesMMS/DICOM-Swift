@@ -59,7 +59,7 @@ Before you start, ensure you have:
    ```
    https://github.com/ThalesMMS/DICOM-Swift.git
    ```
-4. Select version `1.0.0` or later.
+4. Select version `2.0.0` or later.
 5. Click **Add Package**.
 
 #### Using Package.swift
@@ -68,7 +68,7 @@ Add to `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/ThalesMMS/DICOM-Swift.git", exact: "2.0.0-rc.2")
+    .package(url: "https://github.com/ThalesMMS/DICOM-Swift.git", from: "2.0.0")
 ]
 ```
 

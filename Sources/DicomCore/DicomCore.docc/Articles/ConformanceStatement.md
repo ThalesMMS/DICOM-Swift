@@ -19,7 +19,7 @@ Comprehensive DICOM conformance documentation detailing supported transfer synta
 
 ## Overview
 
-This DICOM Conformance Statement describes the capabilities and limitations of the DicomCore library (version 1.2.0) in accordance with DICOM Part 2: Conformance. DicomCore is a Swift DICOM file library for iOS, visionOS, and macOS 26+ that parses DICOM medical imaging files, extracts metadata, provides pixel data access with optional GPU-accelerated image processing, writes controlled Part 10 datasets, and exposes transport-injected DICOMweb service helpers covered by package tests.
+This DICOM Conformance Statement describes the capabilities and limitations of the DicomCore library (version 2.0.0) in accordance with DICOM Part 2: Conformance. DicomCore is a Swift DICOM file library for iOS, visionOS, and macOS 26+ that parses DICOM medical imaging files, extracts metadata, provides pixel data access with optional GPU-accelerated image processing, writes controlled Part 10 datasets, and exposes transport-injected DICOMweb service helpers covered by package tests.
 
 **Implementation Type:** DICOM File Decoder/Writer Library with transport-injected DICOMweb helpers and bounded stateless JPIP progressive pixel streaming
 
@@ -870,7 +870,21 @@ Remaining limitations in this conformance statement are explicitly scoped:
 
 ## 9. Version History
 
-### Version 1.2.0 (Current)
+### Version 2.0.0 (Current)
+
+**Release Date:** 2026-10-04
+
+**Key Features:**
+- Swift 6 language mode; Swift tools 6.2 and iOS, visionOS or macOS 26.0+ unchanged
+- Separate library products, including the independent `DicomWebClient` and `DicomWebOIDC`
+- DICOMweb client: file-backed and streamed STOW-RS, ordered transfer syntax fallback, opt-in retries, QIDO paging, rendered and thumbnail options, per-request authorization, server trust and client certificates
+- DICOMweb server: provider-backed QIDO paging, 405 and 204 answers, dictionary keyword matching and public base URLs
+
+**Conformance Changes:**
+- DICOMweb client and server behaviour as described in section 1.3
+- Transfer syntax and SOP class support as listed in sections 2 and 3
+
+### Version 1.2.0
 
 **Release Date:** 2026-02-15
 
@@ -925,7 +939,7 @@ Remaining limitations in this conformance statement are explicitly scoped:
 For bug reports, feature requests, or conformance issues, please file an issue on the project's GitHub repository.
 
 **Information to Include:**
-- Library version (e.g., 1.2.0)
+- Library version (e.g., 2.0.0)
 - Platform and OS version (e.g., iOS 17.2, macOS 14.1)
 - Minimal reproducible example
 - Sample DICOM file (if applicable, ensure PHI is removed)
