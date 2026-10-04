@@ -659,6 +659,14 @@ for hosts that refuse redirects. Fixed credentials go in `headers` or come from
 `authorizationProvider` supplies headers per request and renews them once after
 a 401, which repeats the request once.
 
+The configuration's `serverTrust` keeps the system's TLS evaluation by default;
+`.anchors(_:)` or `.leafCertificateSHA256(_:)` only add trust, for a private CA
+or a self-signed server, and keep the host name and date checks. Its
+`clientIdentity` answers a server that requires a client certificate (mutual
+TLS); only the base URL's origin receives it, and without one such a server
+fails with `URLError(.clientCertificateRequired)`. The Foundation transport
+keeps the connections of each of these choices apart.
+
 The optional `DicomWebOIDC` product signs a public client in with OpenID Connect
 (discovery, authorization code with PKCE S256, ID-token verification, shared
 refresh) and gives each key a provider for the client. It has no UI: the host

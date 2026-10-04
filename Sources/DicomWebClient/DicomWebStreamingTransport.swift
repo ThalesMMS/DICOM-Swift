@@ -83,7 +83,8 @@ extension URLSessionDicomWebHTTPTransport: DicomWebStreamedBodyTransport {
         let watchdog = delegate.enforce(deadline: request.deadline)
         let responseBody: DicomWebResponseBody, response: URLResponse
         do {
-            (responseBody, response) = try await session.dicomWebResponse(for: urlRequest, delegate: delegate)
+            (responseBody, response) = try await session(for: policy).dicomWebResponse(for: urlRequest,
+                                                                                       delegate: delegate)
         } catch {
             watchdog?.cancel()
             throw delegate.mapping(error)

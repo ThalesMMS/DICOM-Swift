@@ -1,5 +1,6 @@
 import Foundation
 import DicomData
+import Synchronization
 
 public enum DicomWebHTTPMethod: String, Sendable {
     case get = "GET"
@@ -62,9 +63,28 @@ public final class URLSessionDicomWebHTTPTransport: DicomWebHTTPTransport {
     public static let shared = URLSessionDicomWebHTTPTransport()
 
     let session: URLSession
+    /// A request whose origin policy adds server trust or a client certificate goes through a session of its own,
+    /// made with `session`'s configuration, so that a connection opened under one choice never carries a request
+    /// made under another.
+    private let tlsSessions = Mutex<[DicomWebTLSChoice: URLSession]>([:])
 
     public init(session: URLSession = .shared) {
         self.session = session
+    }
+
+    deinit {
+        tlsSessions.withLock { $0.values.forEach { $0.finishTasksAndInvalidate() } }
+    }
+
+    func session(for policy: DicomWebOriginPolicy) -> URLSession {
+        let choice = DicomWebTLSChoice(serverTrust: policy.serverTrust, clientIdentity: policy.clientIdentity)
+        guard choice != DicomWebTLSChoice(serverTrust: .system, clientIdentity: nil) else { return session }
+        return tlsSessions.withLock { sessions in
+            if let existing = sessions[choice] { return existing }
+            let created = URLSession(configuration: session.configuration)
+            sessions[choice] = created
+            return created
+        }
     }
 
     public func send(_ request: DicomWebHTTPRequest) async throws -> DicomWebHTTPResponse {
@@ -90,8 +110,18 @@ public struct DicomWebClientConfiguration: Equatable, Sendable {
     public var multipartLimits = DicomWebMultipartLimits()
     public var maximumMetadataBytes = 64 * 1024 * 1024
     public var originPolicy: DicomWebOriginPolicy {
-        .init(configuredURL: baseURL, allowedOrigins: allowedOrigins.union(allowedBulkDataOrigins))
+        var policy = DicomWebOriginPolicy(configuredURL: baseURL,
+                                          allowedOrigins: allowedOrigins.union(allowedBulkDataOrigins))
+        policy.serverTrust = serverTrust
+        policy.clientIdentity = clientIdentity
+        return policy
     }
+    /// How HTTPS servers are trusted: the system's evaluation by default, optionally with an added anchor or the
+    /// server certificate's SHA-256, which only add trust and keep the host name check. It covers the base URL's
+    /// origin and the allowed origins.
+    public var serverTrust = DicomWebServerTrust.system
+    /// The certificate presented when the base URL's origin asks for one (mutual TLS). No other origin receives it.
+    public var clientIdentity: DicomWebClientIdentity? = nil
     public var baseURL: URL
     /// Headers scoped to the configured origin; foreign BulkDataURI hosts do not receive them.
     public var headers: [String: String]

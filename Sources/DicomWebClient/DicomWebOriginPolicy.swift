@@ -3,6 +3,10 @@ import Foundation
 public struct DicomWebOriginPolicy: Equatable, Sendable {
     public var configuredURL: URL
     public var allowedOrigins: Set<URL>
+    /// How HTTPS servers of the origins this policy allows are trusted. The default is the system's evaluation.
+    public var serverTrust = DicomWebServerTrust.system
+    /// The certificate presented when the configured origin asks for one; no other origin ever receives it.
+    public var clientIdentity: DicomWebClientIdentity? = nil
 
     public init(configuredURL: URL, allowedOrigins: Set<URL> = []) {
         self.configuredURL = configuredURL
@@ -31,17 +35,37 @@ public struct DicomWebOriginPolicy: Equatable, Sendable {
         }
     }
 
+    /// Whether a TLS challenge comes from the configured origin.
+    func isConfiguredOrigin(_ space: URLProtectionSpace) -> Bool {
+        Self.origin(space).map { $0 == Self.origin(configuredURL) } ?? false
+    }
+
+    /// Whether a TLS challenge comes from an origin this policy lets requests reach.
+    func allowsOrigin(_ space: URLProtectionSpace) -> Bool {
+        guard let origin = Self.origin(space) else { return false }
+        return origin == Self.origin(configuredURL) || allowedOrigins.contains(where: { Self.origin($0) == origin })
+    }
+
     private static func origin(_ url: URL) -> String? {
-        guard let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
-              let host = url.host?.lowercased(), !host.isEmpty else { return nil }
-        return "\(scheme)://\(host):\(url.port ?? (scheme == "https" ? 443 : 80))"
+        origin(scheme: url.scheme, host: url.host, port: url.port)
+    }
+
+    private static func origin(_ space: URLProtectionSpace) -> String? {
+        origin(scheme: space.protocol, host: space.host, port: space.port > 0 ? space.port : nil)
+    }
+
+    private static func origin(scheme: String?, host: String?, port: Int?) -> String? {
+        guard let scheme = scheme?.lowercased(), ["http", "https"].contains(scheme),
+              let host = host?.lowercased(), !host.isEmpty else { return nil }
+        return "\(scheme)://\(host):\(port ?? (scheme == "https" ? 443 : 80))"
     }
 }
 
 /// Task delegate of a DICOMweb request (#2893). Redirects are refused, or followed only where the origin policy
 /// allows, with credentials removed off the configured origin. HTTP authentication challenges are answered with no
 /// credential, so shared credential storage is never consulted and the server's 401 reaches the caller; server trust
-/// keeps the system evaluation. The created task is kept so a deadline can cancel it.
+/// keeps the system evaluation, with the policy's added trust, and the policy's client certificate goes to the
+/// configured origin alone. The created task is kept so a deadline can cancel it.
 /// A body sent from a file or from segments is streamed; when URLSession must send it again (after an authentication
 /// challenge or a redirect), the delegate reopens the file or reads the segments again from the start. Without a new stream URLSession keeps asking and the request only ends
 /// at its timeout, so a STOW-RS answered with 401 would wait out the timeout instead of reporting the 401.
@@ -54,6 +78,7 @@ public final class DicomWebRedirectDelegate: NSObject, URLSessionTaskDelegate, @
     private let lock = NSLock()
     private var task: URLSessionTask?
     private var deadlineFired = false
+    private var clientCertificateWithheld = false
 
     public init(policy: DicomWebOriginPolicy, credentialHeaderNames: Set<String>, followsRedirects: Bool = true,
                 bodyFileURL: URL? = nil) {
@@ -92,9 +117,16 @@ public final class DicomWebRedirectDelegate: NSObject, URLSessionTaskDelegate, @
         }
     }
 
-    /// `error`, or a timeout when the deadline cancelled the task.
+    /// `error`, a timeout when the deadline cancelled the task, or `URLError(.clientCertificateRequired)` when the
+    /// connection failed before any response after the server asked for a client certificate that was not presented,
+    /// which URLSession reports only as a lost connection.
     public func mapping(_ error: Error) -> Error {
-        didReachDeadline ? URLError(.timedOut) : error
+        if didReachDeadline { return URLError(.timedOut) }
+        if let failure = error as? URLError, failure.code != .cancelled,
+           lock.withLock({ clientCertificateWithheld && task?.response == nil }) {
+            return URLError(.clientCertificateRequired)
+        }
+        return error
     }
 
     public func urlSession(_ session: URLSession, didCreateTask task: URLSessionTask) {
@@ -127,11 +159,29 @@ public final class DicomWebRedirectDelegate: NSObject, URLSessionTaskDelegate, @
         completionHandler(streamedBody?.makeInputStream() ?? bodyFileURL.flatMap { InputStream(url: $0) })
     }
 
+    /// Server trust keeps the system's evaluation, plus the policy's `serverTrust` for the origins it allows. A client
+    /// certificate is presented only to the configured origin; anywhere else, or without an identity, the TLS
+    /// handshake goes on without one, and a server that requires it fails the request with
+    /// `URLError(.clientCertificateRequired)`. Every other challenge is answered with no credential.
     public func urlSession(_ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge,
                            completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
-        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust {
-            completionHandler(.performDefaultHandling, nil)
-        } else {
+        let space = challenge.protectionSpace
+        switch space.authenticationMethod {
+        case NSURLAuthenticationMethodServerTrust:
+            if let trust = space.serverTrust, policy.allowsOrigin(space),
+               let evaluated = policy.serverTrust.evaluated(trust, host: space.host) {
+                completionHandler(.useCredential, URLCredential(trust: evaluated))
+            } else {
+                completionHandler(.performDefaultHandling, nil)
+            }
+        case NSURLAuthenticationMethodClientCertificate:
+            if let identity = policy.clientIdentity, policy.isConfiguredOrigin(space) {
+                completionHandler(.useCredential, identity.credential)
+            } else {
+                lock.withLock { clientCertificateWithheld = true }
+                completionHandler(.rejectProtectionSpace, nil)
+            }
+        default:
             completionHandler(.rejectProtectionSpace, nil)
         }
     }
