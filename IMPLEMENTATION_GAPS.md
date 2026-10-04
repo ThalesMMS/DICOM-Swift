@@ -70,9 +70,10 @@ SEG, SC, waveform, video, and benchmark code. The main incomplete areas are:
 4. Networking is implemented beyond what older docs claimed, but it still needs
    a parity audit before Isis can rely on it as a DICOM-Swift replacement.
    DICOMweb now has a tested helper matrix for QIDO/WADO/STOW/BulkDataURI,
-   auth hooks, pagination, multipart handling, and stable unsupported-route
-   errors; UPS, production persistence/auth/audit/TLS, JPIP proxying, and
-   zero-copy streaming remain intentionally outside that scope.
+   UPS-RS, auth hooks, TLS trust choices, pagination, multipart handling,
+   streamed bodies, and stable error semantics; production persistence,
+   authorization and audit policy, and JPIP proxying remain intentionally
+   outside that scope.
 5. Example and SwiftUI preview support is now explicitly scoped: the macOS
    document picker and thumbnail-backed slice shortcut strip are implemented,
    while preview mocks remain public preview-only API rather than clinical
@@ -404,41 +405,59 @@ Current tested scope:
   emits the matrix for QIDO-RS, WADO-RS metadata/instance/frame/rendered-frame,
   WADO-URI, STOW-RS, UPS-RS, BulkDataURI, JPIP, multipart, authentication,
   pagination, error semantics, and large-payload streaming responsibility.
-- `Sources/DicomCore/DicomWebClient.swift` serializes QIDO-RS, WADO-RS metadata,
-  WADO-RS instance, WADO-RS frame, rendered-frame, WADO-URI, STOW-RS, and
-  BulkDataURI retrieval through the configured `DicomWebHTTPTransport`. Complete
-  in-memory STOW bodies use an exact configurable budget with a 128 MiB default.
-  Their Part 10 File Meta transfer syntax is derived for a `nil` declaration or
-  checked against an explicit declaration before sizing and transport. Raw
-  non-Part-10 payload labeling remains caller-owned.
-- `Sources/DicomCore/DicomWebServer.swift` implements in-memory QIDO study
-  search with limit/offset pagination, WADO metadata, WADO instance, WADO-URI,
-  STOW Part 10 payload storage, optional bearer-token auth, content
-  negotiation, multipart handling, cache diagnostics, and stable unsupported
-  `501` responses for UPS, frame retrieval, and rendered-frame retrieval.
-- `Tests/DicomCoreTests/DicomWebClientTests.swift` and
-  `Tests/DicomCoreTests/DicomWebServerTests.swift` cover HTTP serialization,
-  multipart boundaries, content negotiation, status codes, auth hooks,
-  BulkDataURI preservation/retrieval, stable unsupported-route errors, QIDO
-  pagination, conformance matrix contents, and large multipart payload
-  preservation.
+- `Sources/DicomWebClient/` (the `DicomWebClient` product) serializes QIDO-RS
+  at study, series and instance level with a pager that returns each result
+  once and stops at configured limits; WADO-RS metadata, decoded one data set
+  at a time and read tolerantly; study, series, instance, frame, rendered and
+  thumbnail retrieval into sinks, with ordered Accept lists that ask again
+  after a fallback status; WADO-URI; STOW-RS; and BulkDataURI retrieval,
+  including relative references and byte ranges, through the configured
+  `DicomWebHTTPTransport`. STOW bodies held in memory use an exact
+  configurable budget with a 128 MiB default; files stream from disk, and
+  `storeFiles` reports each file of a batch from the Annex I response. Their
+  Part 10 File Meta transfer syntax is derived for a `nil` declaration or
+  checked against an explicit declaration. Raw non-Part-10 payload labeling
+  remains caller-owned. The client also carries the opt-in retry policy,
+  per-request authorization providers (`DicomWebOIDC` supplies one), and HTTPS
+  trust and mutual TLS choices.
+- `Sources/DicomCore/DicomWebServer*.swift` implements provider-backed QIDO at
+  the three levels with limit/offset pagination and Warning 299, WADO metadata,
+  instance, frame, rendered and thumbnail retrieval, WADO-URI, provider-backed
+  BulkDataURI routes, streaming STOW of Part 10 payloads with the Annex I
+  response, UPS-RS when a service is injected, injected bearer, Basic or JWT
+  authentication, content negotiation, multipart handling, and cache
+  diagnostics. `Sources/DicomWebHTTP/` adds an optional HTTP listener that can
+  terminate TLS.
+- `Tests/DicomWebClientTests/`, `Tests/DicomWebHTTPTests/`, and the
+  `Tests/DicomCoreTests/DicomWeb*Tests.swift` suites cover HTTP serialization,
+  multipart parsing and boundaries, content negotiation and Accept fallback,
+  status codes and retries, auth hooks and TLS trust, BulkDataURI
+  preservation/retrieval, QIDO pagination, STOW batches, conformance matrix
+  contents, and large multipart payload preservation.
+- `Tests/DicomCoreTests/DicomInteropSmokeTests.swift`, run by
+  `Scripts/interop/run_interop_smoke.sh`, exercises the client against
+  Orthanc and dcm4chee: STOW-RS in batches with one refused instance, paged
+  QIDO-RS with `limit=1`, WADO-RS retrieve of a study, series and instance,
+  frames with `transfer-syntax=*` and plain `application/octet-stream`, a
+  refused Accept followed by the fallback request, the pixel data and palette
+  color LUT `BulkDataURI` values, and, on a second Orthanc, Basic
+  authentication. The script rejects
+  the smoke study on dcm4chee (`113039^DCM`) after each run so it can be
+  repeated. Last recorded run, 2026-10-04: Orthanc 1.13.0 with DICOMweb plugin
+  1.24 passed all 11 smoke tests in three consecutive runs. dcm4chee 5.35 was
+  not run, because that host had no container runtime; the dcm4chee cases and
+  the rejection cleanup have no recorded run.
 - `Sources/DicomCore/DicomCore.docc/Articles/ConformanceStatement.md` documents
   that the DICOMweb surface is a helper API, not a complete production PACS
   client/server.
 
 Future backend work, if a production DICOMweb stack becomes the target:
 
-- Add persistent storage, production authorization, PHI audit logging, TLS
-  termination guidance, external PACS integration tests, and operational
-  metrics.
-- Implement UPS to a concrete P-level scope instead of the current stable
-  deferred `501` response.
-- Implement server-side WADO-RS frame/rendered-frame retrieval if the package
-  should render or stream server-owned pixel data.
+- Add persistent storage, production authorization, PHI audit logging,
+  deployment guidance, and operational metrics.
+- Record a dcm4chee run of the interop smoke.
 - Add JPIP proxying through DICOMweb only if the package should own that network
   path; the current JPIP design remains caller-supplied `DicomJPIPTransport`.
-- Replace Data-backed large-payload request/response bodies with a true
-  streaming API only when zero-copy DICOMweb transfers are required.
 
 ### 8. DIMSE and Network Scope Is Reconciled to Tested Helpers
 

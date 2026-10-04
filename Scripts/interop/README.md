@@ -42,6 +42,18 @@ and writes failure diagnostics to `.build/interop-logs/`.
 Use `--orthanc-only` for a quicker local loop, `--keep` to leave services up for
 manual debugging, or `--no-up` to run against services you started yourself.
 
+Without Docker, `--no-up --orthanc-only` runs against Orthanc binaries started
+by hand: one Orthanc with the DICOMweb plugin, DICOM AET `ORTHANC`, and a
+`MTKSMOKE` modality at `127.0.0.1` on the Storage SCP port, and a second one
+with `AuthenticationEnabled` and the registered user `smoke`. Point the script
+at them with `ORTHANC_HTTP_PORT`, `ORTHANC_AUTH_HTTP_PORT`, `ORTHANC_DIMSE_PORT`
+and `DICOM_INTEROP_STORAGE_SCP_PORT`, and give each a temporary database.
+
+The smoke stores fixed UIDs. When dcm4chee is among the archives, the script
+rejects the smoke study with `POST {DICOMweb}/studies/{uid}/reject/113039%5EDCM`
+(Data Retention Policy Expired) after every run, passed or failed, so the run
+can be repeated. Orthanc accepts the same instances again and needs no cleanup.
+
 ## CI Opt-In
 
 The smoke group is safe to add as an opt-in CI job:
@@ -73,6 +85,15 @@ specific local or CI environment needs pinned versions.
 `DicomInteropSmokeTests` covers:
 
 - DICOMweb STOW-RS, QIDO-RS, and WADO-RS metadata retrieval.
+- STOW-RS in batches of two (`storeFiles`) where the archive refuses one
+  instance of another study and stores the rest of the batch.
+- Paged QIDO-RS at instance level with `limit=1`, each instance returned once.
+- WADO-RS retrieve of the study, the series and one instance.
+- Frames with `transfer-syntax=*` and with plain `application/octet-stream`.
+- An Accept with an unknown transfer syntax, refused alone, then retrieved
+  through a `DicomWebAcceptList` that falls back to `transfer-syntax=*`.
+- The `BulkDataURI` values of three 8 KiB palette color LUTs, resolved with
+  `resolveBulkData(in:)` and compared byte for byte.
 - DIMSE C-ECHO, C-STORE, and C-FIND for configured archives.
 - DIMSE C-GET for archives declaring `dimse-get`.
 - C-MOVE into a local Storage SCP (`DicomStorageSCPServer`) and
@@ -82,18 +103,31 @@ specific local or CI environment needs pinned versions.
   ID/name, series UID, modality), issue #1223.
 - Query cancellation through `DicomDIMSEOperationHandle` surfacing the
   typed `operationCancelled` error.
-- Retry-policy and TLS-against-plaintext failure paths surfacing typed
-  `DicomNetworkError`s instead of hiding protocol errors.
+- Retry-policy and TLS-against-plaintext failure paths surfacing their errors
+  instead of hiding them: a typed `DicomNetworkError`, or the connection's own
+  refusal (`ECONNREFUSED`), which the TCP transport keeps unwrapped.
 - Authenticated DICOMweb path against the `orthanc-auth` service (valid
   Basic credentials round-trip STOW/QIDO; invalid credentials surface the
   typed HTTP 401). Local-only credentials: `smoke` /
   `ORTHANC_AUTH_PASSWORD` (default `smoke-secret`).
-- WADO-RS metadata `BulkDataURI` resolution and retrieval.
+- WADO-RS metadata `BulkDataURI` resolution and retrieval of the pixel data.
 - PHI-free diagnostics: audit events and error bodies are asserted not to
   carry the fixture's patient name/ID.
 
 Failures keep the service logs and Swift test output under
 `.build/interop-logs/` so CI artifacts have enough detail for diagnosis.
+
+### Recorded runs
+
+- 2026-10-04, Apple Silicon, without Docker: Orthanc 1.13.0 with DICOMweb
+  plugin 1.24 (macOS package 26.9.1), `--no-up --orthanc-only`. All 11
+  `DicomInteropSmokeTests` passed, none skipped, in three consecutive runs on
+  the same database. Orthanc answers an Accept it cannot satisfy with 400, not
+  406, so the smoke counts 400 as a fallback status; it refuses an instance of
+  another study with 409 and Failure Reason 0x0110 while storing the rest of
+  the request.
+- dcm4chee 5.35 has no recorded run: that host had no container runtime. The
+  dcm4chee cases and the rejection cleanup are implemented but not exercised.
 
 ## Independent pynetdicom peer (Lot A1)
 

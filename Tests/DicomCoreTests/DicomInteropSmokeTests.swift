@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(Network)
+import Network
+#endif
 import XCTest
 import DicomTestSupport
 @testable import DicomCore
@@ -520,7 +523,15 @@ extension DicomInteropSmokeTests {
         } catch let error as DicomNetworkError {
             assertDiagnosticsCarryNoPHI(String(describing: error), fixture: fixture, context: "retry")
         } catch {
+            #if canImport(Network)
+            // The TCP transport keeps a refused connection's own POSIX error instead of wrapping it.
+            guard let refusal = error as? NWError, case .posix(.ECONNREFUSED) = refusal else {
+                return XCTFail("expected a DicomNetworkError or the connection refusal, got \(error)")
+            }
+            assertDiagnosticsCarryNoPHI(String(describing: error), fixture: fixture, context: "retry")
+            #else
             XCTFail("expected a typed DicomNetworkError, got \(error)")
+            #endif
         }
     }
 
@@ -616,20 +627,19 @@ extension DicomInteropSmokeTests {
             } until: { dataSets in
                 dataSets.contains { $0.dataSet.string(for: .sopInstanceUID) == fixture.sopInstanceUID }
             }
-            guard let instance = metadata.map(\.dataSet).first(where: {
-                $0.string(for: .sopInstanceUID) == fixture.sopInstanceUID
+            guard let instance = metadata.first(where: {
+                $0.dataSet.string(for: .sopInstanceUID) == fixture.sopInstanceUID
             }) else {
                 XCTFail("\(archive.id): stored instance missing from metadata")
                 continue
             }
-            guard let pixelReference = instance.string(for: .pixelData),
-                  pixelReference.contains("/") else {
+            guard let pixelReference = instance.bulkData.first(where: { $0.tag == DicomTag.pixelData.rawValue }) else {
                 throw DicomTestRuntimePreflight.skip(
                     .networkInteropSmoke,
                     detail: "\(archive.id) metadata does not reference pixel data through a BulkDataURI."
                 )
             }
-            let retrieved = try await client.retrieveBulkData(uri: pixelReference)
+            let retrieved = try await client.retrieveBulkData(uri: pixelReference.uri)
             let payload = retrieved.firstPayload ?? Data()
             XCTAssertFalse(payload.isEmpty, archive.id)
             XCTAssertEqual(payload.first, 0x7F, "\(archive.id): bulk pixel payload must match the fixture")
@@ -838,5 +848,258 @@ extension DicomInteropSmokeTests {
         }
         if let lastValue { return lastValue }
         throw lastError ?? DicomNetworkError.networkTimeout(label)
+    }
+}
+
+// MARK: - Batched STOW, paging, retrieve levels, frames, Accept fallback, palette LUT
+
+extension DicomInteropSmokeTests {
+    struct InteropSeriesInstance {
+        var sopInstanceUID: String
+        var part10Data: Data
+    }
+
+    /// A series of the fixture study: one 8-bit grayscale instance, one palette color instance whose LUTs are large
+    /// enough to be sent as BulkDataURI references, and one instance of another study that a STOW-RS request to the
+    /// fixture study must refuse.
+    struct InteropSeriesFixture {
+        var studyInstanceUID: String
+        var seriesInstanceUID: String
+        var grayscale: InteropSeriesInstance
+        var palette: InteropSeriesInstance
+        var paletteLUTs: [Data]
+        var otherStudy: InteropSeriesInstance
+
+        var storedSOPInstanceUIDs: Set<String> { [grayscale.sopInstanceUID, palette.sopInstanceUID] }
+    }
+
+    /// Stores the series in batches with one refused instance, pages it, retrieves it at the three WADO-RS levels
+    /// and as frames, falls back after a refused Accept, and resolves the palette LUT BulkDataURI references.
+    func testInteropDICOMwebBatchesPagingRetrieveFramesFallbackAndPaletteLUT() async throws {
+        let fixture = try interopSeriesFixture()
+        let archives = try interopArchivesForExtension().filter { $0.dicomWebURL != nil }
+        try skipIfEmpty(archives, detail: "No configured archive declares DICOMweb support.")
+
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("dicom-interop-stow-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        // The refused instance shares the first batch with an accepted one, so that batch gets a partial answer.
+        let files = try [fixture.grayscale, fixture.otherStudy, fixture.palette].map { instance in
+            let url = directory.appendingPathComponent("\(instance.sopInstanceUID).dcm")
+            try instance.part10Data.write(to: url)
+            return url
+        }
+
+        for archive in archives {
+            guard let baseURL = archive.dicomWebURL else { continue }
+            let client = DicomWebClient(configuration: DicomWebClientConfiguration(
+                baseURL: baseURL,
+                headers: archive.dicomWebHeaders,
+                timeout: archive.timeout
+            ))
+            try await assertBatchedStore(client, files: files, fixture: fixture, archive: archive.id)
+            try await assertPagedInstanceSearch(client, fixture: fixture, archive: archive.id)
+            try await assertRetrieveLevels(client, fixture: fixture, archive: archive.id)
+            try await assertFrames(client, fixture: fixture, archive: archive.id)
+            try await assertAcceptFallback(client, fixture: fixture, archive: archive.id)
+            try await assertPaletteLUTBulkData(client, fixture: fixture, archive: archive.id)
+        }
+    }
+
+    private func assertBatchedStore(_ client: DicomWebClient, files: [URL], fixture: InteropSeriesFixture,
+                                    archive: String) async throws {
+        let results = await client.storeFiles(files, studyInstanceUID: fixture.studyInstanceUID,
+                                              options: DicomWebStoreBatchOptions(maximumFilesPerBatch: 2))
+        XCTAssertEqual(results.count, 3, archive)
+        for result in results {
+            let uid = result.sopInstanceUID ?? ""
+            if uid == fixture.otherStudy.sopInstanceUID {
+                XCTAssertEqual(result.state, .failed, "\(archive): an instance of another study must be refused")
+                XCTAssertNotNil(result.dicomStatus, "\(archive): the refusal must carry its Failure Reason")
+            } else {
+                // A repeated run stores the same instances again, which an archive may answer with a warning.
+                XCTAssertTrue([.stored, .warning].contains(result.state),
+                              "\(archive): \(uid) ended \(result.state.rawValue) (\(result.reason ?? "no reason"))")
+            }
+        }
+    }
+
+    private func assertPagedInstanceSearch(_ client: DicomWebClient, fixture: InteropSeriesFixture,
+                                           archive: String) async throws {
+        let found = try await interopRetryingAsync("paged QIDO \(archive)") {
+            var uids: [String] = []
+            var pages = 0
+            var stopReason: DicomWebSearchStopReason?
+            let parameters = DicomWebSearchParameters(level: .instance, studyInstanceUID: fixture.studyInstanceUID,
+                                                      seriesInstanceUID: fixture.seriesInstanceUID, limit: 1)
+            for try await page in client.searchPages(parameters: parameters, continuesOnFullPage: true,
+                                                     limits: DicomWebSearchPagingLimits(maximumPages: 10)) {
+                pages += 1
+                uids += page.dataSets.compactMap { $0.string(for: .sopInstanceUID) }
+                stopReason = page.stopReason ?? stopReason
+            }
+            return (uids: uids, pages: pages, stopReason: stopReason)
+        } until: { Set($0.uids) == fixture.storedSOPInstanceUIDs }
+        XCTAssertEqual(Set(found.uids), fixture.storedSOPInstanceUIDs, archive)
+        XCTAssertEqual(found.uids.count, Set(found.uids).count, "\(archive): each instance must be returned once")
+        XCTAssertGreaterThanOrEqual(found.pages, 2, "\(archive): limit=1 must take more than one page")
+        XCTAssertNil(found.stopReason, "\(archive): the pager must end on the server's last page")
+    }
+
+    private func assertRetrieveLevels(_ client: DicomWebClient, fixture: InteropSeriesFixture,
+                                      archive: String) async throws {
+        let study = DicomWebMemoryRetrieveSink()
+        try await client.retrieveStudy(studyInstanceUID: fixture.studyInstanceUID, sink: study)
+        let studyUIDs = Set(await study.result().compactMap(interopSOPInstanceUID))
+        XCTAssertTrue(fixture.storedSOPInstanceUIDs.isSubset(of: studyUIDs), "\(archive): study retrieve")
+
+        let series = DicomWebMemoryRetrieveSink()
+        try await client.retrieveSeries(studyInstanceUID: fixture.studyInstanceUID,
+                                        seriesInstanceUID: fixture.seriesInstanceUID, sink: series)
+        let seriesUIDs = await series.result().compactMap(interopSOPInstanceUID)
+        XCTAssertEqual(Set(seriesUIDs), fixture.storedSOPInstanceUIDs, "\(archive): series retrieve")
+        XCTAssertEqual(seriesUIDs.count, 2, "\(archive): series retrieve")
+
+        let instance = DicomWebMemoryRetrieveSink()
+        try await client.retrieveInstance(studyInstanceUID: fixture.studyInstanceUID,
+                                          seriesInstanceUID: fixture.seriesInstanceUID,
+                                          sopInstanceUID: fixture.grayscale.sopInstanceUID, sink: instance)
+        let instanceUIDs = await instance.result().compactMap(interopSOPInstanceUID)
+        XCTAssertEqual(instanceUIDs, [fixture.grayscale.sopInstanceUID], "\(archive): instance retrieve")
+    }
+
+    private func assertFrames(_ client: DicomWebClient, fixture: InteropSeriesFixture, archive: String) async throws {
+        for accept in [
+            DicomWebMediaTypeNegotiator.acceptHeader(for: .frames),
+            "multipart/related; type=\"application/octet-stream\""
+        ] {
+            let frames = try await client.retrieveFrames(studyInstanceUID: fixture.studyInstanceUID,
+                                                         seriesInstanceUID: fixture.seriesInstanceUID,
+                                                         sopInstanceUID: fixture.grayscale.sopInstanceUID,
+                                                         frames: DicomWebFrameList([1]), accept: accept)
+            XCTAssertEqual(frames.statusCode, 200, "\(archive): \(accept)")
+            XCTAssertEqual(frames.parts.count, 1, "\(archive): \(accept)")
+            XCTAssertEqual(frames.firstPayload?.first, 0x7F, "\(archive): frame 1 must hold the fixture pixel (\(accept))")
+            XCTAssertTrue(frames.parts.first?.contentType?.lowercased().contains("application/octet-stream") == true,
+                          "\(archive): native frames are octet-stream (\(accept))")
+        }
+    }
+
+    /// The first range asks for a transfer syntax no archive can produce. Archives refuse it with 406, or with 400
+    /// (Orthanc), so both are fallback statuses; the retrieve then asks again for the instance as stored.
+    private func assertAcceptFallback(_ client: DicomWebClient, fixture: InteropSeriesFixture,
+                                      archive: String) async throws {
+        let unknownSyntax = "2.25.2810999"
+        let fallbackStatuses: Set<Int> = [400, 406]
+        do {
+            try await client.retrieveInstance(
+                studyInstanceUID: fixture.studyInstanceUID, seriesInstanceUID: fixture.seriesInstanceUID,
+                sopInstanceUID: fixture.grayscale.sopInstanceUID,
+                accept: DicomWebMediaTypeNegotiator.instanceAccept(transferSyntaxUIDs: [unknownSyntax],
+                                                                   fallbackStatuses: fallbackStatuses),
+                sink: DicomWebMemoryRetrieveSink())
+            XCTFail("\(archive): an unknown transfer syntax alone must be refused")
+        } catch let error as DicomWebError {
+            XCTAssertTrue(fallbackStatuses.contains(error.statusCode), "\(archive): refused with \(error)")
+            XCTAssertEqual(error.attemptedAccepts?.count, 1, archive)
+        }
+
+        let sink = DicomWebMemoryRetrieveSink()
+        try await client.retrieveInstance(
+            studyInstanceUID: fixture.studyInstanceUID, seriesInstanceUID: fixture.seriesInstanceUID,
+            sopInstanceUID: fixture.grayscale.sopInstanceUID,
+            accept: DicomWebMediaTypeNegotiator.instanceAccept(transferSyntaxUIDs: [unknownSyntax, "*"],
+                                                               fallbackStatuses: fallbackStatuses),
+            sink: sink)
+        let uids = await sink.result().compactMap(interopSOPInstanceUID)
+        XCTAssertEqual(uids, [fixture.grayscale.sopInstanceUID], "\(archive): the fallback must retrieve the instance")
+    }
+
+    private func assertPaletteLUTBulkData(_ client: DicomWebClient, fixture: InteropSeriesFixture,
+                                          archive: String) async throws {
+        let metadata = try await client.retrieveInstanceMetadata(studyInstanceUID: fixture.studyInstanceUID,
+                                                                 seriesInstanceUID: fixture.seriesInstanceUID,
+                                                                 sopInstanceUID: fixture.palette.sopInstanceUID)
+        let decoded = try XCTUnwrap(metadata.first, archive)
+        for index in fixture.paletteLUTs.indices {
+            XCTAssertTrue(decoded.bulkData.contains { $0.tag == 0x0028_1201 + index },
+                          "\(archive): palette LUT \(index) must be a BulkDataURI reference")
+        }
+        let resolved = try await client.resolveBulkData(in: decoded)
+        for (index, lut) in fixture.paletteLUTs.enumerated() {
+            let element = try XCTUnwrap(resolved.dataSet[0x0028_1201 + index], archive)
+            XCTAssertEqual(try DicomDataSetRepresentation.binaryValueBytes(of: element), lut,
+                           "\(archive): palette LUT \(index) bytes")
+        }
+    }
+
+    func interopSOPInstanceUID(_ part: DicomWebMultipartPart) -> String? {
+        (try? DicomPart10FileMetaParser.parse(part.body))?.mediaStorageSOPInstanceUID?
+            .trimmingCharacters(in: CharacterSet(charactersIn: " \0"))
+    }
+
+    func interopSeriesFixture() throws -> InteropSeriesFixture {
+        let base = try interopFixture()
+        let seriesInstanceUID = "2.25.2810010"
+        // 12-bit palette color: three 4096-entry, 16-bit LUTs of 8 KiB each.
+        let luts = (0..<3).map { channel in
+            Data((0..<4096).flatMap { entry -> [UInt8] in
+                let value = UInt16((entry * (channel + 1) * 16) & 0xFFFF)
+                return [UInt8(value & 0xFF), UInt8(value >> 8)]
+            })
+        }
+        func instance(sopInstanceUID: String, studyInstanceUID: String, seriesInstanceUID: String,
+                      pixel: [DicomDataElement]) throws -> InteropSeriesInstance {
+            let dataSet = DicomDataSet(elements: [
+                interopElement(DicomTag.sopClassUID.rawValue, .UI, base.sopClassUID),
+                interopElement(DicomTag.sopInstanceUID.rawValue, .UI, sopInstanceUID),
+                interopElement(DicomTag.patientName.rawValue, .PN, base.patientName),
+                interopElement(DicomTag.patientID.rawValue, .LO, base.patientID),
+                interopElement(DicomTag.studyInstanceUID.rawValue, .UI, studyInstanceUID),
+                interopElement(DicomTag.seriesInstanceUID.rawValue, .UI, seriesInstanceUID),
+                interopElement(DicomTag.modality.rawValue, .CS, "OT"),
+                interopUS(.samplesPerPixel, 1),
+                interopUS(.rows, 1),
+                interopUS(.columns, 1),
+                interopUS(.pixelRepresentation, 0)
+            ] + pixel)
+            let data = try DicomDataSetWriter.part10Data(
+                from: dataSet,
+                options: DicomPart10WriterOptions(mediaStorageSOPClassUID: base.sopClassUID,
+                                                  mediaStorageSOPInstanceUID: sopInstanceUID)
+            )
+            return InteropSeriesInstance(sopInstanceUID: sopInstanceUID, part10Data: data)
+        }
+        let grayscalePixel = [
+            interopElement(DicomTag.photometricInterpretation.rawValue, .CS, "MONOCHROME2"),
+            interopUS(.bitsAllocated, 8),
+            interopUS(.bitsStored, 8),
+            interopUS(.highBit, 7),
+            DicomDataElement(tag: DicomTag.pixelData.rawValue, vr: .OB, value: .bytes(Data([0x7F])))
+        ]
+        var palettePixel = [
+            interopElement(DicomTag.photometricInterpretation.rawValue, .CS, "PALETTE COLOR"),
+            interopUS(.bitsAllocated, 16),
+            interopUS(.bitsStored, 12),
+            interopUS(.highBit, 11),
+            DicomDataElement(tag: DicomTag.pixelData.rawValue, vr: .OW, value: .bytes(Data([0x23, 0x01])))
+        ]
+        for (index, lut) in luts.enumerated() {
+            palettePixel.append(DicomDataElement(tag: 0x0028_1101 + index, vr: .US,
+                                                 value: .unsignedIntegers([4096, 0, 16])))
+            palettePixel.append(DicomDataElement(tag: 0x0028_1201 + index, vr: .OW, value: .bytes(lut)))
+        }
+        return InteropSeriesFixture(
+            studyInstanceUID: base.studyInstanceUID,
+            seriesInstanceUID: seriesInstanceUID,
+            grayscale: try instance(sopInstanceUID: "2.25.2810011", studyInstanceUID: base.studyInstanceUID,
+                                    seriesInstanceUID: seriesInstanceUID, pixel: grayscalePixel),
+            palette: try instance(sopInstanceUID: "2.25.2810012", studyInstanceUID: base.studyInstanceUID,
+                                  seriesInstanceUID: seriesInstanceUID, pixel: palettePixel),
+            paletteLUTs: luts,
+            otherStudy: try instance(sopInstanceUID: "2.25.2810019", studyInstanceUID: "2.25.2810901",
+                                     seriesInstanceUID: "2.25.2810902", pixel: grayscalePixel)
+        )
     }
 }

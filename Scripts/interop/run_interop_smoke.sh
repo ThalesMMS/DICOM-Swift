@@ -23,6 +23,9 @@ Options:
   --orthanc-only Start and test only Orthanc. Useful for quick local checks.
   -h, --help     Show this help.
 
+When dcm4chee is tested, its smoke study is rejected (113039^DCM) after the run so
+the smoke can be repeated.
+
 Environment overrides:
   ORTHANC_HTTP_PORT, ORTHANC_DIMSE_PORT, ORTHANC_IMAGE
   DCM4CHEE_HTTP_PORT, DCM4CHEE_DIMSE_PORT, DCM4CHEE_ARC_IMAGE
@@ -70,10 +73,31 @@ print_logs() {
   fi
 }
 
+# The smoke stores fixed UIDs. dcm4chee keeps what it stored across runs, so its smoke study (and the other-study
+# instance the batched STOW case sends, should the archive have accepted it) is rejected with "Data Retention
+# Policy Expired" (113039^DCM) after every run, so the smoke can be repeated. Orthanc accepts the same instances
+# again and needs no cleanup. These UIDs must match the fixtures in DicomInteropSmokeTests.
+SMOKE_STUDY_UIDS="2.25.2810001 2.25.2810901"
+SMOKE_STARTED=0
+
+reject_dcm4chee_smoke_studies() {
+  local base="${DICOM_INTEROP_DCM4CHEE_DICOMWEB_URL:-}"
+  [[ -n "${base}" ]] || return 0
+  local study status
+  for study in ${SMOKE_STUDY_UIDS}; do
+    status="$(curl -s -m 30 -o /dev/null -w '%{http_code}' -X POST \
+      "${base}/studies/${study}/reject/113039%5EDCM" || true)"
+    echo "dcm4chee reject ${study} (113039^DCM): HTTP ${status}"
+  done
+}
+
 cleanup() {
   status=$?
   if [[ ${status} -ne 0 ]]; then
     print_logs
+  fi
+  if [[ ${SMOKE_STARTED} -eq 1 && "${ARCHIVES}" == *dcm4chee* ]]; then
+    reject_dcm4chee_smoke_studies || true
   fi
   if [[ ${START_SERVICES} -eq 1 && ${KEEP_SERVICES} -eq 0 ]]; then
     compose down >/dev/null 2>&1 || true
@@ -144,6 +168,7 @@ export DICOM_INTEROP_DCM4CHEE_CALLING_AE="${DICOM_INTEROP_DCM4CHEE_CALLING_AE:-M
 export DICOM_INTEROP_DCM4CHEE_DICOMWEB_URL="${DICOM_INTEROP_DCM4CHEE_DICOMWEB_URL:-http://127.0.0.1:${DCM4CHEE_HTTP_PORT:-8080}/dcm4chee-arc/aets/DCM4CHEE/rs}"
 export DICOM_INTEROP_DCM4CHEE_CAPABILITIES="${DICOM_INTEROP_DCM4CHEE_CAPABILITIES:-dicomweb,dimse-echo,dimse-store,dimse-find}"
 
+SMOKE_STARTED=1
 (
   cd "${PACKAGE_DIR}"
   swift test --filter DicomInteropSmokeTests 2>&1 | tee "${LOG_DIR}/swift-test.log"
