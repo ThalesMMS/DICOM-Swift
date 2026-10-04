@@ -95,9 +95,27 @@ final class DocumentationReconciliationTests: XCTestCase {
     func testMigrationGuideHasNoStaleUncheckedChecklistItems() throws {
         let migration = try Self.packageText("Sources/DicomCore/DicomCore.docc/Articles/MigrationGuide.md")
 
-        XCTAssertTrue(migration.contains("Migration Status Before v2.0.0"))
+        XCTAssertTrue(migration.contains("Migration Status in 2.0.x"))
         XCTAssertTrue(migration.contains("project checklist; current package documentation reconciliation"))
         XCTAssertFalse(migration.contains("- [ ]"))
+    }
+
+    func testMigrationGuideDescribesReleasedTwoZeroLine() throws {
+        let migration = try Self.packageText("Sources/DicomCore/DicomCore.docc/Articles/MigrationGuide.md")
+
+        // 2.0.0 shipped without removing the v1 decoder APIs, so the guide
+        // must not present that release as future or promise those removals.
+        for stale in ["Planned for removal in v2.0.0", "planned for removal in v2.0.0",
+                      "v2.0.0** (planned)", "planned v2.0.0", "Version 2.0.0 is planned"] {
+            XCTAssertFalse(migration.contains(stale), stale)
+        }
+        assert(migration, contains: [
+            "## v1 APIs in 2.0.x",
+            "### Removed Before 2.0.0",
+            "### Still Present in 2.0.x, Deprecated",
+            "### Still Present in 2.0.x, Not Deprecated",
+            "### Removal Plan"
+        ])
     }
 
     func testDocumentationGapIsMarkedReconciledAndGuarded() throws {

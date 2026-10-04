@@ -8,20 +8,27 @@ DicomCore has evolved to provide more Swift-idiomatic APIs. This guide helps you
 
 **Recommended APIs:**
 - **Throwing initializers** (v1.1.0+) - Swift-idiomatic error handling
-- **Type-safe DicomTag enum** (v1.2.0+) - Semantic tag names replace hex values
-- **Type-safe value types** (v1.2.0+) - Structs replace tuples for better type safety
-- **V2 windowing methods** (v1.2.0+) - Return WindowSettings instead of tuples
+- **Type-safe DicomTag enum** (v1.1.0+) - Semantic tag names replace hex values
+- **Type-safe value types** (v1.1.0+) - Structs replace tuples for better type safety
+- **V2 windowing methods** (v1.1.0+) - Return WindowSettings instead of tuples
 
-> **Planned breaking changes in v2.0.0**
+> **v1 APIs in the released 2.0.x line**
 >
-> Version 2.0.0 is expected to remove deprecated APIs that were marked for removal in v1.x releases. Migrate to the modern APIs documented in this guide before upgrading to v2.0.0.
+> Versions 2.0.0 and 2.0.1 are released. The source breaks of 2.0.0 come from the Swift 6 language mode and the reorganized modules described in its release notes, and 2.0.1 changed no public API. Neither release removed the v1 decoder APIs this guide covers.
 >
-> **Planned for removal in v2.0.0:**
-> - Legacy file loading API (`setDicomFilename()`, `dicomFileReadSuccess`, `loadDICOMFileAsync()`)
-> - Tuple-based properties (`windowSettings`, `pixelSpacing`, `rescaleParameters`)
+> **Removed in 1.1.0, before 2.0.0:**
 > - Tuple-based windowing methods (`calculateOptimalWindowLevel()`, `getPresetValues()`, etc.)
-> - DCMDictionary singleton pattern (`DCMDictionary.shared`)
+> - DCMDictionary singleton pattern (`DCMDictionary.shared` and its static lookups)
+>
+> **Still present in 2.0.x, deprecated:**
+> - Legacy file loading API (`setDicomFilename(_:)`, `dicomFileReadSuccess`)
+> - Tuple-based properties (`windowSettings`, `pixelSpacing`, `rescaleParameters`) and `calculateOptimalWindow()`
+>
+> **Still present in 2.0.x, not deprecated but discouraged:**
+> - `loadDICOMFileAsync(_:)`
 > - Async pixel convenience methods (`getPixels16Async()`, `getPixels8Async()`, etc.)
+>
+> No release schedules their removal. The section "v1 APIs in 2.0.x" at the end of this guide lists each API and the removal plan.
 
 ---
 
@@ -146,7 +153,7 @@ Task {
 
 ## Migration Path 2: Type-Safe DicomTag Enum
 
-**Status:** Recommended since v1.2.0
+**Status:** Recommended since v1.1.0; the raw hexadecimal accessors are not deprecated and remain for private and custom tags
 **Replaces:** Raw hex tag values (e.g., `0x00100010`)
 
 ### Old Pattern (Discouraged)
@@ -268,13 +275,13 @@ let patientName = decoder.info(for: .patientName)    // Preferred
 
 ## Migration Path 3: DCMDictionary Singleton to Instance
 
-**Status:** Recommended since v1.2.0, planned as required for v2.0.0
+**Status:** Required since v1.1.0, which removed the singleton
 **Replaces:** `DCMDictionary.shared` singleton pattern
 
-### Old Pattern (Deprecated)
+### Old Pattern (Removed in 1.1.0)
 
 ```swift
-// Deprecated: singleton pattern
+// Removed in 1.1.0: singleton pattern
 let tagName = DCMDictionary.shared.description(forKey: 0x00100010)
 let vrCode = DCMDictionary.shared.vrCode(forKey: 0x00100010)
 ```
@@ -290,8 +297,8 @@ let vrCode = DCMDictionary.shared.vrCode(forKey: 0x00100010)
 ```swift
 // Recommended: Instance-based pattern
 let dictionary = DCMDictionary()
-let tagName = dictionary.description(forKey: 0x00100010)
-let vrCode = dictionary.vrCode(forKey: 0x00100010)
+let tagName = dictionary.description(forTag: 0x00100010)
+let vrCode = dictionary.vrCode(forTag: 0x00100010)
 ```
 
 **For dependency injection:**
@@ -334,7 +341,7 @@ let testService = MyDicomService(dictionary: mockDict)
 
 ## Migration Path 4: Type-Safe Value Types (V2 APIs)
 
-**Status:** Recommended since v1.2.0
+**Status:** Recommended since v1.1.0; the tuple properties and `calculateOptimalWindow()` remain deprecated in 2.0.x
 **Replaces:** Tuple-based APIs
 
 ### Overview
@@ -450,14 +457,14 @@ if !rescale.isIdentity {
 
 ## Migration Path 5: Windowing Processor V2 Methods
 
-**Status:** Recommended since v1.2.0
+**Status:** Required since v1.1.0, which removed the tuple-based windowing methods
 **Replaces:** Tuple-based windowing methods
 
 ### Calculate Optimal Window/Level
 
 **Old Pattern:**
 ```swift
-// Deprecated: Returns tuple
+// Removed in 1.1.0: returns a tuple
 let (center, width) = DCMWindowingProcessor.calculateOptimalWindowLevel(pixels16: pixels)
 
 let pixels8bit = DCMWindowingProcessor.applyWindowLevel(
@@ -488,7 +495,7 @@ if optimal.isValid {
 
 **Old Pattern:**
 ```swift
-// Deprecated: Returns tuple
+// Removed in 1.1.0: returns a tuple
 let (center, width) = DCMWindowingProcessor.getPresetValues(preset: .lung)
 
 let pixels8bit = DCMWindowingProcessor.applyWindowLevel(
@@ -519,7 +526,7 @@ if let presetName = DCMWindowingProcessor.getPresetName(settings: lungSettings) 
 
 **Old Pattern:**
 ```swift
-// Deprecated: Returns array of tuples
+// Removed in 1.1.0: returns an array of tuples
 let results = DCMWindowingProcessor.batchCalculateOptimalWindowLevel(
     imagePixels: [pixels1, pixels2, pixels3]
 )
@@ -550,21 +557,21 @@ let jsonData = try JSONEncoder().encode(results)
 
 ## Migration Path 6: Async Pixel Methods
 
-**Status:** Deprecated; planned for removal in v2.0.0
+**Status:** Present in 2.0.x without a deprecation attribute; discouraged for new code
 **Replaces:** Async convenience wrappers for pixel data access
 
 ### Overview
 
-The async pixel methods (`getPixels16Async()`, `getPixels8Async()`, etc.) are simple async wrappers around synchronous pixel access methods. They are planned for removal in v2.0.0 because:
+The async pixel methods (`getPixels16Async()`, `getPixels8Async()`, etc.) are simple async wrappers around synchronous pixel access methods. They remain available, and are not deprecated, in 2.0.x. Prefer the synchronous methods because:
 
 1. Pixel data access is already memory-mapped and non-blocking for large files
 2. The synchronous methods are fast enough that async wrapping adds no benefit
 3. If async behavior is truly needed, you can wrap calls yourself with more control
 
-### Old Pattern (Deprecated)
+### Old Pattern (Discouraged)
 
 ```swift
-// Deprecated: async pixel wrappers
+// Discouraged: async pixel wrappers
 let decoder = try DCMDecoder(contentsOfFile: "/path/to/image.dcm")
 
 // Prefer the synchronous pixel accessors shown below:
@@ -573,7 +580,7 @@ let pixels8 = await decoder.getPixels8Async()
 let pixels24 = await decoder.getPixels24Async()
 ```
 
-### New Pattern (Required)
+### New Pattern (Recommended)
 
 ```swift
 // Option 1: Use synchronous methods directly (recommended)
@@ -605,7 +612,7 @@ func loadPixelData() async throws -> [UInt16]? {
 
 ### Performance Note
 
-The synchronous pixel methods use memory mapping for large files, making them non-blocking at the I/O level. The async wrappers added no performance benefit and are unnecessary in Swift's modern concurrency model.
+The synchronous pixel methods use memory mapping for large files, making them non-blocking at the I/O level. The async wrappers add no performance benefit and are unnecessary in Swift's modern concurrency model.
 
 ---
 
@@ -613,10 +620,10 @@ The synchronous pixel methods use memory mapping for large files, making them no
 
 Here's a comprehensive before/after example showing all migration paths:
 
-### Before (All Deprecated APIs)
+### Before (v1 APIs)
 
 ```swift
-// Deprecated pattern - all deprecated APIs
+// v1 pattern - deprecated, discouraged and removed APIs
 let decoder = DCMDecoder()
 decoder.setDicomFilename("/path/to/ct_scan.dcm")
 
@@ -638,7 +645,7 @@ let (center, width) = decoder.windowSettings
 let (spacingX, spacingY, spacingZ) = decoder.pixelSpacing
 let (intercept, slope) = decoder.rescaleParameters
 
-// Tuple-based windowing
+// Tuple-based windowing (removed in 1.1.0)
 guard let pixels = decoder.getPixels16() else { return }
 let (optimalCenter, optimalWidth) = DCMWindowingProcessor.calculateOptimalWindowLevel(
     pixels16: pixels
@@ -713,47 +720,47 @@ do {
 
 ### API Replacement Table
 
-| Deprecated API | Replacement API | Migration Path |
-|----------------|-----------------|----------------|
-| `DCMDecoder()` + `setDicomFilename()` | `try DCMDecoder(contentsOfFile:)` | Path 1 |
-| `DCMDecoder()` + `setDicomFilename()` | `try DCMDecoder(contentsOf:)` | Path 1 |
-| `loadDICOMFileAsync()` | `try await DCMDecoder(contentsOfFile:)` | Path 1 |
-| `dicomFileReadSuccess` | Use `do-catch` with throwing initializers | Path 1 |
-| `info(for: 0x00100010)` | `info(for: .patientName)` | Path 2 |
-| `intValue(for: 0x00280010)` | `intValue(for: .rows)` | Path 2 |
-| `DCMDictionary.shared` | `DCMDictionary()` instance | Path 3 |
-| `windowSettings` (tuple) | `windowSettingsV2` (struct) | Path 4 |
-| `pixelSpacing` (tuple) | `pixelSpacingV2` (struct) | Path 4 |
-| `rescaleParameters` (tuple) | `rescaleParametersV2` (struct) | Path 4 |
-| `calculateOptimalWindow()` (tuple) | `calculateOptimalWindowV2()` (struct) | Path 4 |
-| `calculateOptimalWindowLevel()` | `calculateOptimalWindowLevelV2()` | Path 5 |
-| `getPresetValues(preset:)` | `getPresetValuesV2(preset:)` | Path 5 |
-| `getPresetValues(named:)` | `getPresetValuesV2(named:)` | Path 5 |
-| `batchCalculateOptimalWindowLevel()` | `batchCalculateOptimalWindowLevelV2()` | Path 5 |
-| `getPresetName(center:width:)` | `getPresetName(settings:)` | Path 5 |
-| `getPixels16Async()` | `getPixels16()` (synchronous) | Path 6 |
-| `getPixels8Async()` | `getPixels8()` (synchronous) | Path 6 |
-| `getPixels24Async()` | `getPixels24()` (synchronous) | Path 6 |
-| `getDownsampledPixels16Async()` | `getDownsampledPixels16()` (synchronous) | Path 6 |
-| `getDownsampledPixels8Async()` | `getDownsampledPixels8()` (synchronous) | Path 6 |
+| v1 API | Replacement API | Migration Path | State in 2.0.x |
+|--------|-----------------|----------------|----------------|
+| `DCMDecoder()` + `setDicomFilename()` | `try DCMDecoder(contentsOfFile:)` | Path 1 | Deprecated |
+| `DCMDecoder()` + `setDicomFilename()` | `try DCMDecoder(contentsOf:)` | Path 1 | Deprecated |
+| `loadDICOMFileAsync()` | `try await DCMDecoder(contentsOfFile:)` | Path 1 | Present, not deprecated |
+| `dicomFileReadSuccess` | Use `do-catch` with throwing initializers | Path 1 | Deprecated |
+| `info(for: 0x00100010)` | `info(for: .patientName)` | Path 2 | Present, not deprecated (kept for private tags) |
+| `intValue(for: 0x00280010)` | `intValue(for: .rows)` | Path 2 | Present, not deprecated (kept for private tags) |
+| `DCMDictionary.shared` | `DCMDictionary()` instance | Path 3 | Removed in 1.1.0 |
+| `windowSettings` (tuple) | `windowSettingsV2` (struct) | Path 4 | Deprecated |
+| `pixelSpacing` (tuple) | `pixelSpacingV2` (struct) | Path 4 | Deprecated |
+| `rescaleParameters` (tuple) | `rescaleParametersV2` (struct) | Path 4 | Deprecated |
+| `calculateOptimalWindow()` (tuple) | `calculateOptimalWindowV2()` (struct) | Path 4 | Deprecated |
+| `calculateOptimalWindowLevel()` | `calculateOptimalWindowLevelV2()` | Path 5 | Removed in 1.1.0 |
+| `getPresetValues(preset:)` | `getPresetValuesV2(preset:)` | Path 5 | Removed in 1.1.0 |
+| `getPresetValues(named:)` | `getPresetValuesV2(named:)` | Path 5 | Removed in 1.1.0 |
+| `batchCalculateOptimalWindowLevel()` | `batchCalculateOptimalWindowLevelV2()` | Path 5 | Removed in 1.1.0 |
+| `getPresetName(center:width:)` | `getPresetName(settings:)` | Path 5 | Removed in 1.1.0 |
+| `getPixels16Async()` | `getPixels16()` (synchronous) | Path 6 | Present, not deprecated |
+| `getPixels8Async()` | `getPixels8()` (synchronous) | Path 6 | Present, not deprecated |
+| `getPixels24Async()` | `getPixels24()` (synchronous) | Path 6 | Present, not deprecated |
+| `getDownsampledPixels16Async()` | `getDownsampledPixels16()` (synchronous) | Path 6 | Present, not deprecated |
+| `getDownsampledPixels8Async()` | `getDownsampledPixels8()` (synchronous) | Path 6 | Present, not deprecated |
 
-### Migration Status Before v2.0.0
+### Migration Status in 2.0.x
 
-This table records the migration actions consumers should complete before
-upgrading to the planned v2.0.0 API break. It is intentionally not an open
+This table records the migration actions consumers of the v1 APIs should
+complete on the released 2.0.x line. It is intentionally not an open
 project checklist; current package documentation reconciliation is tracked by
 issue #1077, and the Isis-level decoder parity documentation was closed by issue
 #1064.
 
 | Area | Consumer Action | Current Package Status |
 | --- | --- | --- |
-| File Loading (Path 1) | Replace `setDicomFilename()`, `dicomFileReadSuccess`, and `loadDICOMFileAsync()` with throwing initializers, async throwing initializers, and `do-catch` handling for specific `DICOMError` cases. | Recommended APIs are available and documented. |
+| File Loading (Path 1) | Replace `setDicomFilename()`, `dicomFileReadSuccess`, and `loadDICOMFileAsync()` with throwing initializers, async throwing initializers, and `do-catch` handling for specific `DICOMError` cases. | Recommended APIs are available. `setDicomFilename(_:)` and `dicomFileReadSuccess` remain deprecated; `loadDICOMFileAsync(_:)` remains without a deprecation attribute. |
 | Type-Safe Tags (Path 2) | Replace standard hex tag values with `DicomTag` enum cases; keep raw hex only for private or custom tags. | `DicomTag` remains the preferred public API for standard tags. |
-| Dictionary (Path 3) | Replace `DCMDictionary.shared` and static calls with `DCMDictionary()` instances and dependency injection where appropriate. | Instance-based dictionary APIs are available and documented. |
-| Value Types (Path 4) | Replace tuple properties such as `windowSettings`, `pixelSpacing`, `rescaleParameters`, and `calculateOptimalWindow()` with their V2 value-type APIs. | V2 value-type APIs are available and documented. |
-| Windowing Methods (Path 5) | Replace tuple-returning windowing helpers with V2 variants such as `calculateOptimalWindowLevelV2()`, `getPresetValuesV2(...)`, `batchCalculateOptimalWindowLevelV2()`, and `getPresetName(settings:)`. | V2 windowing methods are available and documented. |
-| Async Pixels (Path 6) | Replace async pixel convenience methods with synchronous pixel/downsample accessors and move threading decisions to the caller. | Synchronous pixel APIs are available and documented. |
-| Final Verification | Build without v1.x deprecation warnings, run tests, and confirm readiness for the v2.0.0 compatibility break. | Verification remains a consumer integration responsibility. |
+| Dictionary (Path 3) | Replace `DCMDictionary.shared` and static calls with `DCMDictionary()` instances and dependency injection where appropriate. | The singleton and static calls were removed in 1.1.0; only instance APIs exist. |
+| Value Types (Path 4) | Replace tuple properties such as `windowSettings`, `pixelSpacing`, `rescaleParameters`, and `calculateOptimalWindow()` with their V2 value-type APIs. | V2 value-type APIs are available; the tuple APIs remain deprecated. |
+| Windowing Methods (Path 5) | Replace tuple-returning windowing helpers with V2 variants such as `calculateOptimalWindowLevelV2()`, `getPresetValuesV2(...)`, `batchCalculateOptimalWindowLevelV2()`, and `getPresetName(settings:)`. | The tuple-returning helpers were removed in 1.1.0; only V2 methods exist. |
+| Async Pixels (Path 6) | Replace async pixel convenience methods with synchronous pixel/downsample accessors and move threading decisions to the caller. | Synchronous pixel APIs are available; the async wrappers remain without a deprecation attribute. |
+| Final Verification | Build without deprecation warnings from the v1 APIs and run tests, so that a future major version that removes them needs no further change. | Verification remains a consumer integration responsibility. |
 
 ### Need Help?
 
@@ -764,16 +771,35 @@ issue #1077, and the Isis-level decoder parity documentation was closed by issue
 
 ---
 
-## Preparing for Version 2.0.0 Breaking Changes
+## v1 APIs in 2.0.x
 
-**Important:** Version 2.0.0 is planned as a major breaking release that removes deprecated APIs.
+Versions 2.0.0 and 2.0.1 are released. Version 2.0.0 is a major release: the
+Swift 6 language mode and the reorganized module and API ownership break
+source compatibility, as its release notes describe. It did not remove the v1
+decoder APIs below, and 2.0.1 changed no public API.
 
-### What Is Planned for Removal
+### Removed Before 2.0.0
+
+Version 1.1.0 removed these APIs; they are absent from 2.0.x.
+
+1. **Tuple-based windowing methods**
+   - `calculateOptimalWindowLevel(pixels16:)` → Use `calculateOptimalWindowLevelV2(pixels16:)`
+   - `getPresetValues(preset:)` → Use `getPresetValuesV2(preset:)`
+   - `getPresetValues(named:)` → Use `getPresetValuesV2(named:)`
+   - `batchCalculateOptimalWindowLevel(imagePixels:)` → Use `batchCalculateOptimalWindowLevelV2(imagePixels:)`
+   - `getPresetName(center:width:tolerance:)` → Use `getPresetName(settings:tolerance:)`
+
+2. **DCMDictionary singleton**
+   - `DCMDictionary.shared` → Use `DCMDictionary()` instance
+   - Static methods → Use instance methods
+
+### Still Present in 2.0.x, Deprecated
+
+These APIs compile with a deprecation warning that names the replacement.
 
 1. **Legacy file loading API**
    - `setDicomFilename(_:)` → Use `init(contentsOfFile:) throws`
    - `dicomFileReadSuccess` → Use throwing initializers with do-catch
-   - `loadDICOMFileAsync(_:)` → Use `init(contentsOfFile:) async throws`
 
 2. **Tuple-based properties**
    - `windowSettings` → Use `windowSettingsV2`
@@ -781,44 +807,53 @@ issue #1077, and the Isis-level decoder parity documentation was closed by issue
    - `rescaleParameters` → Use `rescaleParametersV2`
    - `calculateOptimalWindow()` → Use `calculateOptimalWindowV2()`
 
-3. **Tuple-based windowing methods**
-   - `calculateOptimalWindowLevel(pixels16:)` → Use `calculateOptimalWindowLevelV2(pixels16:)`
-   - `getPresetValues(preset:)` → Use `getPresetValuesV2(preset:)`
-   - `getPresetValues(named:)` → Use `getPresetValuesV2(named:)`
-   - `batchCalculateOptimalWindowLevel(imagePixels:)` → Use `batchCalculateOptimalWindowLevelV2(imagePixels:)`
-   - `getPresetName(center:width:tolerance:)` → Use `getPresetName(settings:tolerance:)`
+### Still Present in 2.0.x, Not Deprecated
 
-4. **DCMDictionary singleton**
-   - `DCMDictionary.shared` → Use `DCMDictionary()` instance
-   - Static methods → Use instance methods
+These APIs carry no deprecation attribute, so the compiler does not warn about
+them. This guide still recommends the replacements.
 
-5. **Async pixel convenience methods**
+1. **Async legacy loader**
+   - `loadDICOMFileAsync(_:)` → Use `init(contentsOfFile:) async throws`
+
+2. **Async pixel convenience methods**
    - `getPixels16Async()` → Use synchronous `getPixels16()` directly
    - `getPixels8Async()` → Use synchronous `getPixels8()` directly
    - `getPixels24Async()` → Use synchronous `getPixels24()` directly
-   - `getDownsampledPixels16Async()` → Use synchronous method directly
-   - `getDownsampledPixels8Async()` → Use synchronous method directly
+   - `getDownsampledPixels16Async(maxDimension:)` → Use synchronous method directly
+   - `getDownsampledPixels8Async(maxDimension:)` → Use synchronous method directly
+
+3. **Raw hexadecimal tag accessors**
+   - `info(for:)`, `intValue(for:)` and `doubleValue(for:)` with an `Int` tag
+     stay supported for private and custom tags. Use `DicomTag` cases for
+     standard tags.
+
+### Removal Plan
+
+No release schedules the removal of the APIs still present in 2.0.x. Removing
+a public API breaks source compatibility, so it can happen only in a future
+major version, and the release notes of that version will list each removal.
+Patch and minor releases of the 2.x line keep these APIs.
 
 ### Migration Timeline
 
-- **v1.1.0** (2024) - Throwing initializers added, legacy loading deprecated
-- **v1.2.0** (2024) - Type-safe DicomTag enum and V2 methods added, tuples deprecated
-- **v2.0.0** (planned) - Deprecated APIs removed
+- **v1.1.0** - Throwing initializers, `DicomTag` and V2 value types added; legacy loading and tuple properties deprecated; tuple-based windowing methods and the `DCMDictionary` singleton removed
+- **v2.0.0** - Swift 6 language mode and reorganized modules; the deprecated and discouraged decoder APIs above remain
+- **v2.0.1** - Patch release with no public API change
 
-### Before Upgrading to v2.0.0
+### Recommended Steps
 
-1. Ensure your code compiles without deprecation warnings on v1.x
-2. Follow all migration paths in this guide
-3. Update all deprecated API usage to modern equivalents
-4. Test thoroughly on v1.x before upgrading
+1. Ensure your code compiles without deprecation warnings from DicomCore
+2. Follow all migration paths in this guide, including Path 1 and Path 6 for the APIs that are not deprecated
+3. Update all v1 API usage to modern equivalents
+4. Run your tests after each migration step
 
-### Backward Compatibility (v1.x only)
+### Backward Compatibility
 
-In version 1.x releases, deprecated APIs remain functional:
+In the 2.0.x line, the deprecated and discouraged APIs above remain functional:
 
-1. **No breaking changes** - Existing code continues to work
+1. **No forced migration** - Existing calls to these APIs continue to work
 2. **Gradual migration** - You can update one component at a time
 3. **Incremental adoption** - You can mix old and new APIs during transition
-4. **Clear deprecation warnings** - The compiler guides you to modern APIs
+4. **Deprecation warnings** - The compiler guides you to modern APIs for the deprecated ones
 
-**Version 2.0.0 is expected to end this compatibility period.** Plan to remove all deprecated API usage before upgrading.
+Migrating now means a future major version that removes these APIs will need no further change in your code.
