@@ -81,15 +81,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DicomJ2KCodestreamInspector` and `DicomJPEGFrameInspector` accept the single even-length pad byte after EOC/EOI whatever its value (GDCM and GE write `0xFF`); such frames were reported as `invalidCodestream` (Isis issue #2487).
 - The JPEG encoder writes SOF1 for 8-bit frames under the JPEG Extended syntax (`1.2.840.10008.1.2.4.51`, Process 2 & 4) through `JLIEncoderConfiguration.extendedSequential`; it wrote a Process 1 (SOF0) frame the validator refuses.
 
-### Deprecated
-
-- `setDicomFilename(_:)` and `dicomFileReadSuccess` - use throwing initializers
-- `loadDICOMFileAsync(_:)` - use async throwing initializers
-- `windowSettings` tuple - use `windowSettingsV2`
-- `pixelSpacing` tuple - use `pixelSpacingV2`
-- `rescaleParameters` tuple - use `rescaleParametersV2`
-- Tuple-returning windowing methods - use V2 variants
-
 ---
 
 ## [2.0.1] - 2026-10-04
