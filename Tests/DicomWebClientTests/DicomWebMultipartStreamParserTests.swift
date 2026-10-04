@@ -106,6 +106,81 @@ final class DicomWebMultipartStreamParserTests: XCTestCase {
         }
     }
 
+    func test_partWithoutContentType_takesTheOuterTypeAndTransferSyntax() throws {
+        let wire = Data(("--b\r\nContent-ID: <1>\r\n\r\none\r\n--b\r\ncontent-type: application/dicom\r\n\r\ntwo\r\n" +
+            "--b\r\nContent-Type: application/dicom; transfer-syntax=1.2.840.10008.1.2.4.50\r\n\r\nthree\r\n" +
+            "--b\r\nContent-Type: application/octet-stream\r\n\r\nfour\r\n--b--\r\n").utf8)
+        let outer = "multipart/related; type=\"application/dicom\"; transfer-syntax=1.2.840.10008.1.2.1; boundary=b"
+        let parts = try DicomWebMultipartStreamParser.parts(from: wire, contentType: outer)
+        XCTAssertEqual(parts.map { $0.headers.dicomWebHeaderValue("Content-Type") }, [
+            "application/dicom; transfer-syntax=1.2.840.10008.1.2.1",
+            "application/dicom; transfer-syntax=1.2.840.10008.1.2.1",
+            "application/dicom; transfer-syntax=1.2.840.10008.1.2.4.50",
+            "application/octet-stream"
+        ])
+        XCTAssertEqual(parts.map(\.body), ["one", "two", "three", "four"].map { Data($0.utf8) })
+        XCTAssertEqual(try DicomWebMultipartStreamParser.parts(from: wire, contentType: "multipart/related; " +
+            "type=\"application/dicom\"; boundary=b").first?.headers.dicomWebHeaderValue("Content-Type"), "application/dicom")
+        XCTAssertThrowsError(try DicomWebMultipartStreamParser.parts(from: wire, contentType: "multipart/related; boundary=b")) {
+            XCTAssertEqual($0 as? DicomWebMultipartStreamError, .malformedHeaders)
+        }
+    }
+
+    /// A delimiter search that backtracks becomes slow on bodies full of '-', of lines that almost open a delimiter
+    /// or of one repeated byte. Each such 64 MiB part, read without Content-Length, must take at most four times
+    /// as long as an ordinary 64 MiB part, for the shortest and the longest boundary.
+    func test_adversarialPayload_parsesWithinFourTimesAnOrdinaryOne() throws {
+        let size = 64 * 1024 * 1024
+        var seed: UInt64 = 0x9E37_79B9_7F4A_7C15
+        var ordinary = Data(count: size)
+        ordinary.withUnsafeMutableBytes { raw in
+            for index in 0..<(size / 8) {
+                seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                raw.storeBytes(of: seed, toByteOffset: index * 8, as: UInt64.self)
+            }
+        }
+        for boundary in ["-", String(repeating: "-", count: 69) + "b"] {
+            let nearDelimiter = Data("\r\n--\(boundary.dropLast())".utf8)
+            let adversarial: [(String, Data)] = [
+                ("dashes", Data(repeating: UInt8(ascii: "-"), count: size)),
+                ("near delimiters", Self.repeating(nearDelimiter, count: size)),
+                ("line feeds", Data(repeating: 10, count: size))
+            ]
+            let reference = try (0..<3).map { _ in try Self.parseSeconds(ordinary, boundary: boundary) }.min()!
+            for (name, payload) in adversarial {
+                let seconds = try (0..<3).map { _ in try Self.parseSeconds(payload, boundary: boundary) }.min()!
+                print("boundary \(boundary.count): \(name) \(seconds) s, ordinary \(reference) s")
+                XCTAssertLessThanOrEqual(seconds, 4 * reference,
+                                         "\(name), boundary of \(boundary.count): \(seconds) s against \(reference) s")
+            }
+        }
+    }
+
+    private static func repeating(_ pattern: Data, count: Int) -> Data {
+        var data = Data(capacity: count)
+        while data.count + pattern.count <= count { data.append(pattern) }
+        data.append(pattern.prefix(count - data.count))
+        return data
+    }
+
+    /// Seconds to parse one part holding `payload`, fed in 64 KiB reads, after checking that it all stayed payload.
+    private static func parseSeconds(_ payload: Data, boundary: String) throws -> Double {
+        let wire = Data("--\(boundary)\r\nContent-Type: application/dicom\r\n\r\n".utf8) + payload
+            + Data("\r\n--\(boundary)--\r\n".utf8)
+        var parser = try DicomWebMultipartStreamParser(boundary: boundary)
+        var received = 0
+        let started = ContinuousClock.now
+        for offset in stride(from: 0, to: wire.count, by: 64 * 1024) {
+            for event in try parser.feed(wire[offset..<min(wire.count, offset + 64 * 1024)]) {
+                if case .payload(let data) = event { received += data.count }
+            }
+        }
+        for event in try parser.finish() { if case .payload(let data) = event { received += data.count } }
+        let elapsed = ContinuousClock.now - started
+        XCTAssertEqual(received, payload.count)
+        return Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+    }
+
     func test_missingRootAndCancellation_areRejected() async throws {
         var parser = try DicomWebMultipartStreamParser(boundary: "b", start: "<missing>")
         _ = try parser.feed(Data("--b--\r\n".utf8))

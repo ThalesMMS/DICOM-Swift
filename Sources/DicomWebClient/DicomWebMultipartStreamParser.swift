@@ -50,6 +50,10 @@ public struct DicomWebMultipartStreamParser: Sendable {
     private var partBytes = 0
     private var remaining: Int?
     private var preambleLineStart = true
+    /// The `type` of the outer Content-Type: a part without Content-Type has it, as dcm4che reads such parts.
+    private var defaultPartType: String?
+    /// The outer `transfer-syntax`, applied to every part whose Content-Type does not name one.
+    private var defaultTransferSyntax: String?
 
     public init(boundary: String, start: String? = nil, limits: DicomWebMultipartLimits = .init()) throws {
         guard !boundary.isEmpty, boundary.utf8.count <= 70,
@@ -67,6 +71,8 @@ public struct DicomWebMultipartStreamParser: Sendable {
             throw DicomWebMultipartStreamError.invalidBoundary
         }
         try self.init(boundary: boundary, start: media.parameters["start"], limits: limits)
+        defaultPartType = media.parameters["type"]
+        defaultTransferSyntax = media.parameters["transfer-syntax"]
     }
 
     public mutating func feed(_ chunk: Data) throws -> [DicomWebMultipartEvent] {
@@ -119,6 +125,35 @@ public struct DicomWebMultipartStreamParser: Sendable {
     private func check(_ value: Int, adding: Int, limit: Int, name: String) throws {
         guard value <= limit, adding <= limit - value else {
             throw DicomWebMultipartStreamError.limitExceeded(name, limit: limit)
+        }
+    }
+
+    /// Gives a part without Content-Type the outer `type`, and the outer `transfer-syntax` to a part of that type
+    /// that names none, as dcm4che derives the part type from the outer parameters.
+    private func applyOuterType(to headers: inout [String: String]) throws {
+        let name = headers.keys.first { $0.caseInsensitiveCompare("Content-Type") == .orderedSame } ?? "Content-Type"
+        guard let value = headers[name] ?? defaultPartType else { throw DicomWebMultipartStreamError.malformedHeaders }
+        headers[name] = value
+        guard let syntax = defaultTransferSyntax, let media = try? DicomWebMediaType(value),
+              media.parameters["transfer-syntax"] == nil,
+              defaultPartType.map({ (try? DicomWebMediaType($0))?.type == media.type }) ?? true else { return }
+        headers[name] = value + "; transfer-syntax=" + syntax
+    }
+
+    /// The first `pattern` in the buffer at or after `start`. memmem keeps the search linear and fast on bodies
+    /// made of '-', of near-delimiters or of one repeated byte, where a search that backtracks slows down.
+    private func firstRange(of pattern: Data, from start: Data.Index) -> Range<Data.Index>? {
+        guard start < buffer.endIndex else { return nil }
+        return buffer.withUnsafeBytes { haystack -> Range<Data.Index>? in
+            pattern.withUnsafeBytes { needle -> Range<Data.Index>? in
+                let base = haystack.baseAddress!
+                let offset = start - buffer.startIndex
+                guard let found = memmem(base + offset, haystack.count - offset, needle.baseAddress!, needle.count) else {
+                    return nil
+                }
+                let index = buffer.startIndex + (UnsafeRawPointer(found) - base)
+                return index..<(index + pattern.count)
+            }
         }
     }
 
@@ -224,7 +259,7 @@ public struct DicomWebMultipartStreamParser: Sendable {
                     }
                     headers[name] = pair[1].trimmingCharacters(in: .whitespacesAndNewlines)
                 }
-                guard headers.dicomWebHeaderValue("Content-Type") != nil else { throw DicomWebMultipartStreamError.malformedHeaders }
+                try applyOuterType(to: &headers)
                 remaining = nil
                 if let value = headers.dicomWebHeaderValue("Content-Length") {
                     guard !value.isEmpty, value.utf8.allSatisfy({ (48...57).contains($0) }), let n = Int(value) else {
@@ -265,7 +300,7 @@ public struct DicomWebMultipartStreamParser: Sendable {
                     var search = buffer.startIndex
                     var match: Range<Data.Index>?
                     var undecided: Range<Data.Index>?
-                    while let range = buffer.range(of: framed, in: search..<buffer.endIndex) {
+                    while let range = firstRange(of: framed, from: search) {
                         // Only a whole delimiter line ends the part: the boundary, "--" for the
                         // last one, blanks, then a line break. Anything else is payload.
                         switch delimiterLine(after: range.upperBound, finishing: finishing) {
