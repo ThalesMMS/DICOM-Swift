@@ -153,6 +153,8 @@ extension DicomWebServer {
             resource: .metadata, available: [.init("application/dicom+json"), .init("application/dicom+xml", multipart: true)]
                 .filter { configuration.supportedMediaTypes.contains($0.mediaType) })
         if selection.mediaType == "application/dicom+json" {
+            var options = options
+            options.decimals = configuration.jsonDecimals
             return .init(statusCode: 200, headers: ["Content-Type": selection.contentType], body: try DicomJSONCodec.encode(sets, options: options))
         }
         guard !sets.isEmpty else { return .init(statusCode: 204, body: Data()) }

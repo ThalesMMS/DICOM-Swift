@@ -87,8 +87,10 @@ public enum DicomJSONCodec {
         case .FL, .FD:
             switch element.value {
             case .floats(let values):
-                return try values.enumerated().map { index, value in
-                    guard value.isFinite else { throw Error.unrepresentableValue(tag: key, index: index, reason: "non-finite floating point") }
+                // dcm4che's mapping: NaN is null and ±infinity is ±Double.greatestFiniteMagnitude.
+                return values.map { value -> Any in
+                    if value.isNaN { return NSNull() }
+                    if value.isInfinite { return value < 0 ? -Double.greatestFiniteMagnitude : Double.greatestFiniteMagnitude }
                     return value
                 }
             default:
@@ -117,9 +119,14 @@ public enum DicomJSONCodec {
                 case .preserveText:
                     return text
                 case .numbersWhenExact:
+                    // A number only when a reader gets the same text back from it, and below 2^53 in magnitude. An
+                    // integral double is written without a fraction, so "1.0" would come back as "1": it stays text.
                     guard Values.isCanonicalNumber(trimmed) else { return text }
-                    if element.vr == .IS, let value = Int64(trimmed), value.magnitude <= 1 << 53 { return value }
-                    if element.vr == .DS, let value = Double(trimmed), value.isFinite, String(value) == trimmed { return value }
+                    if let value = Int64(trimmed), value.magnitude < 1 << 53, String(value) == text { return value }
+                    if element.vr == .DS, let value = Double(trimmed), value.magnitude < 0x1p53, value != value.rounded(),
+                       String(value) == text {
+                        return value
+                    }
                     return text
                 }
             }
@@ -170,38 +177,63 @@ public enum DicomJSONCodec {
         var elements: [DicomDataElement] = []
         for key in object.keys.sorted() {
             guard let tag = Values.tag(fromKey: key) else { throw Error.malformedTag(key) }
-            guard let attribute = object[key] as? [String: Any] else { throw Error.invalidDocument("attribute \(key) is not an object") }
-            guard let code = attribute["vr"] as? String else { throw Error.missingVR(tag: key) }
             let elementPath = path + [.tag(tag)]
-            let vr: DicomVR
+            let marks = (bulkData: state.bulkData.count, diagnostics: state.diagnostics.count)
+            do {
+                elements.append(try element(tag: tag, key: key, attribute: object[key], path: elementPath, depth: depth, state: &state))
+            } catch let error as Error where state.options.mode == .tolerant && !error.failsTheDocument {
+                // Nothing read inside the element survives it: no orphan bulk-data reference, no inner diagnostic.
+                state.bulkData.removeSubrange(marks.bulkData...)
+                state.diagnostics.removeSubrange(marks.diagnostics...)
+                state.diagnostics.append(.init(code: .invalidElementDropped, path: elementPath))
+            }
+        }
+        return DicomDataSet(elements: elements)
+    }
+
+    private static func element(tag: Int, key: String, attribute raw: Any?, path: Path, depth: Int,
+                                state: inout DecodeState) throws -> DicomDataElement {
+        guard let attribute = raw as? [String: Any] else { throw Error.invalidDocument("attribute \(key) is not an object") }
+        let vr: DicomVR
+        if let code = attribute["vr"] as? String {
             if let known = Values.vr(fromCode: code) {
                 vr = known
             } else if state.options.unknownVRs == .treatAsUnknown {
                 vr = .UN
-                state.diagnostics.append(.init(code: .unknownVRTreatedAsUnknown, path: elementPath))
+                state.diagnostics.append(.init(code: .unknownVRTreatedAsUnknown, path: path))
             } else {
                 throw Error.unsupportedVR(tag: key, vr: code)
             }
-            let fields = ["Value", "BulkDataURI", "InlineBinary"].filter { attribute[$0] != nil && !(attribute[$0] is NSNull) }
-            guard fields.count <= 1 else { throw Error.conflictingValueFields(tag: key) }
-            let value: DicomDataValue
-            if let inline = attribute["InlineBinary"] as? String {
-                guard let bytes = Data(base64Encoded: inline, options: []) else { throw Error.invalidBase64(tag: key) }
-                value = try Values.value(fromInlineBytes: bytes, vr: vr, tag: key)
-            } else if let uri = attribute["BulkDataURI"] as? String {
-                state.bulkData.append(.init(path: elementPath, tag: tag, vr: vr, uri: uri))
-                value = .empty
-            } else if let values = attribute["Value"] as? [Any] {
-                value = try self.value(from: values, vr: vr, tag: key, path: elementPath, depth: depth, state: &state)
-            } else if attribute["Value"] == nil || attribute["Value"] is NSNull {
-                value = .empty
-            } else {
-                throw Error.invalidDocument("Value of \(key) is not an array")
-            }
-            elements.append(.init(tag: tag, vr: vr, value: value))
+        } else if state.options.mode == .tolerant, attribute["vr"] == nil {
+            vr = dictionary.vrCode(forTag: tag).flatMap(Values.vr(fromCode:)) ?? .UN
+            state.diagnostics.append(.init(code: .missingVRInferred, path: path))
+        } else {
+            throw Error.missingVR(tag: key)
         }
-        return DicomDataSet(elements: elements)
+        let fields = ["Value", "BulkDataURI", "InlineBinary"].filter { attribute[$0] != nil && !(attribute[$0] is NSNull) }
+        guard fields.count <= 1 else { throw Error.conflictingValueFields(tag: key) }
+        let value: DicomDataValue
+        if let inline = attribute["InlineBinary"] as? String {
+            guard let bytes = Data(base64Encoded: inline, options: []) else { throw Error.invalidBase64(tag: key) }
+            value = try Values.value(fromInlineBytes: bytes, vr: vr, tag: key)
+        } else if let uri = attribute["BulkDataURI"] as? String {
+            state.bulkData.append(.init(path: path, tag: tag, vr: vr, uri: uri))
+            value = .empty
+        } else if let values = attribute["Value"] as? [Any] {
+            value = try self.value(from: values, vr: vr, tag: key, path: path, depth: depth, state: &state)
+        } else if attribute["Value"] == nil || attribute["Value"] is NSNull {
+            value = .empty
+        } else if state.options.mode == .tolerant, let scalar = attribute["Value"] {
+            state.diagnostics.append(.init(code: .scalarValueWrapped, path: path))
+            value = try self.value(from: [scalar], vr: vr, tag: key, path: path, depth: depth, state: &state)
+        } else {
+            throw Error.invalidDocument("Value of \(key) is not an array")
+        }
+        return .init(tag: tag, vr: vr, value: value)
     }
+
+    /// The dictionary a tolerant read takes a missing VR from.
+    private static let dictionary = DCMDictionary()
 
     private static func value(from values: [Any], vr: DicomVR, tag key: String, path: Path, depth: Int, state: inout DecodeState) throws -> DicomDataValue {
         guard !values.isEmpty else { return .empty }
@@ -212,12 +244,14 @@ public enum DicomJSONCodec {
             })
         }
         if Values.binaryVRs.contains(vr) { throw Error.invalidDocument("binary VR \(Values.code(for: vr)) of \(key) uses Value instead of InlineBinary") }
+        if vr == .FL || vr == .FD { return .floats(try floats(from: values, vr: vr, tag: key, path: path, state: &state)) }
         var texts: [String] = []
+        var readFromString = false
         var canonicalized = false
         for (index, entry) in values.enumerated() {
             if entry is NSNull {
                 // Empty multi-valued strings are representable; empty numbers are not.
-                if [.PN, .SS, .SL, .US, .UL, .SV, .UV, .FL, .FD, .AT].contains(vr) && ![.PN].contains(vr) {
+                if [.SS, .SL, .US, .UL, .SV, .UV, .AT].contains(vr) {
                     guard state.options.nulls == .dropWithDiagnostic else { throw Error.nullValue(tag: key, index: index) }
                     state.diagnostics.append(.init(code: .nullValueDropped, path: path))
                     continue
@@ -237,8 +271,11 @@ public enum DicomJSONCodec {
                 continue
             }
             if let string = entry as? String {
-                if [.SS, .SL, .US, .UL, .FL, .FD].contains(vr) {
-                    throw Error.unrepresentableValue(tag: key, index: index, reason: "\(Values.code(for: vr)) values must be JSON numbers")
+                if [.SS, .SL, .US, .UL].contains(vr) {
+                    guard state.options.mode == .tolerant else {
+                        throw Error.unrepresentableValue(tag: key, index: index, reason: "\(Values.code(for: vr)) values must be JSON numbers")
+                    }
+                    readFromString = true
                 }
                 texts.append(string)
             } else if let number = entry as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() {
@@ -253,18 +290,60 @@ public enum DicomJSONCodec {
             }
         }
         if canonicalized { state.diagnostics.append(.init(code: .numberCanonicalized, path: path)) }
+        if readFromString { state.diagnostics.append(.init(code: .numberReadFromString, path: path)) }
         guard !texts.isEmpty else { return .empty }
         return try Values.value(fromTexts: texts, vr: vr, tag: key)
     }
 
+    /// FL/FD values with dcm4che's mapping: null is NaN and ±Double.greatestFiniteMagnitude is ±infinity.
+    private static func floats(from values: [Any], vr: DicomVR, tag key: String, path: Path,
+                               state: inout DecodeState) throws -> [Double] {
+        var readFromString = false
+        let result = try values.enumerated().map { index, entry -> Double in
+            if entry is NSNull { return .nan }
+            if let number = entry as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() {
+                let value = number.doubleValue
+                return value.magnitude == .greatestFiniteMagnitude ? (value < 0 ? -.infinity : .infinity) : value
+            }
+            if state.options.mode == .tolerant, let string = entry as? String,
+               let value = Double(string.trimmingCharacters(in: .whitespaces)), value.isFinite {
+                readFromString = true
+                return value
+            }
+            throw Error.unrepresentableValue(tag: key, index: index, reason: "\(Values.code(for: vr)) values must be JSON numbers")
+        }
+        if readFromString { state.diagnostics.append(.init(code: .numberReadFromString, path: path)) }
+        return result
+    }
+
     /// Canonical text of a JSON number: integral numbers without a fraction, others in Swift's shortest form.
+    /// A DS value fits its 16 bytes (PS3.5 6.2), giving up only the digits that do not.
     private static func canonicalText(_ number: NSNumber, vr: DicomVR) -> String {
         let type = String(cString: number.objCType)
+        let text: String
         if ["q", "i", "l", "s", "c", "Q", "I", "L", "S", "C"].contains(type) {
-            return type.first!.isUppercase ? String(number.uint64Value) : String(number.int64Value)
+            text = type.first!.isUppercase ? String(number.uint64Value) : String(number.int64Value)
+        } else {
+            let value = number.doubleValue
+            if value == value.rounded(), value.magnitude < 1e15, vr != .DS { return String(Int64(value)) }
+            text = String(value)
         }
+        guard vr == .DS, text.utf8.count > 16 else { return text }
         let value = number.doubleValue
-        if value == value.rounded(), value.magnitude < 1e15, vr != .DS { return String(Int64(value)) }
-        return String(value)
+        for digits in stride(from: 16, through: 1, by: -1) {
+            let fitted = String(format: "%.\(digits)G", value)
+            if fitted.utf8.count <= 16 { return fitted }
+        }
+        return text
+    }
+}
+
+private extension DicomDataSetRepresentation.Error {
+    /// The limits protect the reader, so a tolerant read never relaxes them.
+    var failsTheDocument: Bool {
+        switch self {
+        case .depthExceeded, .inputTooLarge: return true
+        default: return false
+        }
     }
 }

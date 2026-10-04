@@ -46,7 +46,7 @@ extension DicomWebServer {
                 let identity = [set.string(for: .studyInstanceUID)!, set.string(for: .seriesInstanceUID)!,
                                 set.string(for: .sopInstanceUID)!].joined(separator: "/")
                 let threshold = configuration.inlineBinaryThresholdBytes
-                let options = DicomDataSetRepresentation.EncodingOptions(binary: .reference { path, element in
+                let options = DicomDataSetRepresentation.EncodingOptions(decimals: configuration.jsonDecimals, binary: .reference { path, element in
                     let alwaysBulk = [0x7FE00010, 0x7FE00008, 0x7FE00009, 0x56000020, 0x54001010, 0x00420011].contains(element.tag)
                         || (element.tag & 0xFFE1FFFF) == 0x60003000
                     guard alwaysBulk || (try? DicomDataSetRepresentation.binaryValueBytes(of: element).count).map({ $0 > threshold }) == true else { return nil }

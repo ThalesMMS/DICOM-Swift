@@ -158,6 +158,13 @@ final class DicomRepresentationFidelityTests: XCTestCase {
         XCTAssertEqual((numbers["00281050"] as? [String: Any])?["Value"] as? [Any] as NSArray?, ["70.50", "-0", "1e-3", "  12  "])
         XCTAssertEqual((numbers["00180050"] as? [String: Any])?["Value"] as? [Any] as NSArray?, [2.5])
         XCTAssertEqual((numbers["00091011"] as? [String: Any])?["Value"] as? [Any] as NSArray?, ["007", -12])
+        XCTAssertEqual((numbers["00200037"] as? [String: Any])?["Value"] as? [Any] as NSArray?, [1, 0, 0, 0, 1, 0])
+        let limits = try DicomJSONCodec.object(from: DicomDataSet(elements: [
+            .init(tag: 0x00200013, vr: .IS, value: .strings(["9007199254740991", "9007199254740992"])),
+            .init(tag: 0x00281050, vr: .DS, value: .strings(["9007199254740992", "1e+300", "0.1", "1.0"]))
+        ]), options: .init(decimals: .numbersWhenExact))
+        XCTAssertEqual((limits["00200013"] as? [String: Any])?["Value"] as? [Any] as NSArray?, [9007199254740991, "9007199254740992"])
+        XCTAssertEqual((limits["00281050"] as? [String: Any])?["Value"] as? [Any] as NSArray?, ["9007199254740992", "1e+300", 0.1, "1.0"])
         let json = Data(#"{"00101030":{"vr":"DS","Value":[70.5, 1e-3]},"00200013":{"vr":"IS","Value":[7]},"00620021":{"vr":"UV","Value":[18446744073709551615]}}"#.utf8)
         let decoded = try DicomJSONCodec.decode(json)[0]
         XCTAssertEqual(decoded.dataSet[0x00101030]?.value, .strings(["70.5", "0.001"]))
@@ -197,9 +204,82 @@ final class DicomRepresentationFidelityTests: XCTestCase {
             XCTAssertThrowsError(try DicomJSONCodec.decode(Data(json.utf8)), json) { XCTAssertEqual($0 as? Rep.Error, expected, json) }
         }
         XCTAssertThrowsError(try DicomJSONCodec.decode(Data("{".utf8)))
-        XCTAssertThrowsError(try DicomJSONCodec.encode(DicomDataSet(elements: [.init(tag: 0x00189087, vr: .FD, value: .floats([.nan]))]))) {
-            XCTAssertEqual($0 as? Rep.Error, .unrepresentableValue(tag: "00189087", index: 0, reason: "non-finite floating point"))
+    }
+
+    /// The tolerant read keeps every element it can and names the element of each repair or omission.
+    func test_json_tolerantRead_keepsTheRestAndPointsAtTheElement() throws {
+        let json = Data(("""
+            {"00280010":{"vr":"US","Value":["512"]},"00280011":{"vr":"US","Value":[512,null]},
+             "00080060":{"vr":"CS","Value":"CT"},"00100020":{"Value":["ID-1"]},"00091010":{"Value":["x"]},
+             "00280100":{"vr":"US","Value":["sixteen"]},"0020000D":{"vr":"UI","Value":["2.25.1"]},
+             "00081115":{"vr":"SQ","Value":[{"7FE00010":{"vr":"OB","BulkDataURI":"/b"}},5]},
+             "00082112":{"vr":"SQ","Value":[{"00081150":{"vr":"UI","Value":["1.2"]},"00280010":{"vr":"US","Value":[true]}}]}}
+            """).utf8)
+        XCTAssertThrowsError(try DicomJSONCodec.decode(json))
+        var options = Rep.DecodingOptions(nulls: .dropWithDiagnostic, unknownVRs: .treatAsUnknown)
+        options.mode = .tolerant
+        let decoded = try XCTUnwrap(DicomJSONCodec.decode(json, options: options).first)
+        XCTAssertEqual(decoded.dataSet[0x00280010]?.value, .unsignedIntegers([512]))
+        XCTAssertEqual(decoded.dataSet[0x00280011]?.value, .unsignedIntegers([512]))
+        XCTAssertEqual(decoded.dataSet[0x00080060]?.value, .strings(["CT"]))
+        XCTAssertEqual(decoded.dataSet[0x00100020], .init(tag: 0x00100020, vr: .LO, value: .strings(["ID-1"])))
+        XCTAssertEqual(decoded.dataSet[0x0020000D]?.value, .strings(["2.25.1"]))
+        XCTAssertNil(decoded.dataSet[0x00091010])
+        XCTAssertNil(decoded.dataSet[0x00280100])
+        XCTAssertNil(decoded.dataSet[0x00081115])
+        guard case .sequence(let items)? = decoded.dataSet[0x00082112]?.value else { return XCTFail("sequence dropped") }
+        XCTAssertEqual(items.first?.dataSet[0x00081150]?.value, .strings(["1.2"]))
+        XCTAssertNil(items.first?.dataSet[0x00280010])
+        XCTAssertEqual(decoded.bulkData, [], "a dropped element keeps none of its references")
+        XCTAssertEqual(Set(decoded.diagnostics.map { "\($0.code) \($0.path)" }), Set([
+            (Rep.DiagnosticCode.numberReadFromString, [Rep.Path.Element.tag(0x00280010)]),
+            (.nullValueDropped, [.tag(0x00280011)]),
+            (.scalarValueWrapped, [.tag(0x00080060)]),
+            (.missingVRInferred, [.tag(0x00100020)]),
+            (.invalidElementDropped, [.tag(0x00091010)]),
+            (.invalidElementDropped, [.tag(0x00280100)]),
+            (.invalidElementDropped, [.tag(0x00081115)]),
+            (.invalidElementDropped, [.tag(0x00082112), .item(0), .tag(0x00280010)])
+        ].map { "\($0.0) \($0.1)" }))
+        var deep = "{\"0040A730\":{\"vr\":\"SQ\",\"Value\":[{}]}}"
+        for _ in 0..<70 { deep = "{\"0040A730\":{\"vr\":\"SQ\",\"Value\":[\(deep)]}}" }
+        XCTAssertThrowsError(try DicomJSONCodec.decode(Data(deep.utf8), options: options)) {
+            XCTAssertEqual($0 as? Rep.Error, .depthExceeded(limit: 64))
         }
+    }
+
+    /// A DS that arrives as a JSON number keeps to its 16 bytes, losing only the digits that do not fit.
+    func test_json_decimalStringFromANumber_fitsSixteenBytes() throws {
+        let json = Data(#"{"00281050":{"vr":"DS","Value":[0.30000000000000004,1.2345678901234567e-300,-123456789.12345678,12345678901234567890,2.5]}}"#.utf8)
+        let decoded = try XCTUnwrap(DicomJSONCodec.decode(json).first)
+        guard case .strings(let texts)? = decoded.dataSet[0x00281050]?.value else { return XCTFail("DS not read") }
+        XCTAssertEqual(texts.first, "0.3")
+        XCTAssertEqual(texts.last, "2.5")
+        for (text, expected) in zip(texts, [0.30000000000000004, 1.2345678901234567e-300, -123456789.12345678, 12345678901234567890, 2.5]) {
+            XCTAssertLessThanOrEqual(text.utf8.count, 16, text)
+            let value = try XCTUnwrap(Double(text), text)
+            XCTAssertEqual(value, expected, accuracy: expected.magnitude * 1e-9, text)
+        }
+    }
+
+    /// FL/FD NaN and infinities round-trip with dcm4che's mapping: null and ±Double.greatestFiniteMagnitude.
+    func test_json_nonFiniteFloats_roundTripLikeDcm4che() throws {
+        let dataSet = DicomDataSet(elements: [
+            .init(tag: 0x00189087, vr: .FD, value: .floats([.nan, .infinity, -.infinity, 1.5])),
+            .init(tag: 0x00189089, vr: .FL, value: .floats([.infinity, .nan]))
+        ])
+        let object = try DicomJSONCodec.object(from: dataSet)
+        let written = try XCTUnwrap((object["00189087"] as? [String: Any])?["Value"] as? [Any])
+        XCTAssertTrue(written[0] is NSNull)
+        XCTAssertEqual(written[1] as? Double, .greatestFiniteMagnitude)
+        XCTAssertEqual(written[2] as? Double, -.greatestFiniteMagnitude)
+        let decoded = try XCTUnwrap(DicomJSONCodec.decode(DicomJSONCodec.encode(dataSet)).first)
+        guard case .floats(let doubles)? = decoded.dataSet[0x00189087]?.value,
+              case .floats(let singles)? = decoded.dataSet[0x00189089]?.value else { return XCTFail("floats not read") }
+        XCTAssertTrue(doubles[0].isNaN)
+        XCTAssertEqual(Array(doubles.dropFirst()), [.infinity, -.infinity, 1.5])
+        XCTAssertEqual(singles.first, .infinity)
+        XCTAssertTrue(singles[1].isNaN)
     }
 
     func test_json_enforcesByteAndDepthLimits() throws {

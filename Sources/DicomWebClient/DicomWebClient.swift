@@ -108,6 +108,8 @@ public struct DicomWebClientConfiguration: Equatable, Sendable {
 
     public var allowedOrigins: Set<URL> = []
     public var multipartLimits = DicomWebMultipartLimits()
+    /// Largest search response, and largest single data set of a WADO-RS metadata response. Metadata is read one
+    /// data set at a time, so a whole metadata response may be larger.
     public var maximumMetadataBytes = 64 * 1024 * 1024
     public var originPolicy: DicomWebOriginPolicy {
         var policy = DicomWebOriginPolicy(configuredURL: baseURL,
@@ -546,18 +548,49 @@ public struct DicomWebClient: Sendable {
         try await metadata(path: ["studies", studyInstanceUID, "series", seriesInstanceUID, "instances", sopInstanceUID, "metadata"])
     }
 
+    /// Reads a WADO-RS metadata response one data set at a time and hands each to `body` as soon as it is read, so
+    /// only one data set is held at once and the response may exceed `maximumMetadataBytes`, which bounds each data
+    /// set. Elements outside the DICOM JSON model are read tolerantly. Only the request is repeated on failure:
+    /// once a data set reached `body`, the response is not fetched again.
+    public func retrieveMetadata(studyInstanceUID: String, seriesInstanceUID: String? = nil, sopInstanceUID: String? = nil,
+                                 each body: (DicomDataSetRepresentation.Decoded) async throws -> Void) async throws {
+        guard sopInstanceUID == nil || seriesInstanceUID != nil else { throw DicomWebError(kind: .badRequest) }
+        var path = ["studies", studyInstanceUID]
+        if let seriesInstanceUID { path += ["series", seriesInstanceUID] }
+        if let sopInstanceUID { path += ["instances", sopInstanceUID] }
+        let url = endpoint(path + ["metadata"])
+        let response = try await withRetries(.idempotent) {
+            try await streamRequest(.get, url: url, headers: ["Accept": DicomWebMediaTypeNegotiator.acceptHeader(for: .metadata)])
+        }
+        try await readMetadata(response, from: url, each: body)
+    }
+
     private func metadata(path: [String]) async throws -> [DicomDataSetRepresentation.Decoded] {
         let url = endpoint(path)
-        let response = try await boundedResponse(url: url, accept: DicomWebMediaTypeNegotiator.acceptHeader(for: .metadata))
-        return try Self.decodedMetadata(response.body, from: url)
+        return try await withRetries(.idempotent) {
+            let response = try await streamRequest(.get, url: url, headers: ["Accept": DicomWebMediaTypeNegotiator.acceptHeader(for: .metadata)])
+            var decoded: [DicomDataSetRepresentation.Decoded] = []
+            try await readMetadata(response, from: url) { decoded.append($0) }
+            return decoded
+        }
     }
 
     /// Metadata whose relative `BulkDataURI` values resolve against `url`, the request that returned them.
-    private static func decodedMetadata(_ body: Data, from url: URL) throws -> [DicomDataSetRepresentation.Decoded] {
-        try DicomWebJSONParser.decoded(from: body).map { decoded in
-            var decoded = decoded
-            decoded.sourceURL = url
-            return decoded
+    private func readMetadata(_ response: DicomWebHTTPStreamedResponse, from url: URL,
+                              each body: (DicomDataSetRepresentation.Decoded) async throws -> Void) async throws {
+        defer { response.cancel() }
+        var decoder = DicomJSONStreamDecoder(options: DicomWebJSONParser.options(maximumBytes: configuration.maximumMetadataBytes))
+        do {
+            for try await chunk in response.body {
+                try Task.checkCancellation()
+                for var decoded in try Self.drainingAutoreleasedObjects({ try decoder.feed(chunk) }) {
+                    decoded.sourceURL = url
+                    try await body(decoded)
+                }
+            }
+            try decoder.finish()
+        } catch let error as DicomDataSetRepresentation.Error {
+            throw DicomWebJSONParser.clientError(for: error)
         }
     }
 
@@ -871,13 +904,7 @@ public struct DicomWebClient: Sendable {
     /// Study metadata as decoded representations: elements carried by `BulkDataURI` stay empty and are listed
     /// in `bulkData` until the caller resolves them explicitly (`resolveBulkData(in:)`).
     public func retrieveStudyMetadata(studyInstanceUID: String) async throws -> [DicomDataSetRepresentation.Decoded] {
-        let url = endpoint(["studies", studyInstanceUID, "metadata"])
-        let response = try await send(
-            .get,
-            url: url,
-            headers: ["Accept": DicomWebMediaTypeNegotiator.acceptHeader(for: .metadata)]
-        )
-        return try Self.decodedMetadata(response.body, from: url)
+        try await metadata(path: ["studies", studyInstanceUID, "metadata"])
     }
 
     /// Fetches every bulk-data reference of a decoded representation through this client's transport, origin
@@ -1279,19 +1306,36 @@ public struct DicomWebClient: Sendable {
 
 /// DICOM JSON responses decode through the shared `DicomJSONCodec`; bulk-data references stay explicit.
 enum DicomWebJSONParser {
+    /// The client reads tolerantly: an element outside the model becomes a diagnostic, not a failed response.
+    static func options(maximumBytes: Int = 64 * 1024 * 1024) -> DicomJSONCodec.DecodingOptions {
+        var options = DicomJSONCodec.DecodingOptions(maximumBytes: maximumBytes, nulls: .dropWithDiagnostic,
+                                                     unknownVRs: .treatAsUnknown)
+        options.mode = .tolerant
+        return options
+    }
+
     static func decoded(from data: Data) throws -> [DicomDataSetRepresentation.Decoded] {
         do {
-            return try DicomJSONCodec.decode(data, options: .init(unknownVRs: .treatAsUnknown))
+            return try DicomJSONCodec.decode(data, options: options())
         } catch let error as DicomDataSetRepresentation.Error {
             switch error {
-            case .invalidDocument, .inputTooLarge, .depthExceeded: throw DicomWebClientError.invalidJSONResponse
-            case .malformedTag(let tag), .missingVR(let tag): throw DicomWebClientError.malformedDICOMJSONElement(tag)
-            case .unsupportedVR(let tag, let vr): throw DicomWebClientError.unsupportedDICOMJSONValue(tag: tag, vr: vr)
-            case .conflictingValueFields(let tag), .invalidBase64(let tag), .bulkDataUnresolved(let tag), .bulkDataTooLarge(let tag, _, _):
-                throw DicomWebClientError.malformedDICOMJSONElement(tag)
-            case .nullValue(let tag, _), .unrepresentableValue(let tag, _, _):
-                throw DicomWebClientError.unsupportedDICOMJSONValue(tag: tag, vr: "")
+            case .inputTooLarge: throw DicomWebClientError.invalidJSONResponse
+            default: throw clientError(for: error)
             }
+        }
+    }
+
+    /// A data set over the size limit of a streamed read is `.tooLarge`; the other failures name the element.
+    static func clientError(for error: DicomDataSetRepresentation.Error) -> any Error {
+        switch error {
+        case .inputTooLarge: return DicomWebError(kind: .tooLarge)
+        case .invalidDocument, .depthExceeded: return DicomWebClientError.invalidJSONResponse
+        case .malformedTag(let tag), .missingVR(let tag): return DicomWebClientError.malformedDICOMJSONElement(tag)
+        case .unsupportedVR(let tag, let vr): return DicomWebClientError.unsupportedDICOMJSONValue(tag: tag, vr: vr)
+        case .conflictingValueFields(let tag), .invalidBase64(let tag), .bulkDataUnresolved(let tag), .bulkDataTooLarge(let tag, _, _):
+            return DicomWebClientError.malformedDICOMJSONElement(tag)
+        case .nullValue(let tag, _), .unrepresentableValue(let tag, _, _):
+            return DicomWebClientError.unsupportedDICOMJSONValue(tag: tag, vr: "")
         }
     }
 

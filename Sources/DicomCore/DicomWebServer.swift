@@ -197,6 +197,8 @@ public struct DicomWebServerConfiguration: Equatable, Sendable {
     /// Lets `X-Forwarded-Proto` and `X-Forwarded-Host` replace the request's scheme and host when
     /// `publicBaseURL` is nil. Enable it only when every request arrives through a proxy that sets both.
     public var trustsForwardedHeaders: Bool = false
+    /// How DICOM JSON responses write DS and IS: numbers when exact, as PS3.18 F.2.3 asks, or the stored text.
+    public var jsonDecimals = DicomDataSetRepresentation.DecimalPolicy.numbersWhenExact
     public var supportedMediaTypes: [String] = ["application/dicom", "application/dicom+json",
         "application/dicom+xml", "application/octet-stream", "image/jpeg", "image/png", "image/gif",
         "image/jls", "image/jp2", "image/jphc", "image/dicom-rle", "image/jxl", "application/x-deflate"]

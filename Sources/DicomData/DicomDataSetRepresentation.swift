@@ -34,6 +34,14 @@ public enum DicomDataSetRepresentation {
         case unknownVRTreatedAsUnknown
         /// An attribute keyword or private creator could not be determined for the XML representation.
         case keywordUnavailable
+        /// A tolerant read took a scalar `Value` as an array of one value.
+        case scalarValueWrapped
+        /// A tolerant read took the VR of an element without one from the dictionary, or UN for a tag not in it.
+        case missingVRInferred
+        /// A tolerant read took a number sent as a JSON string for a VR that PS3.18 writes as a JSON number.
+        case numberReadFromString
+        /// A tolerant read left out an element it could not read; the rest of the data set was kept.
+        case invalidElementDropped
     }
 
     public struct Diagnostic: Equatable, Sendable {
@@ -77,7 +85,8 @@ public enum DicomDataSetRepresentation {
     public enum DecimalPolicy: Sendable {
         /// Strings that preserve the original lexical form (default).
         case preserveText
-        /// JSON numbers whenever the text is a canonical JSON number and exact in 53 bits; strings otherwise.
+        /// JSON numbers whenever the number reads back as the same text and its magnitude is below 2^53; strings
+        /// otherwise.
         case numbersWhenExact
     }
 
@@ -105,12 +114,24 @@ public enum DicomDataSetRepresentation {
     public enum NullPolicy: Sendable { case reject, dropWithDiagnostic }
     public enum UnknownVRPolicy: Sendable { case reject, treatAsUnknown }
 
+    /// What a DICOM JSON element outside the model does to the read.
+    public enum ReadingMode: Sendable {
+        /// The whole document fails.
+        case strict
+        /// A scalar `Value` counts as one value, a missing VR comes from the dictionary (UN for a tag not in it),
+        /// numbers sent as strings are read, and an element that still cannot be read is left out. Each repair or
+        /// omission is a diagnostic at the element's path. Depth and size limits still fail the document.
+        case tolerant
+    }
+
     public struct DecodingOptions: Sendable {
         public var maximumBytes: Int
         public var maximumDepth: Int
         public var nulls: NullPolicy
         public var unknownVRs: UnknownVRPolicy
         public var transferSyntax: DicomTransferSyntax?
+        /// Strict by default; the DICOMweb client reads tolerantly.
+        public var mode = ReadingMode.strict
         public init(maximumBytes: Int = 64 * 1024 * 1024, maximumDepth: Int = 64, nulls: NullPolicy = .reject,
                     unknownVRs: UnknownVRPolicy = .reject, transferSyntax: DicomTransferSyntax? = nil) {
             self.maximumBytes = max(0, maximumBytes); self.maximumDepth = max(1, maximumDepth); self.nulls = nulls; self.unknownVRs = unknownVRs

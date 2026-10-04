@@ -232,14 +232,29 @@
     },
     {
       "id": "missing-vr",
-      "bodyBase64": "W3siMDAyMDAwMEQiOnsiVmFsdWUiOlsiMi4yNS5zdHVkeSJdfX1d",
+      "bodyBase64": "W3siMDAxMDAwMTAiOnsiVmFsdWUiOlt7IkFscGhhYmV0aWMiOiJET0VeSkFORSJ9XX0sIjAwMjAwMDBEIjp7IlZhbHVlIjpbIjIuMjUuc3R1ZHkiXX19XQ==",
       "dicomSwiftExpectation": {
-        "accepted": false
+        "accepted": true,
+        "studyUID": "2.25.study",
+        "patientName": "DOE^JANE"
       },
       "isisExpectation": {
         "accepted": false
       },
-      "intentionalDifferences": []
+      "intentionalDifferences": [
+        {
+          "field": "accepted",
+          "reason": "The toolkit client reads DICOM JSON tolerantly, as dcm4che does: a missing VR comes from the dictionary and is reported as a diagnostic. The Isis JSON model requires the vr member."
+        },
+        {
+          "field": "studyUID",
+          "reason": "Only the toolkit produces a dataset when the missing VR is taken from the dictionary."
+        },
+        {
+          "field": "patientName",
+          "reason": "Only the toolkit produces a dataset when the missing VR is taken from the dictionary."
+        }
+      ]
     },
     {
       "id": "invalid-json",
