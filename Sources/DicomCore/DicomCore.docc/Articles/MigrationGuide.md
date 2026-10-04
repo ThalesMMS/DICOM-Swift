@@ -14,7 +14,7 @@ DicomCore has evolved to provide more Swift-idiomatic APIs. This guide helps you
 
 > **v1 APIs in the released 2.0.x line**
 >
-> Versions 2.0.0 and 2.0.1 are released. The source breaks of 2.0.0 come from the Swift 6 language mode and the reorganized modules described in its release notes, and 2.0.1 changed no public API. Neither release removed the v1 decoder APIs this guide covers.
+> Versions 2.0.0, 2.0.1 and 2.0.2 are released. The source breaks of 2.0.0 come from the Swift 6 language mode and the reorganized modules described in its release notes, and 2.0.1 and 2.0.2 changed no public declaration. No release removed the v1 decoder APIs this guide covers.
 >
 > **Removed in 1.1.0, before 2.0.0:**
 > - Tuple-based windowing methods (`calculateOptimalWindowLevel()`, `getPresetValues()`, etc.)
@@ -773,10 +773,11 @@ issue #1077, and the Isis-level decoder parity documentation was closed by issue
 
 ## v1 APIs in 2.0.x
 
-Versions 2.0.0 and 2.0.1 are released. Version 2.0.0 is a major release: the
-Swift 6 language mode and the reorganized module and API ownership break
-source compatibility, as its release notes describe. It did not remove the v1
-decoder APIs below, and 2.0.1 changed no public API.
+Versions 2.0.0, 2.0.1 and 2.0.2 are released. Version 2.0.0 is a major
+release: the Swift 6 language mode and the reorganized module and API
+ownership break source compatibility, as its release notes describe. It did
+not remove the v1 decoder APIs below, and 2.0.1 and 2.0.2 changed no public
+declaration.
 
 ### Removed Before 2.0.0
 
@@ -839,6 +840,7 @@ Patch and minor releases of the 2.x line keep these APIs.
 - **v1.1.0** - Throwing initializers, `DicomTag` and V2 value types added; legacy loading and tuple properties deprecated; tuple-based windowing methods and the `DCMDictionary` singleton removed
 - **v2.0.0** - Swift 6 language mode and reorganized modules; the deprecated and discouraged decoder APIs above remain
 - **v2.0.1** - Patch release with no public API change
+- **v2.0.2** - Patch release of DICOMweb fixes with no public declaration change
 
 ### Recommended Steps
 

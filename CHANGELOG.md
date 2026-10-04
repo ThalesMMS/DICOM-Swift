@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [2.0.2] - 2026-10-04
+
+Patch release of DICOMweb client and server fixes; the executed validation and
+the known limits are in RELEASE_NOTES.md.
+
 ### Fixed
 
 - QIDO-RS searches keep the comma between the values of one key literal, for
@@ -22,6 +29,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   written when `connectionLifetime` (120 s) runs out. A large retrieve to a slow
   client ended without its final boundary. The limit now covers waiting for
   and reading a request, and a response with no completed write for that long.
+- A QIDO-RS code string key with several values, such as
+  `ModalitiesInStudy=CT,MR`, matches any listed value in the DICOMweb server,
+  and a repeated code string or UID key is read as the same list.
+- The DICOMweb server streams a WADO-RS retrieve past 1 GiB to the closing
+  boundary, and renders `rendered` and `thumbnail` of compressed instances
+  after decoding them instead of answering 406.
 
 ---
 

@@ -447,7 +447,8 @@ Current tested scope:
   1.24 passed all 11 smoke tests in three consecutive runs without Docker, and
   dcm4chee 5.35.2 with Orthanc 1.13.0 in Docker passed them in two consecutive
   runs, with the rejection cleanup between them. dcm4chee refuses an Accept it
-  cannot transcode with 500 instead of 406, and gives all representations of an
+  cannot transcode with 500 instead of 406, which a `DicomWebAcceptList`
+  follows to its next range since 2.0.2, and gives all representations of an
   instance one `ETag` without `Vary: Accept`; since 2.0.1 the client's
   URLSession transport neither reads nor writes the URL cache.
 - `DicomWebIndependentClientTests` (dicomweb-client 0.61.2) and

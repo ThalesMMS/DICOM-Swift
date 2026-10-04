@@ -1,3 +1,77 @@
+# 2.0.2
+
+This patch release fixes DICOMweb behaviour found by an edge-case cross test of
+two client applications against Orthanc, dcm4chee and the package's own
+server. Swift tools 6.2, Swift 6 language mode, iOS, visionOS or macOS 26.0+
+and the announced products are those of 2.0.0, and no public declaration
+changed. Two defaults of the `DicomWebClient` product changed, as described
+below. A `from: "2.0.0"` requirement selects 2.0.2.
+
+## Fixed in DicomWebClient
+
+- QIDO-RS searches keep the comma between the values of one key literal, for
+  UID lists and for multiple values of any other VR; a comma inside a value is
+  still percent-encoded. dcm4chee read `CT%2CMR` as a single value and found
+  nothing. `DicomWebSearchParameters` now accepts several values for a key of
+  any VR, not only UI, and `dicomtool web qido --key` splits values on commas.
+  `queryItems()` still returns one item per key with its values joined by
+  commas.
+- A retrieve with a `DicomWebAcceptList` also moves to the next range after a
+  500, at most once per retrieve and only when the refused first range names a
+  transfer syntax. Orthanc and dcm4chee answer 500, not 406, to a syntax they
+  cannot convert to. The default `fallbackStatuses` of `DicomWebAcceptList`
+  and of `DicomWebMediaTypeNegotiator.instanceAccept(transferSyntaxUIDs:
+  fallbackStatuses:)` is now `[406, 500]`. A 500 after `transfer-syntax=*`, a
+  range without a syntax, or a second 500 still ends the retrieve, and a
+  caller that passes its own `fallbackStatuses` keeps them.
+
+## Fixed in the DICOMweb server and listener
+
+- A QIDO-RS code string key with several values, such as
+  `ModalitiesInStudy=CT,MR`, matches any listed value, and a repeated code
+  string or UID key is read as the same list. Repeating any other key answers
+  400 with a message.
+- A WADO-RS retrieve of a study, series or instance streams past 1 GiB to the
+  closing boundary. It is written one part at a time with no limit on the
+  total response size.
+- `rendered` and `thumbnail` of an instance stored in a compressed transfer
+  syntax decode it first, with the transcoder the retrieve already uses, and
+  no longer answer 406 when a decoder is available.
+- The HTTP listener no longer cuts a response that is still being written when
+  `connectionLifetime` (120 s) runs out. The limit now covers waiting for and
+  reading a request, and a response with no completed write for that long.
+
+## Executed validation
+
+Apple Swift 6.4, the macOS 27.0 SDK and an arm64 host were used. The release
+tree was exported from the canonical package; it matched the public mirror
+apart from the refreshed `DistributionContents.json`, and the export tool's
+`verify` operation matched all recorded distribution files.
+
+- `DicomWebSearchParametersTests`, `DicomWebAcceptFallbackTests`,
+  `DicomWebAcceptListTests`, `DicomWebRetryPolicyTests`,
+  `DicomWebModalitiesInStudySearchTests`, `DicomWebLargeRetrieveTests`,
+  `DicomWebCompressedRenderedTests`, `DicomWebHTTPConnectionDeadlineTests`,
+  `DicomWebHTTPListenerTests` and `WebCommandTests` executed 53 cases: 51
+  passed and 2 were skipped, the `WebCommandTests` cases that need the
+  optional Python witnesses.
+- The existing public-API consumer passed in Debug and Release against the
+  exported tree, and its build outputs again excluded Core, codecs, DIMSE, the
+  listener, ZIP, SwiftUI, Metal and Network framework dependencies.
+- `swift package diagnose-api-breaking-changes 2.0.1 --products
+  DicomWebClient` reported no breaking change.
+- Each fix was checked when it was made against local servers: the QIDO-RS
+  comma against dcm4chee 5.35.2 and Orthanc, the 500 fallback against Orthanc,
+  and the server fixes against `dicomtool web serve` with curl.
+
+## Known limits
+
+- Other 5xx statuses do not move a retrieve to the next range.
+- `dicomtool web serve` has no option for `connectionLifetime`; a server-side
+  producer that delivers no chunk for that long is still cut.
+- The interop smoke, the full suite, the `release` gate and optional runtimes
+  were not run for this release. The other limits of 2.0.0 still apply.
+
 # 2.0.1
 
 This patch release of the `DicomWebClient` product changes how the built-in

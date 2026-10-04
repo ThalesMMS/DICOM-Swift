@@ -19,7 +19,7 @@ Comprehensive DICOM conformance documentation detailing supported transfer synta
 
 ## Overview
 
-This DICOM Conformance Statement describes the capabilities and limitations of the DicomCore library (version 2.0.1) in accordance with DICOM Part 2: Conformance. DicomCore is a Swift DICOM file library for iOS, visionOS, and macOS 26+ that parses DICOM medical imaging files, extracts metadata, provides pixel data access with optional GPU-accelerated image processing, writes controlled Part 10 datasets, and exposes transport-injected DICOMweb service helpers covered by package tests.
+This DICOM Conformance Statement describes the capabilities and limitations of the DicomCore library (version 2.0.2) in accordance with DICOM Part 2: Conformance. DicomCore is a Swift DICOM file library for iOS, visionOS, and macOS 26+ that parses DICOM medical imaging files, extracts metadata, provides pixel data access with optional GPU-accelerated image processing, writes controlled Part 10 datasets, and exposes transport-injected DICOMweb service helpers covered by package tests.
 
 **Implementation Type:** DICOM File Decoder/Writer Library with transport-injected DICOMweb helpers and bounded stateless JPIP progressive pixel streaming
 
@@ -870,7 +870,18 @@ Remaining limitations in this conformance statement are explicitly scoped:
 
 ## 9. Version History
 
-### Version 2.0.1 (Current)
+### Version 2.0.2 (Current)
+
+**Release Date:** 2026-10-04
+
+**Key Features:**
+- DICOMweb client: QIDO-RS values of one key are separated by a literal comma, for any VR, and a `DicomWebAcceptList` moves to the next range after a 500 to a named transfer syntax, once per retrieve
+- DICOMweb server: multi-valued code string matching, retrieves past 1 GiB, rendered and thumbnail representations of compressed instances, and responses that keep progressing past the listener's connection limit
+
+**Conformance Changes:**
+- QIDO-RS multiple value matching is sent and matched as PS3.18 describes; the WADO-RS instance and rendered frame rows describe the retrieve and rendering changes
+
+### Version 2.0.1
 
 **Release Date:** 2026-10-04
 
@@ -950,7 +961,7 @@ Remaining limitations in this conformance statement are explicitly scoped:
 For bug reports, feature requests, or conformance issues, please file an issue on the project's GitHub repository.
 
 **Information to Include:**
-- Library version (e.g., 2.0.1)
+- Library version (e.g., 2.0.2)
 - Platform and OS version (e.g., iOS 17.2, macOS 14.1)
 - Minimal reproducible example
 - Sample DICOM file (if applicable, ensure PHI is removed)
