@@ -1,3 +1,71 @@
+# 2.0.0-rc.2
+
+This source-package release candidate adds DICOMweb client robustness work on
+top of 2.0.0-rc.1. It does not represent a stable application release. Swift
+tools 6.2, Swift 6 language mode and iOS, visionOS or macOS 26.0+ are
+unchanged, and so are the announced products.
+
+## DICOMweb client changes
+
+- Response bodies are read in blocks rather than byte by byte. Bodies that are
+  not consumed spill to a file. Requests to the same host share connections.
+  Body blocks that arrived before a dropped connection are still delivered.
+- `DicomWebClientConfiguration.retryPolicy` retries transient failures: GET on
+  408, 429, 502, 503, 504 and connection failures, STOW-RS only on 429, 503 or
+  when no answer arrived, honouring a bounded Retry-After. The default is
+  `DicomWebRetryPolicy.none`: a request is sent once unless the application
+  opts in. Errors keep the server's diagnostic text.
+- `instanceAccept(transferSyntaxUIDs:fallbackStatuses:)` returns an ordered
+  `DicomWebAcceptList`, and a retrieve asks again with the next syntax after a 406.
+- QIDO paging removes duplicate results and stops on a page that repeats
+  earlier results without adding a UID, or on its paging limits.
+- Bulk-data retrieval keeps every part, resolves bulk-data URIs against the
+  metadata and accepts range responses.
+- A streamed request body is reopened when URLSession must send it again, and
+  a failed STOW-RS batch keeps its URL error code.
+
+## Behaviour changes
+
+`swift package diagnose-api-breaking-changes 2.0.0-rc.1 --products
+DicomWebClient` reports two changed initializers:
+`DicomWebStoreFileResult.init(url:sopInstanceUID:state:reason:dicomStatus:httpStatus:)`
+gained `transportErrorCode:` and `DicomWebRedirectDelegate.init(policy:credentialHeaderNames:followsRedirects:)`
+gained `bodyFileURL:`. Both new parameters have defaults, so existing calls
+still compile; only the binary signatures changed. Other additions also carry
+defaults.
+
+Header values now send RFC 9110 token parameters such as a transfer syntax UID
+or `*` unquoted, as dcm4che and dicomweb-client do. `type` remains quoted.
+The legacy study search, metadata and UPS calls report HTTP failures as
+`DicomWebError`, like the other operations, instead of
+`DicomWebClientError.httpStatus`. Applications that matched the old case should
+read `DicomWebError.statusCode`.
+
+The DICOMweb server in `DicomCore` serves stored syntaxes it cannot send as
+Explicit VR Little Endian and can start on a fixed port and bind address. Byte
+swapping during transcoding between byte orders was corrected.
+
+Use the exact `2.0.0-rc.2` version and the consumer's own resolved lockfile.
+
+## Executed validation
+
+The release tree was exported from the canonical package and compared with the
+public mirror. Sources, tests and the manifest were identical, apart from the
+declared documentation adaptations. The export tool's `verify` operation matched
+all recorded distribution files. Apple Swift 6.4, the macOS 27.0 SDK and an
+arm64 host were used:
+
+- The existing public-API consumer passed in Debug and Release against the
+  mirror: QIDO, bounded wire bytes, retrieve to a file sink, STOW files and
+  batches. Its build outputs and linked frameworks again excluded Core, codecs,
+  DIMSE, listener, ZIP, SwiftUI, Metal and Network framework dependencies.
+- Eleven client XCTest suites, the ones changed since rc.1 plus media type and
+  streaming transport, executed 99 cases. All 99 passed, with no failures and
+  no skips.
+
+The full suite, the `release` gate and optional runtimes were not run for this
+candidate. The limits stated for 2.0.0-rc.1 still apply.
+
 # 2.0.0-rc.1
 
 This is a source-package release candidate with the independent DICOMweb

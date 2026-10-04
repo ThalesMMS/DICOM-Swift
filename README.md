@@ -43,7 +43,8 @@ Suitable for lightweight DICOM viewers, PACS clients, telemedicine apps, and res
 
 ## Development Provenance
 
-The public repository is a manually published source mirror. Maintainers develop
+The public repository is a manually published mirror of the canonical package
+source. Maintainers develop
 and review package changes with the application that consumes the canonical
 source; publication preserves the mirror history without importing application
 history. Consumers need only this package and its public SwiftPM dependencies.
