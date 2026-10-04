@@ -131,6 +131,10 @@ final class DicomWebServerTests: XCTestCase {
         XCTAssertEqual(matrix.row(feature: "WADO-RS frame")?.server, "supported")
         XCTAssertEqual(matrix.row(feature: "WADO-RS rendered frame")?.server, "supported")
         XCTAssertEqual(matrix.row(feature: "Pagination")?.server, "limit/offset applied")
+        let paginationNotes = try XCTUnwrap(matrix.row(feature: "Pagination")?.notes)
+        XCTAssertTrue(paginationNotes.contains("study, series and instance searches"))
+        XCTAssertTrue(paginationNotes.contains("Warning 299"))
+        XCTAssertFalse(paginationNotes.contains("in-memory"))
         XCTAssertTrue(try XCTUnwrap(matrix.row(feature: "Large payload streaming")?.notes).contains("one instance payload at a time"))
     }
 
