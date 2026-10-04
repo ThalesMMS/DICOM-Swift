@@ -327,25 +327,43 @@
       "operation": "studyThumbnail",
       "method": "GET",
       "path": "/studies/1/thumbnail",
-      "accept": "image/jpeg, image/png, image/gif"
+      "accept": "image/jpeg"
     },
     {
       "operation": "seriesThumbnail",
       "method": "GET",
       "path": "/studies/1/series/2/thumbnail",
-      "accept": "image/jpeg, image/png, image/gif"
+      "accept": "image/jpeg"
     },
     {
       "operation": "instanceThumbnail",
       "method": "GET",
       "path": "/studies/1/series/2/instances/3/thumbnail",
-      "accept": "image/jpeg, image/png, image/gif"
+      "accept": "image/jpeg"
     },
     {
       "operation": "renderedInstance",
       "method": "GET",
       "path": "/studies/1/series/2/instances/3/rendered",
-      "accept": "image/jpeg, image/png, image/gif"
+      "accept": "image/jpeg"
+    },
+    {
+      "operation": "renderedOptionsDefault",
+      "method": "GET",
+      "path": "/studies/1/series/2/instances/3/rendered",
+      "accept": "image/jpeg"
+    },
+    {
+      "operation": "thumbnailOptionsDefault",
+      "method": "GET",
+      "path": "/studies/1/series/2/thumbnail",
+      "accept": "image/jpeg"
+    },
+    {
+      "operation": "renderedFrame",
+      "method": "GET",
+      "path": "/studies/1/series/2/instances/3/frames/1/rendered",
+      "accept": "image/png"
     },
     {
       "operation": "bulkdataStream",

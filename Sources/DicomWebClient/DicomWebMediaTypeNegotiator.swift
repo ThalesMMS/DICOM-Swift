@@ -85,8 +85,10 @@ extension DicomWebMediaTypeNegotiator {
         "application/dicom+json, multipart/related; type=\"application/dicom+xml\""
     }
 
+    /// The default `Accept` of a rendered frame retrieve: one PNG, or one PNG part per frame. A single media type,
+    /// because some servers (Orthanc's DICOMweb plugin) answer 400 to an `Accept` that lists several image types.
     public static func renderedFrameAcceptHeader(representationCount: Int) -> String {
-        representationCount == 1 ? "image/png, image/jpeg" : "multipart/related; type=\"image/png\""
+        representationCount == 1 ? "image/png" : "multipart/related; type=\"image/png\""
     }
 
     public static func acceptHeader(for resource: ResourceKind) -> String {
@@ -94,7 +96,8 @@ extension DicomWebMediaTypeNegotiator {
         case .instance: return "multipart/related; type=\"application/dicom\"; transfer-syntax=*"
         case .metadata: return "application/dicom+json"
         case .frames: return "multipart/related; type=\"application/octet-stream\"; transfer-syntax=*"
-        case .rendered, .thumbnail: return "image/jpeg, image/png, image/gif"
+        // One media type: some servers (Orthanc's DICOMweb plugin) answer 400 to a list of image types.
+        case .rendered, .thumbnail: return "image/jpeg"
         case .bulkdata: return "application/octet-stream, multipart/related; type=\"application/octet-stream\""
         }
     }

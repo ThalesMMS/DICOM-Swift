@@ -464,6 +464,13 @@ extension DicomWebContractCorpusTests {
             case "seriesThumbnail": _ = try await client.retrieveThumbnail(studyInstanceUID: "1", seriesInstanceUID: "2")
             case "instanceThumbnail": _ = try await client.retrieveThumbnail(studyInstanceUID: "1", seriesInstanceUID: "2", sopInstanceUID: "3")
             case "renderedInstance": _ = try await client.retrieveRenderedInstance(studyInstanceUID: "1", seriesInstanceUID: "2", sopInstanceUID: "3")
+            case "renderedOptionsDefault":
+                _ = try await client.retrieveRendered(studyInstanceUID: "1", seriesInstanceUID: "2", sopInstanceUID: "3",
+                                                      options: .init())
+            case "thumbnailOptionsDefault":
+                _ = try await client.retrieveThumbnail(studyInstanceUID: "1", seriesInstanceUID: "2", options: .init())
+            case "renderedFrame":
+                _ = try await client.retrieveRenderedFrame(studyInstanceUID: "1", seriesInstanceUID: "2", sopInstanceUID: "3")
             case "bulkdataStream": try await client.retrieveBulkData(uri: "/bulk/1", sink: sink)
             case "instanceStream": try await client.retrieveInstance(studyInstanceUID: "1", seriesInstanceUID: "2", sopInstanceUID: "3", sink: sink)
             case "framesStream": try await client.retrieveFrames(studyInstanceUID: "1", seriesInstanceUID: "2", sopInstanceUID: "3", frames: .init([1, 2]), sink: sink)
