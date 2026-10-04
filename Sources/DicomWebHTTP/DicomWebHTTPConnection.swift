@@ -20,6 +20,8 @@ final class DicomWebHTTPConnection: @unchecked Sendable {
     }
     func start(completion: @escaping @Sendable () -> Void) {
         connection.start(queue: queue)
+        // The deadline covers waiting for and reading a request; response writes push it back,
+        // so a large response to a slow reader runs as long as it progresses.
         let timer = DispatchSource.makeTimerSource(queue: queue)
         timer.schedule(deadline: .now() + configuration.connectionLifetime)
         timer.setEventHandler { [weak self] in self?.cancel() }
@@ -53,6 +55,9 @@ final class DicomWebHTTPConnection: @unchecked Sendable {
         lock.withLock { task?.cancel(); receiver?.cancel(); timer?.cancel(); timer = nil }
         connection.cancel()
         Task { await channel.close() }
+    }
+    private func extendDeadline() {
+        lock.withLock { timer?.schedule(deadline: .now() + configuration.connectionLifetime) }
     }
     func waitUntilIdle() async {
         let task = lock.withLock { self.task }
@@ -119,6 +124,7 @@ final class DicomWebHTTPConnection: @unchecked Sendable {
                 }
                 let head = "HTTP/1.1 \(response.statusCode) \(Self.reason(response.statusCode))\r\n" + headers.sorted { $0.key < $1.key }.map { "\($0.key): \($0.value)\r\n" }.joined() + "\r\n"
                 try await write(Data(head.utf8))
+                extendDeadline()
                 if bodyless {
                     response.cancel()
                     if close { return }
@@ -130,8 +136,10 @@ final class DicomWebHTTPConnection: @unchecked Sendable {
                             try await write(Data("\(String(chunk.count, radix: 16))\r\n".utf8))
                             try await write(chunk)
                             try await write(Data("\r\n".utf8))
+                            extendDeadline()
                         }
                         try await write(Data("0\r\n\r\n".utf8))
+                        extendDeadline()
                     } onCancel: { response.cancel() }
                 } catch { response.cancel(); return }
                 if close { return }

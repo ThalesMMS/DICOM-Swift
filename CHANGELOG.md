@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   500, once per retrieve and only when the refused first range names a
   transfer syntax. Orthanc and dcm4chee answer 500, not 406, to a syntax they
   cannot convert to. The default `fallbackStatuses` is now `[406, 500]`.
+- The DICOMweb HTTP listener no longer cuts a response that is still being
+  written when `connectionLifetime` (120 s) runs out. A large retrieve to a slow
+  client ended without its final boundary. The limit now covers waiting for
+  and reading a request, and a response with no completed write for that long.
 
 ---
 

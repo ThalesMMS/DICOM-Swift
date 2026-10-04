@@ -12,6 +12,8 @@ public struct DicomWebHTTPListenerConfiguration: Sendable {
     public var maximumConnections = 32
     public var maximumWebSocketFrameBytes = 1024 * 1024
     public var maximumRequestsPerConnection = 100
+    /// Seconds a connection may spend waiting for and reading a request, or without a completed
+    /// response write. A response that keeps being written is not cut, however long it lasts.
     public var connectionLifetime: TimeInterval = 120
     public init() {}
 }
