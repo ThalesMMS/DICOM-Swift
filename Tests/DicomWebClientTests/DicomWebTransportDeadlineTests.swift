@@ -165,8 +165,13 @@ private final class RoutedHTTPServer: @unchecked Sendable {
         } else if path.hasSuffix("/target") {
             response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 6\r\nConnection: close\r\n\r\ntarget"
         } else if path.hasSuffix("/basic") {
-            response = "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"isis\"\r\n"
+            // The request body may still be arriving; closing with it unread would reset the connection and the
+            // client would see the reset instead of the 401, so the rest of the request is read and dropped.
+            let challenge = "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"isis\"\r\n"
                 + "Content-Length: 0\r\nConnection: close\r\n\r\n"
+            connection.send(content: Data(challenge.utf8), completion: .contentProcessed { _ in })
+            drain(connection)
+            return
         } else if path.contains("/stall-body/") {
             response = "HTTP/1.1 200 OK\r\nContent-Type: multipart/related; type=\"application/dicom\"; boundary=B2893\r\n"
                 + "Transfer-Encoding: chunked\r\n\r\n"

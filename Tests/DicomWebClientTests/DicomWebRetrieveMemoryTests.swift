@@ -8,6 +8,16 @@ import XCTest
 /// A WADO-RS retrieve keeps its memory bounded however large the response is (#2890).
 final class DicomWebRetrieveMemoryTests: XCTestCase {
     func test_streamedRetrieveOf256MiB_staysBelow128MiBOfFootprint() async throws {
+        try await assertRetrieveOf256MiBStaysBelow128MiB(pausePerPart: nil)
+    }
+
+    /// A reader slower than the network leaves most of the body waiting in the transport's temporary file, not in
+    /// memory.
+    func test_slowlyReadRetrieveOf256MiB_staysBelow128MiBOfFootprint() async throws {
+        try await assertRetrieveOf256MiBStaysBelow128MiB(pausePerPart: .milliseconds(100))
+    }
+
+    private func assertRetrieveOf256MiBStaysBelow128MiB(pausePerPart: Duration?) async throws {
         let server = StreamingMultipartServer(partCount: 16, partBytes: 16 * 1024 * 1024)
         let url = try await server.start()
         defer { server.stop() }
@@ -17,7 +27,7 @@ final class DicomWebRetrieveMemoryTests: XCTestCase {
         defer { session.invalidateAndCancel() }
         let client = DicomWebClient(configuration: .init(baseURL: url, timeout: 120),
                                     transport: URLSessionDicomWebHTTPTransport(session: session))
-        let sink = VerifyingRetrieveSink(blocks: server.blocks)
+        let sink = VerifyingRetrieveSink(blocks: server.blocks, pausePerPart: pausePerPart)
 
         let meter = FootprintMeter()
         let status = try await Task.detached {
@@ -37,12 +47,16 @@ final class DicomWebRetrieveMemoryTests: XCTestCase {
 /// Compares every payload byte with the block the server sent, holding none of the payload.
 private actor VerifyingRetrieveSink: DicomWebRetrieveSink {
     private let blocks: [Data]
+    private let pausePerPart: Duration?
     private var parts = 0
     private var bytes = 0
     private var offset = 0
     private var mismatches = 0
 
-    init(blocks: [Data]) { self.blocks = blocks }
+    init(blocks: [Data], pausePerPart: Duration?) {
+        self.blocks = blocks
+        self.pausePerPart = pausePerPart
+    }
 
     var counts: (parts: Int, bytes: Int, mismatches: Int) { (parts, bytes, mismatches) }
 
@@ -51,6 +65,7 @@ private actor VerifyingRetrieveSink: DicomWebRetrieveSink {
         case .partHeaders:
             parts += 1
             offset = 0
+            if let pausePerPart { try await Task.sleep(for: pausePerPart) }
         case .payload(var data):
             bytes += data.count
             let block = blocks[(parts - 1) % blocks.count]

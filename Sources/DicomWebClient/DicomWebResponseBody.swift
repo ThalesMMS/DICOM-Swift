@@ -18,87 +18,120 @@ extension URLSession {
     /// `delegate` decides redirects, authentication challenges and resent file bodies, and receives the task so its
     /// deadline can cancel it.
     ///
-    /// The request runs on a session of its own with this session's configuration. Holding back a body that is read
-    /// slowly stalls its session's delegate queue, and a queue of its own keeps that from delaying any other task.
+    /// The request runs on this session, sharing its connections with the session's other requests. No delegate
+    /// callback waits for the reader: a body that arrives faster than it is read is held in memory up to 1 MiB and in
+    /// a temporary file beyond that, which is deleted as soon as it has been read and when the body ends early.
     public func dicomWebResponse(
         for request: URLRequest, delegate: DicomWebRedirectDelegate
     ) async throws -> (DicomWebResponseBody, URLResponse) {
-        let buffer = DicomWebResponseBuffer(delegate: delegate)
-        let queue = OperationQueue()
-        queue.maxConcurrentOperationCount = 1
-        let session = URLSession(configuration: configuration, delegate: buffer, delegateQueue: queue)
-        let task = session.dataTask(with: request)
-        delegate.urlSession(session, didCreateTask: task)
+        try await dicomWebResponse(for: request, delegate: delegate,
+                                   spillDirectory: FileManager.default.temporaryDirectory)
+    }
+
+    func dicomWebResponse(
+        for request: URLRequest, delegate: DicomWebRedirectDelegate, spillDirectory: URL
+    ) async throws -> (DicomWebResponseBody, URLResponse) {
+        let buffer = DicomWebResponseBuffer(delegate: delegate, spillDirectory: spillDirectory)
+        let task = dataTask(with: request)
+        task.delegate = buffer
+        delegate.urlSession(self, didCreateTask: task)
         let response = try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
-                buffer.start(task, in: session, continuation: continuation)
+                buffer.start(task, continuation: continuation)
             }
         } onCancel: { task.cancel() }
         return (.init(task: task, buffer: buffer), response)
     }
 }
 
-/// Session delegate that queues the blocks of a response body for its single reader. Suspending a data task does not
-/// stop the blocks arriving, so once `maximumBufferedBytes` wait unread the delegate callback itself waits for the
-/// reader; URLSession then reads no further and TCP flow control holds the server back instead of the body piling up
-/// in memory. A cancelled task releases the wait.
+/// Task delegate that queues the blocks of a response body for its single reader. Suspending a data task does not
+/// stop the blocks arriving, and holding back the delegate callback would stall every other task of the session, so
+/// the blocks are always accepted: up to `maximumBufferedBytes` unread wait in memory, and the rest go to a spill file
+/// that the reader drains, in order, once the memory is empty. The file is deleted when it has been read, and when the
+/// task fails or is cancelled.
 final class DicomWebResponseBuffer: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     static let maximumBufferedBytes = 1024 * 1024
 
     private let delegate: DicomWebRedirectDelegate
-    /// Weak because the task's session keeps this delegate until the task completes.
+    private let spillDirectory: URL
+    /// Weak because the task keeps this delegate until it completes.
     private weak var task: URLSessionDataTask?
-    private let condition = NSCondition()
+    private let lock = NSLock()
     private var response: CheckedContinuation<URLResponse, Error>?
     private var reader: CheckedContinuation<Data?, Error>?
     private var blocks: [Data] = []
     private var bufferedBytes = 0
+    /// Set only while it holds unread bytes; every block then goes after them.
+    private var spill: DicomWebResponseSpillFile?
     private var end: Result<Void, Error>?
 
-    init(delegate: DicomWebRedirectDelegate) {
+    init(delegate: DicomWebRedirectDelegate, spillDirectory: URL) {
         self.delegate = delegate
+        self.spillDirectory = spillDirectory
     }
 
-    /// Resumes `task`; `session` is released once the task completes.
-    func start(_ task: URLSessionDataTask, in session: URLSession,
-               continuation: CheckedContinuation<URLResponse, Error>) {
-        condition.withLock {
+    func start(_ task: URLSessionDataTask, continuation: CheckedContinuation<URLResponse, Error>) {
+        lock.withLock {
             self.task = task
             response = continuation
         }
         task.resume()
-        session.finishTasksAndInvalidate()
     }
 
     func next() async throws -> Data? {
         try Task.checkCancellation()
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
-                condition.withLock {
+                let failed = lock.withLock { () -> Bool in
                     if !blocks.isEmpty {
                         let block = blocks.removeFirst()
                         bufferedBytes -= block.count
-                        condition.signal()
                         continuation.resume(returning: block)
+                    } else if let spill {
+                        do {
+                            let block = try spill.readNext(upTo: Self.maximumBufferedBytes)
+                            if !spill.hasUnreadBytes { discardSpill() }
+                            continuation.resume(returning: block)
+                        } catch {
+                            fail(error)
+                            continuation.resume(throwing: error)
+                            return true
+                        }
                     } else if let end {
                         continuation.resume(with: end.map { nil })
                     } else {
                         reader = continuation
                     }
+                    return false
                 }
+                if failed { cancelTask() }
             }
         } onCancel: { [weak self] in
-            guard let self else { return }
-            condition.withLock {
-                task?.cancel()
-                condition.signal()
-            }
+            self?.cancelTask()
         }
+    }
+
+    private func cancelTask() {
+        lock.withLock { task }?.cancel()
+    }
+
+    /// Ends the body with `error`, dropping what was not read. Call with the lock held.
+    private func fail(_ error: Error) {
+        if end == nil { end = .failure(error) }
+        blocks = []
+        bufferedBytes = 0
+        discardSpill()
+    }
+
+    /// Call with the lock held.
+    private func discardSpill() {
+        spill?.remove()
+        spill = nil
     }
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
                     completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void) {
-        let waiter = condition.withLock { () -> CheckedContinuation<URLResponse, Error>? in
+        let waiter = lock.withLock { () -> CheckedContinuation<URLResponse, Error>? in
             defer { self.response = nil }
             return self.response
         }
@@ -107,30 +140,40 @@ final class DicomWebResponseBuffer: NSObject, URLSessionDataDelegate, @unchecked
     }
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-        condition.withLock {
+        let failed = lock.withLock { () -> Bool in
             if let reader {
                 self.reader = nil
                 reader.resume(returning: data)
-                return
+                return false
             }
-            blocks.append(data)
-            bufferedBytes += data.count
-            // The task state is checked again every 100 ms, so a cancellation from elsewhere, such as the deadline,
-            // also releases the wait.
-            while bufferedBytes >= Self.maximumBufferedBytes, dataTask.state == .running {
-                _ = condition.wait(until: Date(timeIntervalSinceNow: 0.1))
+            guard end == nil else { return false }
+            if spill == nil, bufferedBytes < Self.maximumBufferedBytes {
+                blocks.append(data)
+                bufferedBytes += data.count
+                return false
+            }
+            do {
+                let file = try spill ?? DicomWebResponseSpillFile(in: spillDirectory)
+                spill = file
+                try file.append(data)
+                return false
+            } catch {
+                fail(error)
+                return true
             }
         }
+        if failed { dataTask.cancel() }
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        let ending: Result<Void, Error> = error.map { .failure($0) } ?? .success(())
-        condition.withLock {
-            end = ending
+        lock.withLock {
+            if let error { fail(error) } else if end == nil { end = .success(()) }
             response?.resume(throwing: error ?? URLError(.badServerResponse))
             response = nil
-            reader?.resume(with: ending.map { nil })
-            reader = nil
+            if let reader, let end {
+                self.reader = nil
+                reader.resume(with: end.map { nil })
+            }
         }
     }
 
