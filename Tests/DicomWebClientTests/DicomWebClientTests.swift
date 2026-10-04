@@ -993,6 +993,95 @@ extension DicomWebClientTests {
         return try! JSONSerialization.data(withJSONObject: sets)
     }
 
+    func test_bulkDataResolver_threePartResponse_returnsEveryPartInOrder() async throws {
+        var body = Data()
+        for payload in ["first", "second", "third"] {
+            body.append(Data("--parts\r\nContent-Type: application/octet-stream\r\n\r\n\(payload)\r\n".utf8))
+        }
+        body.append(Data("--parts--\r\n".utf8))
+        let response = DicomWebHTTPResponse(statusCode: 200, headers: [
+            "Content-Type": "multipart/related; type=\"application/octet-stream\"; boundary=parts"], body: body)
+        let transport = DicomWebScriptedTransport(responses: [response, response, response])
+        let client = DicomWebClient(configuration: .init(baseURL: URL(string: "https://archive.example/dicom-web")!),
+                                    transport: transport)
+        let reference = DicomDataSetRepresentation.BulkDataReference(path: [.tag(0x7FE00010)], tag: 0x7FE00010, vr: .OB,
+                                                                     uri: "bulk/7FE00010")
+        let resolver = DicomWebBulkDataResolver(client: client, requestBase: nil)
+        let parts = try await resolver.parts(for: reference)
+        XCTAssertEqual(parts.map { String(decoding: $0, as: UTF8.self) }, ["first", "second", "third"])
+        do {
+            _ = try await resolver.data(for: reference)
+            XCTFail("Three parts were cut to one value")
+        } catch let error as DicomDataSetRepresentation.Error {
+            XCTAssertEqual(error, .bulkDataUnresolved(tag: "7FE00010"))
+        }
+        let decoded = DicomDataSetRepresentation.Decoded(dataSet: DicomDataSet(), bulkData: [reference])
+        do {
+            _ = try await client.resolveBulkData(in: decoded)
+            XCTFail("Three parts were cut to one value")
+        } catch let error as DicomDataSetRepresentation.Error {
+            XCTAssertEqual(error, .bulkDataUnresolved(tag: "7FE00010"))
+        }
+        XCTAssertEqual(transport.requests.count, 3)
+    }
+
+    func test_metadataRelativeBulkDataURI_resolvesAgainstMetadataRequestAndForeignOriginStaysRefused() async throws {
+        let metadata = try JSONSerialization.data(withJSONObject: [
+            ["00281201": ["vr": "OW", "BulkDataURI": "bulk/00281201"]],
+            ["00281202": ["vr": "OW", "BulkDataURI": "https://foreign.example/bulk/00281202"]],
+            ["00281203": ["vr": "OW", "BulkDataURI": "//foreign.example/bulk/00281203"]]
+        ])
+        let transport = DicomWebScriptedTransport(responses: [
+            .init(statusCode: 200, headers: ["Content-Type": "application/dicom+json"], body: metadata),
+            .init(statusCode: 200, headers: ["Content-Type": "application/octet-stream"], body: Data([1, 0, 2, 0]))
+        ])
+        let client = DicomWebClient(configuration: .init(baseURL: URL(string: "https://archive.example/dicom-web")!),
+                                    transport: transport)
+        let decoded = try await client.retrieveSeriesMetadata(studyInstanceUID: "2.25.1", seriesInstanceUID: "2.25.2")
+        XCTAssertEqual(decoded.map { $0.bulkData.first?.uri }, ["bulk/00281201", "https://foreign.example/bulk/00281202",
+                                                                "//foreign.example/bulk/00281203"])
+        let resolved = try await client.resolveBulkData(in: decoded[0])
+        XCTAssertEqual(resolved.dataSet[0x00281201]?.value, .bytes(Data([1, 0, 2, 0])))
+        XCTAssertEqual(transport.requests[1].url.absoluteString,
+                       "https://archive.example/dicom-web/studies/2.25.1/series/2.25.2/bulk/00281201")
+        for foreign in decoded.dropFirst() {
+            do {
+                _ = try await client.resolveBulkData(in: foreign)
+                XCTFail("A BulkDataURI of another origin was fetched")
+            } catch let error as DicomWebError {
+                XCTAssertEqual(error.kind, .originDenied)
+            }
+        }
+        XCTAssertEqual(transport.requests.count, 2)
+    }
+
+    func test_bulkDataRange_accepts206AndWhole200AndRefusesAnotherRange() async throws {
+        let whole = Data(0..<16)
+        let transport = DicomWebScriptedTransport(responses: [
+            .init(statusCode: 206, headers: ["Content-Type": "application/octet-stream", "Content-Range": "bytes 4-7/16"],
+                  body: whole[4...7]),
+            .init(statusCode: 200, headers: ["Content-Type": "application/octet-stream"], body: whole),
+            .init(statusCode: 206, headers: ["Content-Type": "application/octet-stream", "Content-Range": "bytes 0-3/16"],
+                  body: whole[0...3])
+        ])
+        let client = DicomWebClient(configuration: .init(baseURL: URL(string: "https://archive.example/dicom-web")!),
+                                    transport: transport)
+        let partial = try await client.retrieveBulkData(uri: "bulk/1", range: 4...7)
+        XCTAssertEqual(partial.statusCode, 206)
+        XCTAssertEqual(partial.firstPayload, Data(whole[4...7]))
+        let ignored = try await client.retrieveBulkData(uri: "bulk/1", range: 4...7)
+        XCTAssertEqual(ignored.statusCode, 200)
+        XCTAssertEqual(ignored.firstPayload, whole)
+        do {
+            _ = try await client.retrieveBulkData(uri: "bulk/1", range: 4...7)
+            XCTFail("A 206 for another range was accepted")
+        } catch let error as DicomWebError {
+            XCTAssertEqual(error.kind, .invalidResponse)
+        }
+        XCTAssertEqual(transport.requests.map { $0.headers["Range"] }, Array(repeating: "bytes=4-7", count: 3))
+        XCTAssertEqual(transport.requests.first?.url.absoluteString, "https://archive.example/dicom-web/bulk/1")
+    }
+
     func test_metadataWith1000BulkURIs_doesNotFetchReferences() async throws {
         let element: [String: Any] = ["7FE00010": ["vr": "OW", "BulkDataURI": "https://foreign.example/bulk"]]
         let wire = try JSONSerialization.data(withJSONObject: Array(repeating: element, count: 1000))

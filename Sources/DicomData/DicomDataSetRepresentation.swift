@@ -48,6 +48,9 @@ public enum DicomDataSetRepresentation {
         public var bulkData: [BulkDataReference]
         public var diagnostics: [Diagnostic]
         public var transferSyntax: DicomTransferSyntax?
+        /// The URL the representation was retrieved from, when known. Relative bulk-data references resolve
+        /// against it, as relative references in a retrieved document do.
+        public var sourceURL: URL?
 
         public init(dataSet: DicomDataSet, bulkData: [BulkDataReference] = [], diagnostics: [Diagnostic] = [], transferSyntax: DicomTransferSyntax? = nil) {
             self.dataSet = dataSet; self.bulkData = bulkData; self.diagnostics = diagnostics

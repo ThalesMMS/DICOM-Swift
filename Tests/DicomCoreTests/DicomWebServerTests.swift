@@ -88,6 +88,36 @@ final class DicomWebServerTests: XCTestCase {
         XCTAssertEqual(waveformBytes.firstPayload, Data([1, 0, 2, 0, 3, 0]))
     }
 
+    func test_seriesMetadata_paletteLUTAsBulkDataURI_resolvesThroughClient() async throws {
+        let luts = (0..<3).map { channel in Data((0..<256).flatMap { [UInt8($0), UInt8(channel)] }) }
+        var dataSet = Self.imageDataSet(patientName: "TEST^PALETTE", studyInstanceUID: "2.25.31",
+                                        seriesInstanceUID: "2.25.32", sopInstanceUID: "2.25.33")
+        dataSet = dataSet.setting(.init(tag: DicomTag.photometricInterpretation.rawValue, vr: .CS,
+                                        value: .strings(["PALETTE COLOR"])))
+        for (index, lut) in luts.enumerated() {
+            dataSet = dataSet.setting(.init(tag: 0x00281101 + index, vr: .US, value: .unsignedIntegers([256, 0, 16])))
+            dataSet = dataSet.setting(.init(tag: 0x00281201 + index, vr: .OW, value: .bytes(lut)))
+        }
+        let store = DicomWebInMemoryStore()
+        try store.add(dataSet: dataSet)
+        var configuration = DicomWebServerConfiguration(cacheEnabled: false)
+        configuration.inlineBinaryThresholdBytes = 64
+        let client = DicomWebClient(configuration: .init(baseURL: Self.serviceURL),
+                                    transport: DicomWebServer(configuration: configuration, store: store))
+
+        let metadata = try await client.retrieveSeriesMetadata(studyInstanceUID: "2.25.31", seriesInstanceUID: "2.25.32")
+        let decoded = try XCTUnwrap(metadata.first)
+        let reference = try XCTUnwrap(decoded.bulkData.first { $0.tag == 0x00281201 })
+        XCTAssertTrue(reference.uri.hasPrefix(Self.serviceURL.absoluteString + "/bulkdata/"))
+        XCTAssertEqual(decoded.dataSet[0x00281201]?.value ?? .empty, .empty)
+        let resolved = try await client.resolveBulkData(in: decoded)
+        XCTAssertTrue(resolved.bulkData.isEmpty)
+        for (index, lut) in luts.enumerated() {
+            let element = try XCTUnwrap(resolved.dataSet[0x00281201 + index])
+            XCTAssertEqual(try DicomDataSetRepresentation.binaryValueBytes(of: element), lut)
+        }
+    }
+
     func testConformanceMatrixListsProductionScopeAndResponsibilities() throws {
         let matrix = DicomWebConformanceMatrix.packageDefault
 

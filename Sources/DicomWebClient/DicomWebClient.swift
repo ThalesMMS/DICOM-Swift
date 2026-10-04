@@ -495,8 +495,18 @@ public struct DicomWebClient: Sendable {
     }
 
     private func metadata(path: [String]) async throws -> [DicomDataSetRepresentation.Decoded] {
-        let response = try await boundedResponse(url: endpoint(path), accept: DicomWebMediaTypeNegotiator.acceptHeader(for: .metadata))
-        return try DicomWebJSONParser.decoded(from: response.body)
+        let url = endpoint(path)
+        let response = try await boundedResponse(url: url, accept: DicomWebMediaTypeNegotiator.acceptHeader(for: .metadata))
+        return try Self.decodedMetadata(response.body, from: url)
+    }
+
+    /// Metadata whose relative `BulkDataURI` values resolve against `url`, the request that returned them.
+    private static func decodedMetadata(_ body: Data, from url: URL) throws -> [DicomDataSetRepresentation.Decoded] {
+        try DicomWebJSONParser.decoded(from: body).map { decoded in
+            var decoded = decoded
+            decoded.sourceURL = url
+            return decoded
+        }
     }
 
     @discardableResult
@@ -552,15 +562,33 @@ public struct DicomWebClient: Sendable {
                                     accept: DicomWebMediaTypeNegotiator.acceptHeader(for: .rendered))
     }
 
-    private func retrieveBuffered(url: URL, accept: String) async throws -> DicomWebRetrievedObject {
+    private func retrieveBuffered(url: URL, accept: String, range: ClosedRange<Int>? = nil) async throws -> DicomWebRetrievedObject {
+        var headers = ["Accept": accept]
+        if let range { headers["Range"] = "bytes=\(range.lowerBound)-\(range.upperBound)" }
         // The whole answer is held here before the caller sees it, so a body that fails can be fetched again.
-        try await withRetries(.idempotent) {
+        return try await withRetries(.idempotent) {
             let sink = DicomWebMemoryRetrieveSink(maximumBytes: configuration.multipartLimits.maximumPartBytes)
-            let response = try await streamRequest(.get, url: url, headers: ["Accept": accept])
+            let response = try await streamRequest(.get, url: url, headers: headers)
+            if let range, response.statusCode == 206,
+               let contentRange = response.headers.dicomWebHeaderValue("Content-Range"),
+               !Self.contentRange(contentRange, isWithin: range) {
+                response.cancel()
+                throw DicomWebError(kind: .invalidResponse)
+            }
             try await consume(response, sink: sink)
             return .init(statusCode: response.statusCode, contentType: response.headers.dicomWebHeaderValue("Content-Type"),
                          parts: await sink.result())
         }
+    }
+
+    /// Whether a `Content-Range: bytes first-last/length` value starts at `range` and ends within it.
+    private static func contentRange(_ value: String, isWithin range: ClosedRange<Int>) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespaces)
+        guard trimmed.lowercased().hasPrefix("bytes "),
+              let span = trimmed.dropFirst(6).split(separator: "/").first?.split(separator: "-"), span.count == 2,
+              let first = Int(span[0].trimmingCharacters(in: .whitespaces)),
+              let last = Int(span[1].trimmingCharacters(in: .whitespaces)) else { return false }
+        return first == range.lowerBound && first <= last && last <= range.upperBound
     }
 
     private func retrieve(url: URL, accept: String, sink: any DicomWebRetrieveSink) async throws -> Int {
@@ -729,16 +757,19 @@ public struct DicomWebClient: Sendable {
     /// Study metadata as decoded representations: elements carried by `BulkDataURI` stay empty and are listed
     /// in `bulkData` until the caller resolves them explicitly (`resolveBulkData(in:)`).
     public func retrieveStudyMetadata(studyInstanceUID: String) async throws -> [DicomDataSetRepresentation.Decoded] {
+        let url = endpoint(["studies", studyInstanceUID, "metadata"])
         let response = try await send(
             .get,
-            url: endpoint(["studies", studyInstanceUID, "metadata"]),
+            url: url,
             headers: ["Accept": DicomWebMediaTypeNegotiator.acceptHeader(for: .metadata)]
         )
-        return try DicomWebJSONParser.decoded(from: response.body)
+        return try Self.decodedMetadata(response.body, from: url)
     }
 
     /// Fetches every bulk-data reference of a decoded representation through this client's transport, origin
-    /// policy and limits, and stores the value fields in the returned data set.
+    /// policy and limits, and stores the value fields in the returned data set. Relative references resolve against
+    /// `requestBase`, else the representation's `sourceURL`, else the base URL. A reference answered in several parts
+    /// fails instead of keeping only one.
     public func resolveBulkData(in decoded: DicomDataSetRepresentation.Decoded,
                                 limits: DicomDataSetRepresentation.BulkDataLimits = .init(),
                                 relativeTo requestBase: URL? = nil) async throws -> DicomDataSetRepresentation.Decoded {
@@ -747,7 +778,8 @@ public struct DicomWebClient: Sendable {
                                                                            limits.maximumBytesPerReference)
         try Task.checkCancellation()
         return try await DicomDataSetRepresentation.resolvingBulkData(decoded,
-            using: DicomWebBulkDataResolver(client: boundedClient, requestBase: requestBase), limits: limits)
+            using: DicomWebBulkDataResolver(client: boundedClient, requestBase: requestBase ?? decoded.sourceURL),
+            limits: limits)
     }
 
     public func retrieveInstance(studyInstanceUID: String,
@@ -832,6 +864,15 @@ public struct DicomWebClient: Sendable {
             url: try bulkDataURL(uri),
             accept: accept
         )
+    }
+
+    /// Retrieves the bytes `range` of a `BulkDataURI` with an HTTP `Range` request. A `206` brings that range; a
+    /// server that ignores `Range` answers `200` with the whole value, which is returned whole. `statusCode` tells
+    /// the two apart. A `206` whose `Content-Range` starts elsewhere or ends past `range` is refused.
+    public func retrieveBulkData(uri: String, relativeTo requestBase: URL? = nil, range: ClosedRange<Int>,
+                                 accept: String = DicomWebMediaTypeNegotiator.acceptHeader(for: .bulkdata)) async throws -> DicomWebRetrievedObject {
+        guard range.lowerBound >= 0 else { throw DicomWebError(kind: .badRequest) }
+        return try await retrieveBuffered(url: try bulkDataURL(uri, relativeTo: requestBase), accept: accept, range: range)
     }
 
     public func retrieveWADOURIObject(studyInstanceUID: String,
@@ -1042,8 +1083,8 @@ public struct DicomWebClient: Sendable {
         return components.url ?? url
     }
 
-    private func bulkDataURL(_ uri: String) throws -> URL {
-        do { return try configuration.originPolicy.resolve(uri, relativeTo: relativeBulkDataBaseURL()) }
+    private func bulkDataURL(_ uri: String, relativeTo requestBase: URL? = nil) throws -> URL {
+        do { return try configuration.originPolicy.resolve(uri, relativeTo: requestBase ?? relativeBulkDataBaseURL()) }
         catch { throw DicomWebClientError.invalidBulkDataURI(uri) }
     }
 
@@ -1200,13 +1241,20 @@ struct DicomWebBulkDataResolver: DicomDataSetRepresentation.BulkDataResolver {
     let client: DicomWebClient
     let requestBase: URL?
 
-    func data(for reference: DicomDataSetRepresentation.BulkDataReference) async throws -> Data {
+    /// Every part of the response, in order. A value can come in several parts, as encapsulated pixel data sent
+    /// one frame per part.
+    func parts(for reference: DicomDataSetRepresentation.BulkDataReference) async throws -> [Data] {
         let sink = DicomWebMemoryRetrieveSink(maximumBytes: client.configuration.multipartLimits.maximumPartBytes)
         try await client.retrieveBulkData(uri: reference.uri, relativeTo: requestBase, sink: sink)
-        let parts = await sink.result()
-        guard let payload = (parts.first(where: \.isRoot) ?? parts.first)?.body else {
+        return await sink.result().map(\.body)
+    }
+
+    /// The one value of `reference`. A response in several parts is refused rather than cut to its first part.
+    func data(for reference: DicomDataSetRepresentation.BulkDataReference) async throws -> Data {
+        let parts = try await parts(for: reference)
+        guard parts.count == 1 else {
             throw DicomDataSetRepresentation.Error.bulkDataUnresolved(tag: String(format: "%08X", reference.tag))
         }
-        return payload
+        return parts[0]
     }
 }
