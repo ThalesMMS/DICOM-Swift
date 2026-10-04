@@ -947,23 +947,53 @@ public struct DicomWebClient: Sendable {
         )
     }
 
-    /// Retrieves an ordered rendered WADO-RS frame list through the configured HTTP transport.
+    /// Retrieves an ordered rendered WADO-RS frame list through the configured HTTP transport, one part per frame.
+    /// With the default `accept`, several frames are asked for in one multipart request. A server that refuses it
+    /// with 400, 406 or 415 (Orthanc's DICOMweb plugin answers 400 to any multipart rendered request) is then asked
+    /// for each frame alone, as one image, a few requests at a time; the images come back as parts in frame order,
+    /// and `contentType` is the multipart type that was asked for. An explicit `accept` is sent as given.
     public func retrieveRenderedFrames(studyInstanceUID: String,
                                        seriesInstanceUID: String,
                                        sopInstanceUID: String,
                                        frames: DicomWebFrameList,
                                        accept: String? = nil) async throws -> DicomWebRetrievedObject {
-        let resolvedAccept = accept ?? DicomWebMediaTypeNegotiator.renderedFrameAcceptHeader(representationCount: frames.numbers.count)
-        return try await retrieveBuffered(
-            url: endpoint([
+        let url = { (frames: String) in
+            endpoint([
                 "studies", studyInstanceUID,
                 "series", seriesInstanceUID,
                 "instances", sopInstanceUID,
-                "frames", frames.pathComponent,
+                "frames", frames,
                 "rendered"
-            ]),
-            accept: resolvedAccept
-        )
+            ])
+        }
+        let resolvedAccept = accept ?? DicomWebMediaTypeNegotiator.renderedFrameAcceptHeader(representationCount: frames.numbers.count)
+        do {
+            return try await retrieveBuffered(url: url(frames.pathComponent), accept: resolvedAccept)
+        } catch let error as DicomWebError
+                    where accept == nil && frames.numbers.count > 1 && [400, 406, 415].contains(error.statusCode) {
+            // The answer is buffered, so nothing reached the caller before the refusal.
+            let images = try await retrieveRenderedImages(frames.numbers.map { url(String($0)) })
+            return .init(statusCode: 200, contentType: resolvedAccept, parts: images)
+        }
+    }
+
+    /// One single-image rendered request per URL, at most four in flight, with the parts in URL order and the first
+    /// one as root, as in a multipart answer.
+    private func retrieveRenderedImages(_ urls: [URL]) async throws -> [DicomWebMultipartPart] {
+        let accept = DicomWebMediaTypeNegotiator.renderedFrameAcceptHeader(representationCount: 1)
+        var images = [[DicomWebMultipartPart]](repeating: [], count: urls.count)
+        try await withThrowingTaskGroup(of: (Int, [DicomWebMultipartPart]).self) { group in
+            for (index, url) in urls.enumerated() {
+                if index >= 4, let (done, parts) = try await group.next() { images[done] = parts }
+                group.addTask { (index, try await retrieveBuffered(url: url, accept: accept).parts) }
+            }
+            for try await (done, parts) in group { images[done] = parts }
+        }
+        return images.joined().enumerated().map { index, part in
+            var part = part
+            part.isRoot = index == 0
+            return part
+        }
     }
 
     /// Retrieves a single WADO-RS frame through the configured HTTP transport.

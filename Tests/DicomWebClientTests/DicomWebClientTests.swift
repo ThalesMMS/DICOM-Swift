@@ -421,6 +421,51 @@ final class DicomWebClientTests: XCTestCase {
         XCTAssertEqual(transport.requests.first?.headers["Accept"], "multipart/related; type=\"image/png\"")
     }
 
+    func test_retrieveRenderedFrames_refusedMultipart_returnsOneImagePerFrameInOrder() async throws {
+        for status in [400, 406] {
+            let transport = DicomWebRenderedFramesTransport(multipartStatus: status)
+            let client = DicomWebClient(configuration: .init(baseURL: URL(string: "https://archive.example/dicom-web")!),
+                                        transport: transport)
+
+            let rendered = try await client.retrieveRenderedFrames(studyInstanceUID: "2.25.study",
+                                                                   seriesInstanceUID: "2.25.series",
+                                                                   sopInstanceUID: "2.25.instance",
+                                                                   frames: DicomWebFrameList([2, 3, 5, 6, 7, 9]))
+
+            XCTAssertEqual(rendered.parts.map(\.body), [2, 3, 5, 6, 7, 9].map { Data([0x89, UInt8($0)]) })
+            XCTAssertEqual(rendered.parts.map(\.isRoot), [true, false, false, false, false, false])
+            XCTAssertEqual(rendered.parts.map(\.contentType), Array(repeating: "image/png", count: 6))
+            XCTAssertEqual(rendered.contentType, "multipart/related; type=\"image/png\"")
+            let requests = transport.requests
+            XCTAssertEqual(requests.count, 7)
+            XCTAssertTrue(try XCTUnwrap(requests.first?.url.path).hasSuffix("/frames/2,3,5,6,7,9/rendered"))
+            XCTAssertEqual(requests.first?.headers["Accept"], "multipart/related; type=\"image/png\"")
+            XCTAssertEqual(Set(requests.dropFirst().map(\.url.path)), Set([2, 3, 5, 6, 7, 9].map {
+                "/dicom-web/studies/2.25.study/series/2.25.series/instances/2.25.instance/frames/\($0)/rendered"
+            }))
+            XCTAssertTrue(requests.dropFirst().allSatisfy { $0.headers["Accept"] == "image/png" })
+            XCTAssertLessThanOrEqual(transport.maximumInFlight, 4)
+        }
+    }
+
+    func test_retrieveRenderedFrames_explicitAcceptRefused_isNotRetriedPerFrame() async throws {
+        let transport = DicomWebRenderedFramesTransport(multipartStatus: 400)
+        let client = DicomWebClient(configuration: .init(baseURL: URL(string: "https://archive.example/dicom-web")!),
+                                    transport: transport)
+
+        do {
+            _ = try await client.retrieveRenderedFrames(studyInstanceUID: "2.25.study",
+                                                        seriesInstanceUID: "2.25.series",
+                                                        sopInstanceUID: "2.25.instance",
+                                                        frames: DicomWebFrameList([1, 2]),
+                                                        accept: "multipart/related; type=\"image/jpeg\"")
+            XCTFail("A refused explicit Accept was not reported")
+        } catch let error as DicomWebError {
+            XCTAssertEqual(error.statusCode, 400)
+        }
+        XCTAssertEqual(transport.requests.count, 1)
+    }
+
     func testRetrieveFrameBulkDataURIAndLargeSTOWSerialization() async throws {
         let largePayload = Data(repeating: 0xA5, count: 1024 * 1024)
         let transport = DicomWebScriptedTransport(responses: [
@@ -712,6 +757,37 @@ private final class DicomWebScriptedTransport: DicomWebHTTPTransport, @unchecked
             return DicomWebHTTPResponse(statusCode: 500, body: Data("No scripted response".utf8))
         }
         return responses.removeFirst()
+    }
+}
+
+/// A server that refuses multipart rendered requests and answers a single rendered frame with one PNG whose second
+/// byte is the frame number. Lower frames answer later, so completion order differs from request order.
+private final class DicomWebRenderedFramesTransport: DicomWebHTTPTransport, @unchecked Sendable {
+    private let lock = NSLock()
+    private let multipartStatus: Int
+    private var storedRequests: [DicomWebHTTPRequest] = []
+    private var inFlight = 0
+    private var storedMaximumInFlight = 0
+    var requests: [DicomWebHTTPRequest] { lock.withLock { storedRequests } }
+    var maximumInFlight: Int { lock.withLock { storedMaximumInFlight } }
+
+    init(multipartStatus: Int) {
+        self.multipartStatus = multipartStatus
+    }
+
+    func send(_ request: DicomWebHTTPRequest) async throws -> DicomWebHTTPResponse {
+        lock.withLock {
+            storedRequests.append(request)
+            inFlight += 1
+            storedMaximumInFlight = max(storedMaximumInFlight, inFlight)
+        }
+        defer { lock.withLock { inFlight -= 1 } }
+        let frames = request.url.deletingLastPathComponent().lastPathComponent
+        guard request.headers["Accept"] == "image/png", let frame = UInt8(frames) else {
+            return DicomWebHTTPResponse(statusCode: multipartStatus, body: Data("multipart refused".utf8))
+        }
+        try await Task.sleep(nanoseconds: UInt64(10 - min(frame, 10)) * 2_000_000)
+        return DicomWebHTTPResponse(statusCode: 200, headers: ["Content-Type": "image/png"], body: Data([0x89, frame]))
     }
 }
 
