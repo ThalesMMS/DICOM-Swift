@@ -46,24 +46,31 @@ public struct DicomWebSearchParameters: Equatable, Sendable {
         return path
     }
 
+    /// Each value list is joined with ",", the QIDO-RS separator between the values of one key.
     public func queryItems() throws -> [URLQueryItem] {
+        try queryValueLists().map { URLQueryItem(name: $0.name, value: $0.values.joined(separator: ",")) }
+    }
+
+    /// The query keys in request order, each with its list of values. A key with several values (a UID list, or
+    /// multiple value matching for any other VR) is matched against any of them.
+    private func queryValueLists() throws -> [(name: String, values: [String])] {
         _ = try pathComponents()
         guard !includeFields.contains("all") || includeFields == ["all"],
               Set(matches.map(\.attribute)).count == matches.count else { throw DicomWebError(kind: .badRequest) }
-        var items: [URLQueryItem] = []
+        var lists: [(name: String, values: [String])] = []
         for match in matches {
             guard !match.attribute.isEmpty, !["limit", "offset", "includefield", "fuzzymatching"].contains(match.attribute),
-                  !match.values.isEmpty, match.vr == .UI || match.values.count == 1,
+                  !match.values.isEmpty, match.values.count == 1 || !match.values.contains(""),
                   match.values.allSatisfy({ !$0.utf8.contains(13) && !$0.utf8.contains(10) }) else {
                 throw DicomWebError(kind: .badRequest)
             }
-            items.append(.init(name: match.attribute, value: match.values.joined(separator: ",")))
+            lists.append((match.attribute, match.values))
         }
-        if let fuzzyMatching { items.append(.init(name: "fuzzymatching", value: String(fuzzyMatching))) }
-        if !includeFields.isEmpty { items.append(.init(name: "includefield", value: includeFields.joined(separator: ","))) }
-        if let limit { items.append(.init(name: "limit", value: String(limit))) }
-        if let offset { items.append(.init(name: "offset", value: String(offset))) }
-        return items
+        if let fuzzyMatching { lists.append(("fuzzymatching", [String(fuzzyMatching)])) }
+        if !includeFields.isEmpty { lists.append(("includefield", includeFields)) }
+        if let limit { lists.append(("limit", [String(limit)])) }
+        if let offset { lists.append(("offset", [String(offset)])) }
+        return lists
     }
 
     public func url(relativeTo base: URL) throws -> URL {
@@ -73,11 +80,13 @@ public struct DicomWebSearchParameters: Equatable, Sendable {
             throw DicomWebError(kind: .badRequest)
         }
         // ASCII only (#2888): `.alphanumerics` is the Unicode set and would leave letters such as "é" unencoded,
-        // which URLComponents refuses as a percent-encoded query. "*" stays literal for wildcards; "," is encoded.
+        // which URLComponents refuses as a percent-encoded query. "*" stays literal for wildcards. The "," between
+        // values stays literal: servers such as dcm4chee read "%2C" as data, so "CT%2CMR" would be one value. A
+        // "," inside a value has no QIDO-RS representation and is encoded.
         let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~*")
-        components.percentEncodedQuery = try queryItems().map {
-            ($0.name.addingPercentEncoding(withAllowedCharacters: allowed) ?? "") + "=" +
-            (($0.value ?? "").addingPercentEncoding(withAllowedCharacters: allowed) ?? "")
+        func encoded(_ text: String) -> String { text.addingPercentEncoding(withAllowedCharacters: allowed) ?? "" }
+        components.percentEncodedQuery = try queryValueLists().map {
+            encoded($0.name) + "=" + $0.values.map(encoded).joined(separator: ",")
         }.joined(separator: "&")
         guard let result = components.url else { throw DicomWebError(kind: .badRequest) }
         return result

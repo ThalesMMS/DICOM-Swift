@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- QIDO-RS searches keep the comma between the values of one key literal, for
+  UID lists and for multiple values of any other VR; a comma inside a value is
+  still percent-encoded. dcm4chee read `%2C` as part of a single value and
+  found nothing. `DicomWebSearchParameters` now accepts several values for a
+  key of any VR, and `dicomtool web qido --key` splits values on commas.
+
 ---
 
 ## [2.0.1] - 2026-10-04

@@ -50,8 +50,7 @@ struct WebCommand: AsyncParsableCommand {
                 let attribute = String(pair[0])
                 let vr = Int(attribute, radix: 16).flatMap { DCMDictionary().vrCode(forTag: $0) }
                     .flatMap(DicomVR.init(code:)) ?? (attribute.hasSuffix("UID") ? .UI : .LO)
-                return .init(attribute, vr: vr,
-                             values: vr == .UI ? String(pair[1]).components(separatedBy: ",") : [String(pair[1])])
+                return .init(attribute, vr: vr, values: String(pair[1]).components(separatedBy: ","))
             }
             let parameters = DicomWebSearchParameters(level: level, studyInstanceUID: study, seriesInstanceUID: series,
                 matches: matches, fuzzyMatching: fuzzy ? true : nil,
