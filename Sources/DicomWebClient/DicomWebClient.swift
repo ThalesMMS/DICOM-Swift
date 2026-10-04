@@ -381,6 +381,45 @@ public struct DicomWebClient: Sendable {
         try await retrieveBulkData(uri: uri, relativeTo: requestBase, sink: sink, accept: accept.headerValue)
     }
 
+    /// Retrieves a study asking for `accept`'s ranges in order, and again without the first ones after a fallback
+    /// status (`DicomWebAcceptList`).
+    @discardableResult
+    public func retrieveStudy(studyInstanceUID: String,
+                              accept: DicomWebAcceptList, sink: any DicomWebRetrieveSink) async throws -> Int {
+        try await retrieve(url: endpoint(["studies", studyInstanceUID]), accept: accept, sink: sink)
+    }
+
+    /// Retrieves a series with `accept`'s ranges in order (`DicomWebAcceptList`).
+    @discardableResult
+    public func retrieveSeries(studyInstanceUID: String, seriesInstanceUID: String,
+                               accept: DicomWebAcceptList, sink: any DicomWebRetrieveSink) async throws -> Int {
+        try await retrieve(url: endpoint(["studies", studyInstanceUID, "series", seriesInstanceUID]), accept: accept, sink: sink)
+    }
+
+    /// Retrieves an instance with `accept`'s ranges in order (`DicomWebAcceptList`).
+    @discardableResult
+    public func retrieveInstance(studyInstanceUID: String, seriesInstanceUID: String, sopInstanceUID: String,
+                                 accept: DicomWebAcceptList, sink: any DicomWebRetrieveSink) async throws -> Int {
+        try await retrieve(url: endpoint(["studies", studyInstanceUID, "series", seriesInstanceUID, "instances", sopInstanceUID]),
+                           accept: accept, sink: sink)
+    }
+
+    /// Retrieves frames with `accept`'s ranges in order (`DicomWebAcceptList`).
+    @discardableResult
+    public func retrieveFrames(studyInstanceUID: String, seriesInstanceUID: String, sopInstanceUID: String, frames: DicomWebFrameList,
+                               accept: DicomWebAcceptList, sink: any DicomWebRetrieveSink) async throws -> Int {
+        try await retrieve(url: endpoint(["studies", studyInstanceUID, "series", seriesInstanceUID, "instances", sopInstanceUID,
+                                           "frames", frames.pathComponent]), accept: accept, sink: sink)
+    }
+
+    /// Retrieves bulk data with `accept`'s ranges in order (`DicomWebAcceptList`).
+    @discardableResult
+    public func retrieveBulkData(uri: String, relativeTo requestBase: URL? = nil,
+                                 accept: DicomWebAcceptList, sink: any DicomWebRetrieveSink) async throws -> Int {
+        let url = try configuration.originPolicy.resolve(uri, relativeTo: requestBase ?? relativeBulkDataBaseURL())
+        return try await retrieve(url: url, accept: accept, sink: sink)
+    }
+
     /// Streams a metadata representation or preview at its study/series/instance scope.
     @discardableResult
     public func retrieveRepresentation(studyInstanceUID: String, seriesInstanceUID: String? = nil,
@@ -526,6 +565,33 @@ public struct DicomWebClient: Sendable {
         }
         try await consume(response, sink: sink)
         return response.statusCode
+    }
+
+    private func retrieve(url: URL, accept: DicomWebAcceptList, sink: any DicomWebRetrieveSink) async throws -> Int {
+        let response = try await streamRequest(url: url, accept: accept)
+        try await consume(response, sink: sink)
+        return response.statusCode
+    }
+
+    /// The response to the first Accept of `accept` the server does not refuse with a fallback status. Only refused
+    /// requests move to the next Accept: nothing has reached the sink yet.
+    private func streamRequest(url: URL, accept: DicomWebAcceptList) async throws -> DicomWebHTTPStreamedResponse {
+        var attempted: [String] = []
+        while true {
+            let header = accept.headerValue(droppingFirst: attempted.count)
+            attempted.append(header)
+            do {
+                return try await withRetries(.idempotent) {
+                    try await streamRequest(.get, url: url, headers: ["Accept": header])
+                }
+            } catch let error as DicomWebError where accept.fallbackStatuses.contains(error.statusCode) {
+                guard attempted.count < accept.ranges.count else {
+                    var error = error
+                    error.attemptedAccepts = attempted
+                    throw error
+                }
+            }
+        }
     }
 
     private func consume(_ response: DicomWebHTTPStreamedResponse, sink: any DicomWebRetrieveSink) async throws {

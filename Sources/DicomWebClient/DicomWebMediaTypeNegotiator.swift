@@ -108,6 +108,21 @@ extension DicomWebMediaTypeNegotiator {
         return try DicomWebMediaType("multipart/related; type=\"application/dicom\"; transfer-syntax=\(uid)")
     }
 
+    /// The Accept of a WADO-RS study, series or instance retrieve that asks for each transfer syntax in turn, as
+    /// `instanceAccept(transferSyntaxUID:)` reads each one: a UID asks for that syntax, `*` or an empty value for the
+    /// objects as stored. `["1.2.840.10008.1.2.4.90", "*"]` asks for JPEG 2000 and accepts the objects as stored
+    /// when the server cannot convert. Implicit VR Little Endian throws `DicomWebImplicitVRAcceptError`; a value that
+    /// is not a UID, or an empty list, throws `DicomWebError` `.badRequest`.
+    public static func instanceAccept(transferSyntaxUIDs: [String],
+                                      fallbackStatuses: Set<Int> = [406]) throws -> DicomWebAcceptList {
+        try DicomWebAcceptList(transferSyntaxUIDs.map { uid in
+            guard uid.trimmingCharacters(in: .whitespaces) != DicomTransferSyntax.implicitVRLittleEndian.rawValue else {
+                throw DicomWebImplicitVRAcceptError()
+            }
+            return try instanceAccept(transferSyntaxUID: uid)
+        }, fallbackStatuses: fallbackStatuses)
+    }
+
     private static func allowed(_ candidate: Representation, resource: ResourceKind) -> Bool {
         switch resource {
         case .instance: return candidate.multipart && candidate.mediaType == "application/dicom"

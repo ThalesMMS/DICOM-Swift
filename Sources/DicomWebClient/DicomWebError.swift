@@ -18,11 +18,15 @@ public struct DicomWebError: Error, Equatable, Sendable, LocalizedError, CustomS
     /// The start of the response body, at most 4 KiB, with every credential the client sent and every
     /// credential-like header line removed.
     public private(set) var bodyPreview: String? = nil
+    /// Every Accept a retrieve with a `DicomWebAcceptList` sent, in order, when the server refused them all with a
+    /// fallback status; nil otherwise. They hold media types and transfer syntax UIDs only.
+    public internal(set) var attemptedAccepts: [String]? = nil
     public var errorDescription: String? { "DICOMweb \(kind.rawValue) (HTTP \(statusCode))." }
     /// Leaves the server's text out, so an interpolated or logged error carries no body.
     public var description: String {
         "DicomWebError(kind: \(kind.rawValue), statusCode: \(statusCode), code: \(code ?? "nil"), "
-            + "retryAfter: \(retryAfter.map { String($0) } ?? "nil"))"
+            + "retryAfter: \(retryAfter.map { String($0) } ?? "nil")"
+            + (attemptedAccepts.map { ", attemptedAccepts: [\($0.joined(separator: " | "))]" } ?? "") + ")"
     }
     public init(kind: Kind, statusCode: Int? = nil, code: String? = nil) {
         self.kind = kind

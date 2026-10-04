@@ -195,7 +195,7 @@ final class DicomWebRetryPolicyTests: XCTestCase {
 }
 
 /// Answers each request with the next scripted action, on a connection it then closes.
-private final class ScriptedHTTPServer: @unchecked Sendable {
+final class ScriptedHTTPServer: @unchecked Sendable {
     enum Action {
         case respond(Int, [String: String], String)
         /// Sends the headers of a 200 and part of its body, then closes the connection. URLSession repeats a request
@@ -209,6 +209,7 @@ private final class ScriptedHTTPServer: @unchecked Sendable {
     private var connections: [NWConnection] = []
     private var actions: [Action] = []
     private var requests = 0
+    private var accepts: [String] = []
     private var url: URL?
 
     var script: [Action] {
@@ -217,6 +218,9 @@ private final class ScriptedHTTPServer: @unchecked Sendable {
     }
 
     var requestCount: Int { lock.withLock { requests } }
+
+    /// The Accept header of each request, in order.
+    var acceptHeaders: [String] { lock.withLock { accepts } }
 
     init() {
         let parameters = NWParameters.tcp
@@ -257,8 +261,12 @@ private final class ScriptedHTTPServer: @unchecked Sendable {
                 if complete || error != nil { connection.cancel() } else { readHead(on: connection, received: head) }
                 return
             }
+            let accept = String(decoding: head, as: UTF8.self).components(separatedBy: "\r\n")
+                .first { $0.lowercased().hasPrefix("accept:") }
+                .map { String($0.dropFirst("accept:".count)).trimmingCharacters(in: .whitespaces) }
             let action = lock.withLock { () -> Action in
                 requests += 1
+                if let accept { accepts.append(accept) }
                 return actions.isEmpty ? .respond(500, [:], "unscripted") : actions.removeFirst()
             }
             switch action {

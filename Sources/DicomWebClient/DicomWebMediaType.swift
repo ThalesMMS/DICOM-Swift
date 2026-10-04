@@ -27,12 +27,31 @@ public struct DicomWebMediaType: Equatable, Sendable {
         self.parameters = parameters
     }
 
+    init(type: String, parameters: [String: String]) {
+        self.type = type
+        self.parameters = parameters
+    }
+
+    /// The value for a header. `type` comes first and is always quoted; `q` comes last, where an Accept weight goes
+    /// (RFC 9110 12.5.1); the other parameters follow in name order. A value that is an RFC 9110 token, such as a
+    /// transfer syntax UID or `*`, goes unquoted, as dcm4che and dicomweb-client send it: some servers compare the
+    /// raw text with the UID.
     public var headerValue: String {
-        type + parameters.keys.sorted().map { key in
-            let escaped = parameters[key]!.replacingOccurrences(of: "\\", with: "\\\\")
+        let order = { (key: String) in key == "type" ? 0 : key == "q" ? 2 : 1 }
+        return type + parameters.keys.sorted { (order($0), $0) < (order($1), $1) }.map { key in
+            let value = parameters[key]!
+            guard key == "type" || !Self.isToken(value) else { return "; \(key)=\(value)" }
+            let escaped = value.replacingOccurrences(of: "\\", with: "\\\\")
                 .replacingOccurrences(of: "\"", with: "\\\"")
             return "; \(key)=\"\(escaped)\""
         }.joined()
+    }
+
+    /// RFC 9110 5.6.2 `token`.
+    private static func isToken(_ value: String) -> Bool {
+        !value.isEmpty && value.unicodeScalars.allSatisfy { scalar in
+            scalar.isASCII && (CharacterSet.alphanumerics.contains(scalar) || "!#$%&'*+-.^_`|~".unicodeScalars.contains(scalar))
+        }
     }
 
     package static func split(_ value: String, separator: Character) -> [String] {

@@ -604,6 +604,24 @@ final class DicomWebServerTests: XCTestCase {
         XCTAssertEqual(Self.header("Content-Location", in: part.headers), instanceURL.absoluteString)
     }
 
+    func testWADOInstanceAcceptsTheTransferSyntaxQuotedOrUnquoted() async throws {
+        let server = try Self.encapsulatedMultiframeServer(fragments: [Self.rleFrame(samples: [10, 20, 30, 40])])
+        let instanceURL = Self.serviceURL.appendingPathComponent(
+            "studies/\(Self.studyUID)/series/\(Self.seriesUID)/instances/\(Self.instanceUID)"
+        )
+        let rle = DicomTransferSyntax.rleLossless.rawValue
+        for accept in ["multipart/related; type=\"application/dicom\"; transfer-syntax=\(rle)",
+                       "multipart/related; type=\"application/dicom\"; transfer-syntax=\"\(rle)\"",
+                       "multipart/related; type=\"application/dicom\"; transfer-syntax=1.2.840.10008.1.2.1, "
+                           + "multipart/related; type=\"application/dicom\"; transfer-syntax=\(rle); q=0.9"] {
+            let response = try await server.send(DicomWebHTTPRequest(method: .get, url: instanceURL,
+                                                                     headers: ["Accept": accept]))
+            XCTAssertEqual(response.statusCode, 200, accept)
+            XCTAssertEqual(try Self.multipartParts(from: response).first?.contentType,
+                           "application/dicom; transfer-syntax=\(rle)", accept)
+        }
+    }
+
     func testSTOWThenWADOPreservesCompressedPart10TransferSyntaxLabel() async throws {
         var dataSet = EncapsulatedFixtureFactory.makeDataSet(
             transferSyntax: .rleLossless,
