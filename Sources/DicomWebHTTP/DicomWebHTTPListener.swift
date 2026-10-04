@@ -53,11 +53,16 @@ public final class DicomWebHTTPListener: DicomWebServerTransport, @unchecked Sen
               configuration.maximumConnections > 0, configuration.maximumRequestsPerConnection > 0,
               configuration.connectionLifetime > 0 else { throw HTTPFailure(status: 400) }
         let parameters = try configuration.tls.map(DicomWebServerTLS.parameters) ?? NWParameters.tcp
-        if !bind.isEmpty {
-            parameters.requiredLocalEndpoint = .hostPort(host: NWEndpoint.Host(bind),
-                port: NWEndpoint.Port(rawValue: configuration.port)!)
+        let port = NWEndpoint.Port(rawValue: configuration.port)!
+        let listener: NWListener
+        if bind.isEmpty {
+            listener = try NWListener(using: parameters, on: port)
+        } else {
+            // The bound endpoint already carries the port; naming it again in
+            // NWListener(using:on:) fails with EINVAL for any fixed port.
+            parameters.requiredLocalEndpoint = .hostPort(host: NWEndpoint.Host(bind), port: port)
+            listener = try NWListener(using: parameters)
         }
-        let listener = try NWListener(using: parameters, on: NWEndpoint.Port(rawValue: configuration.port)!)
         guard lock.withLock({ if self.listener != nil { return false }; self.listener = listener; return true }) else {
             throw HTTPFailure(status: 409)
         }

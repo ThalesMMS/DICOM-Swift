@@ -16,6 +16,31 @@ final class DicomWebHTTPListenerTests: XCTestCase {
         await listener.stop()
     }
 
+    func test_fixedPort_startsOnLoopback() async throws {
+        let socket = Darwin.socket(AF_INET, SOCK_STREAM, 0)
+        guard socket >= 0 else { return XCTFail("socket failed") }
+        var address = sockaddr_in()
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_addr.s_addr = inet_addr("127.0.0.1")
+        var length = socklen_t(MemoryLayout<sockaddr_in>.size)
+        let bound = withUnsafeMutablePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Darwin.bind(socket, $0, length) == 0 && getsockname(socket, $0, &length) == 0
+            }
+        }
+        close(socket)
+        guard bound else { return XCTFail("could not reserve a port") }
+        var configuration = DicomWebHTTPListenerConfiguration()
+        configuration.port = UInt16(bigEndian: address.sin_port)
+        let listener = DicomWebHTTPListener(server: DicomWebServer(), configuration: configuration)
+        let root = try await listener.start()
+        XCTAssertEqual(root.port, Int(configuration.port))
+        let (_, response) = try await URLSession.shared.data(from: root.appendingPathComponent("dicom-web/studies"))
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+        await listener.stop()
+    }
+
     func test_ephemeralPort_remainsBoundToLoopback() async throws {
         guard FileManager.default.isExecutableFile(atPath: "/usr/bin/nc") else { throw XCTSkip("nc absent") }
         var addresses: UnsafeMutablePointer<ifaddrs>?
