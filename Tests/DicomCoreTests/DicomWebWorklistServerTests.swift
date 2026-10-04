@@ -16,6 +16,29 @@ final class DicomWebWorklistServerTests: XCTestCase {
         }
     }
 
+    func test_client_refusedRequestKeepsTheServerDiagnostics() async throws {
+        let transport = RefusingWorklistTransport(response: .init(statusCode: 503,
+            headers: ["Retry-After": "7", "Warning": "299 - \"maintenance\""], body: Data("try later".utf8)))
+        var configuration = DicomWebClientConfiguration(baseURL: URL(string: base)!)
+        configuration.retryPolicy = .init(maximumAttempts: 3, maximumRetryAfter: 1)
+        let client = DicomWebClient(configuration: configuration, transport: transport)
+        let uid = uid
+        let requests: [() async throws -> Void] = [{ _ = try await client.retrieveWorkitem(uid) },
+                                                   { _ = try await client.createWorkitem(webWorkitemFixture(), workitemUID: uid) }]
+        for request in requests {
+            do {
+                try await request()
+                XCTFail("a 503 was accepted")
+            } catch let error as DicomWebError {
+                XCTAssertEqual(error.statusCode, 503)
+                XCTAssertEqual(error.retryAfter, 7)
+                XCTAssertEqual(error.warning, "299 - \"maintenance\"")
+                XCTAssertEqual(error.bodyPreview, "try later")
+            }
+        }
+        XCTAssertEqual(transport.count, 2, "a Retry-After above the ceiling ends the GET; the POST is sent once")
+    }
+
     func request(_ server: DicomWebServer, _ method: DicomWebHTTPMethod, _ path: String,
                  _ data: DicomDataSet? = nil, headers: [String: String] = [:]) async throws -> DicomWebHTTPResponse {
         try await server.send(.init(method: method, url: URL(string: base + path)!,
@@ -352,4 +375,18 @@ func webWorkitemFixture() -> DicomDataSet {
         data.set(.init(tag: row.tag, vr: vr, value: .empty))
     }
     return data
+}
+
+private final class RefusingWorklistTransport: DicomWebHTTPTransport, @unchecked Sendable {
+    let response: DicomWebHTTPResponse
+    private let lock = NSLock()
+    private var requests = 0
+    var count: Int { lock.withLock { requests } }
+
+    init(response: DicomWebHTTPResponse) { self.response = response }
+
+    func send(_ request: DicomWebHTTPRequest) async throws -> DicomWebHTTPResponse {
+        lock.withLock { requests += 1 }
+        return response
+    }
 }

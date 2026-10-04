@@ -97,6 +97,8 @@ public struct DicomWebClientConfiguration: Equatable, Sendable {
     public var totalDeadline: TimeInterval? = nil
     /// False refuses every redirect; true follows those the origin policy allows.
     public var followsRedirects = true
+    /// Which failed requests are repeated, and how long to wait between attempts. The default never repeats.
+    public var retryPolicy = DicomWebRetryPolicy.none
     /// Maximum complete STOW multipart body size, including MIME framing and payloads.
     public var maximumSTOWRequestBodyBytes: Int
     /// Additional BulkDataURI origins. Scheme, host and effective port must match; headers stay on the base origin.
@@ -507,15 +509,21 @@ public struct DicomWebClient: Sendable {
     }
 
     private func retrieveBuffered(url: URL, accept: String) async throws -> DicomWebRetrievedObject {
-        let sink = DicomWebMemoryRetrieveSink(maximumBytes: configuration.multipartLimits.maximumPartBytes)
-        let response = try await streamRequest(.get, url: url, headers: ["Accept": accept])
-        try await consume(response, sink: sink)
-        return .init(statusCode: response.statusCode, contentType: response.headers.dicomWebHeaderValue("Content-Type"),
-                     parts: await sink.result())
+        // The whole answer is held here before the caller sees it, so a body that fails can be fetched again.
+        try await withRetries(.idempotent) {
+            let sink = DicomWebMemoryRetrieveSink(maximumBytes: configuration.multipartLimits.maximumPartBytes)
+            let response = try await streamRequest(.get, url: url, headers: ["Accept": accept])
+            try await consume(response, sink: sink)
+            return .init(statusCode: response.statusCode, contentType: response.headers.dicomWebHeaderValue("Content-Type"),
+                         parts: await sink.result())
+        }
     }
 
     private func retrieve(url: URL, accept: String, sink: any DicomWebRetrieveSink) async throws -> Int {
-        let response = try await streamRequest(.get, url: url, headers: ["Accept": accept])
+        // Only the request is repeated: once the body reaches the caller's sink it is not fetched again.
+        let response = try await withRetries(.idempotent) {
+            try await streamRequest(.get, url: url, headers: ["Accept": accept])
+        }
         try await consume(response, sink: sink)
         return response.statusCode
     }
@@ -581,15 +589,49 @@ public struct DicomWebClient: Sendable {
         request.bodyFileURL = bodyFileURL
         let response = try await transport.stream(request)
         guard (200..<300).contains(response.statusCode) || acceptedStatuses.contains(response.statusCode) else {
-            response.cancel()
-            throw DicomWebError(statusCode: response.statusCode, code: response.headers.dicomWebHeaderValue("X-DICOMweb-Error-Code"))
+            defer { response.cancel() }
+            throw DicomWebError(statusCode: response.statusCode, headers: response.headers,
+                                body: await Self.bodyPreview(of: response), credentials: configuration.headers)
         }
         return response
     }
 
+    /// The start of a refused response's body, for its error. A body that fails to arrive leaves what was read.
+    private static func bodyPreview(of response: DicomWebHTTPStreamedResponse) async -> Data {
+        var body = Data()
+        do {
+            for try await chunk in response.body {
+                body.append(chunk.prefix(DicomWebError.bodyPreviewReadBytes - body.count))
+                if body.count >= DicomWebError.bodyPreviewReadBytes { break }
+            }
+        } catch {}
+        return body
+    }
+
+    /// Runs `attempt` until it succeeds or `configuration.retryPolicy` ends it, waiting between attempts.
+    /// The wait is a task sleep, so cancellation ends it at once with `CancellationError`.
+    private func withRetries<T>(_ request: DicomWebRetryPolicy.Request?,
+                                _ attempt: () async throws -> T) async throws -> T {
+        var attempts = 1
+        while true {
+            do {
+                return try await attempt()
+            } catch {
+                guard let request,
+                      let delay = configuration.retryPolicy.delay(after: error, attempt: attempts, for: request) else {
+                    throw error
+                }
+                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                attempts += 1
+            }
+        }
+    }
+
     private func boundedResponse(url: URL, accept: String) async throws -> DicomWebHTTPResponse {
-        let response = try await streamRequest(.get, url: url, headers: ["Accept": accept])
-        return try await collect(response, maximumBytes: configuration.maximumMetadataBytes)
+        try await withRetries(.idempotent) {
+            let response = try await streamRequest(.get, url: url, headers: ["Accept": accept])
+            return try await collect(response, maximumBytes: configuration.maximumMetadataBytes)
+        }
     }
 
     private func collect(_ response: DicomWebHTTPStreamedResponse, maximumBytes: Int) async throws -> DicomWebHTTPResponse {
@@ -847,11 +889,14 @@ public struct DicomWebClient: Sendable {
         try writer.finish { try handle.write(contentsOf: $0) }
         let length = try handle.offset()
         try handle.close()
-        let streamed = try await streamRequest(.post,
-            url: endpoint(studyInstanceUID.map { ["studies", $0] } ?? ["studies"]),
-            headers: ["Content-Type": "multipart/related; type=\"application/dicom\"; boundary=\(boundary)",
-                      "Content-Length": String(length), "Accept": DicomWebMediaTypeNegotiator.storeResponseAcceptHeader],
-            bodyFileURL: file, acceptedStatuses: [409])
+        // Every attempt opens `file` again from its start; it is removed only after the last one.
+        let streamed = try await withRetries(.store) {
+            try await streamRequest(.post,
+                url: endpoint(studyInstanceUID.map { ["studies", $0] } ?? ["studies"]),
+                headers: ["Content-Type": "multipart/related; type=\"application/dicom\"; boundary=\(boundary)",
+                          "Content-Length": String(length), "Accept": DicomWebMediaTypeNegotiator.storeResponseAcceptHeader],
+                bodyFileURL: file, acceptedStatuses: [409])
+        }
         let response = try await collect(streamed, maximumBytes: configuration.maximumMetadataBytes)
         let contentType = response.headers.dicomWebHeaderValue("Content-Type")
         let parts = try multipartPartsIfNeeded(body: response.body, contentType: contentType)
@@ -865,18 +910,16 @@ public struct DicomWebClient: Sendable {
                                    responseParts: parts, storeResponse: decoded)
     }
 
+    /// A buffered request whose refused status throws `DicomWebError` with the server's diagnostics. Only GET is
+    /// repeated; the UPS-RS requests that change a workitem are sent once.
     package func send(_ method: DicomWebHTTPMethod,
                       url: URL,
                       headers: [String: String],
                       body: Data? = nil) async throws -> DicomWebHTTPResponse {
-        let streamed: DicomWebHTTPStreamedResponse
-        do {
-            streamed = try await streamRequest(method, url: url, headers: headers, body: body)
-        } catch let error as DicomWebError {
-            throw DicomWebClientError.httpStatus(statusCode: error.statusCode, method: method.rawValue,
-                                                url: "", bodyPreview: "")
+        try await withRetries(method == .get ? .idempotent : nil) {
+            let streamed = try await streamRequest(method, url: url, headers: headers, body: body)
+            return try await collect(streamed, maximumBytes: configuration.maximumMetadataBytes)
         }
-        return try await collect(streamed, maximumBytes: configuration.maximumMetadataBytes)
     }
 
     private static func hasSameOrigin(_ url: URL, _ baseURL: URL) -> Bool {

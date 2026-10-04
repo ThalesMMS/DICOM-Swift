@@ -83,7 +83,8 @@ extension DicomWebClient {
     /// Stores `files` with one STOW-RS request per batch, each streamed from disk, and returns one result per file in
     /// the given order (#2892). A file without valid File Meta Information is refused alone. 401, 403, 404, network,
     /// TLS, timeout and cancellation stop the remaining batches, whose files are reported as not sent; any other
-    /// failure fails only its batch. Every answer, including a partial one (202, 409), is mapped instance by instance,
+    /// failure fails only its batch. With a `retryPolicy` that repeats, a batch still refused with 429 or 503 after its
+    /// last attempt also stops the remaining batches, rather than sending them to a server that is overloaded. Every answer, including a partial one (202, 409), is mapped instance by instance,
     /// by the SOP Instance UID of each file's File Meta Information or, when given, by `sopInstanceUIDs[i]`.
     public func storeFiles(_ files: [URL], sopInstanceUIDs: [String]? = nil, studyInstanceUID: String? = nil,
                            options: DicomWebStoreBatchOptions = .init(),
@@ -125,7 +126,7 @@ extension DicomWebClient {
                                                 reason: Self.describe(error), httpStatus: httpStatus,
                                                 transportErrorCode: (error as? URLError)?.code)
                 }
-                if Self.isFatal(error) { stop = (Self.describe(error), httpStatus) }
+                if isFatal(error) { stop = (Self.describe(error), httpStatus) }
             }
             completedFiles += batch.count
             await progress?(.init(completedBatches: number + 1, totalBatches: batches.count,
@@ -190,10 +191,11 @@ extension DicomWebClient {
         return text + String(format: " (0x%04X)", code)
     }
 
-    private static func isFatal(_ error: Error) -> Bool {
+    private func isFatal(_ error: Error) -> Bool {
         if error is CancellationError || error is URLError { return true }
-        if let error = error as? DicomWebError { return [.unauthorized, .forbidden, .notFound].contains(error.kind) }
-        return false
+        guard let error = error as? DicomWebError else { return false }
+        if [.unauthorized, .forbidden, .notFound].contains(error.kind) { return true }
+        return configuration.retryPolicy.maximumAttempts > 1 && DicomWebRetryPolicy.isTransient(error, for: .store)
     }
 
     private static func describe(_ error: Error) -> String {

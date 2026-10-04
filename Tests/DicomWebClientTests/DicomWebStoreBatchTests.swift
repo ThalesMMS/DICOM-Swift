@@ -47,6 +47,54 @@ final class DicomWebStoreBatchTests: XCTestCase {
         XCTAssertEqual(progress.last?.completedFiles, 5)
     }
 
+    func test_aBatchRefusedWith503IsRepeatedAndExhaustedAttemptsLeaveTheRestNotSent() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("stow-retry-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let uids = (0..<3).map { "2.25.29400\($0)" }
+        let files = try uids.enumerated().map { index, uid in
+            let url = directory.appendingPathComponent("\(index).dcm")
+            try Self.part10(uid).write(to: url)
+            return url
+        }
+        let server = ScriptedSTOWServer(responses: [(503, Data()), (200, Self.storedResponse(uids[0])),
+                                                    (503, Data()), (503, Data()), (503, Data())])
+        var configuration = DicomWebClientConfiguration(baseURL: try await server.start())
+        defer { server.stop() }
+        configuration.retryPolicy = .init(maximumAttempts: 3, initialBackoff: 0.05, maximumBackoff: 0.2)
+        let client = DicomWebClient(configuration: configuration)
+
+        let results = await client.storeFiles(files, options: .init(maximumFilesPerBatch: 1))
+
+        XCTAssertEqual(results.map(\.state), [.stored, .failed, .notSent])
+        XCTAssertEqual(results[1].httpStatus, 503)
+        XCTAssertEqual(results[2].httpStatus, 503, "the not-sent file names what stopped the store")
+        XCTAssertEqual(server.requestCount, 5, "two attempts for the first batch, three for the second, none for the third")
+        let lastBody = try XCTUnwrap(server.receivedBody)
+        XCTAssertNil(lastBody.error)
+        XCTAssertEqual(lastBody.uids, [uids[1]], "the repeated request sent the whole staged body again")
+    }
+
+    func test_withoutARetryPolicy_a503FailsOnlyItsBatchOnce() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("stow-retry-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let uids = (0..<2).map { "2.25.29401\($0)" }
+        let files = try uids.enumerated().map { index, uid in
+            let url = directory.appendingPathComponent("\(index).dcm")
+            try Self.part10(uid).write(to: url)
+            return url
+        }
+        let server = ScriptedSTOWServer(responses: [(503, Data()), (200, Self.storedResponse(uids[1]))])
+        let client = DicomWebClient(configuration: .init(baseURL: try await server.start()))
+        defer { server.stop() }
+
+        let results = await client.storeFiles(files, options: .init(maximumFilesPerBatch: 1))
+
+        XCTAssertEqual(results.map(\.state), [.failed, .stored])
+        XCTAssertEqual(server.requestCount, 2)
+    }
+
     func test_aBatchThatNeverReachedTheServerKeepsItsURLErrorCode() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("stow-unreachable-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -175,6 +223,11 @@ final class DicomWebStoreBatchTests: XCTestCase {
             .init(tag: DicomTag.seriesInstanceUID.rawValue, vr: .UI, value: .strings(["2.25.2892.1"])),
             .init(tag: DicomTag.patientID.rawValue, vr: .LO, value: .strings(["ISIS2892"]))
         ]), options: .init(transferSyntax: .explicitVRLittleEndian))
+    }
+
+    private static func storedResponse(_ uid: String) -> Data {
+        Data(("[{\"00081199\":{\"vr\":\"SQ\",\"Value\":[{\"00081150\":{\"vr\":\"UI\",\"Value\":[\"1.2.840.10008.5.1.4.1.1.7\"]},"
+            + "\"00081155\":{\"vr\":\"UI\",\"Value\":[\"\(uid)\"]}}]}}]").utf8)
     }
 
     private static func partialResponse(stored: String, refused: String, reason: Int) -> Data {

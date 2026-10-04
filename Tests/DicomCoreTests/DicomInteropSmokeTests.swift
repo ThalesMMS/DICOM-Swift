@@ -587,12 +587,9 @@ extension DicomInteropSmokeTests {
         do {
             _ = try await unauthenticated.searchStudies(DicomWebQuery(patientID: fixture.patientID))
             XCTFail("QIDO with invalid credentials must fail")
-        } catch let error as DicomWebClientError {
-            guard case .httpStatus(let statusCode, _, _, let bodyPreview) = error else {
-                return XCTFail("expected httpStatus error, got \(error)")
-            }
-            XCTAssertEqual(statusCode, 401)
-            assertDiagnosticsCarryNoPHI(bodyPreview, fixture: fixture, context: "auth")
+        } catch let error as DicomWebError {
+            XCTAssertEqual(error.statusCode, 401)
+            assertDiagnosticsCarryNoPHI(error.bodyPreview ?? "", fixture: fixture, context: "auth")
         }
     }
 

@@ -98,9 +98,9 @@ final class DicomWebContractCorpusTests: XCTestCase {
             do {
                 _ = try await client.retrieveStudyMetadata(studyInstanceUID: fixture.id)
                 XCTAssertTrue(fixture.accepted, "\(fixture.id) unexpectedly succeeded")
-            } catch DicomWebClientError.httpStatus(let statusCode, _, _, _) {
+            } catch let error as DicomWebError {
                 XCTAssertFalse(fixture.accepted, "\(fixture.id) unexpectedly failed")
-                XCTAssertEqual(statusCode, fixture.statusCode)
+                XCTAssertEqual(error.statusCode, fixture.statusCode)
             } catch {
                 XCTFail("\(fixture.id) returned an unexpected error: \(error)")
             }

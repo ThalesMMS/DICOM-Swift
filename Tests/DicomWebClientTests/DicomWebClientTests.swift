@@ -95,9 +95,9 @@ final class DicomWebClientTests: XCTestCase {
             do {
                 _ = try await client.searchStudies(.init())
                 XCTFail("Mutated HTTP status was ignored")
-            } catch let error as DicomWebClientError {
-                guard case .httpStatus(let actual, _, _, _) = error else { return XCTFail("Unexpected error: \(error)") }
-                XCTAssertEqual(actual, status)
+            } catch let error as DicomWebError {
+                XCTAssertEqual(error.statusCode, status)
+                XCTAssertEqual(error.bodyPreview, "[]")
             }
         }
         for body in ["[", "{", "null", "[1]", "[{\"0020000D\":"] {
@@ -579,11 +579,10 @@ final class DicomWebClientTests: XCTestCase {
         do {
             _ = try await client.retrieveStudyMetadata(studyInstanceUID: "2.25.missing")
             XCTFail("Expected HTTP diagnostic error.")
-        } catch let error as DicomWebClientError {
-            XCTAssertEqual(error, .httpStatus(statusCode: 404,
-                                             method: "GET",
-                                             url: "",
-                                             bodyPreview: ""))
+        } catch let error as DicomWebError {
+            XCTAssertEqual(error.statusCode, 404)
+            XCTAssertEqual(error.bodyPreview, "missing study")
+            XCTAssertFalse(try XCTUnwrap(error.errorDescription).contains("missing study"), "the description stays fixed")
             XCTAssertTrue(try XCTUnwrap(error.errorDescription).contains("HTTP 404"))
         }
     }
