@@ -42,6 +42,8 @@ public struct DicomWebMultipartStreamParser: Sendable {
     private var pendingPayload = Data()
     private var pendingEpilogue = Data()
     private let marker: Data
+    /// The marker after the line feed that opens a delimiter line inside a part.
+    private let framedMarker: [UInt8]
     private let limits: DicomWebMultipartLimits
     private let rootID: String?
     private var foundRoot = false
@@ -61,6 +63,7 @@ public struct DicomWebMultipartStreamParser: Sendable {
                   || (97...122).contains($0) || "'()+_,-./:=? ".utf8.contains($0) }),
               !boundary.hasSuffix(" ") else { throw DicomWebMultipartStreamError.invalidBoundary }
         marker = Data("--\(boundary)".utf8)
+        framedMarker = [10] + Array(marker)
         rootID = start
         self.limits = limits
     }
@@ -140,19 +143,29 @@ public struct DicomWebMultipartStreamParser: Sendable {
         headers[name] = value + "; transfer-syntax=" + syntax
     }
 
-    /// The first `pattern` in the buffer at or after `start`. memmem keeps the search linear and fast on bodies
-    /// made of '-', of near-delimiters or of one repeated byte, where a search that backtracks slows down.
-    private func firstRange(of pattern: Data, from start: Data.Index) -> Range<Data.Index>? {
-        guard start < buffer.endIndex else { return nil }
-        return buffer.withUnsafeBytes { haystack -> Range<Data.Index>? in
-            pattern.withUnsafeBytes { needle -> Range<Data.Index>? in
-                let base = haystack.baseAddress!
-                let offset = start - buffer.startIndex
-                guard let found = memmem(base + offset, haystack.count - offset, needle.baseAddress!, needle.count) else {
-                    return nil
+    /// The first line break + marker in the buffer that opens a whole delimiter line, or that opens a line still too
+    /// short to tell (`decided` false), with the payload bytes before its line break. One pass over the raw bytes:
+    /// memmem keeps the search linear on bodies of '-', of near-delimiters or of one repeated byte, and each
+    /// candidate is checked in place, so a body of whole delimiters followed by text costs a few compares each.
+    private func delimiterCandidate(finishing: Bool) -> (payload: Int, lineBreak: Int, decided: Bool)? {
+        let maximumBlanks = limits.maximumHeaderBytes
+        return buffer.withUnsafeBytes { raw in
+            framedMarker.withUnsafeBufferPointer { needle in
+                guard let base = raw.baseAddress, let needleBase = needle.baseAddress else { return nil }
+                let bytes = base.assumingMemoryBound(to: UInt8.self)
+                let count = raw.count
+                var offset = 0
+                while offset < count, let found = memmem(base + offset, count - offset, needleBase, needle.count) {
+                    let start = UnsafeRawPointer(found) - base
+                    let lineBreak = start > 0 && bytes[start - 1] == 13 ? 2 : 1
+                    switch Self.delimiterLine(bytes, count: count, after: start + needle.count, finishing: finishing,
+                                              maximumBlanks: maximumBlanks) {
+                    case .some(true): return (start + 1 - lineBreak, lineBreak, true)
+                    case .none: return (start + 1 - lineBreak, lineBreak, false)
+                    case .some(false): offset = start + needle.count
+                    }
                 }
-                let index = buffer.startIndex + (UnsafeRawPointer(found) - base)
-                return index..<(index + pattern.count)
+                return nil
             }
         }
     }
@@ -184,22 +197,23 @@ public struct DicomWebMultipartStreamParser: Sendable {
 
     /// Whether the bytes after a CRLF-boundary at `index` complete a delimiter
     /// line; nil while more bytes are needed to tell.
-    private func delimiterLine(after index: Data.Index, finishing: Bool) -> Bool? {
+    private static func delimiterLine(_ bytes: UnsafePointer<UInt8>, count: Int, after index: Int, finishing: Bool,
+                                      maximumBlanks: Int) -> Bool? {
         var position = index
-        let closing = buffer[position...].starts(with: [45, 45])
+        let closing = position + 1 < count && bytes[position] == 45 && bytes[position + 1] == 45
         if closing { position += 2 }
-        while position < buffer.endIndex, buffer[position] == 32 || buffer[position] == 9 {
+        while position < count, bytes[position] == 32 || bytes[position] == 9 {
             position += 1
-            if position - index > limits.maximumHeaderBytes { return false }
+            if position - index > maximumBlanks { return false }
         }
-        guard position < buffer.endIndex else {
+        guard position < count else {
             if !finishing { return nil }
             return closing
         }
-        if buffer[position] == 10 { return true }
-        guard buffer[position] == 13 else { return false }
-        guard position + 1 < buffer.endIndex else { return finishing ? false : nil }
-        return buffer[position + 1] == 10
+        if bytes[position] == 10 { return true }
+        guard bytes[position] == 13 else { return false }
+        guard position + 1 < count else { return finishing ? false : nil }
+        return bytes[position + 1] == 10
     }
 
     private mutating func drain(into events: inout [DicomWebMultipartEvent], finishing: Bool) throws {
@@ -296,31 +310,17 @@ public struct DicomWebMultipartStreamParser: Sendable {
                     events.append(.partEnd)
                     state = .delimiter
                 } else {
-                    let framed = Data([10]) + marker
-                    var search = buffer.startIndex
-                    var match: Range<Data.Index>?
-                    var undecided: Range<Data.Index>?
-                    while let range = firstRange(of: framed, from: search) {
-                        // Only a whole delimiter line ends the part: the boundary, "--" for the
-                        // last one, blanks, then a line break. Anything else is payload.
-                        switch delimiterLine(after: range.upperBound, finishing: finishing) {
-                        case .some(true): match = range
-                        case .none: undecided = range
-                        case .some(false): search = range.upperBound; continue
-                        }
-                        break
-                    }
-                    if match == nil, let undecided {
+                    // Only a whole delimiter line ends the part: the boundary, "--" for the
+                    // last one, blanks, then a line break. Anything else is payload.
+                    let candidate = delimiterCandidate(finishing: finishing)
+                    if let candidate, !candidate.decided {
                         // Keep the candidate until the bytes after it decide what it is.
-                        let hasCR = undecided.lowerBound > buffer.startIndex && buffer[undecided.lowerBound - 1] == 13
-                        try emit(undecided.lowerBound - buffer.startIndex - (hasCR ? 1 : 0), into: &events)
+                        try emit(candidate.payload, into: &events)
                         return
                     }
-                    if let match {
-                        let hasCR = match.lowerBound > buffer.startIndex && buffer[match.lowerBound - 1] == 13
-                        let n = match.lowerBound - buffer.startIndex - (hasCR ? 1 : 0)
-                        try emit(n, into: &events)
-                        consume(hasCR ? 2 : 1)
+                    if let candidate {
+                        try emit(candidate.payload, into: &events)
+                        consume(candidate.lineBreak)
                         if !pendingPayload.isEmpty { events.append(.payload(pendingPayload)); pendingPayload = Data() }
                         events.append(.partEnd)
                         state = .delimiter

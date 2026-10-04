@@ -128,8 +128,9 @@ final class DicomWebMultipartStreamParserTests: XCTestCase {
 
     /// A delimiter search that backtracks becomes slow on bodies full of '-', of lines that almost open a delimiter
     /// or of one repeated byte. Each such 64 MiB part, read without Content-Length, must take at most four times
-    /// as long as an ordinary 64 MiB part, for the shortest and the longest boundary.
-    func test_adversarialPayload_parsesWithinFourTimesAnOrdinaryOne() throws {
+    /// as long as an ordinary 64 MiB part, for the shortest and the longest boundary. Whole delimiters followed by
+    /// text make a candidate every few bytes, each one checked and rejected; those get at most ten times.
+    func test_adversarialPayload_parsesWithinABoundedMultipleOfAnOrdinaryOne() throws {
         let size = 64 * 1024 * 1024
         var seed: UInt64 = 0x9E37_79B9_7F4A_7C15
         var ordinary = Data(count: size)
@@ -141,16 +142,18 @@ final class DicomWebMultipartStreamParserTests: XCTestCase {
         }
         for boundary in ["-", String(repeating: "-", count: 69) + "b"] {
             let nearDelimiter = Data("\r\n--\(boundary.dropLast())".utf8)
-            let adversarial: [(String, Data)] = [
-                ("dashes", Data(repeating: UInt8(ascii: "-"), count: size)),
-                ("near delimiters", Self.repeating(nearDelimiter, count: size)),
-                ("line feeds", Data(repeating: 10, count: size))
+            let delimiterThenText = Data("\r\n--\(boundary)x".utf8)
+            let adversarial: [(String, Data, Double)] = [
+                ("dashes", Data(repeating: UInt8(ascii: "-"), count: size), 4),
+                ("near delimiters", Self.repeating(nearDelimiter, count: size), 4),
+                ("line feeds", Data(repeating: 10, count: size), 4),
+                ("delimiters followed by text", Self.repeating(delimiterThenText, count: size), 10)
             ]
             let reference = try (0..<3).map { _ in try Self.parseSeconds(ordinary, boundary: boundary) }.min()!
-            for (name, payload) in adversarial {
+            for (name, payload, factor) in adversarial {
                 let seconds = try (0..<3).map { _ in try Self.parseSeconds(payload, boundary: boundary) }.min()!
                 print("boundary \(boundary.count): \(name) \(seconds) s, ordinary \(reference) s")
-                XCTAssertLessThanOrEqual(seconds, 4 * reference,
+                XCTAssertLessThanOrEqual(seconds, factor * reference,
                                          "\(name), boundary of \(boundary.count): \(seconds) s against \(reference) s")
             }
         }
