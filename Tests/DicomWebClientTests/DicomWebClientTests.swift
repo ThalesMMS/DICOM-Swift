@@ -911,6 +911,21 @@ extension DicomWebClientTests {
         XCTAssertEqual(pages.map(\.stopReason), [nil, .repeatedPage])
     }
 
+    func test_searchPager_repeatedPageWithResultWithoutUID_stopsAsRepeated() async throws {
+        let sets: [[String: Any]] = [["0020000E": ["vr": "UI", "Value": ["1.1"]]],
+                                     ["0020000E": ["vr": "UI", "Value": ["1.2"]]],
+                                     ["0008103E": ["vr": "LO", "Value": ["no uid"]]]]
+        let transport = DicomWebFixedPageTransport(body: try JSONSerialization.data(withJSONObject: sets))
+        let client = DicomWebClient(configuration: .init(baseURL: URL(string: "https://archive.example")!), transport: transport)
+        var pages: [DicomWebSearchPage] = []
+        for try await page in client.searchPages(parameters: .init(level: .series, limit: 3), continuesOnFullPage: true) {
+            pages.append(page)
+        }
+        XCTAssertEqual(transport.requestCount, 2)
+        XCTAssertEqual(pages.map { $0.dataSets.count }, [3, 1])
+        XCTAssertEqual(pages.map(\.stopReason), [nil, .repeatedPage])
+    }
+
     func test_searchPager_resultRepeatedAcrossPages_isReturnedOnce() async throws {
         let transport = DicomWebScriptedTransport(responses: [
             .init(statusCode: 200, headers: ["Content-Type": "application/dicom+json"], body: Self.seriesPage(["1.1", "1.2"])),

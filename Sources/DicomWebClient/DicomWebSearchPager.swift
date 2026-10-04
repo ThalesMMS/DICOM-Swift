@@ -39,7 +39,8 @@ public struct DicomWebSearchPage: Sendable {
 
 /// Why a pager stopped before the server reported the end of its results.
 public enum DicomWebSearchStopReason: String, Sendable, Equatable {
-    /// A page that should have advanced brought only results already returned, as when a server ignores `offset`.
+    /// A page that should have advanced repeated results already returned and brought none new, as when a server
+    /// ignores `offset`. Results without the UID of the search level cannot be told apart, so they never count as new.
     case repeatedPage
     /// The pager reached `DicomWebSearchPagingLimits.maximumPages`.
     case pageLimitReached
@@ -59,7 +60,7 @@ public struct DicomWebSearchPagingLimits: Sendable, Equatable {
 
 /// Pages a QIDO search by `offset`. Each result is returned once, keyed by the UID of the search level; results
 /// without that UID pass through, and only the page limit bounds them. The pager stops, saying why on the last page,
-/// when a page brings nothing new or a limit is reached.
+/// when a page repeats results without bringing any new one, or a limit is reached.
 public struct DicomWebSearchPager: AsyncSequence, Sendable {
     public typealias Element = DicomWebSearchPage
     let client: DicomWebClient
@@ -95,15 +96,20 @@ public struct DicomWebSearchPager: AsyncSequence, Sendable {
             case .series: .seriesInstanceUID
             case .instance: .sopInstanceUID
             }
+            var newUIDs = 0
+            var repeats = 0
             var dataSets = page.dataSets.filter { dataSet in
-                dataSet.string(for: tag).map { seen.insert($0).inserted } ?? true
+                guard let uid = dataSet.string(for: tag) else { return true }
+                if seen.insert(uid).inserted { newUIDs += 1; return true }
+                repeats += 1
+                return false
             }
             let room = Swift.max(0, limits.maximumResults - resultCount)
             var stopReason: DicomWebSearchStopReason?
             if dataSets.count > room || (dataSets.count == room && !finished) {
                 dataSets = Array(dataSets.prefix(room))
                 stopReason = .resultLimitReached
-            } else if !finished && dataSets.isEmpty {
+            } else if !finished && newUIDs == 0 && repeats > 0 {
                 stopReason = .repeatedPage
             } else if !finished && pageCount >= limits.maximumPages {
                 stopReason = .pageLimitReached
