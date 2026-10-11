@@ -419,6 +419,22 @@ final class DicomJ2KSwiftBackendTests: XCTestCase {
         }
     }
 
+    /// Issue #3043 (`693_J2KR`): a lossless codestream less precise than Bits Stored holds every value exactly, so the
+    /// samples are delivered as decoded, which is what GDCM and pydicom display.
+    func test_losslessCodestreamBelowBitsStored_deliversTheDecodedSamples() async throws {
+        let width = 17, height = 11
+        let image = Self.grayscaleImage(width: width, height: height, bitDepth: 14, signed: false)
+        let codestream = try await J2KEncoder(encodingConfiguration: J2KEncodingConfiguration(
+            quality: 1, lossless: true, decompositionLevels: 2, qualityLayers: 1, progressionOrder: .lrcp
+        )).encode(image)
+        let declared = try await DicomJ2KSwiftBackend().decode(Self.request(
+            codestream: codestream, width: width, height: height, bitsStored: 14, samplesPerPixel: 1, pixelRepresentation: 0))
+        let wider = try await DicomJ2KSwiftBackend().decode(Self.request(
+            codestream: codestream, width: width, height: height, bitsStored: 16, samplesPerPixel: 1, pixelRepresentation: 0))
+        XCTAssertEqual(wider.buffer.data, declared.buffer.data)
+        XCTAssertEqual(wider.bitsPerSample, 14)
+    }
+
     func test_asyncFrameReaderUsesTheShadowPipelineWithoutChangingPixels() async throws {
         try HTJ2KDecodeTests.skipUnlessHTJ2KSupported()
         let url = Self.repoRoot().appendingPathComponent(HTJ2KDecodeTests.fixtureRelativePath)

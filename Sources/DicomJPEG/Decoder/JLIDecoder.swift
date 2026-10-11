@@ -537,7 +537,32 @@ public struct JLIDecoder: Sendable {
                 yTrimmed = yPlane.data
             }
 
-            if isExtendedPrecision {
+            if !configuration.appliesColorTransform {
+                // Components coded as R, G and B (issue #3043): interleave the reconstructed planes, rounded and
+                // clamped to the sample range exactly as the grayscale path does.
+                let maximum = (1 << frame.precision) - 1
+                let planes = [yTrimmed, cbUp, crUp]
+                let pixelCount = outW * outH
+                if isExtendedPrecision {
+                    var bytes = [UInt8](repeating: 0, count: pixelCount * 6)
+                    for index in 0..<pixelCount {
+                        for component in 0..<3 {
+                            let value = UInt16(min(max(Int(planes[component][index].rounded()), 0), maximum))
+                            bytes[(index * 3 + component) * 2] = UInt8(value & 0xFF)
+                            bytes[(index * 3 + component) * 2 + 1] = UInt8(value >> 8)
+                        }
+                    }
+                    outputData = bytes
+                } else {
+                    var bytes = [UInt8](repeating: 0, count: pixelCount * 3)
+                    for index in 0..<pixelCount {
+                        for component in 0..<3 {
+                            bytes[index * 3 + component] = UInt8(clamping: Int(planes[component][index].rounded()))
+                        }
+                    }
+                    outputData = bytes
+                }
+            } else if isExtendedPrecision {
                 // 12-bit color → little-endian UInt16 RGB. Planes are already
                 // reconstructed in 0...2^P-1 with chroma centered at 2^(P-1).
                 outputData = ColorConversion.imageYCbCr16ToRGB(
@@ -547,8 +572,12 @@ public struct JLIDecoder: Sendable {
                     maxValue: Float((1 << frame.precision) - 1)
                 )
             } else {
+                // Integer samples, range-limited to 0...255, before the conversion, as libjpeg converts its IDCT
+                // output: converting the unrounded planes moved RGB further from the reference decoders (issue #3043:
+                // RMSE 0.68 against libjpeg on gdcmData LEADTOOLS_FLOWERS-24-RGB-JpegLossy, 0.17 with integer samples).
+                func samples(_ plane: [Float]) -> [Float] { plane.map { min(max($0.rounded(), 0), 255) } }
                 outputData = ColorConversion.imageYCbCrToRGB(
-                    y: yTrimmed, cb: cbUp, cr: crUp,
+                    y: samples(yTrimmed), cb: samples(cbUp), cr: samples(crUp),
                     width: outW, height: outH
                 )
             }

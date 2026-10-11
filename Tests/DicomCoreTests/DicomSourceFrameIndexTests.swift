@@ -28,6 +28,52 @@ final class DicomSourceFrameIndexTests: XCTestCase {
         XCTAssertEqual(backed.metadata.bitsStored, 8)
     }
 
+    /// Issue #3043: native Pixel Data longer than its frames (pydicom's `MR_small_padded`: 128 bytes after a 64 × 64
+    /// frame) is addressed from the start, as GDCM and pydicom read it, and the excess is reported; a value too short
+    /// for its frames stays refused.
+    func test_nativePixelDataBeyondItsFrames_isAddressedFromTheStartAndReportsTheExcess() async throws {
+        func object(frames: Int, rows: Int, columns: Int, bits: Int, pixels: Data) throws -> Data {
+            try DicomDataSetWriter.part10Data(from: DicomDataSet(elements: [
+                .init(tag: DicomTag.sopClassUID.rawValue, vr: .UI, value: .strings(["1.2.840.10008.5.1.4.1.1.4"])),
+                .init(tag: DicomTag.sopInstanceUID.rawValue, vr: .UI, value: .strings(["2.25.30431"])),
+                .init(tag: DicomTag.samplesPerPixel.rawValue, vr: .US, value: .unsignedIntegers([1])),
+                .init(tag: DicomTag.photometricInterpretation.rawValue, vr: .CS, value: .strings(["MONOCHROME2"])),
+                .init(tag: DicomTag.numberOfFrames.rawValue, vr: .IS, value: .strings(["\(frames)"])),
+                .init(tag: DicomTag.rows.rawValue, vr: .US, value: .unsignedIntegers([UInt(rows)])),
+                .init(tag: DicomTag.columns.rawValue, vr: .US, value: .unsignedIntegers([UInt(columns)])),
+                .init(tag: DicomTag.bitsAllocated.rawValue, vr: .US, value: .unsignedIntegers([UInt(bits)])),
+                .init(tag: DicomTag.bitsStored.rawValue, vr: .US, value: .unsignedIntegers([UInt(bits)])),
+                .init(tag: DicomTag.highBit.rawValue, vr: .US, value: .unsignedIntegers([UInt(bits - 1)])),
+                .init(tag: DicomTag.pixelRepresentation.rawValue, vr: .US, value: .unsignedIntegers([0])),
+                .init(tag: DicomTag.pixelData.rawValue, vr: bits == 8 ? .OB : .OW, value: .bytes(pixels))
+            ]))
+        }
+        // Two 3 × 2 frames of 16-bit samples, then 128 bytes that belong to no frame.
+        let samples = (0..<12).map { UInt16($0 * 1000 + 7) }
+        let frameBytes = Data(samples.flatMap { [UInt8($0 & 0xFF), UInt8($0 >> 8)] })
+        let padded = try await DicomSourceFrameSession.open(source: DicomByteSource(
+            data: object(frames: 2, rows: 2, columns: 3, bits: 16, pixels: frameBytes + Data(repeating: 0xEE, count: 128))))
+        XCTAssertEqual(padded.index.excessPixelDataBytes, 128)
+        for frame in 0..<2 {
+            let decoded = try await padded.frame(at: frame)
+            XCTAssertEqual(decoded.storedSampleData(), frameBytes.subdata(in: (frame * 12)..<((frame + 1) * 12)), "frame \(frame)")
+        }
+        // A conformant odd-length value with its pad byte reports no excess.
+        let odd = try await DicomSourceFrameSession.open(source: DicomByteSource(
+            data: object(frames: 1, rows: 1, columns: 3, bits: 8, pixels: Data([10, 20, 30, 0]))))
+        XCTAssertEqual(odd.index.excessPixelDataBytes, 0)
+        let oddFrame = try await odd.frame(at: 0)
+        XCTAssertEqual(oddFrame.storedSampleData(), Data([10, 20, 30]))
+        // Too short for the declared frames.
+        do {
+            _ = try await DicomSourceFrameSession.open(source: DicomByteSource(
+                data: object(frames: 2, rows: 2, columns: 3, bits: 16, pixels: frameBytes.prefix(20))))
+            XCTFail("a value shorter than its frames was indexed")
+        } catch {
+            XCTAssertEqual(error as? DicomSourceFrameIndex.Failure, .invalidLayout)
+        }
+    }
+
     func test_basicTable_readsRandomMultiFragmentFramesWithoutSiblingPayloads() async throws {
         let fragments = [Data([1, 2]), Data([3, 4]), Data([5, 6]), Data([7, 8])]
         let bytes = encapsulated(bot: [0, 20, 30], fragments: fragments)

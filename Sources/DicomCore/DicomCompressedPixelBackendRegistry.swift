@@ -339,7 +339,8 @@ internal enum DicomCompressedPixelBackendRegistry {
         let samples = samplesPerPixel ?? 1
         let photometric = photometricInterpretation?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() ?? "MONOCHROME2"
         if samples == 3 {
-            return stored == 8 && (requestedBitDepth ?? 8) == 8 && ["YBR_FULL", "YBR_FULL_422"].contains(photometric)
+            // Issue #3043: RGB too, decoded as its codestream markers say instead of through ImageIO's guess.
+            return stored == 8 && (requestedBitDepth ?? 8) == 8 && ["YBR_FULL", "YBR_FULL_422", "RGB"].contains(photometric)
         }
         guard samples == 1, ["MONOCHROME1", "MONOCHROME2", "PALETTE COLOR"].contains(photometric) else { return false }
         if syntax == .jpegBaseline { return stored == 8 && (requestedBitDepth ?? 8) == 8 }

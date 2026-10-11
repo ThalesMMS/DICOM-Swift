@@ -73,11 +73,22 @@ enum DicomSingleFramePart10Writer {
         withUnsafeBytes(of: &littleLength) { encoded.append(contentsOf: $0) }
         encoded.append(bytes)
         encoded.append(contentsOf: [0xFE, 0xFF, 0xDD, 0xE0, 0, 0, 0, 0])
-        return try DicomDataSetWriter.part10Data(
-            fromEncodedDataSet: encoded, transferSyntax: transferSyntax,
-            mediaStorageSOPClassUID: dataSet.string(for: .sopClassUID) ?? DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID,
-            mediaStorageSOPInstanceUID: dataSet.string(for: .sopInstanceUID) ?? placeholderUID
-        )
+        let sopClass = dataSet.string(for: .sopClassUID) ?? DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID
+        do {
+            return try DicomDataSetWriter.part10Data(
+                fromEncodedDataSet: encoded, transferSyntax: transferSyntax,
+                mediaStorageSOPClassUID: sopClass,
+                mediaStorageSOPInstanceUID: dataSet.string(for: .sopInstanceUID) ?? placeholderUID
+            )
+        } catch DicomDataSetWriterError.invalidUID {
+            // A dataset UID the File Meta cannot carry (a 64-digit hexadecimal SOP Instance UID, issue #3043) only
+            // names this in-memory codec input: the File Meta takes placeholders and the dataset keeps its value.
+            return try DicomDataSetWriter.part10Data(
+                fromEncodedDataSet: encoded, transferSyntax: transferSyntax,
+                mediaStorageSOPClassUID: DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID,
+                mediaStorageSOPInstanceUID: placeholderUID
+            )
+        }
     }
 
     /// Stands in for a missing or malformed SOP Instance UID: this file is a codec input that never leaves memory.
@@ -85,8 +96,9 @@ enum DicomSingleFramePart10Writer {
 
     /// Runs `write` on the dataset as read. A value the writer refuses that has nothing to do with the pixels (an
     /// empty UID, text outside the declared character set, a private DS longer than 16 bytes) must not stop the
-    /// frame from decoding (issue #2850): the write is retried without the top-level elements that do not encode,
-    /// and with a placeholder SOP Instance UID. The functional groups carry each frame's rescale and geometry, so
+    /// frame from decoding (issue #2850): the write is retried without the top-level elements that do not encode
+    /// under the dataset's Specific Character Set (issue #3043: text valid alone can fail in that context), and with
+    /// a placeholder SOP Instance UID. The functional groups carry each frame's rescale and geometry, so
     /// one that does not encode refuses the frame rather than decoding it with the wrong values.
     private static func encodable<Result>(
         _ dataSet: DicomDataSet, _ write: (DicomDataSet) throws -> Result
@@ -95,15 +107,18 @@ enum DicomSingleFramePart10Writer {
             return try write(dataSet)
         } catch let failure as DicomDataSetWriterError {
             var reduced = DicomDataSet()
+            let characterSet = dataSet.element(for: .specificCharacterSet)
+            let inContext = { (element: DicomDataElement) in
+                DicomDataSet(elements: [characterSet, element].compactMap { $0 })
+            }
             for element in dataSet.elements {
                 if element.tag == DicomTag.sopInstanceUID.rawValue {
-                    let single = DicomDataSet(elements: [element])
-                    let valid = (try? DicomDataSetWriter.dataSetData(from: single)) != nil
+                    let valid = (try? DicomDataSetWriter.dataSetData(from: inContext(element))) != nil
                         && element.stringValue?.isEmpty == false
                     reduced.set(valid ? element : .init(tag: element.tag, vr: .UI, value: .strings([placeholderUID])))
                     continue
                 }
-                guard (try? DicomDataSetWriter.dataSetData(from: DicomDataSet(elements: [element]))) != nil else {
+                guard (try? DicomDataSetWriter.dataSetData(from: inContext(element))) != nil else {
                     let functionalGroups = [DicomTag.perFrameFunctionalGroupsSequence.rawValue,
                                             DicomTag.sharedFunctionalGroupsSequence.rawValue]
                     if functionalGroups.contains(element.tag) { throw failure }

@@ -132,6 +132,56 @@ final class DicomJPEGSwiftBackendTests: XCTestCase {
         }
     }
 
+    /// Issue #3043: a three-component DCT codestream under an RGB label is converted from YCbCr only when its markers
+    /// say so (JFIF, or an Adobe transform other than 0); without a marker the label governs and the components are kept,
+    /// as GDCM and pydicom read pydicom's `SC_jpeg_no_color_transform`. Expected components come from the BT.601
+    /// forward equations, independent of the decoder.
+    func test_rgbLabel_convertsOnlyWhenTheCodestreamMarkersSaySo() throws {
+        let width = 32, height = 16
+        let colours: [[UInt8]] = [[200, 40, 90], [30, 160, 220]]
+        let rgb = (0..<(width * height)).flatMap { colours[$0 % width < 16 ? 0 : 1] }
+        let jfif = try Self.imageIOJPEG(rgb: rgb, width: width, height: height, quality: 1.0)
+        // The same scans without the JFIF APP0 segment, then with an Adobe APP14 segment of transform 0 or 1.
+        var bare = Data([0xFF, 0xD8])
+        var index = 2
+        while index + 4 <= jfif.count, jfif[index] == 0xFF, jfif[index + 1] != 0xDA {
+            let length = Int(jfif[index + 2]) << 8 | Int(jfif[index + 3])
+            let isJFIF = jfif[index + 1] == 0xE0 && jfif[(index + 4)...].starts(with: Data("JFIF\0".utf8))
+            if !isJFIF { bare.append(jfif.subdata(in: index..<(index + 2 + length))) }
+            index += 2 + length
+        }
+        bare.append(jfif.subdata(in: index..<jfif.count))
+        func adobe(_ transform: UInt8) -> Data {
+            Data([0xFF, 0xD8, 0xFF, 0xEE, 0x00, 0x0E]) + Data("Adobe".utf8) + Data([0x00, 0x64, 0, 0, 0, 0, transform]) + bare.dropFirst(2)
+        }
+        func decode(_ jpeg: Data, _ photometric: String) throws -> [UInt8] {
+            [UInt8](try DicomJPEGSwiftBackend.decodeSynchronously(jpeg, descriptor: Self.descriptor(
+                .jpegBaseline, width: width, height: height, bitsStored: 8, samples: 3, photometric: photometric)).buffer.data)
+        }
+        let converted = try decode(jfif, "RGB")
+        XCTAssertEqual(converted, try decode(jfif, "YBR_FULL_422"), "a JFIF codestream is YCbCr whatever the label")
+        XCTAssertEqual(try decode(adobe(1), "RGB"), converted, "Adobe transform 1")
+        let kept = try decode(bare, "RGB")
+        XCTAssertEqual(try decode(adobe(0), "RGB"), kept, "Adobe transform 0 and no marker keep the components")
+        XCTAssertNotEqual(kept, converted)
+        // Away from the patch edge, where chroma upsampling blends the two colours.
+        for y in 0..<height {
+            for x in 0..<width where !(12...19).contains(x) {
+                let pixel = (y * width + x) * 3
+                let source = colours[x < 16 ? 0 : 1].map(Double.init)
+                let forward = [0.299 * source[0] + 0.587 * source[1] + 0.114 * source[2],
+                               128 - 0.168736 * source[0] - 0.331264 * source[1] + 0.5 * source[2],
+                               128 + 0.5 * source[0] - 0.418688 * source[1] - 0.081312 * source[2]]
+                for component in 0..<3 {
+                    XCTAssertLessThanOrEqual(abs(Double(kept[pixel + component]) - forward[component].rounded()), 3, "kept (\(x), \(y)) \(component)")
+                    XCTAssertLessThanOrEqual(abs(Double(converted[pixel + component]) - source[component]), 4, "converted (\(x), \(y)) \(component)")
+                }
+            }
+        }
+        XCTAssertTrue(DicomJPEGSwiftBackend.codestreamCarriesYCbCr([UInt8](bare), photometricInterpretation: "YBR_FULL_422"))
+        XCTAssertFalse(DicomJPEGSwiftBackend.codestreamCarriesYCbCr([UInt8](bare), photometricInterpretation: "RGB"))
+    }
+
     func test_reducedDecodeIsTheBoxAverageOfTheFullFrame() async throws {
         let width = 40, height = 24
         let jpeg = try Self.imageIOJPEG(gray: Self.gray8(width, height), width: width, height: height)
@@ -321,7 +371,9 @@ final class DicomJPEGSwiftBackendTests: XCTestCase {
         XCTAssertNotNil(DicomJPEGSwiftBackend().capabilities.unsupportedReason(for: Self.descriptor(.jpegBaseline, width: width, height: height, bitsStored: 8, samples: 4, photometric: "CMYK")))
         XCTAssertThrowsError(try DicomJPEGSwiftBackend.validateDescriptor(Self.descriptor(.jpegBaseline, width: width, height: height, bitsStored: 12, samples: 1, photometric: "MONOCHROME2"), operation: .decode), "12-bit baseline")
         XCTAssertThrowsError(try DicomJPEGSwiftBackend.validateDescriptor(Self.descriptor(.jpegExtended, width: width, height: height, bitsStored: 16, samples: 1, photometric: "MONOCHROME2"), operation: .decode), "16-bit DCT")
-        XCTAssertThrowsError(try DicomJPEGSwiftBackend.validateDescriptor(Self.descriptor(.jpegBaseline, width: width, height: height, bitsStored: 8, samples: 3, photometric: "RGB"), operation: .decode), "RGB photometric has no unambiguous transform")
+        // Issue #3043: RGB is decoded as its codestream markers say (`test_rgbLabel_convertsOnlyWhenTheCodestreamMarkersSaySo`).
+        XCTAssertNoThrow(try DicomJPEGSwiftBackend.validateDescriptor(Self.descriptor(.jpegBaseline, width: width, height: height, bitsStored: 8, samples: 3, photometric: "RGB"), operation: .decode))
+        XCTAssertThrowsError(try DicomJPEGSwiftBackend.validateDescriptor(Self.descriptor(.jpegBaseline, width: width, height: height, bitsStored: 8, samples: 3, photometric: "YBR_RCT"), operation: .decode), "YBR_RCT names a JPEG 2000 transform")
         XCTAssertThrowsError(try DicomJPEGSwiftBackend.validateEncoding(descriptor: descriptor, targetTransferSyntaxUID: descriptor.transferSyntaxUID, intent: .reversible), "lossy syntax without explicit intent")
         // A progressive codestream under the Baseline syntax is decoded for robustness but reported as mislabelled.
         let mislabelled = try dicomFile(jpeg: progressive, syntax: .jpegBaseline, width: width, height: height, bitsStored: 8, samples: 1, photometric: "MONOCHROME2")

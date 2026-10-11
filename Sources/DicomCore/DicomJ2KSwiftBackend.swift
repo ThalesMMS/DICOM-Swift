@@ -542,12 +542,10 @@ struct DicomJ2KSwiftBackend: DicomFrameCodecBackend {
                     reason: "component \(component.index) has subsampled or mismatched dimensions"
                 )
             }
-            let requiresExactPrecision = descriptor.transferSyntaxUID
-                == DicomTransferSyntax.jpeg2000Lossless.rawValue
-                || descriptor.transferSyntaxUID == DicomTransferSyntax.htj2kLossless.rawValue
-            let precisionMatches = requiresExactPrecision
-                ? component.bitDepth == descriptor.bitsStored
-                : (1...descriptor.bitsStored).contains(component.bitDepth)
+            // A codestream less precise than Bits Stored holds every value exactly, lossless syntaxes included: the
+            // samples are delivered as decoded, as GDCM and pydicom read `693_J2KR` (14-bit under Bits Stored 16,
+            // issue #3043).
+            let precisionMatches = (1...descriptor.bitsStored).contains(component.bitDepth)
             // A codestream more precise than Bits Stored that still fits Bits Allocated keeps its own precision, as
             // GDCM reads it (`Osirix10vs8BitsStored`: 10-bit samples under Bits Stored 8, issue #2854).
             let exceedsBitsStoredWithinAllocation = component.bitDepth > descriptor.bitsStored

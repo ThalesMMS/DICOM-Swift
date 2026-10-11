@@ -311,6 +311,11 @@ public struct JLIDecoderConfiguration: Sendable {
     /// `ceil(width/scale) × ceil(height/scale)`.
     public var scale: Int
 
+    /// Whether a three-component (non-XYB) frame is converted from YCbCr to RGB. `false` keeps the components as
+    /// coded, upsampled and interleaved: a codestream whose components already are R, G and B (an Adobe APP14
+    /// transform of 0, or no marker under a DICOM RGB label, issue #3043).
+    public var appliesColorTransform: Bool
+
     /// A sensible default configuration that auto-detects precision and color model.
     public static let `default` = JLIDecoderConfiguration(
         outputPixelFormat: nil,
@@ -323,13 +328,16 @@ public struct JLIDecoderConfiguration: Sendable {
     ///   - outputPixelFormat: Desired output pixel format, or `nil` for auto-detection.
     ///   - outputColorModel: Desired output color model, or `nil` for auto-detection.
     ///   - scale: Decode at `1/scale` resolution — `1` (full), `2`, `4`, or `8`.
+    ///   - appliesColorTransform: Convert three YCbCr components to RGB (default), or keep them as coded.
     public init(
         outputPixelFormat: JLIPixelFormat? = nil,
         outputColorModel: JLIColorModel? = nil,
-        scale: Int = 1
+        scale: Int = 1,
+        appliesColorTransform: Bool = true
     ) {
         self.outputPixelFormat = outputPixelFormat
         self.outputColorModel = outputColorModel
         self.scale = scale
+        self.appliesColorTransform = appliesColorTransform
     }
 }

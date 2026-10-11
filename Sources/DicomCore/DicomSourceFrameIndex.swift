@@ -64,8 +64,20 @@ public struct DicomSourceFrameIndex: Sendable {
         let totalBits = descriptor.bitsPerFrame.multipliedReportingOverflow(by: frames)
         guard !totalBits.overflow else { throw Failure.invalidLayout }
         let totalBytes = totalBits.partialValue / 8 + (totalBits.partialValue % 8 == 0 ? 0 : 1)
-        guard totalBytes <= pixels.count, pixels.count - totalBytes <= 1 else { throw Failure.invalidLayout }
+        // Bytes beyond the declared frames (and the even-length pad) do not change where the frames are: they are
+        // addressed from the start, as GDCM, DCMTK and pydicom read them, and reported by `excessPixelDataBytes`
+        // (issue #3043). A shorter value cannot hold the frames and stays refused.
+        guard totalBytes <= pixels.count else { throw Failure.invalidLayout }
         return Self(metadata: metadata, frameCount: frames, nativeLayout: descriptor, encapsulatedLayout: nil)
+    }
+
+    /// Native Pixel Data bytes beyond the declared frames and the one pad byte of an odd length: 0 for a conformant
+    /// value. A non-zero count is a typed diagnostic of a damaged or mis-described object (PS3.5 8.1.1).
+    public var excessPixelDataBytes: Int {
+        guard let layout = nativeLayout, let pixels = metadata.pixelDataRange else { return 0 }
+        let bits = layout.bitsPerFrame * frameCount
+        let bytes = bits / 8 + (bits % 8 == 0 ? 0 : 1)
+        return max(0, pixels.count - bytes - bytes % 2)
     }
 
     /// Exact source ranges for one frame. Native packed-bit ranges may overlap a byte;

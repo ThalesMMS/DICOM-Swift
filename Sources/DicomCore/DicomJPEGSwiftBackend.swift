@@ -134,10 +134,13 @@ struct DicomJPEGSwiftBackend: DicomFrameCodecBackend {
         }
         let pixelFormat: JLIPixelFormat = descriptor.bitsAllocated > 8 ? .uint16 : .uint8
         let colorModel: JLIColorModel = descriptor.samplesPerPixel == 3 ? .rgb : .grayscale
+        let appliesColorTransform = descriptor.samplesPerPixel == 3
+            && Self.codestreamCarriesYCbCr(bytes, photometricInterpretation: descriptor.photometricInterpretation)
         let image: JLIImage
         do {
             image = try JLIDecoder().decode(from: bytes, configuration: JLIDecoderConfiguration(
-                outputPixelFormat: pixelFormat, outputColorModel: colorModel, scale: scale))
+                outputPixelFormat: pixelFormat, outputColorModel: colorModel, scale: scale,
+                appliesColorTransform: appliesColorTransform))
         } catch {
             throw DicomJPEGSwiftBackendError.codestreamRejected((error as? LocalizedError)?.errorDescription ?? "\(error)")
         }
@@ -151,6 +154,36 @@ struct DicomJPEGSwiftBackend: DicomFrameCodecBackend {
         }
         return DicomCodecDecodedFrame(buffer: .owned(Data(image.data)), width: image.width, height: image.height,
                                       bitsPerSample: descriptor.bitsAllocated, componentCount: descriptor.samplesPerPixel)
+    }
+
+    /// Whether a three-component DCT codestream holds YCbCr. A YBR_FULL(_422) label does (PS3.5 8.2.1). Under an RGB
+    /// label the codestream's own markers decide, as libjpeg reads them: a JFIF APP0 segment means YCbCr (issue #2853),
+    /// otherwise an Adobe APP14 segment states its transform (0 = none). Without either marker the DICOM label governs and the
+    /// components are R, G and B, as GDCM and pydicom read them (issue #3043); libjpeg's component-identifier guess is
+    /// not applied over an explicit label.
+    static func codestreamCarriesYCbCr(_ bytes: [UInt8], photometricInterpretation: String) -> Bool {
+        guard photometricInterpretation.trimmingCharacters(in: .whitespaces).uppercased() == "RGB" else { return true }
+        guard bytes.count >= 4, bytes[0] == 0xFF, bytes[1] == 0xD8 else { return false }
+        var index = 2
+        var jfif = false
+        var adobeTransform: UInt8?
+        while index + 4 <= bytes.count, bytes[index] == 0xFF {
+            let marker = bytes[index + 1]
+            if marker == 0xFF { index += 1; continue }
+            // A frame header or a scan ends the segments that may carry APPn.
+            if marker == 0xDA || ((0xC0...0xCF).contains(marker) && ![0xC4, 0xC8, 0xCC].contains(marker)) { break }
+            let length = Int(bytes[index + 2]) << 8 | Int(bytes[index + 3])
+            guard length >= 2, index + 2 + length <= bytes.count else { break }
+            let segment = bytes[(index + 4)..<(index + 2 + length)]
+            if marker == 0xE0, segment.starts(with: [0x4A, 0x46, 0x49, 0x46, 0x00]) { jfif = true }
+            if marker == 0xEE, segment.count >= 12, segment.starts(with: [0x41, 0x64, 0x6F, 0x62, 0x65]) {
+                adobeTransform = segment[segment.startIndex + 11]
+            }
+            index += 2 + length
+        }
+        // libjpeg's order: JFIF implies YCbCr; otherwise an Adobe segment's transform.
+        if jfif { return true }
+        return adobeTransform.map { $0 != 0 } ?? false
     }
 
     /// SOF3 through the own lossless decoder: full resolution only, samples packed to Bits Allocated, signed samples
@@ -378,8 +411,9 @@ struct DicomJPEGSwiftBackend: DicomFrameCodecBackend {
                     throw DicomJPEGSwiftBackendError.unsupportedShape(transferSyntaxUID: uid, reason: "lossless colour JPEG is qualified for RGB only (no colour transform)")
                 }
             } else {
-                // DCT colour carries YCbCr (PS3.5 8.2.1); output is converted to RGB explicitly by the decoder.
-                let accepted: Set<String> = operation == .decode ? ["YBR_FULL", "YBR_FULL_422"] : ["YBR_FULL", "YBR_FULL_422", "RGB"]
+                // DCT colour carries YCbCr (PS3.5 8.2.1) and is converted to RGB by the decoder; an RGB label is decoded
+                // as its codestream markers say (issue #3043, `codestreamCarriesYCbCr`).
+                let accepted: Set<String> = ["YBR_FULL", "YBR_FULL_422", "RGB"]
                 guard accepted.contains(photometric) else {
                     throw DicomJPEGSwiftBackendError.unsupportedShape(transferSyntaxUID: uid, reason: "DCT colour JPEG is qualified for YBR_FULL/YBR_FULL_422 (\(descriptor.photometricInterpretation) has no unambiguous transform)")
                 }

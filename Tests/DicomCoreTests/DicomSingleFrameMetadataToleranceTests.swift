@@ -28,18 +28,43 @@ final class DicomSingleFrameMetadataToleranceTests: XCTestCase {
         XCTAssertThrowsError(try decoder.singleFramePart10Data(at: 0))
     }
 
+    /// Issue #3043 (DICOM_Example corpus): text that encodes alone but not under the declared ISO 2022 character set,
+    /// and a 64-digit hexadecimal SOP Instance UID the File Meta of an encapsulated frame cannot carry. GDCM displays
+    /// both objects, so the frame must still decode.
+    func test_textRefusedUnderTheCharacterSetAndAHexadecimalUID_stillYieldTheFrame() async throws {
+        let charset = Self.element(0x0008, 0x0005, "CS", Data("ISO 2022 IR 58".utf8))
+        let accession = Self.element(0x0008, 0x0050, "SH", Data([0x30, 0x00]))
+        let native = try DCMDecoder(data: Self.part10(pixelData: Self.element(0x7FE0, 0x0010, "OW", Data(count: 8)),
+                                                      leading: charset, accession: accession))
+        XCTAssertNoThrow(try native.singleFramePart10Data(at: 0))
+
+        let fragment = Data((0..<16).map { UInt8($0) })
+        let encapsulated = Self.encapsulated(fragment: fragment)
+        let hexUID = Data(String(repeating: "a1", count: 32).utf8)
+        let decoder = try DCMDecoder(data: Self.part10(pixelData: encapsulated, syntax: "1.2.840.10008.1.2.5",
+                                                       instanceUID: hexUID))
+        let artifact = try decoder.singleFramePart10Data(at: 0)
+        let session = try await DicomSourceFrameSession.open(source: DicomByteSource(data: artifact))
+        let frame = try await session.frameData(at: 0)
+        await session.close()
+        XCTAssertEqual(frame, fragment, "the frame's codestream reaches the codec input unchanged")
+    }
+
     // MARK: - Explicit VR Little Endian by hand
 
-    private static func part10(pixelData: Data, extra: Data = Data()) -> Data {
-        let syntax = Data("1.2.840.10008.1.2.1\0".utf8)
+    private static func part10(pixelData: Data, extra: Data = Data(), syntax: String = "1.2.840.10008.1.2.1",
+                               instanceUID: Data = Data(), leading: Data = Data(),
+                               accession: Data = Data()) -> Data {
+        let syntax = Data((syntax + (syntax.utf8.count % 2 == 0 ? "" : "\0")).utf8)
         let sopClass = Data("1.2.840.10008.5.1.4.1.1.7\0".utf8)
         var metaBody = element(0x0002, 0x0002, "UI", sopClass)
         metaBody += element(0x0002, 0x0003, "UI", Data("2.25.1".utf8))
         metaBody += element(0x0002, 0x0010, "UI", syntax)
         var groupLength = UInt32(metaBody.count).littleEndian
         let meta = element(0x0002, 0x0000, "UL", Data(bytes: &groupLength, count: 4)) + metaBody
-        var body = element(0x0008, 0x0016, "UI", sopClass)
-        body += element(0x0008, 0x0018, "UI", Data())                                // empty SOP Instance UID
+        var body = leading + element(0x0008, 0x0016, "UI", sopClass)
+        body += element(0x0008, 0x0018, "UI", instanceUID)                           // empty by default
+        body += accession
         body += element(0x0010, 0x0010, "PN", Data([0x4A, 0xE9, 0x5E, 0x42]))        // é, no Specific Character Set
         body += element(0x0011, 0x0010, "LO", Data("ISIS TEST ".utf8))
         body += element(0x0011, 0x1033, "DS", Data("1.23456789012345678 ".utf8))    // 20 bytes
@@ -69,6 +94,15 @@ final class DicomSingleFrameMetadataToleranceTests: XCTestCase {
             data += uint16(UInt16(value.count))
         }
         return data + value
+    }
+
+    /// Encapsulated Pixel Data: an empty Basic Offset Table, one fragment and the sequence delimiter.
+    private static func encapsulated(fragment: Data) -> Data {
+        var data = uint16(0x7FE0) + uint16(0x0010) + Data("OB".utf8) + Data(count: 2) + Data([0xFF, 0xFF, 0xFF, 0xFF])
+        data += Data([0xFE, 0xFF, 0x00, 0xE0, 0, 0, 0, 0])
+        var length = UInt32(fragment.count).littleEndian
+        data += Data([0xFE, 0xFF, 0x00, 0xE0]) + Data(bytes: &length, count: 4) + fragment
+        return data + Data([0xFE, 0xFF, 0xDD, 0xE0, 0, 0, 0, 0])
     }
 
     private static func sequence(_ group: UInt16, _ number: UInt16, items: [Data]) -> Data {

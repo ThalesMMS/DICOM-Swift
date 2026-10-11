@@ -1,3 +1,39 @@
+# 2.0.4
+
+This patch synchronizes the remaining reviewed canonical codec and frame-input
+fixes. It includes the legacy WADO-RS compatibility introduced in 2.0.3, whose
+published tag remains unchanged. Swift tools 6.2, Swift 6 language mode,
+Apple-platform 26.0 minimums and the announced products remain unchanged.
+
+## Fixed
+
+- Native Pixel Data longer than the declared frames is addressed from its start;
+  the excess is reported and short values are still rejected.
+- RGB-labelled 8-bit JPEG uses the own DCT decoder. Colour conversion follows
+  JFIF/Adobe markers and the DICOM label, with integer-plane rounding before
+  YCbCr conversion. `JLIDecoderConfiguration.appliesColorTransform` is additive
+  and defaults to the previous behaviour.
+- Single-frame codec input validates text under its declared character set and
+  uses placeholder File Meta UIDs when the input UID cannot be encoded.
+- Lossless JPEG 2000 and HTJ2K accept codestream precision below Bits Stored,
+  preserving the decoded samples.
+
+## Validation and limits
+
+The existing canonical corpus qualification is reused for these unchanged
+fixes: 3,199 frame rows had no mismatch or own failure in required supported
+cells, with independent pydicom comparisons. Unsupported profiles and known
+codec/volume readiness gaps remain; this is not a universal codec claim.
+
+The DicomData, DicomWebClient and DicomWebOIDC source graph is identical to
+2.0.3. Its focused parser, AddressSanitizer, Debug/Release consumer and synthetic
+GUI retrieval evidence remains valid. Publication verifies the exported tree
+and remote version resolution. Application integration is checked separately.
+The full suite and optional codec runtime matrix were not repeated. Earlier
+app-level iOS simulator qualification retains three findings in codec-selection
+and Metal-accounting tests; hardware Metal lifecycle and visionOS validation
+remain outside this patch's evidence.
+
 # 2.0.3
 
 This patch adds opt-in recovery of legacy WADO-RS multipart framing to
