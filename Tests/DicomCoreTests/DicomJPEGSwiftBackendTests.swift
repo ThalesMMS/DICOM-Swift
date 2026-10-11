@@ -489,7 +489,8 @@ final class DicomJPEGSwiftBackendTests: XCTestCase {
         XCTAssertLessThanOrEqual(zip(reopened, samples).map { abs(Int($0) - Int($1)) }.max() ?? Int.max, 24)
         let back = try await transcoder.transcode(extended, to: .explicitVRLittleEndian, intent: .reversible)
         XCTAssertEqual(try DCMDecoder(data: back).info(for: .transferSyntaxUID), DicomTransferSyntax.explicitVRLittleEndian.rawValue)
-        // Colour: YBR_FULL declared for DCT output, decodable by ImageIO.
+        // Colour: YBR_FULL_422 in 4:2:2 for DCT output without the JFIF APP0 segment (PS3.5 8.2.1 and Table 8.2.1-1,
+        // issue #3019), decodable by ImageIO.
         let rgb = Self.rgb8(width, height)
         var nativeRGB = native8
         nativeRGB.set(DicomDataElement(tag: DicomTag.samplesPerPixel.rawValue, vr: .US, value: .unsignedIntegers([3])))
@@ -498,10 +499,35 @@ final class DicomJPEGSwiftBackendTests: XCTestCase {
         nativeRGB.set(DicomDataElement(tag: DicomTag.pixelData.rawValue, vr: .OB, value: .bytes(Data(rgb))))
         let colour = try await transcoder.transcode(try DicomDataSetWriter.part10Data(from: nativeRGB), to: .jpegBaseline, intent: .irreversible(quality: 0.95))
         let colourDecoder = try DCMDecoder(data: colour)
-        XCTAssertEqual(colourDecoder.info(for: .photometricInterpretation), "YBR_FULL")
+        XCTAssertEqual(colourDecoder.info(for: .photometricInterpretation), "YBR_FULL_422")
+        XCTAssertEqual(colourDecoder.info(for: .planarConfiguration), "0")
         let colourReader = try DicomEncapsulatedPixelFrameReader(descriptor: try XCTUnwrap(colourDecoder.encapsulatedPixelDataDescriptor), fileData: colour)
-        XCTAssertEqual(try DicomJPEGFrameInspector.inspect(try colourReader.frame(at: 0).data).chromaSubsampling.map { [$0.horizontal, $0.vertical] }, [1, 1], "no chroma subsampling on DICOM output")
-        XCTAssertLessThanOrEqual(Self.maxDifference(try Self.imageIODecode(try colourReader.frame(at: 0).data, components: 3), rgb), 8)
+        let colourFrame = try colourReader.frame(at: 0).data
+        XCTAssertEqual(try DicomJPEGFrameInspector.inspect(colourFrame).chromaSubsampling.map { [$0.horizontal, $0.vertical] }, [2, 1], "4:2:2 luma sampling")
+        XCTAssertFalse(Self.hasJFIFMarker(colourFrame), "no APP0 in DICOM JPEG")
+        XCTAssertLessThanOrEqual(Self.maxDifference(try Self.imageIODecode(colourFrame, components: 3), rgb), 24)
+        let grayReader = try DicomEncapsulatedPixelFrameReader(descriptor: try XCTUnwrap(extendedDecoder.encapsulatedPixelDataDescriptor), fileData: extended)
+        XCTAssertFalse(Self.hasJFIFMarker(try grayReader.frame(at: 0).data), "no APP0 in DICOM JPEG")
+        // Table 8.2.1-1 has no three-sample entry for JPEG Extended.
+        do {
+            _ = try await transcoder.transcode(try DicomDataSetWriter.part10Data(from: nativeRGB), to: .jpegExtended, intent: .irreversible(quality: 0.95))
+            XCTFail("colour JPEG Extended was written")
+        } catch {
+            XCTAssertTrue("\(error)".contains("no three-sample entry"), "\(error)")
+        }
+    }
+
+    /// Whether the marker segments before the frame header include APP0 (FFE0).
+    private static func hasJFIFMarker(_ jpeg: Data) -> Bool {
+        let bytes = [UInt8](jpeg)
+        var index = 2
+        while index + 3 < bytes.count, bytes[index] == 0xFF {
+            let marker = bytes[index + 1]
+            if marker == 0xE0 { return true }
+            if (0xC0...0xCF).contains(marker), marker != 0xC4, marker != 0xC8, marker != 0xCC { return false }
+            index += 2 + (Int(bytes[index + 2]) << 8 | Int(bytes[index + 3]))
+        }
+        return false
     }
 
     // MARK: - JPEG backend timing comparison

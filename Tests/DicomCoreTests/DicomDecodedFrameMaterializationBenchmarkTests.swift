@@ -621,14 +621,14 @@ final class DicomDecodedFrameMaterializationBenchmarkTests: XCTestCase {
     private static func pixelHash(_ pixels: DicomDecodedFramePixelBuffer) -> UInt64 {
         switch pixels {
         case .gray8(let values), .rgb8(let values): return hash(Data(values))
-        case .gray16(let values): return values.withUnsafeBytes { hash(Data($0)) }
+        case .gray16(let values), .rgb16(let values): return values.withUnsafeBytes { hash(Data($0)) }
         }
     }
 
     private static func byteCount(_ pixels: DicomDecodedFramePixelBuffer) -> Int {
         switch pixels {
         case .gray8(let values), .rgb8(let values): return values.count
-        case .gray16(let values): return values.count * MemoryLayout<UInt16>.size
+        case .gray16(let values), .rgb16(let values): return values.count * MemoryLayout<UInt16>.size
         }
     }
 

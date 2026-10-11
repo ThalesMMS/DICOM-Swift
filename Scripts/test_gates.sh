@@ -114,6 +114,7 @@ FIXTURE_FILTERS=(
   DicomSourceFrameIndexTests
   DicomSourceFrameSessionTests
   DicomJPEGFrameBoundaryScannerTests
+  DicomJ2KFrameBoundaryScannerTests
   SelectiveFrameOracleTests
   ExtractCommandTests
   ClinicalCodecConformanceManifestTests

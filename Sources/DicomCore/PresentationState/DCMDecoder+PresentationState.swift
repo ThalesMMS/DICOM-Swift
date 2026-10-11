@@ -440,6 +440,7 @@ private enum DicomGrayscalePresentationStateParser {
 
         if shapes.contains("BITMAP"),
            let overlayGroup = decoder.dataSet.int(for: .shutterOverlayGroup),
+           isShutterOverlayGroup(overlayGroup),
            let group = UInt16(exactly: overlayGroup),
            let plane = decoder.overlayPlanes().first(where: { $0.group == overlayGroup }) {
             shutters.append(.bitmap(DicomPresentationBitmapShutter(
@@ -456,6 +457,12 @@ private enum DicomGrayscalePresentationStateParser {
         }
 
         return shutters
+    }
+
+    /// Shutter Overlay Group (0018,1623) names a repeating Overlay Plane group: even, 6000–601E (PS3.3 C.7.6.15 and
+    /// C.9.2).
+    static func isShutterOverlayGroup(_ group: Int) -> Bool {
+        (0x6000...0x601E).contains(group) && group.isMultiple(of: 2)
     }
 
     private static func diagnostics(
@@ -529,7 +536,14 @@ private enum DicomGrayscalePresentationStateParser {
                 message: "Unsupported shutter shapes: \(unsupportedShutters.joined(separator: ", "))."
             ))
         }
-        if shutterShapes.contains("BITMAP"), !parsedShutters.contains(where: {
+        let shutterOverlayGroup = decoder.dataSet.int(for: .shutterOverlayGroup)
+        if shutterShapes.contains("BITMAP"), let group = shutterOverlayGroup, !isShutterOverlayGroup(group) {
+            result.append(DicomPresentationStateDiagnostic(
+                code: "invalid-shutter-overlay-group",
+                message: String(format: "Shutter Overlay Group %04X is not an even overlay group from 6000 to 601E; "
+                    + "the bitmap shutter was ignored.", group)
+            ))
+        } else if shutterShapes.contains("BITMAP"), !parsedShutters.contains(where: {
             if case .bitmap = $0 { return true }
             return false
         }) {

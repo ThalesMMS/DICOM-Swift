@@ -121,19 +121,48 @@ public struct DicomDIMSEOperationResult: Equatable, Sendable {
     /// when more than one was proposed on the association (issue #1867).
     /// `nil` for operations that are not model-negotiated (echo, store, print).
     public var negotiatedQueryModelUID: String?
+    /// Failed SOP Instance UID List (0008,0058) of a C-MOVE or C-GET's final response
+    /// (PS3.4 C.4.2.1.4, C.4.3.1.4; issue #3004); empty when the peer sent none.
+    public var failedSOPInstanceUIDs: [String]
+    /// The acceptor's SOP Class Extended Negotiation answer for `negotiatedQueryModelUID` (for example
+    /// relational queries or relational retrieval); nil when it returned none, which means unsupported.
+    public var acceptedExtendedNegotiation: DicomSOPClassExtendedNegotiation?
 
     public init(status: UInt16,
                 remainingSuboperations: UInt16? = nil,
                 completedSuboperations: UInt16? = nil,
                 failedSuboperations: UInt16? = nil,
                 warningSuboperations: UInt16? = nil,
-                negotiatedQueryModelUID: String? = nil) {
+                negotiatedQueryModelUID: String? = nil,
+                failedSOPInstanceUIDs: [String] = []) {
         self.status = status
         self.remainingSuboperations = remainingSuboperations
         self.completedSuboperations = completedSuboperations
         self.failedSuboperations = failedSuboperations
         self.warningSuboperations = warningSuboperations
         self.negotiatedQueryModelUID = negotiatedQueryModelUID
+        self.failedSOPInstanceUIDs = failedSOPInstanceUIDs
+    }
+}
+
+/// A C-MOVE or C-GET whose final response carries a failure status (A701/A702, A801, A900,
+/// Cxxx; PS3.4 Tables C.4-2 and C.4-3). It keeps what the response reported: the sub-operation
+/// counts and the Failed SOP Instance UID List, so a partly delivered retrieve is not reduced to
+/// a bare status code (issue #3004).
+public struct DicomRetrieveFailure: Error, Equatable, Sendable {
+    public var result: DicomDIMSEOperationResult
+
+    public init(result: DicomDIMSEOperationResult) {
+        self.result = result
+    }
+}
+
+extension DicomRetrieveFailure: LocalizedError {
+    public var errorDescription: String? {
+        let completed = result.completedSuboperations.map(String.init) ?? "unknown"
+        let failed = result.failedSuboperations.map(String.init) ?? "unknown"
+        return String(format: "DIMSE retrieve failed with status 0x%04X", result.status)
+            + " (\(completed) completed, \(failed) failed, \(result.failedSOPInstanceUIDs.count) listed as failed)"
     }
 }
 

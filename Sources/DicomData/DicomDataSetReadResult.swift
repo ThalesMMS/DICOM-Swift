@@ -12,6 +12,9 @@ public struct DicomDataSetReadResult: Sendable {
             case duplicateElement
             case ambiguousVR
             case incompatibleVR
+            /// Recovery only: the bytes from `offset` on follow a complete root Pixel Data element and are not data
+            /// elements of the data set, which ends where the Pixel Data value ends (issue #3039).
+            case trailingBytesAfterPixelData
         }
 
         public let tag: Int
@@ -32,4 +35,13 @@ public struct DicomDataSetReadResult: Sendable {
     public let dataSet: DicomDataSet
     /// Recoveries contain no original strings, patient identifiers or pixel data.
     public let diagnostics: [Diagnostic]
+    /// The root data set's Pixel Data header (`valueLength` is `UInt32.max` when encapsulated), when it has one. The
+    /// value itself is skipped, never read.
+    public let pixelDataHeader: DicomPixelDataHeaderEvidence?
+
+    public init(dataSet: DicomDataSet, diagnostics: [Diagnostic], pixelDataHeader: DicomPixelDataHeaderEvidence? = nil) {
+        self.dataSet = dataSet
+        self.diagnostics = diagnostics
+        self.pixelDataHeader = pixelDataHeader
+    }
 }

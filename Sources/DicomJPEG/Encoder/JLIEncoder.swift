@@ -364,7 +364,7 @@ public struct JLIEncoder: Sendable {
         // Step 6: Assemble JPEG bitstream. Shared prefix: SOI, APP0, DQT.
         var mw = MarkerWriter()
         mw.writeSOI()
-        mw.writeAPP0()
+        if configuration.writesJFIFMarker { mw.writeAPP0() }
         if let exif = image.exif { mw.writeAPP1Exif(exif) }
         if let icc = image.iccProfile { mw.writeAPP2ICC(icc) }
         let lumZZ = zigzagQuantTable(lumQT)

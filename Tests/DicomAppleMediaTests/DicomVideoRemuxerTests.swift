@@ -1,5 +1,5 @@
 @preconcurrency import AVFoundation
-import DicomAppleMedia
+@testable import DicomAppleMedia
 import DicomCore
 import Foundation
 import Synchronization
@@ -488,4 +488,86 @@ final class DicomVideoRemuxerTests: XCTestCase {
         "AAGzBABAE///4BgAAAG1FIoAAQAAAAABuAAIAMAAAAEAAA//+AAAAbWP//NBgAAAAQET+UUpS/cLzblKUiLlKUiLlKUiIAAAA",
         "QIT+UUpS/cLzblKUiLlKUiLlKUiIAAAAQMT+UUpS/cLzblKUiLlKUiLlKUiIAAAAQQT+UUpS/cLzblKUiLlKUiLlKUiIA=="
     ].joined()
+}
+
+// MARK: - MPEG-2 Program Stream and PES (issue #3013)
+
+extension DicomVideoRemuxerTests {
+    /// A PES packet with the MPEG-2 header (`10` marker) and an optional PTS; `unbounded` writes length 0.
+    private func pes(_ streamID: UInt8, _ payload: [UInt8], pts: UInt64? = nil, unbounded: Bool = false) -> [UInt8] {
+        var header: [UInt8] = [0x80, pts == nil ? 0x00 : 0x80, pts == nil ? 0 : 5]
+        if let pts {
+            header += [UInt8(0x21 | (pts >> 29) & 0x0E), UInt8((pts >> 22) & 0xFF), UInt8(((pts >> 14) & 0xFE) | 1),
+                       UInt8((pts >> 7) & 0xFF), UInt8(((pts << 1) & 0xFE) | 1)]
+        }
+        let length = unbounded ? 0 : header.count + payload.count
+        return [0, 0, 1, streamID, UInt8(length >> 8), UInt8(length & 0xFF)] + header + payload
+    }
+
+    /// An MPEG-2 pack header with two stuffing bytes.
+    private var pack: [UInt8] { [0, 0, 1, 0xBA, 0x44, 0x00, 0x04, 0x00, 0x04, 0x01, 0x01, 0x89, 0xC3, 0xFA, 0xFF, 0xFF] }
+
+    private func mpeg2Chunks() throws -> (stream: [UInt8], chunks: [[UInt8]]) {
+        let stream = [UInt8](try XCTUnwrap(Data(base64Encoded: Self.mpeg2FixtureBase64)))
+        let first = stream.count / 3, second = 2 * stream.count / 3
+        return (stream, [Array(stream[..<first]), Array(stream[first..<second]), Array(stream[second...])])
+    }
+
+    func test_mpeg2ProgramStream_isDemuxedToItsVideoElementaryStreamAndPlays() async throws {
+        let (stream, chunks) = try mpeg2Chunks()
+        let systemHeader: [UInt8] = [0, 0, 1, 0xBB, 0, 9, 0x80, 0x00, 0x01, 0x04, 0xE1, 0xFF, 0xE0, 0xE0, 0x2E]
+        // Audio carries a sequence header start code, and a second video stream another payload: both are dropped.
+        let program = pack + systemHeader + pes(0xE0, chunks[0], pts: 3600)
+            + pes(0xC0, [0, 0, 1, 0xB3, 0xAA, 0xBB], pts: 3600) + pes(0xBE, [UInt8](repeating: 0xFF, count: 8))
+            + pack + pes(0xE0, chunks[1], pts: 7200) + pes(0xE1, [0, 0, 1, 0xB3, 0x01]) + pes(0xE0, chunks[2])
+            + [0, 0, 1, 0xB9]
+        XCTAssertEqual(try DicomMPEG2SystemsDemuxer.videoElementaryStream(from: Data(program)), Data(stream))
+
+        let outputURL = temporaryDirectory.appendingPathComponent("mpeg2-ps.ts")
+        let video = makeVideo(stream: Data(program), transferSyntax: .mpeg2MainProfileMainLevel, width: 64, height: 64)
+        try await DicomVideoRemuxer.writePlayableContainer(for: video, frameRate: 25, to: outputURL)
+        try await assertMPEG2TransportStreamPlays(outputURL, elementaryStream: Data(stream))
+    }
+
+    func test_mpeg2PESPackets_areDemuxedIncludingMPEG1HeadersAndAnUnboundedLastPacket() async throws {
+        let (stream, chunks) = try mpeg2Chunks()
+        // MPEG-1 PES header: two stuffing bytes, then 0x0F (no PTS or DTS).
+        let mpeg1Header: [UInt8] = [0xFF, 0xFF, 0x0F]
+        let mpeg1 = [0, 0, 1, 0xE0, UInt8((mpeg1Header.count + chunks[1].count) >> 8),
+                     UInt8((mpeg1Header.count + chunks[1].count) & 0xFF)] + mpeg1Header + chunks[1]
+        let packets = pes(0xE0, chunks[0], pts: 3600) + mpeg1 + pes(0xE0, chunks[2], unbounded: true)
+        XCTAssertEqual(try DicomMPEG2SystemsDemuxer.videoElementaryStream(from: Data(packets)), Data(stream))
+
+        let outputURL = temporaryDirectory.appendingPathComponent("mpeg2-pes.ts")
+        let video = makeVideo(stream: Data(packets), transferSyntax: .mpeg2MainProfileMainLevel, width: 64, height: 64)
+        try await DicomVideoRemuxer.writePlayableContainer(for: video, frameRate: 25, to: outputURL)
+        try await assertMPEG2TransportStreamPlays(outputURL, elementaryStream: Data(stream))
+    }
+
+    func test_mpeg2SystemsStream_elementaryStreamsPassAndMalformedContainersFailTyped() throws {
+        let (stream, chunks) = try mpeg2Chunks()
+        XCTAssertNil(try DicomMPEG2SystemsDemuxer.videoElementaryStream(from: Data(stream)), "an elementary stream is unchanged")
+        let truncated = Array(pes(0xE0, chunks[0]).dropLast(4))
+        XCTAssertThrowsError(try DicomMPEG2SystemsDemuxer.videoElementaryStream(from: Data(truncated))) {
+            XCTAssertEqual($0 as? DicomVideoRemuxError, .malformedSystemsStream)
+        }
+        XCTAssertThrowsError(try DicomMPEG2SystemsDemuxer.videoElementaryStream(from: Data(pack + pes(0xC0, [1, 2]) + [0, 0, 1, 0xB9]))) {
+            XCTAssertEqual($0 as? DicomVideoRemuxError, .noVideoFrames(codec: .mpeg2))
+        }
+    }
+
+    /// The remuxed Transport Stream plays and decodes a frame, so no packet header reached the access units.
+    private func assertMPEG2TransportStreamPlays(_ outputURL: URL, elementaryStream: Data) async throws {
+        let asset = AVURLAsset(url: outputURL)
+        let isPlayable = try await asset.load(.isPlayable)
+        let tracks = try await asset.loadTracks(withMediaType: .video)
+        XCTAssertTrue(isPlayable)
+        XCTAssertEqual(tracks.count, 1)
+        let expectedURL = temporaryDirectory.appendingPathComponent("expected-\(UUID().uuidString).ts")
+        try await DicomVideoRemuxer.writePlayableContainer(
+            for: makeVideo(stream: elementaryStream, transferSyntax: .mpeg2MainProfileMainLevel, width: 64, height: 64),
+            frameRate: 25, to: expectedURL)
+        XCTAssertEqual(try Data(contentsOf: outputURL), try Data(contentsOf: expectedURL),
+                       "the container remuxes exactly like its elementary stream")
+    }
 }

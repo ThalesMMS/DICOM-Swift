@@ -141,6 +141,16 @@ final class DicomDataSetTests: XCTestCase {
         XCTAssertTrue(dataSet.element(for: privateTag)?.isPrivate == true)
     }
 
+    /// PS3.5 7.1 (issue #3015): 0001, 0003, 0005, 0007 and FFFF are odd but not private groups.
+    func test_isPrivate_excludesTheOddGroupsThatMayNotBeUsed() {
+        for group in [0x0001, 0x0003, 0x0005, 0x0007, 0xFFFF] {
+            let element = DicomDataElement(tag: group << 16 | 0x0010, vr: .UN, value: .bytes(Data([0])))
+            XCTAssertFalse(element.isPrivate, String(format: "group %04X", group))
+        }
+        XCTAssertTrue(DicomDataElement(tag: 0x0009_0010, vr: .LO, value: .strings(["CREATOR"])).isPrivate)
+        XCTAssertFalse(DicomDataElement(tag: 0x0008_0060, vr: .CS, value: .strings(["CT"])).isPrivate)
+    }
+
     private func makeMinimalDICOMFile() throws -> URL {
         var data = Data(count: 128)
         data.append(contentsOf: "DICM".utf8)

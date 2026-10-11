@@ -31,6 +31,12 @@ public struct DicomSpecificCharacterSet: Equatable, Hashable, Sendable {
     package func decode(_ data: Data, vr: DicomVR = .LO) -> String {
         guard !data.isEmpty else { return "" }
         if let value = try? decodeValidated(data, vr: vr) { return normalize(value) }
+        // A PN whose first group designates a repertoire (a Korean or Japanese name written there) is refused by
+        // validated reads; its characters are still those the declared ISO 2022 repertoires give.
+        if vr == .PN, usesISO2022,
+           let value = try? DicomISO2022Codec(terms: normalizedTerms).decode(data, vr: vr, escapesInAlphabeticGroup: true) {
+            return normalize(value)
+        }
         for encoding in decodingCandidates {
             if let value = String(data: data, encoding: encoding) {
                 return normalize(value)
@@ -168,7 +174,12 @@ public struct DicomSpecificCharacterSet: Equatable, Hashable, Sendable {
     }
 
     private var decodingCandidates: [String.Encoding] {
-        let candidates = [primaryEncoding, .utf8, .isoLatin1]
+        // A multibyte G1 repertoire declared without code extension (a lone `ISO 2022 IR 58` or `IR 149`) is refused
+        // by validated reads; its GR bytes are still the EUC form of that repertoire.
+        var declared: [String.Encoding] = []
+        if normalizedTerms.contains("ISO 2022 IR 58") { declared.append(Self.coreFoundationEncoding(.EUC_CN)) }
+        if normalizedTerms.contains("ISO 2022 IR 149") { declared.append(Self.coreFoundationEncoding(.EUC_KR)) }
+        let candidates = declared + [primaryEncoding, .utf8, .isoLatin1]
         var seen = Set<UInt>()
         return candidates.filter { seen.insert($0.rawValue).inserted }
     }

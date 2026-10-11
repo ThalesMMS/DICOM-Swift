@@ -31,12 +31,16 @@ public enum DicomWebMultipartStreamError: Error, Equatable, Sendable {
     case missingRoot
     case duplicateRoot
     case invalidState
+    /// The opted-in legacy envelope cannot be separated without guessing DICOM value boundaries.
+    case unsafeLegacyFraming
 }
 
 /// Incremental MIME decoder. Data events use deterministic 16 KiB blocks and a final remainder.
 /// A declared Content-Length takes precedence over delimiter-looking bytes inside the payload.
 public struct DicomWebMultipartStreamParser: Sendable {
     private enum State { case preamble, headers, payload, delimiter, epilogue, finished }
+    private var legacy: DicomWebLegacyMultipartDecoder?
+    private var compatibilityProbe: Data?
     private var state: State = .preamble
     private var buffer = Data()
     private var pendingPayload = Data()
@@ -68,7 +72,8 @@ public struct DicomWebMultipartStreamParser: Sendable {
         self.limits = limits
     }
 
-    public init(contentType: String, limits: DicomWebMultipartLimits = .init()) throws {
+    public init(contentType: String, limits: DicomWebMultipartLimits = .init(),
+                compatibility: DicomWebMultipartCompatibility = .strict) throws {
         let media = try DicomWebMediaType(contentType)
         guard media.type == "multipart/related", let boundary = media.parameters["boundary"] else {
             throw DicomWebMultipartStreamError.invalidBoundary
@@ -76,11 +81,36 @@ public struct DicomWebMultipartStreamParser: Sendable {
         try self.init(boundary: boundary, start: media.parameters["start"], limits: limits)
         defaultPartType = media.parameters["type"]
         defaultTransferSyntax = media.parameters["transfer-syntax"]
+        if compatibility == .pixeonLegacyFraming, media.parameters["type"]?.lowercased() == "application/dicom",
+           media.parameters["start"] == nil {
+            legacy = DicomWebLegacyMultipartDecoder(boundary: boundary, limits: limits)
+            compatibilityProbe = Data()
+        }
     }
 
     public mutating func feed(_ chunk: Data) throws -> [DicomWebMultipartEvent] {
         try Task.checkCancellation()
         guard state != .finished else { throw DicomWebMultipartStreamError.invalidState }
+        if var probe = compatibilityProbe {
+            try check(probe.count, adding: chunk.count, limit: limits.maximumTotalBytes, name: "maximumTotalBytes")
+            let needed = min(13 - probe.count, chunk.count)
+            probe.append(chunk.prefix(needed))
+            let signature = Array("content-type:".utf8)
+            let folded = probe.map { (65...90).contains($0) ? $0 + 32 : $0 }
+            if signature.starts(with: folded), probe.count < signature.count {
+                compatibilityProbe = probe
+                return []
+            }
+            compatibilityProbe = nil
+            if folded == signature {
+                let events = try legacy!.feed(probe)
+                return events + (try legacy!.feed(chunk.dropFirst(needed)))
+            }
+            legacy = nil
+            let events = try feed(probe)
+            return events + (try feed(chunk.dropFirst(needed)))
+        }
+        if legacy != nil { return try legacy!.feed(chunk) }
         try check(total, adding: chunk.count, limit: limits.maximumTotalBytes, name: "maximumTotalBytes")
         total += chunk.count
         var events: [DicomWebMultipartEvent] = []
@@ -99,6 +129,12 @@ public struct DicomWebMultipartStreamParser: Sendable {
 
     public mutating func finish() throws -> [DicomWebMultipartEvent] {
         try Task.checkCancellation()
+        if compatibilityProbe != nil { throw DicomWebMultipartStreamError.missingFinalDelimiter }
+        if legacy != nil {
+            let events = try legacy!.finish()
+            state = .finished
+            return events
+        }
         var events: [DicomWebMultipartEvent] = []
         try drain(into: &events, finishing: true)
         guard state == .epilogue else { throw DicomWebMultipartStreamError.missingFinalDelimiter }
@@ -109,8 +145,9 @@ public struct DicomWebMultipartStreamParser: Sendable {
     }
 
     public static func parts(from data: Data, contentType: String,
-                             limits: DicomWebMultipartLimits = .init()) throws -> [DicomWebMultipartPart] {
-        var parser = try Self(contentType: contentType, limits: limits)
+                             limits: DicomWebMultipartLimits = .init(),
+                             compatibility: DicomWebMultipartCompatibility = .strict) throws -> [DicomWebMultipartPart] {
+        var parser = try Self(contentType: contentType, limits: limits, compatibility: compatibility)
         var parts: [DicomWebMultipartPart] = []
         for event in try parser.feed(data) + parser.finish() {
             switch event {

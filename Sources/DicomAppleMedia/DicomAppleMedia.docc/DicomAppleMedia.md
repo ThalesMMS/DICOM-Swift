@@ -16,11 +16,14 @@ PPS, and the AVCC length-field size from a CoreMedia format description, then
 validates each complete sample before changing its output.
 
 ``DicomVideoRemuxer`` preserves an existing ISO base media stream byte-for-byte,
-wraps MPEG-2 elementary streams in an MPEG-2 transport stream, and converts
+wraps MPEG-2 video in an MPEG-2 transport stream, and converts
 H.264 or H.265 Annex-B access units into an ISO base media container. Its
 parsers validate the elementary-stream structure and required codec parameter
 sets before writing. The operation never decodes pixels and never changes the
-video codec.
+video codec. PS3.5 8.2.5 leaves the MPEG-2 container unconstrained, so an MPEG-2
+Program Stream (pack header `00 00 01 BA`) or bare PES packets are first reduced
+to the first video elementary stream; audio, padding and private streams are
+dropped.
 
 H.264 B-slices are supported in a qualified subset: progressive Main or High
 profile, 8-bit 4:2:0, picture-order-count type 0, one slice per picture, and
@@ -45,7 +48,7 @@ are still copied byte-for-byte.
 
 The caller owns destination-file lifecycle, cache policy, playback UI, and the
 choice of output filename extension. Failures that describe unsupported codecs,
-malformed elementary streams, missing parameter sets, absent video frames,
+malformed elementary streams or MPEG-2 systems streams, missing parameter sets, absent video frames,
 unsupported frame reordering, CoreMedia construction, or AVFoundation writing are exposed as
 ``DicomVideoRemuxError``.
 

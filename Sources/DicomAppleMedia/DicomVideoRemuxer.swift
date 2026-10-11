@@ -78,7 +78,9 @@ public enum DicomVideoRemuxer {
                 return
             }
             if codec == .mpeg2 {
-                let parsed = try parseMPEG2(stream, width: video.columns, height: video.rows)
+                // PS3.5 8.2.5 allows a Program Stream or PES packets around the elementary stream.
+                let elementary = try DicomMPEG2SystemsDemuxer.videoElementaryStream(from: stream) ?? stream
+                let parsed = try parseMPEG2(elementary, width: video.columns, height: video.rows)
                 try writeMPEG2TransportStream(accessUnits: parsed.accessUnits,
                                              frameDuration: mpegFrameDuration, output: output)
                 try output.close()

@@ -55,6 +55,15 @@ enum DicomDecodedFrameDataNormalizer {
             )
         }
 
+        if componentCount == 3 {
+            return makeRGB16Buffer(
+                data: data, width: width, pixelCount: pixelCount, componentSampleCount: componentSampleCount,
+                bitsStored: bitsStored, sampleShift: sampleShift, storedValueMask: storedValueMask,
+                pixelRepresentation: pixelRepresentation, sourceByteOrder: sourceByteOrder, ownership: ownership,
+                packedBitOffset: packedBitOffset
+            )
+        }
+
         guard componentCount == 1 else { return nil }
         if bitsPerSample == 1 {
             let finalBitIndex = packedBitOffset.addingReportingOverflow(pixelCount)
@@ -178,6 +187,62 @@ enum DicomDecodedFrameDataNormalizer {
         )
     }
 
+    /// 9- to 16-bit colour (issue #3034): stored samples right-aligned to Bits Stored, little endian, interleaved.
+    /// Signed colour has no display meaning in DICOM and is refused; the source bytes are kept untouched when they
+    /// are already canonical.
+    private static func makeRGB16Buffer(
+        data: Data,
+        width: Int,
+        pixelCount: Int,
+        componentSampleCount: Int,
+        bitsStored: Int,
+        sampleShift: Int,
+        storedValueMask: Int,
+        pixelRepresentation: Int,
+        sourceByteOrder: DicomDecodedFrameByteOrder,
+        ownership: DicomDecodedFrameDataOwnership,
+        packedBitOffset: Int
+    ) -> DicomDecodedFrameDataBuffer? {
+        let expectedBytes = componentSampleCount.multipliedReportingOverflow(by: 2)
+        let rowBytes = width.multipliedReportingOverflow(by: 6)
+        guard pixelRepresentation == 0, packedBitOffset == 0, !expectedBytes.overflow, !rowBytes.overflow,
+              data.count == expectedBytes.partialValue else { return nil }
+        let needsByteSwap = sourceByteOrder == .bigEndian
+        let needsStoredBitNormalization = bitsStored != 16 || sampleShift != 0
+        let normalized: Data
+        let normalizedOwnership: DicomDecodedFrameDataOwnership
+        if needsByteSwap || needsStoredBitNormalization {
+            var outputData = Data(count: expectedBytes.partialValue)
+            data.withUnsafeBytes { (input: UnsafeRawBufferPointer) in
+                outputData.withUnsafeMutableBytes { (output: UnsafeMutableRawBufferPointer) in
+                    for index in 0..<componentSampleCount {
+                        let byteIndex = index * 2
+                        let raw = needsByteSwap
+                            ? (Int(input[byteIndex]) << 8) | Int(input[byteIndex + 1])
+                            : Int(input[byteIndex]) | (Int(input[byteIndex + 1]) << 8)
+                        let stored = (raw >> sampleShift) & storedValueMask
+                        output[byteIndex] = UInt8(truncatingIfNeeded: stored)
+                        output[byteIndex + 1] = UInt8(truncatingIfNeeded: stored >> 8)
+                    }
+                }
+            }
+            normalized = outputData
+            normalizedOwnership = .ownedData
+        } else {
+            normalized = data
+            normalizedOwnership = ownership
+        }
+        return DicomDecodedFrameDataBuffer(
+            data: normalized,
+            format: .rgb16Interleaved,
+            byteOrder: .littleEndian,
+            ownership: normalizedOwnership,
+            pixelCount: pixelCount,
+            componentSampleCount: componentSampleCount,
+            bytesPerRow: rowBytes.partialValue
+        )
+    }
+
     static func copyBuffer(
         from pixels: DicomDecodedFramePixelBuffer,
         width: Int,
@@ -210,6 +275,21 @@ enum DicomDecodedFrameDataNormalizer {
                 data: Data(interleaved), width: width, height: height, bitsPerSample: 8, bitsStored: 8, highBit: 7,
                 componentCount: 3,
                 pixelRepresentation: 0, photometricInterpretation: "RGB", sourceByteOrder: .notApplicable,
+                ownership: .ownedData
+            )
+        case .rgb16(let interleaved):
+            // The array samples are already right-aligned stored values: copy them as little-endian words.
+            var data = Data(count: interleaved.count * 2)
+            data.withUnsafeMutableBytes { (output: UnsafeMutableRawBufferPointer) in
+                for (index, value) in interleaved.enumerated() {
+                    output[index * 2] = UInt8(truncatingIfNeeded: value)
+                    output[index * 2 + 1] = UInt8(truncatingIfNeeded: value >> 8)
+                }
+            }
+            return makeBuffer(
+                data: data,
+                width: width, height: height, bitsPerSample: 16, bitsStored: 16, highBit: 15, componentCount: 3,
+                pixelRepresentation: 0, photometricInterpretation: "RGB", sourceByteOrder: .littleEndian,
                 ownership: .ownedData
             )
         }

@@ -90,7 +90,7 @@ final class DicomJLSwiftBackendTests: XCTestCase {
         XCTAssertEqual(capability.source, .packageLinked)
         XCTAssertEqual(capability.operations, [.decode, .encode])
         XCTAssertEqual(capability.supportedGrayscaleBitDepths, 8...16)
-        XCTAssertEqual(capability.supportedColorBitDepths, 8...8)
+        XCTAssertEqual(capability.supportedColorBitDepths, 8...16)
         XCTAssertEqual(capability.transferSyntaxUIDs, DicomJLSwiftBackend.transferSyntaxes)
         XCTAssertEqual(capability.encodeTransferSyntaxUIDs, DicomJLSwiftBackend.transferSyntaxes)
     }
@@ -319,10 +319,11 @@ final class DicomJLSwiftBackendTests: XCTestCase {
     }
 
     func test_forcedModeRejectsAmbiguousHighBitDepthColorWithContext() async throws {
+        // 12-bit RGB decodes since issue #3034; deeper colour of any other photometric stays refused.
         let descriptor = Self.descriptor(
             bitsStored: 12,
             samplesPerPixel: 3,
-            photometric: "RGB",
+            photometric: "YBR_FULL",
             planarConfiguration: 0
         )
         do {
@@ -332,7 +333,7 @@ final class DicomJLSwiftBackendTests: XCTestCase {
             )
             XCTFail("Expected contextual unsupported-shape error")
         } catch {
-            XCTAssertTrue(error.localizedDescription.contains("12-bit output"))
+            XCTAssertTrue(error.localizedDescription.contains("unsigned RGB"), error.localizedDescription)
         }
     }
 

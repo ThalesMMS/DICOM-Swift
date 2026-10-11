@@ -222,19 +222,28 @@ final class JPEGLosslessRestartAndColorTests: XCTestCase {
         XCTAssertTrue(ybrDiagnostic.contains("Photometric Interpretation=YBR_PARTIAL_422"), ybrDiagnostic)
         XCTAssertTrue(ybrDiagnostic.contains("Samples Per Pixel=3"), ybrDiagnostic)
 
-        let sixteenBitColor = DicomCompressedPixelBackendResolver.resolve(
+        // 16-bit RGB decodes since issue #3034; 16-bit YBR has no unambiguous mapping.
+        let sixteenBitRGB = DicomCompressedPixelBackendResolver.resolve(
             transferSyntax: .jpegLossless,
             requestedBitDepth: 16,
             samplesPerPixel: 3,
             photometricInterpretation: "RGB",
             bitsStored: 16
         )
+        XCTAssertEqual(sixteenBitRGB.backend, .nativeJPEGLossless)
+        let sixteenBitColor = DicomCompressedPixelBackendResolver.resolve(
+            transferSyntax: .jpegLossless,
+            requestedBitDepth: 16,
+            samplesPerPixel: 3,
+            photometricInterpretation: "YBR_FULL",
+            bitsStored: 16
+        )
         XCTAssertEqual(sixteenBitColor.backend, .unsupported)
         XCTAssertTrue(sixteenBitColor.diagnostics.joined().contains("16-bit"))
     }
 
-    /// A >8-bit color stream that reaches the decoder through the legacy
-    /// sniffing path must still fail with a stable diagnostic.
+    /// A >8-bit RGB stream keeps its precision (issue #3034); the same stream
+    /// under a YBR label still fails with a stable diagnostic.
     func testHighBitDepthColorStreamFailsAtTheDecoderGuard() throws {
         let width = 2, height = 2
         let planes = [
@@ -243,10 +252,13 @@ final class JPEGLosslessRestartAndColorTests: XCTestCase {
             [900, 1000, 1100, 1200]
         ]
         let stream = makeJPEGLosslessStream(planes: planes, width: width, height: height, precision: 12)
+        let rgb = DCMPixelReader.decodeCompressedFrameData(data: stream, photometricInterpretation: "RGB")
+        XCTAssertEqual(rgb?.pixels48, [100, 500, 900, 200, 600, 1000, 300, 700, 1100, 400, 800, 1200])
+        XCTAssertEqual(rgb?.bitDepth, 12)
         let logger = MockLogger()
         let result = DCMPixelReader.decodeCompressedFrameData(
             data: stream,
-            photometricInterpretation: "RGB",
+            photometricInterpretation: "YBR_FULL",
             logger: logger
         )
         XCTAssertNil(result)

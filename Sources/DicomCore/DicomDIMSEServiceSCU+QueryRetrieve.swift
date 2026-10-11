@@ -3,10 +3,12 @@ import Foundation
 extension DicomDIMSEServiceSCU {
     public func find(identifier: DicomDataSet,
                      queryModelUIDs: [String] = DicomQueryRetrieveModelPreference.find,
+                     priority: DicomDIMSEPriority = .medium,
                      progress: ((DicomDIMSEProgress) -> Void)? = nil) throws -> DicomCFindResult {
         try performWithResilience(operation: .query, progress: progress) { transport in
             try find(identifier: identifier,
                      queryModelUIDs: queryModelUIDs,
+                     priority: priority,
                      operation: .query,
                      using: transport,
                      progress: progress)
@@ -15,10 +17,12 @@ extension DicomDIMSEServiceSCU {
 
     public func find(identifier: DicomDataSet,
                      queryModelUIDs: [String] = DicomQueryRetrieveModelPreference.find,
+                     priority: DicomDIMSEPriority = .medium,
                      using transport: DicomAssociationTransport,
                      progress: ((DicomDIMSEProgress) -> Void)? = nil) throws -> DicomCFindResult {
         try find(identifier: identifier,
                  queryModelUIDs: queryModelUIDs,
+                 priority: priority,
                  operation: .query,
                  using: transport,
                  progress: progress)
@@ -26,6 +30,7 @@ extension DicomDIMSEServiceSCU {
 
     func find(identifier: DicomDataSet,
               queryModelUIDs: [String],
+              priority: DicomDIMSEPriority = .medium,
               operation: DicomDIMSEOperation,
               using transport: DicomAssociationTransport,
               progress: ((DicomDIMSEProgress) -> Void)? = nil) throws -> DicomCFindResult {
@@ -47,7 +52,7 @@ extension DicomDIMSEServiceSCU {
             commandField: DicomDIMSECommandField.cFindRQ,
             messageID: messageID,
             commandDataSetType: DicomDIMSECommandDataSetType.hasDataSet,
-            priority: 0
+            priority: priority.rawValue
         )
         try sendCommand(command,
                         presentationContextID: context.id,
@@ -86,16 +91,19 @@ extension DicomDIMSEServiceSCU {
             try validateSuccessStatus(response)
             var result = operationResult(from: response)
             result.negotiatedQueryModelUID = queryModelUID
+            result.acceptedExtendedNegotiation = association.accept.extendedNegotiation(for: queryModelUID)
             progress?(.completed(operation: operation, status: result.status))
             return DicomCFindResult(operation: result, matches: matches)
         }
     }
 
     public func findModalityWorklist(query: DicomModalityWorklistQuery,
+                                     priority: DicomDIMSEPriority = .medium,
                                      progress: ((DicomDIMSEProgress) -> Void)? = nil) throws -> DicomModalityWorklistResult {
         let result = try performWithResilience(operation: .modalityWorklist, progress: progress) { transport in
             try find(identifier: query.identifier,
                      queryModelUIDs: [DicomNetworkUID.modalityWorklistInformationModelFind],
+                     priority: priority,
                      operation: .modalityWorklist,
                      using: transport,
                      progress: progress)
@@ -107,10 +115,12 @@ extension DicomDIMSEServiceSCU {
     }
 
     public func findModalityWorklist(query: DicomModalityWorklistQuery,
+                                     priority: DicomDIMSEPriority = .medium,
                                      using transport: DicomAssociationTransport,
                                      progress: ((DicomDIMSEProgress) -> Void)? = nil) throws -> DicomModalityWorklistResult {
         let result = try find(identifier: query.identifier,
                               queryModelUIDs: [DicomNetworkUID.modalityWorklistInformationModelFind],
+                              priority: priority,
                               operation: .modalityWorklist,
                               using: transport,
                               progress: progress)
@@ -123,11 +133,13 @@ extension DicomDIMSEServiceSCU {
     public func move(identifier: DicomDataSet,
                      moveDestinationAETitle: String,
                      queryModelUIDs: [String] = DicomQueryRetrieveModelPreference.move,
+                     priority: DicomDIMSEPriority = .medium,
                      progress: ((DicomDIMSEProgress) -> Void)? = nil) throws -> DicomDIMSEOperationResult {
         try performWithResilience(operation: .moveRetrieve, progress: progress) { transport in
             try move(identifier: identifier,
                      moveDestinationAETitle: moveDestinationAETitle,
                      queryModelUIDs: queryModelUIDs,
+                     priority: priority,
                      using: transport,
                      progress: progress)
         }
@@ -136,6 +148,7 @@ extension DicomDIMSEServiceSCU {
     public func move(identifier: DicomDataSet,
                      moveDestinationAETitle: String,
                      queryModelUIDs: [String] = DicomQueryRetrieveModelPreference.move,
+                     priority: DicomDIMSEPriority = .medium,
                      using transport: DicomAssociationTransport,
                      progress: ((DicomDIMSEProgress) -> Void)? = nil) throws -> DicomDIMSEOperationResult {
         let operation = DicomDIMSEOperation.moveRetrieve
@@ -161,7 +174,7 @@ extension DicomDIMSEServiceSCU {
             messageID: messageID,
             commandDataSetType: DicomDIMSECommandDataSetType.hasDataSet,
             moveDestination: moveDestinationAETitle,
-            priority: 0
+            priority: priority.rawValue
         )
         try sendCommand(command,
                         presentationContextID: context.id,
@@ -187,12 +200,11 @@ extension DicomDIMSEServiceSCU {
                 progressPending(operation: operation, response: response, progress: progress)
                 continue
             }
-            _ = try readOptionalDataSet(response: response, transferSyntax: transferSyntax,
-                                        transport: transport, reader: reader)
+            let finalIdentifier = try readOptionalDataSet(response: response, transferSyntax: transferSyntax,
+                                                          transport: transport, reader: reader)
             try operationHandle?.checkCancellation(operation: operation)
-            try validateRetrieveStatus(response)
-            var result = operationResult(from: response)
-            result.negotiatedQueryModelUID = queryModelUID
+            let result = try finalRetrieveResult(response, identifier: finalIdentifier,
+                                                 queryModelUID: queryModelUID, association: association)
             didRelease = true
             do {
                 try release(operation: operation, using: transport, progress: progress, completingRetrieve: true)
@@ -208,11 +220,13 @@ extension DicomDIMSEServiceSCU {
     public func get(identifier: DicomDataSet,
                     storageSOPClassUIDs: [String] = [DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID],
                     queryModelUIDs: [String] = DicomQueryRetrieveModelPreference.get,
+                    priority: DicomDIMSEPriority = .medium,
                     progress: ((DicomDIMSEProgress) -> Void)? = nil) throws -> DicomCGetResult {
         try performWithResilience(operation: .getRetrieve, progress: progress) { transport in
             try get(identifier: identifier,
                     storageSOPClassUIDs: storageSOPClassUIDs,
                     queryModelUIDs: queryModelUIDs,
+                    priority: priority,
                     using: transport,
                     progress: progress)
         }
@@ -221,6 +235,7 @@ extension DicomDIMSEServiceSCU {
     public func get(identifier: DicomDataSet,
                     storageSOPClassUIDs: [String] = [DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID],
                     queryModelUIDs: [String] = DicomQueryRetrieveModelPreference.get,
+                    priority: DicomDIMSEPriority = .medium,
                     onInstance: (DicomRetrievedInstance) throws -> Void,
                     progress: ((DicomDIMSEProgress) -> Void)? = nil) throws -> DicomDIMSEOperationResult {
         return try performWithResilience(operation: .getRetrieve, progress: progress) { transport in
@@ -228,6 +243,7 @@ extension DicomDIMSEServiceSCU {
             return try get(identifier: identifier,
                     storageSOPClassUIDs: storageSOPClassUIDs,
                     queryModelUIDs: queryModelUIDs,
+                    priority: priority,
                     using: transport,
                     onInstance: { instance in
                         if let sopInstanceUID = instance.sopInstanceUID,
@@ -244,12 +260,14 @@ extension DicomDIMSEServiceSCU {
     public func get(identifier: DicomDataSet,
                     storageSOPClassUIDs: [String] = [DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID],
                     queryModelUIDs: [String] = DicomQueryRetrieveModelPreference.get,
+                    priority: DicomDIMSEPriority = .medium,
                     using transport: DicomAssociationTransport,
                     progress: ((DicomDIMSEProgress) -> Void)? = nil) throws -> DicomCGetResult {
         var retrieved: [DicomRetrievedInstance] = []
         let operation = try get(identifier: identifier,
                                 storageSOPClassUIDs: storageSOPClassUIDs,
                                 queryModelUIDs: queryModelUIDs,
+                                priority: priority,
                                 using: transport,
                                 onInstance: { retrieved.append($0) },
                                 progress: progress)
@@ -259,6 +277,7 @@ extension DicomDIMSEServiceSCU {
     public func get(identifier: DicomDataSet,
                     storageSOPClassUIDs: [String] = [DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID],
                     queryModelUIDs: [String] = DicomQueryRetrieveModelPreference.get,
+                    priority: DicomDIMSEPriority = .medium,
                     using transport: DicomAssociationTransport,
                     onInstance: (DicomRetrievedInstance) throws -> Void,
                     progress: ((DicomDIMSEProgress) -> Void)? = nil) throws -> DicomDIMSEOperationResult {
@@ -305,7 +324,7 @@ extension DicomDIMSEServiceSCU {
             commandField: DicomDIMSECommandField.cGetRQ,
             messageID: messageID,
             commandDataSetType: DicomDIMSECommandDataSetType.hasDataSet,
-            priority: 0
+            priority: priority.rawValue
         )
         try sendCommand(command,
                         presentationContextID: context.id,
@@ -339,12 +358,11 @@ extension DicomDIMSEServiceSCU {
                     progressPending(operation: operation, response: response, progress: progress)
                     continue
                 }
-                _ = try readOptionalDataSet(response: response, transferSyntax: transferSyntax,
-                                            transport: transport, reader: reader)
+                let finalIdentifier = try readOptionalDataSet(response: response, transferSyntax: transferSyntax,
+                                                              transport: transport, reader: reader)
                 try operationHandle?.checkCancellation(operation: operation)
-                try validateRetrieveStatus(response)
-                var result = operationResult(from: response)
-                result.negotiatedQueryModelUID = queryModelUID
+                let result = try finalRetrieveResult(response, identifier: finalIdentifier,
+                                                     queryModelUID: queryModelUID, association: association)
                 didRelease = true
                 do {
                     try release(operation: operation, using: transport, progress: progress, completingRetrieve: true)
@@ -366,13 +384,14 @@ extension DicomDIMSEServiceSCU {
 extension DicomDIMSEServiceSCU {
     /// Concurrent FIND operations, optionally followed by C-ECHO on the same association.
     /// Each message is sent whole; the negotiated invoked window bounds outstanding requests.
-    public func find(identifiers: [DicomDataSet], verifyOnAssociation: Bool = false) throws -> [DicomCFindResult] {
+    public func find(identifiers: [DicomDataSet], verifyOnAssociation: Bool = false,
+                     priority: DicomDIMSEPriority = .medium) throws -> [DicomCFindResult] {
         try performWithResilience(operation: .query, progress: nil) {
-            try find(identifiers: identifiers, verifyOnAssociation: verifyOnAssociation, using: $0)
+            try find(identifiers: identifiers, verifyOnAssociation: verifyOnAssociation, priority: priority, using: $0)
         }
     }
 
-    public func find(identifiers: [DicomDataSet], verifyOnAssociation: Bool = false,
+    public func find(identifiers: [DicomDataSet], verifyOnAssociation: Bool = false, priority: DicomDIMSEPriority = .medium,
                      using transport: DicomAssociationTransport) throws -> [DicomCFindResult] {
         guard !identifiers.isEmpty else { return [] }
         let models = DicomQueryRetrieveModelPreference.find
@@ -403,7 +422,7 @@ extension DicomDIMSEServiceSCU {
                     commandField: echo ? DicomDIMSECommandField.cEchoRQ : DicomDIMSECommandField.cFindRQ,
                     messageID: id,
                     commandDataSetType: echo ? DicomDIMSECommandDataSetType.noDataSet : DicomDIMSECommandDataSetType.hasDataSet,
-                    priority: echo ? nil : 0)
+                    priority: echo ? nil : priority.rawValue)
                 try sendCommand(command, presentationContextID: echo ? echoContext!.id : context.id,
                                 association: association, transport: transport)
                 if !echo {
@@ -434,6 +453,7 @@ extension DicomDIMSEServiceSCU {
             if operationHandle?.isCancelled != true { try validateSuccessStatus(response) }
             var result = operationResult(from: response)
             result.negotiatedQueryModelUID = model
+            result.acceptedExtendedNegotiation = association.accept.extendedNegotiation(for: model)
             results[index] = DicomCFindResult(operation: result, matches: matches[index])
             pending.removeValue(forKey: id)
         }

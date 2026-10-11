@@ -4,7 +4,8 @@ extension DicomDecodedFrame {
     /// The frame as little-endian stored sample bytes: the display normalisation of the typed buffer
     /// (signed level shift to unsigned, MONOCHROME1 full-range inversion) is undone so signed samples are
     /// two's complement again and MONOCHROME1 samples are the values written in the object. Colour frames
-    /// are interleaved RGB regardless of the source Planar Configuration. This is the sample contract that
+    /// are interleaved RGB regardless of the source Planar Configuration; 16-bit colour comes out as little-endian
+    /// words holding the right-aligned stored values (issue #3034). This is the sample contract that
     /// native readers and the GDCM bridge deliver, so consumers can mix providers without a second convention.
     public func storedSampleData() -> Data {
         let inverted = metadata.photometricInterpretation == "MONOCHROME1"
@@ -12,15 +13,19 @@ extension DicomDecodedFrame {
         switch pixels {
         case .gray16(let values):
             let bits = StoredBits(metadata, width: 16)
-            var bytes = Data(capacity: values.count * 2)
-            for value in values {
-                let unInverted = inverted ? UInt16.max - value : value
-                let pattern: UInt16 = signed
-                    ? UInt16(bitPattern: Int16(truncatingIfNeeded: Int32(unInverted) + Int32(Int16.min)))
-                    : unInverted
-                let stored = UInt16(truncatingIfNeeded: bits.sample(Int(pattern), signed: signed))
-                bytes.append(UInt8(stored & 0xFF))
-                bytes.append(UInt8(stored >> 8))
+            // Written in place: appending two bytes per sample cost more than the JPEG 2000 decode of a
+            // 512x512 frame (issue #3041). Same per-sample conversion, little-endian words.
+            var bytes = Data(count: values.count * 2)
+            bytes.withUnsafeMutableBytes { (output: UnsafeMutableRawBufferPointer) in
+                for (index, value) in values.enumerated() {
+                    let unInverted = inverted ? UInt16.max - value : value
+                    let pattern: UInt16 = signed
+                        ? UInt16(bitPattern: Int16(truncatingIfNeeded: Int32(unInverted) + Int32(Int16.min)))
+                        : unInverted
+                    let stored = UInt16(truncatingIfNeeded: bits.sample(Int(pattern), signed: signed))
+                    output[index * 2] = UInt8(stored & 0xFF)
+                    output[index * 2 + 1] = UInt8(stored >> 8)
+                }
             }
             return bytes
         case .gray8(let values):
@@ -32,6 +37,16 @@ extension DicomDecodedFrame {
             })
         case .rgb8(let interleaved):
             return Data(interleaved)
+        case .rgb16(let interleaved):
+            // Already the stored values (right-aligned, unsigned): little-endian words, interleaved.
+            var bytes = Data(count: interleaved.count * 2)
+            bytes.withUnsafeMutableBytes { (output: UnsafeMutableRawBufferPointer) in
+                for (index, value) in interleaved.enumerated() {
+                    output[index * 2] = UInt8(truncatingIfNeeded: value)
+                    output[index * 2 + 1] = UInt8(truncatingIfNeeded: value >> 8)
+                }
+            }
+            return bytes
         }
     }
 }

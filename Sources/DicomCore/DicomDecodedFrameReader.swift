@@ -37,6 +37,10 @@ public enum DicomDecodedFramePixelBuffer: Equatable, Sendable {
     case gray16([UInt16])
     /// Interleaved 8-bit R,G,B triplets.
     case rgb8(interleaved: [UInt8])
+    /// Interleaved R,G,B triplets of 9 to 16 stored bits (issue #3034): the stored sample values, unscaled and
+    /// right-aligned (bits above Bits Stored cleared), whatever the source byte order and Planar Configuration.
+    /// The frame metadata reports the effective Bits Stored and a High Bit of Bits Stored - 1.
+    case rgb16(interleaved: [UInt16])
 
     /// Number of addressable pixel samples in the buffer.
     public var sampleCount: Int {
@@ -44,6 +48,15 @@ public enum DicomDecodedFramePixelBuffer: Equatable, Sendable {
         case .gray8(let pixels): return pixels.count
         case .gray16(let pixels): return pixels.count
         case .rgb8(let interleaved): return interleaved.count / 3
+        case .rgb16(let interleaved): return interleaved.count / 3
+        }
+    }
+
+    /// True for the three-sample layouts.
+    var isColor: Bool {
+        switch self {
+        case .rgb8, .rgb16: return true
+        case .gray8, .gray16: return false
         }
     }
 }
@@ -98,6 +111,20 @@ public struct DicomDecodedFrameMetadata: Equatable, Sendable {
     public let pixelPaddingRangeLimit: Double?
     /// Actual presentation unit declared by the object, such as BQML or CNTS.
     public let presentationUnits: String?
+    /// Rescale Type (0028,1054), the unit of the rescaled values: an Enhanced frame's per-frame Pixel Value
+    /// Transformation, else the shared one, else the top level (issue #3037).
+    public let rescaleType: String?
+    /// Valid Modality LUT Sequence (0028,3000) items; the first replaces the rescale (PS3.3 C.11.1.1.2, issue #3037).
+    public let modalityLUTs: [DicomLookupTable]
+    /// Pixel Spacing (0028,0030) as row then column spacing: an Enhanced frame's Pixel Measures, else the top level;
+    /// empty when absent (issue #3037).
+    public let pixelSpacing: [Double]
+    /// Imager Pixel Spacing (0018,1164), row then column; empty when absent.
+    public let imagerPixelSpacing: [Double]
+    /// Nominal Scanned Pixel Spacing (0018,2010), row then column; empty when absent.
+    public let nominalScannedPixelSpacing: [Double]
+    /// Pixel Spacing Calibration Type (0028,0A02), when present.
+    public let pixelSpacingCalibrationType: String?
 }
 
 /// One decoded frame: typed pixels plus renderer-facing metadata.
@@ -581,19 +608,23 @@ public struct DicomDecodedFrameReader: Sendable {
     // MARK: - Native path
 
     private func decodeNativeFrame(at index: Int, frameCount: Int) throws -> DicomDecodedFrame {
+        try refuseUndefinedNativeColour()
         guard let descriptor = decoder.pixelDataDescriptor,
               let byteRange = descriptor.byteRange(forFrame: index) else {
             throw ReadError.noPixelData
         }
-        if descriptor.eightBitSamplesAreWordSwapped {
-            // The whole-buffer reader addresses the file directly; the data-backed path restores the word order.
+        // The whole-buffer reader addresses the file directly; the data-backed path restores the word order of
+        // word-swapped 8-bit samples, unpacks 1-bit samples at their bit offset and right-aligns 16-bit colour
+        // (issue #3034).
+        if descriptor.eightBitSamplesAreWordSwapped || descriptor.bitsAllocated == 1
+            || (descriptor.samplesPerPixel == 3 && descriptor.bitsAllocated == 16) {
             return try decodeNativeDataBackedFrame(at: index, frameCount: frameCount).copyingToArrayBackedFrame()
         }
         let pixels: DicomDecodedFramePixelBuffer
         if let interleaved = try interleavedNativeRGB(at: index, descriptor: descriptor) {
             pixels = .rgb8(interleaved: Array(interleaved))
-        } else if let expanded = expandedNativeYBR422(at: index, descriptor: descriptor) {
-            pixels = .rgb8(interleaved: expanded)
+        } else if Self.needsYBRTriplets(descriptor), let frame = decoder.getFrame(index) {
+            pixels = .rgb8(interleaved: Array(try nativeYBRTriplets(frame.data, descriptor: descriptor)))
         } else {
             let result = DCMPixelReader.readPixels(
                 data: decoder.dicomDataSnapshot(),
@@ -610,7 +641,7 @@ public struct DicomDecodedFrameReader: Sendable {
                 throw ReadError.decodeFailed(
                     transferSyntaxUID: decoder.transferSyntaxUID,
                     reason: "native \(descriptor.bitsAllocated)-bit, \(descriptor.samplesPerPixel)-sample layout"
-                        + " is not representable as gray8/gray16/rgb8"
+                        + " is not representable as gray8/gray16/rgb8/rgb16"
                 )
             }
             pixels = decoded
@@ -635,28 +666,72 @@ public struct DicomDecodedFrameReader: Sendable {
         return try decoder.displayRGBPixelBuffer(frame: index).rgbData
     }
 
-    /// Native YBR_FULL_422 stores Y1 Y2 Cb Cr for each pair of pixels (PS3.3 C.7.6.3.1.2); the frame comes out
-    /// as one Y Cb Cr triplet per pixel, as GDCM hands it over, still labelled YBR_FULL_422 (issue #2821).
-    private func expandedNativeYBR422(at index: Int, descriptor: DicomPixelDataDescriptor) -> [UInt8]? {
-        guard descriptor.samplesPerPixel == 3, descriptor.bitsAllocated == 8,
-              descriptor.photometricInterpretation == "YBR_FULL_422", descriptor.columns.isMultiple(of: 2),
-              let frame = decoder.getFrame(index), frame.data.count >= descriptor.rows * descriptor.columns * 2 else {
-            return nil
+    /// Native 8-bit YBR frames whose stored layout is not one Y Cb Cr triplet per pixel: YBR_FULL_422 (packed pairs)
+    /// and YBR_FULL with Planar Configuration 1 (three planes).
+    static func needsYBRTriplets(_ descriptor: DicomPixelDataDescriptor) -> Bool {
+        guard descriptor.samplesPerPixel == 3, descriptor.bitsAllocated == 8 else { return false }
+        return descriptor.photometricInterpretation == "YBR_FULL_422"
+            || (descriptor.photometricInterpretation == "YBR_FULL" && descriptor.planarConfiguration == 1)
+    }
+
+    /// The frame as one Y Cb Cr triplet per pixel, the stored-sample layout of decoded colour frames; the label is
+    /// kept and the YBR→RGB conversion stays a display operation (`DCMDecoder.displayRGB8(decodedFrame:)`).
+    /// * YBR_FULL_422 stores Y1 Y2 Cb Cr for each pair of horizontally adjacent pixels (PS3.3 C.7.6.3.1.2); both
+    ///   pixels of a pair take its chroma, as GDCM and pydicom expand it (issue #2821).
+    /// * YBR_FULL with Planar Configuration 1 stores the Y, Cb and Cr planes one after the other; they are
+    ///   interleaved here, as for RGB (issue #3036).
+    private func nativeYBRTriplets(_ bytes: Data, descriptor: DicomPixelDataDescriptor) throws -> Data {
+        let pixelCount = descriptor.rows * descriptor.columns
+        guard descriptor.photometricInterpretation == "YBR_FULL_422" else {
+            guard bytes.count >= pixelCount * 3 else { throw truncatedNativeFrame(descriptor) }
+            return Self.interleavedPlanes(bytes, pixelCount: pixelCount, bytesPerSample: 1)
         }
-        let pairs = descriptor.rows * descriptor.columns / 2
-        var output = [UInt8](repeating: 0, count: pairs * 6)
-        frame.data.withUnsafeBytes { bytes in
-            for pair in 0 ..< pairs {
-                let y1 = bytes[pair * 4], y2 = bytes[pair * 4 + 1], cb = bytes[pair * 4 + 2], cr = bytes[pair * 4 + 3]
-                output[pair * 6] = y1
-                output[pair * 6 + 1] = cb
-                output[pair * 6 + 2] = cr
-                output[pair * 6 + 3] = y2
-                output[pair * 6 + 4] = cb
-                output[pair * 6 + 5] = cr
+        let pairs = pixelCount / 2
+        guard bytes.count >= pairs * 4 else { throw truncatedNativeFrame(descriptor) }
+        var output = Data(count: pairs * 6)
+        bytes.withUnsafeBytes { (source: UnsafeRawBufferPointer) in
+            output.withUnsafeMutableBytes { (target: UnsafeMutableRawBufferPointer) in
+                for pair in 0 ..< pairs {
+                    let y1 = source[pair * 4], y2 = source[pair * 4 + 1], cb = source[pair * 4 + 2], cr = source[pair * 4 + 3]
+                    target[pair * 6] = y1
+                    target[pair * 6 + 1] = cb
+                    target[pair * 6 + 2] = cr
+                    target[pair * 6 + 3] = y2
+                    target[pair * 6 + 4] = cb
+                    target[pair * 6 + 5] = cr
+                }
             }
         }
         return output
+    }
+
+    private func truncatedNativeFrame(_ descriptor: DicomPixelDataDescriptor) -> ReadError {
+        .decodeFailed(transferSyntaxUID: decoder.transferSyntaxUID,
+                      reason: "native \(descriptor.photometricInterpretation) frame is shorter than its declared layout")
+    }
+
+    /// Native colour labels with no conversion in the typed pipeline are refused typed rather than delivered under a
+    /// label that does not describe the samples (issue #3036):
+    /// * YBR_PARTIAL_422 (retired) and YBR_PARTIAL_420 are partial range and would need their own equations;
+    ///   PS3.3 defines YBR_PARTIAL_420 for MPEG-2, H.264 and HEVC streams only;
+    /// * YBR_RCT and YBR_ICT name the JPEG 2000 codestream colour transform (PS3.5 8.2.4) and say nothing of
+    ///   native samples;
+    /// * YBR_FULL_422 pairs horizontally adjacent pixels, which an odd number of columns leaves undefined.
+    private func refuseUndefinedNativeColour() throws {
+        guard decoder.samplesPerPixel == 3 else { return }
+        let photometric = decoder.photometricInterpretation.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let reason: String
+        switch photometric {
+        case "YBR_PARTIAL_422", "YBR_PARTIAL_420":
+            reason = "native \(photometric) is partial-range YBR and has no conversion; full-range equations are not applied to it"
+        case "YBR_RCT", "YBR_ICT":
+            reason = "\(photometric) names a JPEG 2000 codestream colour transform; native samples under it are not interpreted"
+        case "YBR_FULL_422" where !decoder.width.isMultiple(of: 2):
+            reason = "native YBR_FULL_422 with an odd number of columns has no defined chroma pairing"
+        default:
+            return
+        }
+        throw ReadError.decodeFailed(transferSyntaxUID: decoder.transferSyntaxUID, reason: reason)
     }
 
     private func dataBackedFrameSynchronously(
@@ -682,6 +757,7 @@ public struct DicomDecodedFrameReader: Sendable {
         at index: Int,
         frameCount: Int
     ) throws -> DicomDataBackedDecodedFrame {
+        try refuseUndefinedNativeColour()
         guard let descriptor = decoder.pixelDataDescriptor,
               let byteRange = descriptor.byteRange(forFrame: index),
               let bitRange = descriptor.bitRange(forFrame: index) else {
@@ -702,10 +778,18 @@ public struct DicomDecodedFrameReader: Sendable {
                 reason: "native frame byte range is outside the source data"
             )
         }
-        let bytes = try interleavedNativeRGB(at: index, descriptor: descriptor) ?? nativeBytes
-        let byteOrder: DicomDecodedFrameByteOrder = decoder.currentLittleEndian()
-            ? .littleEndian
-            : .bigEndian
+        let deepColor = descriptor.samplesPerPixel == 3 && descriptor.bitsAllocated == 16
+        if deepColor {
+            try validateNativeDeepColor(descriptor)
+        }
+        // Planar 16-bit RGB: the three planes are interleaved word by word in the source byte order; the
+        // normalizer then masks Bits Stored and restores host order as for interleaved frames. 8-bit YBR_FULL_422 and
+        // planar YBR_FULL become Y Cb Cr triplets from the restored bytes (issue #3036).
+        let bytes = deepColor && descriptor.planarConfiguration == 1
+            ? Self.interleavedPlanes(nativeBytes, pixelCount: descriptor.rows * descriptor.columns, bytesPerSample: 2)
+            : Self.needsYBRTriplets(descriptor) ? try nativeYBRTriplets(nativeBytes, descriptor: descriptor)
+            : try interleavedNativeRGB(at: index, descriptor: descriptor) ?? nativeBytes
+        let byteOrder: DicomDecodedFrameByteOrder = decoder.currentLittleEndian() ? .littleEndian : .bigEndian
         guard let pixels = DicomDecodedFrameDataNormalizer.makeBuffer(
             data: bytes,
             width: descriptor.columns,
@@ -732,9 +816,80 @@ public struct DicomDecodedFrameReader: Sendable {
                 width: descriptor.columns,
                 height: descriptor.rows,
                 frameCount: frameCount,
-                frameIndex: index
+                frameIndex: index,
+                rightAlignsStoredBits: deepColor
             )
         )
+    }
+
+    /// 16-bit colour reaches the typed pipeline as RGB with unsigned samples only (issue #3034). YBR at 16 bits
+    /// and signed colour have no conversion here and are refused typed rather than reduced or reinterpreted.
+    private func validateNativeDeepColor(_ descriptor: DicomPixelDataDescriptor) throws {
+        guard descriptor.photometricInterpretation == "RGB" else {
+            throw ReadError.decodeFailed(
+                transferSyntaxUID: decoder.transferSyntaxUID,
+                reason: "16-bit \(descriptor.photometricInterpretation) colour has no typed conversion; only RGB is delivered"
+            )
+        }
+        guard decoder.pixelRepresentationTagValue == 0 else {
+            throw ReadError.decodeFailed(
+                transferSyntaxUID: decoder.transferSyntaxUID,
+                reason: "signed 16-bit colour samples are not delivered by the typed pipeline"
+            )
+        }
+    }
+
+    /// Three colour planes (Planar Configuration 1) as one interleaved buffer, sample bytes kept as stored.
+    static func interleavedPlanes(_ planes: Data, pixelCount: Int, bytesPerSample: Int) -> Data {
+        let planeBytes = pixelCount * bytesPerSample
+        guard planes.count >= planeBytes * 3 else { return planes }
+        var output = Data(count: planeBytes * 3)
+        planes.withUnsafeBytes { (source: UnsafeRawBufferPointer) in
+            output.withUnsafeMutableBytes { (target: UnsafeMutableRawBufferPointer) in
+                for pixel in 0 ..< pixelCount {
+                    for component in 0 ..< 3 {
+                        let from = component * planeBytes + pixel * bytesPerSample
+                        let to = (pixel * 3 + component) * bytesPerSample
+                        for byte in 0 ..< bytesPerSample { target[to + byte] = source[from + byte] }
+                    }
+                }
+            }
+        }
+        return output
+    }
+
+    /// Whether frames of this object decode through the JPEG 2000 / HTJ2K selection of `frameExecution(at:)`
+    /// (JPEG 2000 Part 1 and HTJ2K; Part 2 collections already use the own codec on every path).
+    var decodesThroughAsyncJPEG2000Selection: Bool {
+        guard let syntax = DicomTransferSyntax(uid: decoder.transferSyntaxUID), syntax.isCompressed,
+              !DicomJ2KPart2Profile.isPart2(decoder.transferSyntaxUID),
+              let family = DicomCodecFamily.family(for: syntax) else { return false }
+        return family == .jpeg2000 || family == .htj2k
+    }
+
+    /// The decode decision `frameExecution(at:)` applies to this object's compressed frames before decoding.
+    func compressedDecodeDecision(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> DicomCodecDecision {
+        DicomCodecCapabilities.resolve(
+            DicomCodecCapabilityRequest(operation: .decode, descriptor: compressedFrameDescriptor()),
+            environment: environment
+        )
+    }
+
+    /// Synchronous volume decode (issue #3050). JPEG 2000 and HTJ2K frames take the backend selection of
+    /// `frameExecution(at:)`, which the streaming slice decoder uses: the own DicomJPEG2000 codec by default, with
+    /// OpenJPEG only as that path's fallback. A full volume build then decodes the values the stream decodes and needs
+    /// no external runtime. Other syntaxes decode through `frame(at:)`.
+    func volumeFrame(
+        at index: Int,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) throws -> DicomDecodedFrame {
+        guard decodesThroughAsyncJPEG2000Selection else { return try frame(at: index) }
+        let reader = self
+        return try DicomBlockingAsyncOperation.run {
+            try await reader.frameExecution(at: index, environment: environment).frame
+        }
     }
 
     // MARK: - Compressed path
@@ -1244,11 +1399,25 @@ public struct DicomDecodedFrameReader: Sendable {
             }
         }
 
-        guard let result, let pixels = Self.typedPixels(from: result) else {
+        guard let result, var pixels = Self.typedPixels(from: result) else {
             throw ReadError.decodeFailed(
                 transferSyntaxUID: decoder.transferSyntaxUID,
                 reason: "the \(decision.backend) backend did not produce a typed pixel buffer"
             )
+        }
+        var rightAligned = false
+        if case .rgb16(let interleaved) = pixels {
+            let photometric = decoder.photometricInterpretation.trimmingCharacters(in: .whitespaces).uppercased()
+            guard ["RGB", "YBR_RCT", "YBR_ICT"].contains(photometric) else {
+                throw ReadError.decodeFailed(
+                    transferSyntaxUID: decoder.transferSyntaxUID,
+                    reason: "16-bit \(photometric) colour has no typed conversion; only RGB is delivered"
+                )
+            }
+            // RLE and other word-preserving backends return the stored words: keep only Bits Stored, at bit 0.
+            pixels = .rgb16(interleaved: Self.rightAligned(interleaved, bitsStored: bitsStored ?? 16,
+                                                           highBit: decoder.intValue(for: Int(DicomTag.highBit.rawValue))))
+            rightAligned = true
         }
         return DicomDecodedFrame(
             index: index,
@@ -1258,9 +1427,19 @@ public struct DicomDecodedFrameReader: Sendable {
                 height: result.height,
                 frameCount: frameCount,
                 frameIndex: index,
-                decodedSampleBits: result.bitDepth
+                decodedSampleBits: result.bitDepth,
+                rightAlignsStoredBits: rightAligned
             )
         )
+    }
+
+    /// PS3.5 8.1.1: only Bits Stored bits ending at High Bit belong to a sample.
+    private static func rightAligned(_ samples: [UInt16], bitsStored: Int, highBit: Int?) -> [UInt16] {
+        guard (1...16).contains(bitsStored) else { return samples }
+        let shift = max(0, (highBit ?? bitsStored - 1) - bitsStored + 1)
+        guard shift != 0 || bitsStored != 16 else { return samples }
+        let mask = UInt16(truncatingIfNeeded: (1 << bitsStored) - 1)
+        return samples.map { ($0 >> UInt16(shift)) & mask }
     }
 
     // MARK: - Shared helpers
@@ -1340,14 +1519,16 @@ public struct DicomDecodedFrameReader: Sendable {
     /// Bits Allocated the samples keep it, as GDCM reads them (issue #2854), instead of being cut to Bits Stored.
     /// `decodedSampleBits` is the size of the samples a codec delivered: 8-bit samples under Bits Allocated 16
     /// (a codestream of 8-bit precision) are described as 8-bit words, which is how GDCM hands them over
-    /// (issue #2856).
+    /// (issue #2856). `rightAlignsStoredBits` reports a High Bit of Bits Stored - 1 for samples the reader shifted
+    /// down to bit 0 (16-bit colour, issue #3034).
     func makeMetadata(
         width: Int,
         height: Int,
         frameCount: Int? = nil,
         frameIndex: Int? = nil,
         codestreamPrecision: Int? = nil,
-        decodedSampleBits: Int? = nil
+        decodedSampleBits: Int? = nil,
+        rightAlignsStoredBits: Bool = false
     ) -> DicomDecodedFrameMetadata {
         let declaredBitsAllocated = decoder.bitDepth
         let declaredBitsStored = decoder.intValue(for: Int(DicomTag.bitsStored.rawValue)) ?? declaredBitsAllocated
@@ -1367,13 +1548,23 @@ public struct DicomDecodedFrameReader: Sendable {
                 ? enhanced?.perFrame[index].frameVOI
                 : nil
         }
+        // Issue #3037: an Enhanced frame's rescale and spacing live in its functional groups (per frame, else
+        // shared), which win over the top level, as the GDCM provider resolves them.
+        let frameGroups = frameIndex.flatMap { index in
+            enhanced?.frames.indices.contains(index) == true ? enhanced?.frames[index].functionalGroups : nil
+        }
+        let perFrameTransformation = frameIndex.flatMap { index in
+            enhanced?.perFrame.indices.contains(index) == true ? enhanced?.perFrame[index].pixelValueTransformation : nil
+        }
+        let transformation = frameGroups?.pixelValueTransformation
+        let frameSpacing = frameGroups?.pixelMeasures?.pixelSpacing.map { [$0.x, $0.y] }
         return DicomDecodedFrameMetadata(
             width: width,
             height: height,
             frameCount: frameCount ?? self.frameCount,
             bitsAllocated: bitsAllocated,
             bitsStored: bitsStored,
-            highBit: redefinesBits ? bitsStored - 1
+            highBit: redefinesBits || rightAlignsStoredBits ? bitsStored - 1
                 : decoder.intValue(for: Int(DicomTag.highBit.rawValue)) ?? max(0, bitsStored - 1),
             pixelRepresentation: decoder.pixelRepresentationTagValue,
             samplesPerPixel: decoder.samplesPerPixel,
@@ -1383,7 +1574,9 @@ public struct DicomDecodedFrameReader: Sendable {
             windowSettings: window.isValid ? window : nil,
             sharedFrameVOI: enhanced?.shared?.frameVOI,
             perFrameVOI: perFrameVOI,
-            rescaleParameters: decoder.rescaleParametersV2,
+            rescaleParameters: transformation.map {
+                RescaleParameters(intercept: $0.rescaleIntercept, slope: $0.rescaleSlope)
+            } ?? decoder.rescaleParametersV2,
             smallestImagePixelValue: decoder.intValue(for: 0x0028_0106),
             largestImagePixelValue: decoder.intValue(for: 0x0028_0107),
             voiLUTs: voiLUTs,
@@ -1392,8 +1585,27 @@ public struct DicomDecodedFrameReader: Sendable {
                 ?? optionalString(for: .voiLUTFunction),
             pixelPaddingValue: decoder.doubleValue(for: .pixelPaddingValue),
             pixelPaddingRangeLimit: decoder.doubleValue(for: .pixelPaddingRangeLimit),
-            presentationUnits: optionalString(for: .units)
+            presentationUnits: optionalString(for: .units),
+            rescaleType: perFrameTransformation?.rescaleType ?? enhanced?.shared?.pixelValueTransformation?.rescaleType
+                ?? optionalString(for: .rescaleType),
+            modalityLUTs: decoder.modalityLookupTables,
+            pixelSpacing: frameSpacing ?? decimals(for: DicomTag.pixelSpacing.rawValue),
+            imagerPixelSpacing: decimals(for: 0x0018_1164),
+            nominalScannedPixelSpacing: decimals(for: 0x0018_2010),
+            pixelSpacingCalibrationType: optionalString(for: 0x0028_0A02)
         )
+    }
+
+    private func optionalString(for tag: Int) -> String? {
+        let value = decoder.info(for: tag).trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    private func decimals(for tag: Int) -> [Double] {
+        let values = decoder.info(for: tag).split(separator: "\\").compactMap {
+            Double($0.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return values.count >= 2 ? Array(values.prefix(2)) : []
     }
 
     private func optionalString(for tag: DicomTag) -> String? {
@@ -1404,6 +1616,9 @@ public struct DicomDecodedFrameReader: Sendable {
     private static func typedPixels(from result: DCMPixelReadResult) -> DicomDecodedFramePixelBuffer? {
         if let interleaved = result.pixels24 {
             return .rgb8(interleaved: interleaved)
+        }
+        if let interleaved = result.pixels48 {
+            return .rgb16(interleaved: interleaved)
         }
         if let pixels = result.pixels16 {
             return .gray16(pixels)

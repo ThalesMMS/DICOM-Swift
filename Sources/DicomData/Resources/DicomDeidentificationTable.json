@@ -9497,5 +9497,2279 @@
  ],
  "sourceSHA256": "77d60b856faf4223ab40a398c53130fc0ee9490d0d811ee3536e6d25c02ac717",
  "standard": "PS3.15",
+ "structuredContent": [
+  {
+   "basic": "X",
+   "codeValue": "109054",
+   "meaning": "Patient State",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "109056",
+   "meaning": "Stress Protocol",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "110119",
+   "meaning": "Station AE Title",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "D",
+   "codeValue": "110180",
+   "meaning": "Study Instance UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "UIDREF"
+  },
+  {
+   "basic": "X",
+   "codeValue": "110190",
+   "meaning": "Issuer of Identifier",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X/D",
+   "codeValue": "111018",
+   "meaning": "Content Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATE"
+  },
+  {
+   "basic": "X/D",
+   "codeValue": "111019",
+   "meaning": "Content Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "111021",
+   "meaning": "Description of Change",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "D",
+   "codeValue": "111033",
+   "meaning": "Impression Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "D",
+   "codeValue": "111040",
+   "meaning": "Original Source",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "X/D",
+   "codeValue": "111054",
+   "meaning": "Recommended Follow-up Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATE"
+  },
+  {
+   "basic": "D",
+   "codeValue": "111058",
+   "meaning": "Selected Region Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X/D",
+   "codeValue": "111060",
+   "meaning": "Study Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATE"
+  },
+  {
+   "basic": "X/D",
+   "codeValue": "111061",
+   "meaning": "Study Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TIME"
+  },
+  {
+   "basic": "D",
+   "codeValue": "111469",
+   "meaning": "Sampling DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "111516",
+   "meaning": "Medication Type",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X/D",
+   "codeValue": "111526",
+   "meaning": "DateTime Started",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "111527",
+   "meaning": "DateTime Ended",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "111535",
+   "meaning": "DateTime problem observed",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "111536",
+   "meaning": "DateTime of last evaluation",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "111700",
+   "meaning": "Specimen Container Identifier",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "111702",
+   "meaning": "DateTime of processing",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "111703",
+   "meaning": "Processing step description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "D",
+   "codeValue": "111705",
+   "meaning": "Parent Specimen Identifier",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "111706",
+   "meaning": "Issuer of Parent Specimen Identifier",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "111724",
+   "meaning": "Issuer of Specimen Identifier",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "D",
+   "codeValue": "112002",
+   "meaning": "Series Instance UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "UIDREF"
+  },
+  {
+   "basic": "D",
+   "codeValue": "112040",
+   "meaning": "Tracking Unique Identifier",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "UIDREF"
+  },
+  {
+   "basic": "X",
+   "codeValue": "112050",
+   "meaning": "Anatomic Identifier",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X/D",
+   "codeValue": "112227",
+   "meaning": "Frame of Reference UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "UIDREF"
+  },
+  {
+   "basic": "D",
+   "codeValue": "112229",
+   "meaning": "Identifying Segment",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "IMAGE"
+  },
+  {
+   "basic": "D",
+   "codeValue": "112347",
+   "meaning": "Component ID",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "D",
+   "codeValue": "112351",
+   "meaning": "Mating Feature Set ID",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "D",
+   "codeValue": "112352",
+   "meaning": "Mating Feature ID",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "112353",
+   "meaning": "Spatial Registration",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "112354",
+   "meaning": "Patient Image",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "IMAGE"
+  },
+  {
+   "basic": "D",
+   "codeValue": "112356",
+   "meaning": "User Selected Fiducial",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "UIDREF"
+  },
+  {
+   "basic": "D",
+   "codeValue": "112357",
+   "meaning": "Derived Fiducial",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "UIDREF"
+  },
+  {
+   "basic": "X",
+   "codeValue": "112359",
+   "meaning": "Supporting Information",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "112361",
+   "meaning": "Patient Data Used During Planning",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "D",
+   "codeValue": "112363",
+   "meaning": "Degree of Freedom ID",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "112364",
+   "meaning": "Related Patient Data Not Used During Planning",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "112366",
+   "meaning": "Implant Assembly Template",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "D",
+   "codeValue": "112371",
+   "meaning": "Manufacturer Implant Template",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "112372",
+   "meaning": "Derived Planning Images",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "112373",
+   "meaning": "Derived Planning Data",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "113012",
+   "meaning": "Key Object Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "D",
+   "codeValue": "113503",
+   "meaning": "Radiopharmaceutical Administration Event UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "UIDREF"
+  },
+  {
+   "basic": "X",
+   "codeValue": "113511",
+   "meaning": "Radiopharmaceutical Dispense Unit Identifier",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "113512",
+   "meaning": "Radiopharmaceutical Lot Identifier",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "113513",
+   "meaning": "Reagent Vial Identifier",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "113514",
+   "meaning": "Radionuclide Identifier",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "113516",
+   "meaning": "Prescription Identifier",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "113552",
+   "meaning": "Recent Physical Activity",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "113605",
+   "meaning": "Irradiation Event Label",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "113701",
+   "meaning": "X-Ray Radiation Dose Report",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "113720",
+   "meaning": "Calibration Protocol",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "D",
+   "codeValue": "113723",
+   "meaning": "Calibration DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "D",
+   "codeValue": "113724",
+   "meaning": "Calibration Responsible Party",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "D",
+   "codeValue": "113769",
+   "meaning": "Irradiation Event UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "UIDREF"
+  },
+  {
+   "basic": "D",
+   "codeValue": "113795",
+   "meaning": "Acquired Image",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "IMAGE"
+  },
+  {
+   "basic": "D",
+   "codeValue": "113809",
+   "meaning": "Start of X-Ray Irradiation",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "D",
+   "codeValue": "113810",
+   "meaning": "End of X-Ray Irradiation",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "D",
+   "codeValue": "113815",
+   "meaning": "Patient Model",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "D",
+   "codeValue": "113832",
+   "meaning": "Identification of the X-Ray Source",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "D",
+   "codeValue": "113850",
+   "meaning": "Irradiation Authorizing",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "PNAME"
+  },
+  {
+   "basic": "D",
+   "codeValue": "113870",
+   "meaning": "Person Name",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "PNAME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "113871",
+   "meaning": "Person ID",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "113872",
+   "meaning": "Person ID Issuer",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "113873",
+   "meaning": "Organization Name",
+   "options": {
+    "retainInstitutionIdentity": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "113877",
+   "meaning": "Device Name",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X/D",
+   "codeValue": "113880",
+   "meaning": "Device Serial Number",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "113907",
+   "meaning": "Reason for Proceeding",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "D",
+   "codeValue": "113985",
+   "meaning": "Series or Instance used for Water Equivalent Diameter estimation",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "UIDREF"
+  },
+  {
+   "basic": "X",
+   "codeValue": "120999",
+   "meaning": "Device Description",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121000",
+   "meaning": "Unique Device Identifiers",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "CONTAINER"
+  },
+  {
+   "basic": "D",
+   "codeValue": "121002",
+   "meaning": "Quoted Source",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "D",
+   "codeValue": "121008",
+   "meaning": "Person Observer Name",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "PNAME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121009",
+   "meaning": "Person Observer's Organization Name",
+   "options": {
+    "retainInstitutionIdentity": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X/D",
+   "codeValue": "121012",
+   "meaning": "Device Observer UID",
+   "options": {
+    "retainDeviceIdentity": "K",
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "UIDREF"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121013",
+   "meaning": "Device Observer Name",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121016",
+   "meaning": "Device Observer Serial Number",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121017",
+   "meaning": "Device Observer Physical Location During Observation",
+   "options": {
+    "retainInstitutionIdentity": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121018",
+   "meaning": "Procedure Study Instance UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "UIDREF"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121019",
+   "meaning": "Procedure Study Component UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "UIDREF"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121020",
+   "meaning": "Placer Number",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121021",
+   "meaning": "Filler Number",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121022",
+   "meaning": "Accession Number",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121028",
+   "meaning": "Subject UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "UIDREF"
+  },
+  {
+   "basic": "D",
+   "codeValue": "121029",
+   "meaning": "Subject Name",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "PNAME"
+  },
+  {
+   "basic": "X/D",
+   "codeValue": "121030",
+   "meaning": "Subject ID",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121031",
+   "meaning": "Subject Birth Date",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121032",
+   "meaning": "Subject Sex",
+   "options": {
+    "retainPatientCharacteristics": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "CODE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121033",
+   "meaning": "Subject Age",
+   "options": {
+    "retainPatientCharacteristics": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "NUM"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121036",
+   "meaning": "Mother of fetus",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "PNAME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121039",
+   "meaning": "Specimen UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "UIDREF"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121041",
+   "meaning": "Specimen Identifier",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X/D",
+   "codeValue": "121065",
+   "meaning": "Procedure Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X/D",
+   "codeValue": "121071",
+   "meaning": "Finding",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121075",
+   "meaning": "Recommendation",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121077",
+   "meaning": "Conclusion",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121080",
+   "meaning": "Best illustration of finding",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "IMAGE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121080",
+   "meaning": "Best illustration of finding",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "WAVEFORM"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121088",
+   "meaning": "Fellow",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "PNAME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121106",
+   "meaning": "Comment",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121110",
+   "meaning": "Patient Presentation",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121111",
+   "meaning": "Summary",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "D",
+   "codeValue": "121112",
+   "meaning": "Source of Measurement",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "IMAGE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121112",
+   "meaning": "Source of Measurement",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "WAVEFORM"
+  },
+  {
+   "basic": "D",
+   "codeValue": "121114",
+   "meaning": "Performing Physician",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "PNAME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121120",
+   "meaning": "Cath Lab Procedure Log",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121121",
+   "meaning": "Room Identification",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121122",
+   "meaning": "Equipment Identification",
+   "options": {
+    "cleanDescriptors": "C",
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X/D",
+   "codeValue": "121124",
+   "meaning": "Procedure Action ID",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121125",
+   "meaning": "DateTime of Recording of Log Entry",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "D",
+   "codeValue": "121126",
+   "meaning": "Performed Procedure Step SOP Instance UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "UIDREF"
+  },
+  {
+   "basic": "D",
+   "codeValue": "121138",
+   "meaning": "Image Acquired",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "IMAGE"
+  },
+  {
+   "basic": "D",
+   "codeValue": "121143",
+   "meaning": "Waveform Acquired",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "WAVEFORM"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121145",
+   "meaning": "Description of Material",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121152",
+   "meaning": "Person administering drug/contrast",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "PNAME"
+  },
+  {
+   "basic": "D",
+   "codeValue": "121154",
+   "meaning": "Intervention attempt identifier",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121173",
+   "meaning": "Physician Note",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X/D",
+   "codeValue": "121191",
+   "meaning": "Referenced Segment",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "IMAGE"
+  },
+  {
+   "basic": "D",
+   "codeValue": "121193",
+   "meaning": "Device Subject Name",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121196",
+   "meaning": "Device Subject Serial Number",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121197",
+   "meaning": "Device Subject Physical Location during observation",
+   "options": {
+    "retainInstitutionIdentity": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121198",
+   "meaning": "Device Subject UID",
+   "options": {
+    "retainDeviceIdentity": "K",
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "UIDREF"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121200",
+   "meaning": "Illustration of ROI",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "IMAGE"
+  },
+  {
+   "basic": "D",
+   "codeValue": "121214",
+   "meaning": "Referenced Segmentation Frame",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "IMAGE"
+  },
+  {
+   "basic": "D",
+   "codeValue": "121232",
+   "meaning": "Source series for segmentation",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "UIDREF"
+  },
+  {
+   "basic": "D",
+   "codeValue": "121233",
+   "meaning": "Source image for segmentation",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "IMAGE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121342",
+   "meaning": "Dose Image",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "IMAGE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121431",
+   "meaning": "DateTime Concern Noted",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121432",
+   "meaning": "DateTime Concern Resolved",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121433",
+   "meaning": "DateTime Problem Resolved",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121434",
+   "meaning": "Service Delivery Location",
+   "options": {
+    "retainInstitutionIdentity": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121435",
+   "meaning": "Service Performer",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "PNAME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "121435",
+   "meaning": "Service Performer",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "122073",
+   "meaning": "Current procedure evidence",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "122075",
+   "meaning": "Prior report for current patient",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "122081",
+   "meaning": "Drug start",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "122082",
+   "meaning": "Drug end",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X/D",
+   "codeValue": "122083",
+   "meaning": "Drug administered",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "122105",
+   "meaning": "DateTime of Intervention",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "122128",
+   "meaning": "Patient Transferred From",
+   "options": {
+    "retainInstitutionIdentity": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X/D",
+   "codeValue": "122146",
+   "meaning": "Procedure DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "122163",
+   "meaning": "Discharge DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "122165",
+   "meaning": "DateTime of Death",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "122173",
+   "meaning": "ST Elevation Onset DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "122177",
+   "meaning": "Procedure Result",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "122701",
+   "meaning": "Procedure Time Base",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "D",
+   "codeValue": "122712",
+   "meaning": "Imaging Start DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X/D",
+   "codeValue": "123003",
+   "meaning": "Radiopharmaceutical Start DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "123004",
+   "meaning": "Radiopharmaceutical Stop DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "125010",
+   "meaning": "Identifier",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "125201",
+   "meaning": "Illustration of Finding",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "IMAGE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "125203",
+   "meaning": "Acquisition Protocol",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "126070",
+   "meaning": "Subject Time Point Identifier",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "126071",
+   "meaning": "Protocol Time Point Identifier",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "126100",
+   "meaning": "Real World Value Map used for measurement",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "126201",
+   "meaning": "Acquisition Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "126202",
+   "meaning": "Acquisition Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TIME"
+  },
+  {
+   "basic": "D",
+   "codeValue": "127857",
+   "meaning": "Glucose Measurement Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATE"
+  },
+  {
+   "basic": "D",
+   "codeValue": "127858",
+   "meaning": "Glucose Measurement Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "128230",
+   "meaning": "Pulse Sequence Name",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "D",
+   "codeValue": "128403",
+   "meaning": "Radiation Dose Estimate Name",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "D",
+   "codeValue": "128414",
+   "meaning": "Radiation Dose Representation Data",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "D",
+   "codeValue": "128414",
+   "meaning": "Radiation Dose Representation Data",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "IMAGE"
+  },
+  {
+   "basic": "D",
+   "codeValue": "128416",
+   "meaning": "SR Instance Used",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "128425",
+   "meaning": "Patient Radiation Dose Model Data",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "128425",
+   "meaning": "Patient Radiation Dose Model Data",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "IMAGE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "128425",
+   "meaning": "Patient Radiation Dose Model Data",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "UIDREF"
+  },
+  {
+   "basic": "X",
+   "codeValue": "128426",
+   "meaning": "Patient Radiation Dose Model Reference",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "D",
+   "codeValue": "128429",
+   "meaning": "Event UID Used",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "UIDREF"
+  },
+  {
+   "basic": "D",
+   "codeValue": "128436",
+   "meaning": "Radiation Dose Composite Parameters",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "D",
+   "codeValue": "128444",
+   "meaning": "Spatial Registration Reference",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "128447",
+   "meaning": "Spatial Fiducials",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "128470",
+   "meaning": "X-Ray Attenuator Model Data",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "128470",
+   "meaning": "X-Ray Attenuator Model Data",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "IMAGE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "128470",
+   "meaning": "X-Ray Attenuator Model Data",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "UIDREF"
+  },
+  {
+   "basic": "X",
+   "codeValue": "128774",
+   "meaning": "Person Observer's Login Name",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "128775",
+   "meaning": "Identifier within Person Observer's Role",
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "130507",
+   "meaning": "RDSR Frame of Reference Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "D",
+   "codeValue": "130527",
+   "meaning": "Identification of the Attenuator",
+   "options": {
+    "retainInstitutionIdentity": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "130884",
+   "meaning": "Acquisition DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "130885",
+   "meaning": "Synchronization Frame of Reference UID",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "UIDREF"
+  },
+  {
+   "basic": "X",
+   "codeValue": "131561",
+   "meaning": "Series Date",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "DATE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "131562",
+   "meaning": "Series Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "131563",
+   "meaning": "Series Description",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "DCM",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "11329-0",
+   "meaning": "History",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "LN",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "11778-8",
+   "meaning": "EDD",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "LN",
+   "valueType": "DATE"
+  },
+  {
+   "basic": "D",
+   "codeValue": "11951-1",
+   "meaning": "Fetus ID",
+   "retired": false,
+   "scheme": "LN",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "11955-2",
+   "meaning": "Date of last menstrual period",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "LN",
+   "valueType": "DATE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "18118-0",
+   "meaning": "LV Wall Motion Segmental Findings",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "LN",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "D",
+   "codeValue": "18785-6",
+   "meaning": "Indications for Procedure",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "LN",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "74711-3",
+   "meaning": "Unique Device Identifier",
+   "options": {
+    "retainDeviceIdentity": "K"
+   },
+   "retired": false,
+   "scheme": "LN",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "15",
+   "meaning": "Admission DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "NCDR [2.0b]",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "D",
+   "codeValue": "52",
+   "meaning": "Procedure DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "NCDR [2.0b]",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "53",
+   "meaning": "Procedure Number in this admission",
+   "retired": false,
+   "scheme": "NCDR [2.0b]",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "D",
+   "codeValue": "76",
+   "meaning": "Catheterization Operator",
+   "retired": false,
+   "scheme": "NCDR [2.0b]",
+   "valueType": "PNAME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "C54627",
+   "meaning": "Experience",
+   "retired": false,
+   "scheme": "NCIt",
+   "valueType": "NUM"
+  },
+  {
+   "basic": "X",
+   "codeValue": "C67447",
+   "meaning": "Activity Session",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "NCIt",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "116224001",
+   "meaning": "Complication of Procedure",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "SCT",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "160476009",
+   "meaning": "Social History",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "SCT",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X/D",
+   "codeValue": "271921002",
+   "meaning": "ECG Finding",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "SCT",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "D",
+   "codeValue": "363698007",
+   "meaning": "Finding Site",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "SCT",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X",
+   "codeValue": "371524004",
+   "meaning": "Clinical Report",
+   "options": {
+    "retainUIDs": "K"
+   },
+   "retired": false,
+   "scheme": "SCT",
+   "valueType": "COMPOSITE"
+  },
+  {
+   "basic": "X",
+   "codeValue": "371524004",
+   "meaning": "Clinical Report",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "SCT",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "D",
+   "codeValue": "397898000",
+   "meaning": "Stop DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "SCT",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "398164008",
+   "meaning": "Anesthesia Finish Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "SCT",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "D",
+   "codeValue": "398201009",
+   "meaning": "Start DateTime",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "SCT",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "X",
+   "codeValue": "398325003",
+   "meaning": "Anesthesia Start Time",
+   "options": {
+    "retainLongitudinalFullDates": "K",
+    "retainLongitudinalModifiedDates": "C"
+   },
+   "retired": false,
+   "scheme": "SCT",
+   "valueType": "DATETIME"
+  },
+  {
+   "basic": "D",
+   "codeValue": "440252007",
+   "meaning": "Administration of radiopharmaceutical",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "SCT",
+   "valueType": "TEXT"
+  },
+  {
+   "basic": "X/D",
+   "codeValue": "C2348792",
+   "meaning": "Time Point",
+   "options": {
+    "cleanDescriptors": "C"
+   },
+   "retired": false,
+   "scheme": "UMLS",
+   "valueType": "TEXT"
+  }
+ ],
  "version": "2026c"
 }

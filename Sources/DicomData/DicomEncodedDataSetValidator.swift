@@ -101,6 +101,9 @@ public enum DicomEncodedDataSetValidator {
             code = .ambiguousVR
             severity = .limitation
         case .incompatibleVR: code = .incompatibleVR
+        case .trailingBytesAfterPixelData:
+            code = .invalidDataSetStructure
+            layer = .structure
         }
         return .init(code: code, severity: severity, layer: layer, path: diagnostic.path)
     }

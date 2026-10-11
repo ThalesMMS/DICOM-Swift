@@ -157,7 +157,7 @@ final class DicomJ2KSwiftBackendTests: XCTestCase {
         XCTAssertEqual(capabilities.source, .packageLinked)
         XCTAssertEqual(capabilities.executionClass, .cpu)
         XCTAssertEqual(capabilities.supportedGrayscaleBitDepths, 1...16)
-        XCTAssertEqual(capabilities.supportedColorBitDepths, 1...8)
+        XCTAssertEqual(capabilities.supportedColorBitDepths, 1...16)
         // #2330: the five frame syntaxes (.90/.91 and .201/.202/.203) are qualified for decode and encode alike;
         // #2331 adds the two Part 2 collection syntaxes (experimental, frames as components).
         XCTAssertEqual(capabilities.transferSyntaxUIDs,

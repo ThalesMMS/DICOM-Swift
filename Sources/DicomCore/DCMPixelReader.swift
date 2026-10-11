@@ -50,6 +50,8 @@ internal struct DCMPixelReadResult {
     var bitDepth: Int
     /// Actual samples per pixel (may differ from header for compressed images)
     var samplesPerPixel: Int
+    /// Interleaved 9- to 16-bit RGB samples as decoded (issue #3034); nil for every other layout.
+    var pixels48: [UInt16]? = nil
 }
 
 /// Reader for DICOM pixel data.

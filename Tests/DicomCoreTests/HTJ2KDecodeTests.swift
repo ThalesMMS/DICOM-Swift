@@ -147,11 +147,19 @@ final class HTJ2KDecodeTests: XCTestCase {
 
     func testHTJ2KColorAndDepthLimitsMatchTheJPEG2000Pipeline() throws {
         try Self.skipUnlessHTJ2KSupported()
-        let deepColor = DicomCompressedPixelBackendResolver.resolve(
+        // 16-bit RGB reaches the decoder since issue #3034; deeper YBR stays refused.
+        let deepRGB = DicomCompressedPixelBackendResolver.resolve(
             transferSyntax: .htj2k,
             requestedBitDepth: 16,
             samplesPerPixel: 3,
             photometricInterpretation: "RGB"
+        )
+        XCTAssertEqual(deepRGB.backend, .openJPEGHTJ2K)
+        let deepColor = DicomCompressedPixelBackendResolver.resolve(
+            transferSyntax: .htj2k,
+            requestedBitDepth: 16,
+            samplesPerPixel: 3,
+            photometricInterpretation: "YBR_FULL"
         )
         XCTAssertEqual(deepColor.backend, .unsupported)
         XCTAssertTrue(deepColor.diagnostics.joined().contains("color output above 8 bits"))

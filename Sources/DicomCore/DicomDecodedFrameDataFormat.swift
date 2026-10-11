@@ -6,4 +6,7 @@ public enum DicomDecodedFrameDataFormat: String, Equatable, Sendable {
     case gray16NormalizedUnsigned
     /// Interleaved 8-bit red, green, and blue component samples.
     case rgb8Interleaved
+    /// Interleaved 16-bit little-endian red, green, and blue stored samples, right-aligned to Bits Stored
+    /// (issue #3034).
+    case rgb16Interleaved
 }

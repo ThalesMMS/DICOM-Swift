@@ -14,8 +14,8 @@ internal enum DicomRLELosslessDecoder {
             throw DICOMError.invalidPixelData(reason: "RLE supports only 8-bit and 16-bit samples in this decoder")
         }
         guard (samplesPerPixel == 1 && (pixelRepresentation == 0 || pixelRepresentation == 1))
-                || (samplesPerPixel == 3 && bitsAllocated == 8 && pixelRepresentation == 0) else {
-            throw DICOMError.invalidPixelData(reason: "RLE supports grayscale samples or 8-bit RGB samples")
+                || (samplesPerPixel == 3 && pixelRepresentation == 0) else {
+            throw DICOMError.invalidPixelData(reason: "RLE supports grayscale samples or unsigned 8/16-bit three-sample colour")
         }
         guard let metrics = DCMPixelReader.computePixelMetrics(
             width: width,
@@ -93,6 +93,29 @@ internal enum DicomRLELosslessDecoder {
                 height: height,
                 bitDepth: bitsAllocated,
                 samplesPerPixel: samplesPerPixel
+            )
+        }
+
+        if bytesPerSample == 2 {
+            // PS3.5 G.2: one segment per byte of each sample, most significant byte first, samples in order
+            // (R high, R low, G high, G low, B high, B low); the words come out interleaved (issue #3034).
+            var rgb = [UInt16](repeating: 0, count: pixelCount * 3)
+            for index in 0..<pixelCount {
+                for sample in 0..<3 {
+                    rgb[index * 3 + sample] = (UInt16(decodedSegments[sample * 2][index]) << 8)
+                        | UInt16(decodedSegments[sample * 2 + 1][index])
+                }
+            }
+            return DCMPixelReadResult(
+                pixels8: nil,
+                pixels16: nil,
+                pixels24: nil,
+                signedImage: false,
+                width: width,
+                height: height,
+                bitDepth: bitsAllocated,
+                samplesPerPixel: samplesPerPixel,
+                pixels48: rgb
             )
         }
 

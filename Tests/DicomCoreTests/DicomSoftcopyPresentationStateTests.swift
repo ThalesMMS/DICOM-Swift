@@ -474,7 +474,8 @@ final class DicomSoftcopyPresentationStateTests: XCTestCase {
 
     private func presentationStateData(
         sopClassUID: String,
-        includesPalette: Bool
+        includesPalette: Bool,
+        adding extra: (inout DicomDataSet) -> Void = { _ in }
     ) throws -> Data {
         var dataSet = try DicomGrayscalePresentationStateBuilder.dataSet(
             referencedSeries: [
@@ -519,6 +520,7 @@ final class DicomSoftcopyPresentationStateTests: XCTestCase {
             setPalette([65_535, 43_690, 21_845, 0], tag: .greenPalette, in: &dataSet)
             setPalette([0, 65_535, 65_535, 0], tag: .bluePalette, in: &dataSet)
         }
+        extra(&dataSet)
         return try DicomDataSetWriter.part10Data(
             from: dataSet,
             options: DicomPart10WriterOptions(
@@ -568,5 +570,45 @@ final class DicomSoftcopyPresentationStateTests: XCTestCase {
             vr: .OW,
             value: .bytes(Data(bytes))
         ))
+    }
+}
+
+// MARK: - Bitmap shutter overlay group (issue #3017)
+
+extension DicomSoftcopyPresentationStateTests {
+    /// A 4×4 overlay with one set bit at Overlay Origin (2,3), used as the bitmap shutter of `shutterGroup`.
+    private func bitmapShutterState(overlayGroup: Int, shutterGroup: Int) throws -> DicomGrayscalePresentationState {
+        let base = overlayGroup << 16
+        let data = try presentationStateData(sopClassUID: "1.2.840.10008.5.1.4.1.1.11.1", includesPalette: false) { dataSet in
+            dataSet.set(DicomDataElement(tag: base | 0x0010, vr: .US, value: .unsignedIntegers([4])))
+            dataSet.set(DicomDataElement(tag: base | 0x0011, vr: .US, value: .unsignedIntegers([4])))
+            dataSet.set(DicomDataElement(tag: base | 0x0040, vr: .CS, value: .strings(["G"])))
+            dataSet.set(DicomDataElement(tag: base | 0x0050, vr: .SS, value: .signedIntegers([2, 3])))
+            dataSet.set(DicomDataElement(tag: base | 0x0100, vr: .US, value: .unsignedIntegers([1])))
+            dataSet.set(DicomDataElement(tag: base | 0x0102, vr: .US, value: .unsignedIntegers([0])))
+            dataSet.set(DicomDataElement(tag: base | 0x3000, vr: .OW, value: .bytes(Data([0x01, 0x00]))))
+            dataSet.set(DicomDataElement(tag: 0x0018_1600, vr: .CS, value: .strings(["BITMAP"])))
+            dataSet.set(DicomDataElement(tag: 0x0018_1623, vr: .US, value: .unsignedIntegers([UInt(shutterGroup)])))
+            dataSet.set(DicomDataElement(tag: 0x0018_1622, vr: .US, value: .unsignedIntegers([0])))
+        }
+        return try XCTUnwrap(try DCMDecoder(data: data).grayscalePresentationState)
+    }
+
+    func test_bitmapShutter_evenOverlayGroupIsParsedWithAZeroBasedOrigin() throws {
+        let state = try bitmapShutterState(overlayGroup: 0x6002, shutterGroup: 0x6002)
+        guard case .bitmap(let bitmap)? = state.shutters.first else { return XCTFail("\(state.shutters)") }
+        XCTAssertEqual(bitmap.overlayGroup, 0x6002)
+        XCTAssertEqual(bitmap.originRow, 1, "Overlay Origin is 1-based; the shutter carries it 0-based")
+        XCTAssertEqual(bitmap.originColumn, 2)
+        XCTAssertFalse(state.diagnostics.contains { $0.code.contains("shutter") }, "\(state.diagnostics)")
+    }
+
+    func test_bitmapShutter_oddOrOutOfRangeOverlayGroupIsIgnoredWithADiagnostic() throws {
+        for group in [0x6001, 0x6020, 0x5000] {
+            let state = try bitmapShutterState(overlayGroup: 0x6000, shutterGroup: group)
+            XCTAssertTrue(state.shutters.isEmpty, String(format: "%04X", group))
+            XCTAssertEqual(state.diagnostics.filter { $0.code.contains("shutter") }.map(\.code), ["invalid-shutter-overlay-group"],
+                           String(format: "%04X: %@", group, "\(state.diagnostics)"))
+        }
     }
 }

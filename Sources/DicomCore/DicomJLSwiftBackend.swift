@@ -55,7 +55,9 @@ struct DicomJLSwiftBackend: DicomFrameCodecBackend {
         encodeTransferSyntaxUIDs: transferSyntaxes,
         operations: [.decode, .encode],
         supportedGrayscaleBitDepths: 8...16,
-        supportedColorBitDepths: 8...8,
+        // Colour decodes up to 16 bits since issue #3034 (unsigned RGB); `validateEncoding` still limits colour
+        // encoding to unsigned RGB8.
+        supportedColorBitDepths: 8...16,
         maximumComponents: 3,
         supportsSignedSamples: true,
         executionClass: .cpu,
@@ -220,6 +222,13 @@ struct DicomJLSwiftBackend: DicomFrameCodecBackend {
             )
         }
         try validateDescriptor(descriptor)
+        // 16-bit colour is a decode capability only (issue #3034): the encoder stays qualified for RGB8.
+        guard descriptor.samplesPerPixel == 1 || descriptor.bitsAllocated == 8 else {
+            throw DicomJLSwiftBackendError.unsupportedShape(
+                transferSyntaxUID: targetTransferSyntaxUID,
+                reason: "multi-component JPEG-LS encoding is qualified only for unsigned RGB8"
+            )
+        }
         let near = try nearParameter(for: intent, transferSyntaxUID: targetTransferSyntaxUID)
         var interleave: JPEGLSInterleaveMode = descriptor.samplesPerPixel == 1 ? .none : .sample
         var restartLines = 0
@@ -281,15 +290,15 @@ struct DicomJLSwiftBackend: DicomFrameCodecBackend {
                 )
             }
         } else {
+            // 16-bit colour decodes as unsigned RGB since issue #3034.
             guard descriptor.samplesPerPixel == 3,
-                  descriptor.bitsAllocated == 8,
-                  descriptor.bitsStored <= 8,
+                  descriptor.bitsAllocated == 8 && descriptor.bitsStored <= 8 || descriptor.bitsAllocated == 16,
                   descriptor.pixelRepresentation == 0,
                   photometric == "RGB",
                   descriptor.planarConfiguration == 0 || descriptor.planarConfiguration == 1 else {
                 throw DicomJLSwiftBackendError.unsupportedShape(
                     transferSyntaxUID: uid,
-                    reason: "multi-component JPEG-LS is qualified only for unsigned RGB8 with Planar Configuration 0 or 1"
+                    reason: "multi-component JPEG-LS is qualified only for unsigned RGB (8 or 16 bits allocated) with Planar Configuration 0 or 1"
                 )
             }
         }
@@ -439,6 +448,22 @@ struct DicomJLSwiftBackend: DicomFrameCodecBackend {
                 transferSyntaxUID: descriptor.transferSyntaxUID,
                 reason: "decoded RGB component dimensions do not match Rows and Columns"
             )
+        }
+        if descriptor.bitsAllocated == 16 {
+            // 16-bit colour (issue #3034): interleaved little-endian words.
+            var words = Data(count: pixelCount * 6)
+            words.withUnsafeMutableBytes { (target: UnsafeMutableRawBufferPointer) in
+                for component in 0..<3 {
+                    planes[component].withUnsafeBufferPointer { plane in
+                        for index in 0..<pixelCount {
+                            let offset = (index * 3 + component) * 2
+                            target[offset] = UInt8(truncatingIfNeeded: plane[index])
+                            target[offset + 1] = UInt8(truncatingIfNeeded: plane[index] >> 8)
+                        }
+                    }
+                }
+            }
+            return words
         }
         var bytes = [UInt8](repeating: 0, count: pixelCount * 3)
         bytes.withUnsafeMutableBufferPointer { target in

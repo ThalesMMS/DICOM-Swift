@@ -426,8 +426,11 @@ public final class DicomWebServer: DicomWebHTTPTransport, Sendable {
             if let authorizer, await authorizer.policyVersion < 0 {
                 throw DicomWebServerFailure(503, "Authorization unavailable.")
             }
+            let authenticated = authentication != nil || (principal != nil && principal?.kind != .anonymous
+                && principal?.source != DicomPrincipal.Source.none)
             return try await DicomRequestAuthorization.$current.withValue(access) {
-                try await dispatchAuthorized(request, body: body)
+                applyingConditionalGET(try await dispatchAuthorized(request, body: body), request: request,
+                                       authenticated: authenticated)
             }
         } catch let failure as DicomWebServerFailure {
             return streamed(error(failure.status, failure.message))
@@ -480,7 +483,8 @@ public final class DicomWebServer: DicomWebHTTPTransport, Sendable {
             if path == ["wado"] { return streamed(try await wadoURI(request)) }
             if path.first == "bulkdata" { return streamed(try await bulkData(request, path: path)) }
             if let query = try searchParameters(request, path: path) {
-                return streamed(try await search(request, parameters: query.parameters, ignored: query.ignored))
+                return streamed(taggingBody(try await search(request, parameters: query.parameters, ignored: query.ignored),
+                                            request: request))
             }
             return try await retrieve(request, path: path)
     }

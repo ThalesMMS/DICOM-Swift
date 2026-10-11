@@ -129,6 +129,40 @@ final class DicomTranscoderTests: XCTestCase {
                        "a Big Endian source must not come back with its sample bytes swapped (3 read as 768)")
     }
 
+    /// Binary values wider than a byte besides Pixel Data change byte order with the transfer syntax too, inside
+    /// sequences as well (PS3.5 7.3, issue #3012): a Palette Color LUT and a VOI LUT in OW, and an OV value.
+    func test_byteOrderRewrite_swapsOtherWordValuesBothWays() throws {
+        let source = try Self.makeNativeFile(storedValues: [-1000, -500, 3, 250], extraElements: [
+            DicomDataElement(tag: 0x0028_1201, vr: .OW, value: .unsignedIntegers([0x0102, 0x0304])),
+            DicomDataElement(tag: 0x0028_3010, vr: .SQ, value: .sequence([DicomSequenceItem(dataSet: DicomDataSet(elements: [
+                DicomDataElement(tag: 0x0028_3002, vr: .US, value: .unsignedIntegers([2, 0, 16])),
+                DicomDataElement(tag: 0x0028_3006, vr: .OW, value: .unsignedIntegers([0x0A0B, 0x0C0D])),
+            ]))])),
+            DicomDataElement(tag: 0x0009_1010, vr: .OV, value: .unsignedIntegers([0x0102_0304_0506_0708])),
+        ])
+        func words(_ data: Data) throws -> (palette: Data?, lut: Data?, ov: Data?) {
+            let dataSet = try Self.open(data).dataSet
+            let lutItem: DicomDataSet?
+            if case .sequence(let items) = dataSet[0x0028_3010]?.value { lutItem = items.first?.dataSet } else { lutItem = nil }
+            func bytes(_ element: DicomDataElement?) -> Data? {
+                if case .bytes(let value) = element?.value { return value }
+                return nil
+            }
+            return (bytes(dataSet[0x0028_1201]), bytes(lutItem?[0x0028_3006]), bytes(dataSet[0x0009_1010]))
+        }
+
+        let bigEndian = try DicomTranscoder().transcode(source, to: .explicitVRBigEndian)
+        let big = try words(bigEndian)
+        XCTAssertEqual(big.palette, Data([0x01, 0x02, 0x03, 0x04]), "Palette Color LUT Data in Big Endian order")
+        XCTAssertEqual(big.lut, Data([0x0A, 0x0B, 0x0C, 0x0D]), "LUT Data inside a sequence in Big Endian order")
+        XCTAssertEqual(big.ov, Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]), "OV in Big Endian order")
+
+        let little = try words(try DicomTranscoder().transcode(bigEndian, to: .explicitVRLittleEndian))
+        XCTAssertEqual(little.palette, Data([0x02, 0x01, 0x04, 0x03]))
+        XCTAssertEqual(little.lut, Data([0x0B, 0x0A, 0x0D, 0x0C]))
+        XCTAssertEqual(little.ov, Data([0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01]))
+    }
+
     func testNativeRewriteDoesNotInventPixelDataForStructuredReport() throws {
         let sopClassUID = "1.2.840.10008.5.1.4.1.1.88.11"
         let sopInstanceUID = "2.25.1869"
@@ -775,7 +809,8 @@ final class DicomTranscoderTests: XCTestCase {
 
     private static func makeNativeFile(
         storedValues: [Int],
-        photometricInterpretation: String = "MONOCHROME2"
+        photometricInterpretation: String = "MONOCHROME2",
+        extraElements: [DicomDataElement] = []
     ) throws -> Data {
         var pixelData = Data()
         for value in storedValues {
@@ -797,6 +832,7 @@ final class DicomTranscoderTests: XCTestCase {
         )
         dataSet.set(DicomDataElement(tag: DicomTag.patientName.rawValue, vr: .PN, value: .strings(["PARITY^TRANSCODE"])))
         dataSet.set(DicomDataElement(tag: DicomTag.pixelData.rawValue, vr: .OW, value: .bytes(pixelData)))
+        extraElements.forEach { dataSet.set($0) }
         return try DicomDataSetWriter.part10Data(
             from: dataSet,
             options: DicomPart10WriterOptions(

@@ -176,8 +176,14 @@ final class RLEDeflateCodecTests: XCTestCase {
             if [8, 16].contains(fixture.bits), fixture.samples == 1 || fixture.bits == 8 {
                 XCTAssertEqual(try decodedFrames(out), try decodedFrames(fixture.object), "\(label): typed frames match the native decode")
             } else {
-                XCTAssertThrowsError(try decodedFrames(out), "\(label): shapes outside the typed pipeline fail typed")
-                XCTAssertThrowsError(try decodedFrames(fixture.object), label)
+                // Issue #3034: native 1-bit and 16-bit RGB frames are typed; the deflated-frame decoder keeps its
+                // gray8/gray16/rgb8 envelope (GDCM has no decoder for 1.2.840.10008.1.2.8.1 to compare with).
+                XCTAssertThrowsError(try decodedFrames(out), "\(label): shapes outside the deflated-frame decoder fail typed")
+                if fixture.bits == 1 || fixture.bits == 16 && fixture.samples == 3 {
+                    XCTAssertNoThrow(try decodedFrames(fixture.object), label)
+                } else {
+                    XCTAssertThrowsError(try decodedFrames(fixture.object), label)
+                }
             }
         }
         // Big-endian 16-bit sources go through the decoded path, so the frames come out little endian.
@@ -375,7 +381,8 @@ final class RLEDeflateCodecTests: XCTestCase {
         XCTAssertThrowsError(try DicomRLECodec.encodeFrame(Data(count: 4 * 6 * 4 * 4), width: 6, height: 4, samplesPerPixel: 4, bytesPerSample: 4)) { error in
             XCTAssertEqual(error as? DicomRLECodec.EncodeFailure, .tooManySegments(16))
         }
-        for (bits, samples) in [(32, 1), (16, 3), (1, 1), (8, 4)] {
+        // 16-bit three-sample frames decode since issue #3034 (`DicomDeepColorTypedFrameTests`).
+        for (bits, samples) in [(32, 1), (1, 1), (8, 4)] {
             XCTAssertThrowsError(try DicomRLELosslessDecoder.decode(frame: frame, width: 6, height: 4, bitsAllocated: bits, samplesPerPixel: samples,
                                                                     pixelRepresentation: 0, photometricInterpretation: "RGB"), "\(bits)/\(samples)") { error in
                 guard case DICOMError.invalidPixelData = error else { return XCTFail("\(error)") }
@@ -564,7 +571,7 @@ final class RLEDeflateCodecTests: XCTestCase {
         let reader = DicomDecodedFrameReader(decoder: decoder)
         return try (0..<max(1, reader.frameCount)).map { index -> Data in
             switch try reader.frame(at: index).pixels {
-            case .gray16(let values): return values.withUnsafeBufferPointer { Data(buffer: $0) }
+            case .gray16(let values), .rgb16(let values): return values.withUnsafeBufferPointer { Data(buffer: $0) }
             case .gray8(let values): return Data(values)
             case .rgb8(let values): return Data(values)
             }

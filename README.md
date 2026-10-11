@@ -2004,7 +2004,7 @@ autoreleasepool {
 
 ### Known Limitations
 
-- Compressed and referenced transfer syntaxes: inspect `DicomTransferSyntaxRegistry.standard.compressedPixelSupportMatrix` for the explicit status of every compressed pixel syntax. JPEG Lossless, RLE, and JPEG Extended 12-bit grayscale are `decoded` natively. JPEG Baseline, JPEG Extended <=8-bit, JPEG-LS, JPEG 2000, and JPEG 2000 Part 2 are `delegated` to ImageIO, JLSwift, CharLS, J2KSwift, OpenJPEG, or `DicomJP3DVolumeDocument` with documented limits. JLSwift 0.9.1 is qualified for async JPEG-LS .80/.81 on aligned 8–16-bit grayscale and RGB8, defaults to the own DicomJPEGLS backend, and can be disabled with `DICOM_JLSWIFT_MODE=disabled`; lower-depth grayscale and >8-bit color remain typed exclusions. J2KSwift 11.0.2 is qualified for the two JPEG 2000 frame UIDs through the async reader, defaults to the own DicomJPEG2000 backend, and can be disabled with `DICOM_J2KSWIFT_MODE=disabled`. The same .90/.91 path supports ROI, resolution and cumulative quality-layer requests, including the qualified combined profiles recorded in the partial-decode evidence. These operations consume a complete local codestream and are not JPIP or arbitrary-prefix streaming. HTJ2K .201–.203 decode uses the own qualified CPU backend; OpenJPEG is an optional fallback for other eligible profiles. Encoding is a separate CPU-only qualification: the async `DicomTranscoder` accepts reversible or explicit NEAR intent for JPEG-LS .80/.81 and explicit reversible or irreversible intent for JPEG 2000 .90/.91 and HTJ2K .201-.203; JPEG 2000 Part 2 .92/.93 uses the bounded multi-component profiles described by `DicomJ2KPart2Profile`; arbitrary Part 2 transforms are not implied. JPIP `.94/.95/.204/.205` uses the bounded stateless complete-entity profile documented in `DISTRIBUTION.md`; JPIP and video syntaxes are `streamed-only`, and Deflated Explicit VR Little Endian is dataset-level zlib compression.
+- Compressed and referenced transfer syntaxes: inspect `DicomTransferSyntaxRegistry.standard.compressedPixelSupportMatrix` for the explicit status of every compressed pixel syntax. JPEG Lossless, RLE, and JPEG Extended 12-bit grayscale are `decoded` natively. JPEG Baseline, JPEG Extended <=8-bit, JPEG-LS, JPEG 2000, and JPEG 2000 Part 2 are `delegated` to ImageIO, JLSwift, CharLS, J2KSwift, OpenJPEG, or `DicomJP3DVolumeDocument` with documented limits. JLSwift 0.9.1 is qualified for async JPEG-LS .80/.81 on aligned 8–16-bit grayscale and RGB8, defaults to the own DicomJPEGLS backend, and can be disabled with `DICOM_JLSWIFT_MODE=disabled`; lower-depth grayscale and >8-bit color remain typed exclusions. J2KSwift 11.0.2 is qualified for the two JPEG 2000 frame UIDs through the async reader, defaults to the own DicomJPEG2000 backend, and can be disabled with `DICOM_J2KSWIFT_MODE=disabled`. `DicomSeriesLoader` volume builds (series, Enhanced and classic multi-frame) decode .90/.91 and HTJ2K slices through that same async selection (issue #3050), so the full build equals the stream and needs no OpenJPEG runtime. The same .90/.91 path supports ROI, resolution and cumulative quality-layer requests, including the qualified combined profiles recorded in the partial-decode evidence. These operations consume a complete local codestream and are not JPIP or arbitrary-prefix streaming. HTJ2K .201–.203 decode uses the own qualified CPU backend; OpenJPEG is an optional fallback for other eligible profiles. Encoding is a separate CPU-only qualification: the async `DicomTranscoder` accepts reversible or explicit NEAR intent for JPEG-LS .80/.81 and explicit reversible or irreversible intent for JPEG 2000 .90/.91 and HTJ2K .201-.203; JPEG 2000 Part 2 .92/.93 uses the bounded multi-component profiles described by `DicomJ2KPart2Profile`; arbitrary Part 2 transforms are not implied. JPIP `.94/.95/.204/.205` uses the bounded stateless complete-entity profile documented in `DISTRIBUTION.md`; JPIP and video syntaxes are `streamed-only`, and Deflated Explicit VR Little Endian is dataset-level zlib compression.
 - The external Raster-Lab packages are absent from the production and test resolution graph. Selected JLISwift source is incorporated as DicomJPEG; the previous candidate DEFER review retains historical GDCM EOT-only evidence. Current JPEG support and refusals are documented in `DISTRIBUTION.md`. `DISTRIBUTION.md` records preserved Apache-2.0, libjxl and IJG materials and distinguishes the unknown original libjpeg port revision from the retained comparison snapshot.
 - JPEG XL UIDs .110/.111/.112 are explicitly `experimental`. The vendored DicomJPEGXL codec remains disabled unless `DICOM_JXLSWIFT_MODE=experimental`; the own Modular lossless routes cover Bits Stored 1–16 grayscale (signed through a Pixel Representation level shift), RGB8 (colour above 8 bits at codec level only), the DICOM ICC Profile embedded in the codestream, and byte-identical JPEG recompression (own reconstruction reader/writer for SOF0/SOF1/SOF2 Huffman JPEG, exact against the source and `djxl` in every direction, `.111` ↔ `.50`/`.51` without decoding for SOF0/SOF1 respectively; progressive SOF2 is refused under both UIDs), exact against libjxl in both directions; the own VarDCT decoder reads lossy `.112` streams (progressive DC/AC, resampling, noise, lossy Modular, custom quantisation) within one code of libjxl and lossy output is written only for an explicit `DicomEncodingIntent.jpegXL(options:)` distance with the derivation record; the 8/12/16-bit grayscale and RGB8 encoder meets size ≤ 1.25× cjxl and PSNR ≥ cjxl − 0.5 dB on the declared 68-case corpus at the same distance and effort 7 (`DISTRIBUTION.md`). The decoder meets the eight-case single-thread Release budget of ≤ 3× `djxl` (maximum 2.464×, process/PNM IO included for `djxl`), preserving all 68 decoded output hashes and DC/AC group cancellation. The `.111` bridge also meets its eight-case Release budget of ≤ 5× cjxl/djxl (maximum 4.727× to recompress and 2.925× to reconstruct), with 25/25 accepted JXL output hashes unchanged and exact JPEG reconstruction (`DISTRIBUTION.md`). The #2378 matrix cell `codec.jxl.vardct.excluded-profiles` lists tested refusals for patches/splines, nonzero AC in six DCT128/256 strategies, upsampled extra channels, custom geometry/opsin, standalone DC extraction, more than eight DC frames, lossy animation beyond its first image, blending and Modular XYB EPF; RGB above 8 bits stays outside the DICOM frame contract. Implicit DIMSE negotiation and sole clinical archive use remain excluded.
 - Color display conversion: inspect `DicomColorDisplayConversionMatrix.standard` separately from compressed pixel support. `displayRGBPixelBuffer(frame:)` converts supported MONOCHROME1, MONOCHROME2, RGB, PALETTE COLOR, YBR_FULL, and YBR_FULL_422 native frames to interleaved RGB8 display data. Unsupported YBR variants, alpha/extra samples, unsupported planar layouts, and unsupported bit depths throw `DicomColorConversionError.unsupportedColorPath` with photometric interpretation, samples per pixel, planar configuration, bits allocated, and transfer syntax context.
@@ -2078,11 +2078,14 @@ Viewer repository so the package and its callers remain on one tested commit.
 3. Create a feature branch (`git checkout -b feature/MyFeature`).
 4. Update code under `DICOM-Swift/Sources/DicomCore/` and add tests under
    `DICOM-Swift/Tests/`.
-5. Run the tests:
+5. Build and run the affected tests, selecting the class or method relevant to
+   the change. For example, a DICOMweb contract change uses:
    ```bash
-   swift test --package-path DICOM-Swift
+   swift test --package-path DICOM-Swift --filter DicomWebContractCorpusTests
    swift build --package-path DICOM-Swift
    ```
+   Follow [the parent testing policy](../TESTING.md). A complete suite requires
+   an explicit maintainer instruction for that execution.
 6. Commit with a clear message.
 7. Push to your branch.
 8. Open the pull request against `ThalesMMS/Isis-DICOM-Viewer`.
@@ -2283,3 +2286,20 @@ object so later steps observe the same sequence of changes, while filesystem wri
 The reference `dicom-*`/HL7CLI family mapping belongs to application
 qualification records. Standalone consumers use the command descriptions here
 and the package scripts; see [Distribution](DISTRIBUTION.md) for the limits.
+
+### Legacy WADO-RS Part 10 framing
+
+`DicomWebClientConfiguration.multipartCompatibility` defaults to `.strict`.
+For a known node, `.pixeonLegacyFraming` opts into the observed envelope that
+starts with part headers and omits CRLF before subsequent delimiters.
+`.identifiedPixeonLegacyFraming` additionally requires the response's `Server`
+header to identify the `DicomWebServices ` family. Valid MIME still uses the
+strict decoder in both modes.
+
+Recovery validates bounded ASCII MIME headers and Part 10 File Meta, then walks
+DICOM element lengths, undefined sequences and encapsulated fragments. It never
+searches inside value bytes or rewrites payloads. Truncated, conflicting or
+ambiguous framing is rejected. Implicit VR and deflated datasets, non-Part-10 bodies, MIME root
+selection and arbitrary epilogues are outside this narrow compatibility profile.
+Existing multipart size/count budgets apply to original wire bytes and payloads;
+structural traversal also limits nesting to 64 and element headers to 1,000,000.

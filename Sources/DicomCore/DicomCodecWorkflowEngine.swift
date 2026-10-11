@@ -665,7 +665,7 @@ public struct DicomCodecWorkflowEngine: Sendable {
         switch pixels {
         case .gray8(let values), .rgb8(let values):
             return Data(values)
-        case .gray16(let values):
+        case .gray16(let values), .rgb16(interleaved: let values):
             var data = Data(capacity: values.count * MemoryLayout<UInt16>.size)
             for value in values {
                 var littleEndian = value.littleEndian

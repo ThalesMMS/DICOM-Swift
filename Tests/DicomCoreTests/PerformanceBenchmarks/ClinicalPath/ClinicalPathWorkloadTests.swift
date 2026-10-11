@@ -75,7 +75,7 @@ final class ClinicalPathWorkloadTests: XCTestCase {
     private static func decodedBytes(_ frame: DicomDecodedFrame) -> Data {
         switch frame.pixels {
         case .gray8(let pixels): return Data(pixels)
-        case .gray16(let pixels): return pixels.withUnsafeBufferPointer { Data(buffer: $0) }
+        case .gray16(let pixels), .rgb16(let pixels): return pixels.withUnsafeBufferPointer { Data(buffer: $0) }
         case .rgb8(let interleaved): return Data(interleaved)
         }
     }

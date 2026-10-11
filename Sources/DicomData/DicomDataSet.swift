@@ -265,8 +265,10 @@ public struct DicomDataElement: Equatable, Sendable {
         tag & 0xFFFF
     }
 
+    /// PS3.5 7.1: an odd group is private, except 0001, 0003, 0005, 0007 and FFFF, which may not be used.
+    /// De-identification removes every odd group with its own rule.
     public var isPrivate: Bool {
-        (group & 1) == 1
+        (group & 1) == 1 && group > 0x0007 && group != 0xFFFF
     }
 
     public var vm: DicomVM {

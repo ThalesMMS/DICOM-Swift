@@ -354,11 +354,19 @@ public struct DicomSeriesVolume: Sendable {
     /// Per-slice rescale parameters in the same order as the assembled voxel buffer.
     public let sliceRescaleParameters: [DicomSliceRescaleParameters]
 
-    /// Per-slice Frame VOI values in the same order as the assembled voxel buffer.
+    /// Per-slice VOI values in the same order as the assembled voxel buffer: the Frame VOI LUT functional group of
+    /// an Enhanced frame, the image's own window and VOI LUT Sequence for a classic slice (issue #3037).
     public let sliceVOIs: [DicomFrameVOI?]
 
     /// Original Enhanced object/frame identities, in voxel slice order.
     public let enhancedFrameReferences: [DicomEnhancedFrameCollection.Reference]
+
+    /// Units (0054,1001) of the modality values, such as BQML or CNTS, when the objects declare them (issue #3037).
+    public let units: String?
+
+    /// Where the slice order, slice interval, in-plane spacing and orientation come from; nil when the producer
+    /// did not report it (issue #3037).
+    public let geometryProvenance: DicomSeriesVolumeGeometryProvenance?
 
     public init(voxels: Data,
                 width: Int,
@@ -384,7 +392,9 @@ public struct DicomSeriesVolume: Sendable {
                 imageInstances: [DicomSeriesImageInstance] = [],
                 sliceRescaleParameters: [DicomSliceRescaleParameters] = [],
                 sliceVOIs: [DicomFrameVOI?] = [],
-                enhancedFrameReferences: [DicomEnhancedFrameCollection.Reference] = []) {
+                enhancedFrameReferences: [DicomEnhancedFrameCollection.Reference] = [],
+                units: String? = nil,
+                geometryProvenance: DicomSeriesVolumeGeometryProvenance? = nil) {
         self.voxels = voxels
         self.width = width
         self.height = height
@@ -410,6 +420,8 @@ public struct DicomSeriesVolume: Sendable {
         self.sliceRescaleParameters = sliceRescaleParameters
         self.sliceVOIs = sliceVOIs
         self.enhancedFrameReferences = enhancedFrameReferences
+        self.units = units
+        self.geometryProvenance = geometryProvenance
     }
 }
 
@@ -450,6 +462,7 @@ struct SliceMeta {
     let rescaleSlope: Double
     let rescaleIntercept: Double
     let pixelFormat: DicomSeriesLoaderPixelFormat
+    let voi: DicomFrameVOI?
 
     init(url: URL,
          position: SIMD3<Double>?,
@@ -463,7 +476,8 @@ struct SliceMeta {
          sopInstanceUID: String? = nil,
          rescaleSlope: Double = 1,
          rescaleIntercept: Double = 0,
-         pixelFormat: DicomSeriesLoaderPixelFormat = .defaultGrayscale16) {
+         pixelFormat: DicomSeriesLoaderPixelFormat = .defaultGrayscale16,
+         voi: DicomFrameVOI? = nil) {
         self.url = url
         self.position = position
         self.instanceNumber = instanceNumber
@@ -477,6 +491,7 @@ struct SliceMeta {
         self.rescaleSlope = rescaleSlope
         self.rescaleIntercept = rescaleIntercept
         self.pixelFormat = pixelFormat
+        self.voi = voi
     }
 }
 
@@ -756,6 +771,10 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
         var seriesInstanceUID: String?
         var frameOfReferenceUID: String?
         var quantitativeValueProfile: DicomQuantitativeValueProfile = .empty
+        var units: String?
+        var isInPlaneSpacingCalibrated = false
+        var headerSpacingSource: DicomSeriesVolumeGeometryProvenance.SliceSpacingSource = .defaultValue
+        var everySliceDeclaresOrientation = true
 
         var width = 0
         var height = 0
@@ -802,7 +821,7 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
             }
 
             let pixelFormat = pixelFormat(from: decoder)
-            try validatePixelFormat(pixelFormat)
+            try validatePixelFormat(pixelFormat, decoder: decoder)
 
             // Cache the validated decoder for reuse in second pass
             cacheDecoder(decoder, for: url)
@@ -824,10 +843,14 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
                 }
 
                 origin = decoder.imagePosition
+                isInPlaneSpacingCalibrated = hasDeclaredPixelSpacing(decoder)
+                headerSpacingSource = headerSliceSpacingSource(decoder)
                 // Issue #2813: Secondary Capture, NM and US spacing follows their SOP Class's own attributes.
                 if let dataSet = (decoder as? DCMDecoder)?.dataSet,
                    let geometry = DicomSOPClassGeometry(dataSet: dataSet, sopClassUID: sopClassUID) {
                     spacing = geometry.spacing
+                    isInPlaneSpacingCalibrated = geometry.isInPlaneSpacingCalibrated
+                    headerSpacingSource = geometry.frameStepSource
                 }
                 rescaleSlope = decoder.rescaleParametersV2.slope
                 rescaleIntercept = decoder.rescaleParametersV2.intercept
@@ -843,6 +866,7 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
                 seriesInstanceUID = nonEmpty(decoder.info(for: DicomTag.seriesInstanceUID.rawValue))
                 frameOfReferenceUID = nonEmpty(decoder.info(for: 0x0020_0052))
                 quantitativeValueProfile = decoder.quantitativeValueProfile
+                units = nonEmpty(decoder.info(for: .units))
                 baselinePixelFormat = pixelFormat
             } else {
                 // Check consistency across slices.
@@ -869,6 +893,7 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
                 }
             }
 
+            everySliceDeclaresOrientation = everySliceDeclaresOrientation && decoder.imageOrientation != nil
             let normal = orientation.flatMap { simd_normalize(simd_cross($0.row, $0.column)) }
             let projection: Double?
             if let ipp = decoder.imagePosition, let normal {
@@ -892,7 +917,8 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
                                     sopInstanceUID: nonEmpty(decoder.info(for: .sopInstanceUID)),
                                     rescaleSlope: sliceRescale.slope,
                                     rescaleIntercept: sliceRescale.intercept,
-                                    pixelFormat: pixelFormat))
+                                    pixelFormat: pixelFormat,
+                                    voi: imageVOI(from: decoder, window: window)))
         }
 
         guard !slices.isEmpty, firstDecoder != nil else {
@@ -964,6 +990,18 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
         // absent, nominal, or inconsistent with the real reconstructed slice positions.
         let computedZ = try computeZSpacing(from: slices, normal: normal)
         spacing = SIMD3<Double>(spacing.x, spacing.y, computedZ ?? spacing.z)
+        let sliceOrdering: DicomSeriesVolumeGeometryProvenance.SliceOrdering
+        if slices.allSatisfy({ $0.projection != nil }) {
+            sliceOrdering = .imagePositionPatient
+        } else {
+            sliceOrdering = slices.allSatisfy({ $0.instanceNumber != nil }) ? .instanceNumber : .fileName
+        }
+        let geometryProvenance = DicomSeriesVolumeGeometryProvenance(
+            sliceOrdering: sliceOrdering,
+            sliceSpacingSource: computedZ == nil ? headerSpacingSource : .imagePositionPatient,
+            isInPlaneSpacingCalibrated: isInPlaneSpacingCalibrated,
+            hasDeclaredOrientation: everySliceDeclaresOrientation
+        )
 
         let depth = slices.count
         let sliceVoxelCount = width * height
@@ -1087,7 +1125,10 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
                                        frameOfReferenceUID: frameOfReferenceUID,
                                        quantitativeValueProfile: quantitativeValueProfile,
                                        imageInstances: imageInstances,
-                                       sliceRescaleParameters: sliceRescaleParameters)
+                                       sliceRescaleParameters: sliceRescaleParameters,
+                                       sliceVOIs: slices.map(\.voi),
+                                       units: units,
+                                       geometryProvenance: geometryProvenance)
 
         return volume
     }
@@ -1120,27 +1161,23 @@ private func pixelFormat(from decoder: any DicomDecoderProtocol) -> DicomSeriesL
     )
 }
 
-private func validatePixelFormat(_ pixelFormat: DicomSeriesLoaderPixelFormat) throws {
+private func validatePixelFormat(_ pixelFormat: DicomSeriesLoaderPixelFormat,
+                                 decoder: any DicomDecoderProtocol) throws {
     let matrix = DicomSeriesLoaderSupportMatrix.standard
     if pixelFormat.isCompressed {
         guard matrix.supportsCompressedTransferSyntaxes else {
             throw DicomSeriesLoaderError.unsupportedTransferSyntaxForVolume(pixelFormat)
         }
-        // Volume assembly only accepts compressed syntaxes whose decode
-        // backend is active in this build; the typed error carries the
-        // transfer syntax UID plus the slice's pixel metadata.
-        let decision = DicomCompressedPixelBackendResolver.resolve(
-            transferSyntax: DicomTransferSyntax(uid: pixelFormat.transferSyntaxUID),
-            requestedBitDepth: pixelFormat.bitsAllocated,
-            samplesPerPixel: pixelFormat.samplesPerPixel,
-            photometricInterpretation: pixelFormat.photometricInterpretation,
-            bitsStored: pixelFormat.bitsStored
-        )
-        switch decision.backend {
-        case .unsupported, .legacyImageIO:
-            throw DicomSeriesLoaderError.unsupportedTransferSyntaxForVolume(pixelFormat)
-        default:
-            break
+        // Issue #3050: JPEG 2000 and HTJ2K slices decode through the stream's backend selection (own codec first),
+        // so they are admitted by that decision rather than by the synchronous resolver's OpenJPEG requirement.
+        if let concreteDecoder = decoder as? DCMDecoder,
+           case let reader = DicomDecodedFrameReader(decoder: concreteDecoder),
+           reader.decodesThroughAsyncJPEG2000Selection {
+            guard reader.compressedDecodeDecision().canExecute else {
+                throw DicomSeriesLoaderError.unsupportedTransferSyntaxForVolume(pixelFormat)
+            }
+        } else {
+            try validateCompressedBackend(pixelFormat)
         }
     }
     if !matrix.supportsMultiframe, pixelFormat.numberOfFrames > 1 {
@@ -1148,6 +1185,25 @@ private func validatePixelFormat(_ pixelFormat: DicomSeriesLoaderPixelFormat) th
     }
     guard matrix.supports(pixelFormat) else {
         throw DicomSeriesLoaderError.unsupportedPixelFormat(pixelFormat)
+    }
+}
+
+private func validateCompressedBackend(_ pixelFormat: DicomSeriesLoaderPixelFormat) throws {
+    // Volume assembly only accepts compressed syntaxes whose decode
+    // backend is active in this build; the typed error carries the
+    // transfer syntax UID plus the slice's pixel metadata.
+    let decision = DicomCompressedPixelBackendResolver.resolve(
+        transferSyntax: DicomTransferSyntax(uid: pixelFormat.transferSyntaxUID),
+        requestedBitDepth: pixelFormat.bitsAllocated,
+        samplesPerPixel: pixelFormat.samplesPerPixel,
+        photometricInterpretation: pixelFormat.photometricInterpretation,
+        bitsStored: pixelFormat.bitsStored
+    )
+    switch decision.backend {
+    case .unsupported, .legacyImageIO:
+        throw DicomSeriesLoaderError.unsupportedTransferSyntaxForVolume(pixelFormat)
+    default:
+        break
     }
 }
 

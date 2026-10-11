@@ -12,6 +12,9 @@ public enum DicomVideoRemuxError: Error, Equatable, LocalizedError, Sendable {
     /// The elementary stream does not contain the framing required by its codec.
     case malformedElementaryStream(codec: DicomVideoCodec)
 
+    /// The MPEG-2 Program Stream or PES packets around the video elementary stream are malformed.
+    case malformedSystemsStream
+
     /// The elementary stream is missing the decoder parameter sets required by its codec.
     case missingParameterSets(codec: DicomVideoCodec)
 
@@ -42,6 +45,8 @@ public enum DicomVideoRemuxError: Error, Equatable, LocalizedError, Sendable {
             return "The DICOM video codec is not supported for native playback."
         case .malformedElementaryStream(let codec):
             return "The encapsulated \(codec.displayName) stream is malformed."
+        case .malformedSystemsStream:
+            return "The encapsulated MPEG-2 Program Stream or PES packets are malformed."
         case .missingParameterSets(let codec):
             return "The encapsulated \(codec.displayName) stream is missing decoder parameter sets."
         case .noVideoFrames(let codec):

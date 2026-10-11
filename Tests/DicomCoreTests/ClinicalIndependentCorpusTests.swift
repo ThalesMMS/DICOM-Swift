@@ -110,6 +110,7 @@ final class ClinicalIndependentCorpusTests: XCTestCase {
             case .gray8(let values): return values.map(Int.init)
             case .gray16(let values): return values.map(Int.init)
             case .rgb8(let values): return values.map(Int.init)
+            case .rgb16(let values): return values.map(Int.init)
             }
         }
     }

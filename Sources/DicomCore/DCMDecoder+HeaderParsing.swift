@@ -207,9 +207,11 @@ extension DCMDecoder {
                                                                littleEndian: littleEndian)
                     guard Int(declaredLength) <= dicomData.count - location else { return false }
                 }
-                // Keep source VR and bytes for contextual values even when a handler
-                // also supplies a formatted string. Pixel Data is never captured here.
-                if DicomContextualVRResolver.needsContext(tag) || DicomPixelValueContext.discriminatorTags.contains(tag) {
+                // Keep source VR and bytes for contextual values, and for binary values such as the Palette Color
+                // LUT Data, even when a handler also supplies a formatted string: a rewrite of `dataSet` carries
+                // them (issue #3012). Pixel Data is never captured here.
+                if DicomContextualVRResolver.needsContext(tag) || DicomPixelValueContext.discriminatorTags.contains(tag)
+                    || (tag >> 16 != 0x7FE0 && [.OB, .OW, .OL, .OF, .OD, .OV].contains(parser.currentVR)) {
                     tagMetadataCache[tag] = .init(tag: tag, offset: location, vr: parser.currentVR,
                         elementLength: parser.currentElementLength)
                 }

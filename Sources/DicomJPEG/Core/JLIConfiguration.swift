@@ -125,6 +125,10 @@ public struct JLIEncoderConfiguration: Sendable {
     /// see PS3.5 A.4.1. Ignored for progressive and lossless frames.
     public var extendedSequential: Bool = false
 
+    /// Write the JFIF APP0 marker segment. DICOM recommends that it be absent from the JPEG streams it carries
+    /// (PS3.5 8.2.1), so DICOM writers turn it off.
+    public var writesJFIFMarker: Bool = true
+
     /// Whether to use optimised Huffman coding.
     public var optimiseHuffman: Bool
 

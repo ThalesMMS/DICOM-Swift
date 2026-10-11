@@ -136,12 +136,13 @@ final class DicomCompressedPixelCodecMatrixTests: XCTestCase {
             photometricInterpretation: "YBR_FULL",
             expectedTexts: ["multi-component", "Photometric Interpretation=YBR_FULL", "Samples Per Pixel=3"]
         )
+        // 16-bit RGB decodes since issue #3034; deeper YBR stays refused with its context.
         assertUnsupported(
             transferSyntax: .jpeg2000Lossless,
             bitDepth: 16,
             samplesPerPixel: 3,
-            photometricInterpretation: "RGB",
-            expectedTexts: ["color output above 8 bits", "Photometric Interpretation=RGB", "Samples Per Pixel=3"]
+            photometricInterpretation: "YBR_FULL",
+            expectedTexts: ["color output above 8 bits", "Photometric Interpretation=YBR_FULL", "Samples Per Pixel=3"]
         )
         assertUnsupported(
             transferSyntax: .jpeg2000Part2MulticomponentLossless,

@@ -210,10 +210,13 @@ public struct DicomPixelMeasures: Equatable, Sendable {
 public struct DicomPixelValueTransformation: Equatable, Sendable {
     public let rescaleIntercept: Double
     public let rescaleSlope: Double
+    /// Rescale Type (0028,1054), the unit of the rescaled values, when the group declares it (issue #3037).
+    public let rescaleType: String?
 
-    public init(rescaleIntercept: Double, rescaleSlope: Double) {
+    public init(rescaleIntercept: Double, rescaleSlope: Double, rescaleType: String? = nil) {
         self.rescaleIntercept = rescaleIntercept
         self.rescaleSlope = rescaleSlope
+        self.rescaleType = rescaleType
     }
 }
 
@@ -421,9 +424,11 @@ enum DicomEnhancedMultiframeParser {
         let intercept = dataSet.decimalString(for: .rescaleIntercept)
         let slope = dataSet.decimalString(for: .rescaleSlope)
         guard intercept != nil || slope != nil else { return nil }
+        let rescaleType = dataSet.string(for: .rescaleType)?.trimmingCharacters(in: .whitespacesAndNewlines)
         return DicomPixelValueTransformation(
             rescaleIntercept: intercept ?? 0,
-            rescaleSlope: slope ?? 1
+            rescaleSlope: slope ?? 1,
+            rescaleType: rescaleType?.isEmpty == false ? rescaleType : nil
         )
     }
 

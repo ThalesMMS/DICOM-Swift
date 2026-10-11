@@ -43,10 +43,15 @@ public struct DicomDeidentificationProfile: Equatable, Sendable {
     public var overrides: [Int: Override]
     /// Free text recorded in De-identification Method (0012,0063) besides the profile and option names.
     public var methodDescription: String?
+    /// Clean Pixel Data Option: regions the caller knows to carry burned-in information, blanked in every frame.
+    public var pixelRedactionRegions: [DicomPixelEdit.Region]
+    /// Clean Pixel Data Option: device templates consulted after the caller's regions and the ultrasound regions.
+    public var pixelRedactionTemplates: [DicomPixelRedactionTemplate]
 
     public init(options: Set<Option> = [], burnedInAnnotationPolicy: BurnedInPolicy = .reject, unknownBurnedInPolicy: BurnedInPolicy = .flag,
                 keepsUnlistedPrivateElements: Bool = false, removesUnlistedTemporalAttributes: Bool = true,
-                overrides: [Int: Override] = [:], methodDescription: String? = nil) {
+                overrides: [Int: Override] = [:], methodDescription: String? = nil, pixelRedactionRegions: [DicomPixelEdit.Region] = [],
+                pixelRedactionTemplates: [DicomPixelRedactionTemplate] = DicomPixelRedactionTemplate.verified) {
         self.options = options
         self.burnedInAnnotationPolicy = burnedInAnnotationPolicy
         self.unknownBurnedInPolicy = unknownBurnedInPolicy
@@ -54,6 +59,8 @@ public struct DicomDeidentificationProfile: Equatable, Sendable {
         self.removesUnlistedTemporalAttributes = removesUnlistedTemporalAttributes
         self.overrides = overrides
         self.methodDescription = methodDescription
+        self.pixelRedactionRegions = pixelRedactionRegions
+        self.pixelRedactionTemplates = pixelRedactionTemplates
     }
 
     /// Basic profile, no options.
@@ -185,7 +192,7 @@ public struct DicomDeidentificationReport: Equatable, Sendable {
         public enum Kind: String, Equatable, Sendable {
             case burnedInAnnotation, unknownBurnedInAnnotation, descriptorRetained, encapsulatedDocumentReplaced
             case graphicsRemoved, privateRetained, unlistedTemporalRemoved, structuredContentReplaced
-            case profileActionOverridden, temporalValueReplaced
+            case profileActionOverridden, temporalValueReplaced, pixelDataNotCleaned
         }
 
         public let kind: Kind
@@ -278,14 +285,28 @@ public struct DicomDeidentifier: Sendable {
         var state = State(known: known)
         var findings: [DicomDeidentificationReport.Finding] = []
         var rejection: DicomDeidentificationReport.Rejection?
+        var redaction: (pixels: DicomDataElement, sources: [DicomPixelRedactionPlan.Source])?
         if source.contains(.pixelData) {
             let annotation = (source.string(for: 0x0028_0301) ?? "").trimmingCharacters(in: .whitespaces).uppercased()
-            if annotation == "YES" {
-                if profile.burnedInAnnotationPolicy == .reject { rejection = .burnedInAnnotation }
-                if profile.burnedInAnnotationPolicy != .accept { findings.append(.init(kind: .burnedInAnnotation, path: "(0028,0301)", detail: "Burned In Annotation is YES; pixels are not cleaned")) }
-            } else if annotation != "NO" {
-                if profile.unknownBurnedInPolicy == .reject { rejection = .unknownBurnedInAnnotation }
-                if profile.unknownBurnedInPolicy != .accept { findings.append(.init(kind: .unknownBurnedInAnnotation, path: "(0028,0301)", detail: "Burned In Annotation absent or not NO; pixels are not verified")) }
+            var unresolved: String?
+            if profile.options.contains(.cleanPixelData) {
+                switch cleanedPixelData(decoder: decoder, source: source) {
+                case .success(let cleaned): redaction = cleaned
+                case .failure(let reason): unresolved = reason.description
+                }
+            }
+            if redaction == nil {
+                if annotation == "YES" {
+                    if profile.burnedInAnnotationPolicy == .reject { rejection = .burnedInAnnotation }
+                    if profile.burnedInAnnotationPolicy != .accept { findings.append(.init(kind: .burnedInAnnotation, path: "(0028,0301)", detail: "Burned In Annotation is YES; pixels are not cleaned")) }
+                } else if annotation != "NO" {
+                    if profile.unknownBurnedInPolicy == .reject { rejection = .unknownBurnedInAnnotation }
+                    if profile.unknownBurnedInPolicy != .accept { findings.append(.init(kind: .unknownBurnedInAnnotation, path: "(0028,0301)", detail: "Burned In Annotation absent or not NO; pixels are not verified")) }
+                }
+                // The option was requested but nothing was blanked: the instance never passes as cleaned.
+                if let unresolved, annotation != "NO" {
+                    findings.append(.init(kind: .pixelDataNotCleaned, path: "(7FE0,0010)", detail: "Clean Pixel Data not applied: \(unresolved)"))
+                }
             }
         }
         if let rejection {
@@ -294,7 +315,27 @@ public struct DicomDeidentifier: Sendable {
         }
         try Task.checkCancellation()
         var output = try rewrite(source, path: "", state: &state, topLevel: true)
-        record(in: &output, retainedByOverride: state.findings.contains { $0.kind == .profileActionOverridden })
+        if let redaction {
+            output.set(redaction.pixels)
+            output.set(DicomDataElement(tag: 0x0028_0301, vr: .CS, value: .strings(["NO"])))
+            // The icon is derived from the uncleaned pixels and overlays are not inspected: neither survives cleaning.
+            for element in output.elements where element.tag == 0x0088_0200 || (0x6000...0x601E).contains(element.group) && element.group.isMultiple(of: 2) {
+                output.remove(element.tag)
+                state.actions.append(.init(path: Self.component(element.tag), tag: element.tag, disposition: .removed, note: "Clean Pixel Data"))
+            }
+            let sources = redaction.sources.map { source -> String in
+                switch source {
+                case .caller: return "caller regions"
+                case .ultrasoundRegions: return "outside ultrasound regions"
+                case .template(let name): return "template \(name)"
+                }
+            }
+            state.actions.append(.init(path: "(7FE0,0010)", tag: DicomTag.pixelData.rawValue, disposition: .changed,
+                                       note: "Clean Pixel Data: " + sources.joined(separator: ", ")))
+        }
+        var recorded = profile.options
+        if redaction == nil { recorded.remove(.cleanPixelData) }
+        record(in: &output, options: recorded, retainedByOverride: state.findings.contains { $0.kind == .profileActionOverridden })
         let transferSyntax = DicomTransferSyntax(uid: decoder.info(for: .transferSyntaxUID)) ?? .explicitVRLittleEndian
         let fileData: Data
         do {
@@ -302,7 +343,7 @@ public struct DicomDeidentifier: Sendable {
                 transferSyntax: transferSyntax, mediaStorageSOPClassUID: output.string(for: .sopClassUID) ?? sopClassUID,
                 mediaStorageSOPInstanceUID: output.string(for: .sopInstanceUID) ?? decoder.info(for: .sopInstanceUID)))
         } catch { throw DicomDeidentificationError.writeFailed("\(error)") }
-        try verify(fileData, source: source, output: output, replacements: state.usedUIDs)
+        try verify(fileData, pixels: output.element(for: .pixelData)?.bytesValue, output: output, replacements: state.usedUIDs)
         try Task.checkCancellation()
         if commit { known.merge(state.pendingUIDs) { existing, _ in existing } }
         let allFindings = findings + state.findings
@@ -316,7 +357,7 @@ public struct DicomDeidentifier: Sendable {
     }
 
     /// Every UID that was remapped must be gone from the output; identity, pixel bytes and transfer syntax must survive.
-    private func verify(_ fileData: Data, source: DicomDataSet, output: DicomDataSet, replacements: [String: String]) throws {
+    private func verify(_ fileData: Data, pixels: Data?, output: DicomDataSet, replacements: [String: String]) throws {
         let reopened: DCMDecoder
         let reread: DicomDataSet
         do {
@@ -330,10 +371,28 @@ public struct DicomDeidentifier: Sendable {
             throw DicomDeidentificationError.writeFailed("replaced UID still present")
         }
         guard reopened.info(for: 0x0002_0003) == output.string(for: .sopInstanceUID) else { throw DicomDeidentificationError.writeFailed("file meta identity differs") }
-        guard reread.element(for: .pixelData)?.bytesValue == source.element(for: .pixelData)?.bytesValue else { throw DicomDeidentificationError.writeFailed("pixel bytes changed") }
+        guard reread.element(for: .pixelData)?.bytesValue == pixels else { throw DicomDeidentificationError.writeFailed("pixel bytes changed") }
         for element in reread.elements where element.group != 0x0002 && element.element != 0 && !Self.structuralTags.contains(element.tag) {
             guard let intended = output[element.tag], intended.vr == element.vr else { throw DicomDeidentificationError.writeFailed("element set differs after reopen") }
         }
+    }
+
+    private struct UnresolvedRedaction: Error, CustomStringConvertible {
+        let description: String
+    }
+
+    /// Clean Pixel Data: the plan for this instance applied to a copy of its native pixel data.
+    private func cleanedPixelData(decoder: DCMDecoder, source: DicomDataSet)
+        -> Result<(pixels: DicomDataElement, sources: [DicomPixelRedactionPlan.Source]), UnresolvedRedaction> {
+        let plan = DicomPixelRedactionPlan(decoder: decoder, dataSet: source, callerRegions: profile.pixelRedactionRegions,
+                                           templates: profile.pixelRedactionTemplates)
+        guard plan.isResolved else { return .failure(.init(description: "no caller region, ultrasound region or device template applies")) }
+        guard !decoder.compressedImage, let element = source.element(for: .pixelData), case .bytes(var pixels) = element.value,
+              let descriptor = decoder.pixelDataDescriptor else {
+            return .failure(.init(description: "encapsulated pixel data cannot be blanked; transcode to a native syntax first"))
+        }
+        if let reason = plan.blank(&pixels, descriptor: descriptor) { return .failure(.init(description: reason)) }
+        return .success((DicomDataElement(tag: element.tag, vr: element.vr, value: .bytes(pixels), name: element.name), plan.sources))
     }
 
     // MARK: - Recursive rewrite
@@ -362,6 +421,11 @@ public struct DicomDeidentifier: Sendable {
             }
             if group.isMultiple(of: 2) == false {
                 try rewritePrivate(element, in: dataSet, path: elementPath, into: &output, state: &state)
+                continue
+            }
+            if element.tag == 0x0040_0612, profile.options.contains(.cleanStructuredContent), case .sequence(let items) = element.value {
+                output.set(try cleanedContentSequence(element, items: items, path: elementPath, state: &state))
+                state.actions.append(.init(path: elementPath, tag: element.tag, disposition: .changed, note: "C: structured content cleaned"))
                 continue
             }
             let entry = table.entry(forTag: element.tag)
@@ -534,10 +598,8 @@ public struct DicomDeidentifier: Sendable {
             return
         }
         if case .sequence(let items) = element.value {
-            if element.tag == DicomTag.contentSequence.rawValue {
-                output.set(DicomDataElement(tag: element.tag, vr: .SQ, value: .sequence(try items.enumerated().map { index, item in
-                    DicomSequenceItem(dataSet: try cleanContentItem(item.dataSet, path: path + "[\(index)]/", state: &state))
-                }), name: element.name))
+            if Self.contentItemSequenceTags.contains(element.tag) {
+                output.set(try cleanedContentSequence(element, items: items, path: path, state: &state))
                 state.actions.append(.init(path: path, tag: element.tag, disposition: .changed, note: "C: structured content cleaned"))
             } else {
                 var rewritten: [DicomSequenceItem] = []
@@ -564,13 +626,52 @@ public struct DicomDeidentifier: Sendable {
         state.actions.append(.init(path: path, tag: element.tag, disposition: .kept, note: "C: no identifying content for this VR"))
     }
 
-    /// Clean Structured Content: identifying value types become dummies or shifted dates, codes and numerics
-    /// stay, references are remapped, nested content is cleaned recursively.
-    private func cleanContentItem(_ item: DicomDataSet, path: String, state: inout State) throws -> DicomDataSet {
+    /// Sequences whose items are content items: Content Sequence, Acquisition Context Sequence and Specimen
+    /// Preparation Step Content Item Sequence (PS3.15 E.3.4).
+    static let contentItemSequenceTags: Set<Int> = [DicomTag.contentSequence.rawValue, 0x0040_0555, 0x0040_0612]
+    /// The elements that carry a content item's value (PS3.3 C.17.3 and C.18).
+    static let contentItemValueTags: Set<Int> = [0x0040_A160, 0x0040_A123, 0x0040_A121, 0x0040_A122, 0x0040_A120, 0x0040_A124,
+                                                0x0040_A168, 0x0040_A300, 0x0008_1199]
+
+    private func cleanedContentSequence(_ element: DicomDataElement, items: [DicomSequenceItem], path: String, state: inout State) throws -> DicomDataElement {
+        var cleaned: [DicomSequenceItem] = []
+        for (index, item) in items.enumerated() {
+            if let dataSet = try cleanContentItem(item.dataSet, path: path + "[\(index)]/", state: &state) {
+                cleaned.append(DicomSequenceItem(dataSet: dataSet))
+            }
+        }
+        return DicomDataElement(tag: element.tag, vr: .SQ, value: .sequence(cleaned), name: element.name)
+    }
+
+    /// The Table E.3.4-1 action for a content item's value, from its concept name and value type.
+    private func structuredContentAction(for item: DicomDataSet, valueType: String) -> (ActionCode, String)? {
+        guard let concept = item.sequenceItems(for: 0x0040_A043).first?.dataSet,
+              let code = concept.string(for: 0x0008_0100) ?? concept.string(for: 0x0008_0119),
+              let scheme = concept.string(for: 0x0008_0102),
+              let entry = table.structuredContentEntry(codeValue: code, scheme: scheme, schemeVersion: concept.string(for: 0x0008_0103),
+                                                       valueType: valueType) else { return nil }
+        let action = entry.action(with: profile.options)
+        return (action, "E.3.4-1 \(entry.meaning): \(action.rawValue)")
+    }
+
+    /// Clean Structured Content. A concept listed in Table E.3.4-1 receives the table's action: X removes the
+    /// content item, K keeps its value, C cleans it, D (and the compound codes) replaces it with a dummy or a
+    /// remapped reference. Other items fall back to their value type: identifying value types become dummies or
+    /// shifted dates, codes and numerics stay, references are remapped. Nested content is cleaned recursively.
+    private func cleanContentItem(_ item: DicomDataSet, path: String, state: inout State) throws -> DicomDataSet? {
         var output = DicomDataSet()
-        let valueType = (item.string(for: .valueType) ?? "").uppercased()
+        let valueType = (item.string(for: .valueType) ?? "").trimmingCharacters(in: .whitespaces).uppercased()
+        let listed = structuredContentAction(for: item, valueType: valueType)
+        if let (action, note) = listed, action == .remove {
+            state.actions.append(.init(path: path, tag: 0x0040_A040, disposition: .removed, note: note + " (content item removed)"))
+            return nil
+        }
         for element in item.elements {
             let elementPath = path + Self.component(element.tag)
+            if let (action, note) = listed, Self.contentItemValueTags.contains(element.tag) {
+                try applyListed(action, note: note, element, path: elementPath, into: &output, state: &state)
+                continue
+            }
             switch element.tag {
             case 0x0040_A160 where valueType == "TEXT":
                 output.set(DicomDataElement(tag: element.tag, vr: element.vr, value: .strings(["REMOVED"]), name: element.name))
@@ -585,9 +686,7 @@ public struct DicomDeidentifier: Sendable {
                 try remap(element, path: elementPath, into: &output, state: &state, note: "C")
             case DicomTag.contentSequence.rawValue:
                 if case .sequence(let items) = element.value {
-                    output.set(DicomDataElement(tag: element.tag, vr: .SQ, value: .sequence(try items.enumerated().map { index, child in
-                        DicomSequenceItem(dataSet: try cleanContentItem(child.dataSet, path: elementPath + "[\(index)]/", state: &state))
-                    }), name: element.name))
+                    output.set(try cleanedContentSequence(element, items: items, path: elementPath, state: &state))
                 }
             default:
                 if element.group.isMultiple(of: 2) == false {
@@ -606,9 +705,39 @@ public struct DicomDeidentifier: Sendable {
         return output
     }
 
+    /// A Table E.3.4-1 action on one value element of a listed content item.
+    private func applyListed(_ action: ActionCode, note: String, _ element: DicomDataElement, path: String,
+                             into output: inout DicomDataSet, state: inout State) throws {
+        switch action {
+        case .keep:
+            output.set(element)
+            state.actions.append(.init(path: path, tag: element.tag, disposition: .kept, note: note))
+        case .clean:
+            try clean(element, entry: nil, path: path, into: &output, state: &state)
+        case .zero, .removeOrZero:
+            output.set(DicomDataElement(tag: element.tag, vr: element.vr, value: .empty, name: element.name))
+            state.actions.append(.init(path: path, tag: element.tag, disposition: .changed, note: note))
+        case .remove, .dummy, .removeOrDummy, .zeroOrDummy, .removeOrZeroOrDummy, .replaceUID, .removeOrZeroOrUID:
+            if case .sequence(let items) = element.value {
+                // A referenced object or a code keeps its structure; the profile remaps the UIDs inside.
+                var rewritten: [DicomSequenceItem] = []
+                for (index, item) in items.enumerated() {
+                    rewritten.append(DicomSequenceItem(dataSet: try rewrite(item.dataSet, path: path + "[\(index)]/", state: &state, topLevel: false)))
+                }
+                output.set(DicomDataElement(tag: element.tag, vr: element.vr, value: .sequence(rewritten), name: element.name))
+                state.actions.append(.init(path: path, tag: element.tag, disposition: .changed, note: note + " (items rewritten)"))
+            } else if element.vr == .UI {
+                try remap(element, path: path, into: &output, state: &state, note: note)
+            } else {
+                output.set(DicomDataElement(tag: element.tag, vr: element.vr, value: Self.dummyValue(for: element.vr), name: element.name))
+                state.actions.append(.init(path: path, tag: element.tag, disposition: .changed, note: note + " (dummy)"))
+            }
+        }
+    }
+
     // MARK: - Markers
 
-    private func record(in dataSet: inout DicomDataSet, retainedByOverride: Bool) {
+    private func record(in dataSet: inout DicomDataSet, options: Set<DicomDeidentificationTable.Option>, retainedByOverride: Bool) {
         if retainedByOverride {
             var method = ["Incomplete de-identification: caller overrides retain attributes"]
             if let description = profile.methodDescription, !description.isEmpty { method.append(description) }
@@ -619,12 +748,12 @@ public struct DicomDeidentifier: Sendable {
             return
         }
         var method = ["PS3.15 Basic Application Level Confidentiality Profile (\(table.version))"]
-        method += profile.options.sorted { $0.rawValue < $1.rawValue }.map(\.code.meaning)
+        method += options.sorted { $0.rawValue < $1.rawValue }.map(\.code.meaning)
         if let description = profile.methodDescription, !description.isEmpty { method.append(description) }
         dataSet.set(DicomDataElement(tag: 0x0012_0062, vr: .CS, value: .strings(["YES"])))
         dataSet.set(DicomDataElement(tag: 0x0012_0063, vr: .LO, value: .strings(method.map { String($0.prefix(64)) })))
         var codes: [(String, String)] = [("113100", "Basic Application Confidentiality Profile")]
-        codes += profile.options.sorted { $0.rawValue < $1.rawValue }.map { ($0.code.value, $0.code.meaning) }
+        codes += options.sorted { $0.rawValue < $1.rawValue }.map { ($0.code.value, $0.code.meaning) }
         dataSet.set(DicomDataElement(tag: 0x0012_0064, vr: .SQ, value: .sequence(codes.map { value, meaning in
             DicomSequenceItem(dataSet: DicomDataSet(elements: [
                 DicomDataElement(tag: 0x0008_0100, vr: .SH, value: .strings([value])),

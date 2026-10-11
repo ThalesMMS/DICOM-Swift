@@ -290,6 +290,11 @@ public struct DicomAssociationRequest: Equatable, Sendable {
 }
 
 public struct DicomAssociationAccept: Equatable, Sendable {
+    /// The acceptor's SOP Class Extended Negotiation item for a SOP Class; nil when it returned none.
+    public func extendedNegotiation(for sopClassUID: String) -> DicomSOPClassExtendedNegotiation? {
+        extendedNegotiations.first { $0.sopClassUID == sopClassUID }
+    }
+
     public var calledAETitle: String
     public var callingAETitle: String
     public var applicationContextUID: String

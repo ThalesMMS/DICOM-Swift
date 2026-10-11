@@ -16,6 +16,16 @@ struct DicomDataSetParseState {
     private(set) var omittedPixelDataPaths: [[DicomValidationReport.PathComponent]] = []
     private(set) var omittedPixelDataPathsTruncated = false
 
+    /// The root data set's Pixel Data header and the end of its value, once the value was skipped whole (issue #3039).
+    private(set) var rootPixelDataHeader: DicomPixelDataHeaderEvidence?
+    private(set) var rootPixelDataEnd: Int?
+
+    mutating func recordRootPixelData(vr: DicomVR, length: UInt32, valueOffset: Int, end: Int) {
+        rootPixelDataHeader = .init(path: [.tag(DicomTag.pixelData.rawValue)], vr: vr, valueLength: length,
+                                    valueOffset: valueOffset)
+        rootPixelDataEnd = end
+    }
+
     private(set) var pixelDataHeaders: [DicomPixelDataHeaderEvidence] = []
     private(set) var pixelDataHeadersTruncated = false
 
@@ -66,10 +76,17 @@ struct DicomDataSetParseState {
         }
     }
 
+    /// A recovery stopped because its diagnostic budget was spent, not because of what it read.
+    private(set) var diagnosticBudgetExhausted = false
+
     mutating func diagnose(_ reason: DicomDataSetReadResult.Diagnostic.Reason, tag: Int, offset: Int,
                            path: [Int]? = nil) throws {
         let diagnostic = diagnostic(reason, tag: tag, offset: offset, path: path)
-        guard mode == .recover, diagnostics.count < maximumDiagnostics else { throw diagnostic }
+        guard mode == .recover else { throw diagnostic }
+        guard diagnostics.count < maximumDiagnostics else {
+            diagnosticBudgetExhausted = true
+            throw diagnostic
+        }
         diagnostics.append(diagnostic)
     }
 

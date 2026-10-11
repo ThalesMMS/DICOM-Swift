@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import Synchronization
 
 /// Optional native codec runtimes that DicomCore can load dynamically.
 public enum DicomCodecRuntime: String, CaseIterable, Sendable {
@@ -198,6 +199,42 @@ public enum DicomCodecRuntimePreflight {
         candidateOverride: (paths: [String], isExplicitOverride: Bool)? = nil
     ) -> DicomCodecRuntimeResolution {
         let candidates = candidateOverride ?? libraryCandidates(for: runtime, environment: environment)
+        // Codec resolution asks for every runtime's status several times per decoded frame. Without a memo each
+        // query dlopen()s and dlclose()s the candidates again, re-running the library initializers; on a host with
+        // CharLS/OpenJPEG installed that was most of a 512x512 JPEG 2000 frame's decode time (issue #3041). The
+        // status of one candidate list does not change during the process; handle-retaining resolutions and explicit
+        // test candidates are never memoized.
+        let memoKey = candidateOverride == nil && !retainHandle
+            ? Self.memoKey(runtime: runtime, candidates: candidates, requiredSymbols: requiredSymbols)
+            : nil
+        if let memoKey, let status = statusMemo.withLock({ $0[memoKey] }) {
+            return DicomCodecRuntimeResolution(status: status, handle: nil)
+        }
+        let resolution = probe(for: runtime, candidates: candidates, requiredSymbols: requiredSymbols,
+                               retainHandle: retainHandle)
+        if let memoKey {
+            statusMemo.withLock { $0[memoKey] = resolution.status }
+        }
+        return resolution
+    }
+
+    private static let statusMemo = Mutex<[String: DicomCodecRuntimeStatus]>([:])
+
+    private static func memoKey(
+        runtime: DicomCodecRuntime,
+        candidates: (paths: [String], isExplicitOverride: Bool),
+        requiredSymbols: [String]
+    ) -> String {
+        ([runtime.rawValue, candidates.isExplicitOverride ? "explicit" : "default"] + candidates.paths
+            + ["symbols"] + requiredSymbols).joined(separator: "\u{1F}")
+    }
+
+    private static func probe(
+        for runtime: DicomCodecRuntime,
+        candidates: (paths: [String], isExplicitOverride: Bool),
+        requiredSymbols: [String],
+        retainHandle: Bool
+    ) -> DicomCodecRuntimeResolution {
         var lastError: String?
 
         for candidate in candidates.paths {

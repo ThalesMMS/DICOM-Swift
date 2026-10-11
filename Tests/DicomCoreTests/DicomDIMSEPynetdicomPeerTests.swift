@@ -271,7 +271,9 @@ final class DicomDIMSEPynetdicomPeerTests: XCTestCase {
         XCTAssertThrowsError(try service(peer).get(identifier: identifier(), onInstance: { _ in
             throw CocoaError(.fileWriteOutOfSpace)
         })) { error in
-            XCTAssertEqual(error as? DicomNetworkError, .dimseStatusFailure(0xA702))
+            let failure = error as? DicomRetrieveFailure
+            XCTAssertEqual(failure?.result.status, 0xA702)
+            XCTAssertEqual(failure?.result.failedSuboperations, 1)
         }
         let responses = try XCTUnwrap(try peer.stop()["responses"] as? [[String: Int]])
         let final = try XCTUnwrap(responses.last { $0["field"] == Int(DicomDIMSECommandField.cGetRSP) })

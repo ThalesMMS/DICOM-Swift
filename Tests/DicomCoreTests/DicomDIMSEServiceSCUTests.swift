@@ -256,6 +256,54 @@ final class DicomDIMSEServiceSCUTests: XCTestCase {
         XCTAssertEqual(result.completedSuboperations, 2)
     }
 
+    /// Issue #3004: a failed final response keeps its counts and Failed SOP Instance UID List.
+    func test_moveAndGet_failedFinalResponse_throwTheResultWithFailedUIDs() throws {
+        let failedUIDs = ["2.25.failed.1", "2.25.failed.2"]
+        for status: UInt16 in [0xA702, 0xC001] {
+            let moveTransport = DIMSEScriptedTransport(
+                supportedAbstractSyntaxUIDs: [DicomNetworkUID.studyRootQueryRetrieveMove],
+                retrieveFinalStatus: status,
+                retrieveFinalFailedSOPInstanceUIDs: failedUIDs
+            )
+            XCTAssertThrowsError(try makeService().move(identifier: retrieveIdentifier(),
+                                                        moveDestinationAETitle: "VIEWER",
+                                                        using: moveTransport)) { error in
+                let failure = error as? DicomRetrieveFailure
+                XCTAssertEqual(failure?.result.status, status)
+                XCTAssertEqual(failure?.result.completedSuboperations, 2)
+                XCTAssertEqual(failure?.result.failedSuboperations, 2)
+                XCTAssertEqual(failure?.result.failedSOPInstanceUIDs, failedUIDs)
+            }
+
+            let getTransport = DIMSEScriptedTransport(
+                supportedAbstractSyntaxUIDs: [DicomNetworkUID.studyRootQueryRetrieveGet,
+                                              DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID],
+                retrieveFinalStatus: status,
+                retrieveFinalFailedSOPInstanceUIDs: failedUIDs
+            )
+            var delivered: [String?] = []
+            XCTAssertThrowsError(try makeService().get(identifier: retrieveIdentifier(), using: getTransport,
+                                                       onInstance: { delivered.append($0.sopInstanceUID) })) { error in
+                let failure = error as? DicomRetrieveFailure
+                XCTAssertEqual(failure?.result.status, status)
+                XCTAssertEqual(failure?.result.completedSuboperations, 1)
+                XCTAssertEqual(failure?.result.failedSOPInstanceUIDs, failedUIDs)
+            }
+            XCTAssertEqual(delivered, ["2.25.instance"], "The instance that arrived is still delivered")
+        }
+    }
+
+    func test_moveWarning_keepsTheFailedUIDsOnTheResult() throws {
+        let transport = DIMSEScriptedTransport(
+            supportedAbstractSyntaxUIDs: [DicomNetworkUID.studyRootQueryRetrieveMove],
+            retrieveFinalStatus: 0xB000,
+            retrieveFinalFailedSOPInstanceUIDs: ["2.25.failed.1"]
+        )
+        let result = try makeService().move(identifier: retrieveIdentifier(), moveDestinationAETitle: "VIEWER",
+                                            using: transport)
+        XCTAssertEqual(result.failedSOPInstanceUIDs, ["2.25.failed.1"])
+    }
+
     func testGetSCUReceivesStoreSuboperationAndAcknowledgesIt() throws {
         let transport = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [
             DicomNetworkUID.studyRootQueryRetrieveGet,
@@ -3487,6 +3535,7 @@ private final class DIMSEScriptedTransport: DicomCancellableAssociationTransport
     private let roleSelectionPolicy: DicomAssociationNegotiator.RoleSelectionResponsePolicy
     private let cancelBeforeReturningCommandFields: Set<UInt16>
     private let retrieveFinalStatus: UInt16
+    private let retrieveFinalFailedSOPInstanceUIDs: [String]
     private let failBeforeRetrieveFinalResponse: Bool
     private let findResponseDataSet: DicomDataSet?
     private let grantedImageBoxCount: Int
@@ -3532,6 +3581,7 @@ private final class DIMSEScriptedTransport: DicomCancellableAssociationTransport
         roleSelectionPolicy: DicomAssociationNegotiator.RoleSelectionResponsePolicy = .acceptProposed,
         cancelBeforeReturningCommandFields: Set<UInt16> = [],
         retrieveFinalStatus: UInt16 = 0,
+        retrieveFinalFailedSOPInstanceUIDs: [String] = [],
         failBeforeRetrieveFinalResponse: Bool = false,
         findResponseDataSet: DicomDataSet? = nil,
         grantedImageBoxCount: Int = 1,
@@ -3551,6 +3601,7 @@ private final class DIMSEScriptedTransport: DicomCancellableAssociationTransport
         self.roleSelectionPolicy = roleSelectionPolicy
         self.cancelBeforeReturningCommandFields = cancelBeforeReturningCommandFields
         self.retrieveFinalStatus = retrieveFinalStatus
+        self.retrieveFinalFailedSOPInstanceUIDs = retrieveFinalFailedSOPInstanceUIDs
         self.failBeforeRetrieveFinalResponse = failBeforeRetrieveFinalResponse
         self.findResponseDataSet = findResponseDataSet
         self.grantedImageBoxCount = grantedImageBoxCount
@@ -3742,6 +3793,20 @@ private final class DIMSEScriptedTransport: DicomCancellableAssociationTransport
         }
     }
 
+    /// The final C-MOVE/C-GET identifier carries the Failed SOP Instance UID List when one is scripted.
+    private var finalRetrieveDataSetType: UInt16 {
+        retrieveFinalFailedSOPInstanceUIDs.isEmpty
+            ? DicomDIMSECommandDataSetType.noDataSet
+            : DicomDIMSECommandDataSetType.hasDataSet
+    }
+
+    private func enqueueFinalRetrieveIdentifier(contextID: UInt8) throws {
+        guard !retrieveFinalFailedSOPInstanceUIDs.isEmpty else { return }
+        try enqueueDataSet(DicomDataSet(elements: [
+            DicomDataElement(tag: 0x0008_0058, vr: .UI, value: .strings(retrieveFinalFailedSOPInstanceUIDs))
+        ]), contextID: contextID)
+    }
+
     private func handleDataSetAfterCommand(presentationContextID: UInt8) throws {
         guard let command = lastRequestCommand else { return }
         switch command.commandField {
@@ -3785,13 +3850,14 @@ private final class DIMSEScriptedTransport: DicomCancellableAssociationTransport
                 affectedSOPClassUID: command.affectedSOPClassUID,
                 commandField: DicomDIMSECommandField.cMoveRSP,
                 messageIDBeingRespondedTo: command.messageID,
-                commandDataSetType: DicomDIMSECommandDataSetType.noDataSet,
+                commandDataSetType: finalRetrieveDataSetType,
                 status: retrieveFinalStatus,
                 remainingSuboperations: 0,
                 completedSuboperations: 2,
-                failedSuboperations: 0,
+                failedSuboperations: UInt16(retrieveFinalFailedSOPInstanceUIDs.count),
                 warningSuboperations: 0
             ), contextID: presentationContextID)
+            try enqueueFinalRetrieveIdentifier(contextID: presentationContextID)
         case DicomDIMSECommandField.cGetRQ:
             // The store sub-operation rides whichever accepted context carries
             // the storage class — its id shifts as the SCU proposes more
@@ -3813,13 +3879,14 @@ private final class DIMSEScriptedTransport: DicomCancellableAssociationTransport
                 affectedSOPClassUID: command.affectedSOPClassUID,
                 commandField: DicomDIMSECommandField.cGetRSP,
                 messageIDBeingRespondedTo: command.messageID,
-                commandDataSetType: DicomDIMSECommandDataSetType.noDataSet,
+                commandDataSetType: finalRetrieveDataSetType,
                 status: retrieveFinalStatus,
                 remainingSuboperations: 0,
                 completedSuboperations: 1,
-                failedSuboperations: 0,
+                failedSuboperations: UInt16(retrieveFinalFailedSOPInstanceUIDs.count),
                 warningSuboperations: 0
             ), contextID: presentationContextID)
+            try enqueueFinalRetrieveIdentifier(contextID: presentationContextID)
         case DicomDIMSECommandField.cStoreRQ:
             try enqueueCommand(DicomDIMSECommandSet(
                 affectedSOPClassUID: command.affectedSOPClassUID,
@@ -4159,5 +4226,64 @@ extension DicomDIMSEServiceSCUTests {
         XCTAssertEqual(configuration.dimseResponseTimeout, 9)
         XCTAssertEqual(configuration.releaseTimeout, 9)
         XCTAssertEqual(configuration.cancelTimeout, 3)
+    }
+}
+
+// MARK: - Priority and relational retrieval negotiation (issue #3014)
+
+extension DicomDIMSEServiceSCUTests {
+    func test_priority_isSentOnEveryQueryAndRetrieveRequest() throws {
+        for priority in [DicomDIMSEPriority?.none] + DicomDIMSEPriority.allCases.map(Optional.some) {
+            let expected = (priority ?? .medium).rawValue
+            let find = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [DicomNetworkUID.studyRootQueryRetrieveFind])
+            let move = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [DicomNetworkUID.studyRootQueryRetrieveMove])
+            let get = DIMSEScriptedTransport(supportedAbstractSyntaxUIDs: [
+                DicomNetworkUID.studyRootQueryRetrieveGet, DicomDataSetWriter.defaultSecondaryCaptureImageStorageSOPClassUID
+            ])
+            if let priority {
+                _ = try makeService().find(identifier: retrieveIdentifier(), priority: priority, using: find)
+                _ = try makeService().move(identifier: retrieveIdentifier(), moveDestinationAETitle: "VIEWER", priority: priority, using: move)
+                _ = try makeService().get(identifier: retrieveIdentifier(), priority: priority, using: get)
+            } else {
+                _ = try makeService().find(identifier: retrieveIdentifier(), using: find)
+                _ = try makeService().move(identifier: retrieveIdentifier(), moveDestinationAETitle: "VIEWER", using: move)
+                _ = try makeService().get(identifier: retrieveIdentifier(), using: get)
+            }
+            XCTAssertEqual(find.writtenCommands.first { $0.commandField == DicomDIMSECommandField.cFindRQ }?.priority, expected)
+            XCTAssertEqual(move.writtenCommands.first { $0.commandField == DicomDIMSECommandField.cMoveRQ }?.priority, expected)
+            XCTAssertEqual(get.writtenCommands.first { $0.commandField == DicomDIMSECommandField.cGetRQ }?.priority, expected)
+        }
+        XCTAssertEqual(DicomDIMSEPriority.allCases.map(\.rawValue), [0x0000, 0x0001, 0x0002], "MEDIUM, HIGH, LOW per PS3.7")
+        for priority in DicomDIMSEPriority.allCases {
+            let command = DicomDIMSECommandSet(affectedSOPClassUID: DicomNetworkUID.studyRootQueryRetrieveGet,
+                commandField: DicomDIMSECommandField.cGetRQ, messageID: 1,
+                commandDataSetType: DicomDIMSECommandDataSetType.hasDataSet, priority: priority.rawValue)
+            let encoded = try command.encoded()
+            // (0000,0700) US, VR implicit: tag, length 2, value.
+            XCTAssertNotNil(encoded.range(of: Data([0x00, 0x00, 0x00, 0x07, 0x02, 0x00, 0x00, 0x00,
+                                                    UInt8(priority.rawValue), 0x00])))
+            XCTAssertEqual(try DicomDIMSECommandSet.decode(encoded).priority, priority.rawValue)
+        }
+    }
+
+    func test_relationalRetrievalNegotiation_usesTheRetrieveLayoutAndReportsTheAnswer() throws {
+        let uid = DicomNetworkUID.studyRootQueryRetrieveMove
+        let offered = DicomSOPClassExtendedNegotiation(sopClassUID: uid, relationalRetrieval: true, enhancedMultiFrameConversion: true)
+        XCTAssertEqual(offered.serviceClassApplicationInformation, Data([1, 1]), "PS3.4 Table C.5-3: two bytes")
+        XCTAssertEqual(DicomSOPClassExtendedNegotiation(sopClassUID: uid, relationalRetrieval: true).serviceClassApplicationInformation,
+                       Data([1, 0]))
+        let request = DicomAssociationRequest(calledAETitle: "SCP", callingAETitle: "SCU",
+            presentationContexts: [.init(id: 1, abstractSyntaxUID: uid, transferSyntaxes: [.explicitVRLittleEndian])],
+            extendedNegotiations: [offered])
+        XCTAssertEqual(try DicomPDUCodec.decode(DicomPDUCodec.encode(.associationRequest(request))), .associationRequest(request))
+        let accept = DicomAssociationNegotiator.accept(request, supportedAbstractSyntaxUIDs: [uid],
+            preferredTransferSyntaxes: [.explicitVRLittleEndian], maximumPDULength: 16_384,
+            supportedExtendedNegotiations: [.init(sopClassUID: uid, relationalRetrieval: true)])
+        let answer = try XCTUnwrap(accept.extendedNegotiation(for: uid))
+        XCTAssertTrue(answer.relationalRetrieval)
+        XCTAssertFalse(answer.retrievalEnhancedMultiFrameConversion, "only what the acceptor implements")
+        XCTAssertNil(accept.extendedNegotiation(for: DicomNetworkUID.studyRootQueryRetrieveGet), "omitted means unsupported")
+        XCTAssertFalse(DicomSOPClassExtendedNegotiation(sopClassUID: uid, serviceClassApplicationInformation: Data([1])).retrievalEnhancedMultiFrameConversion,
+                       "a one-byte answer leaves the second field 0")
     }
 }

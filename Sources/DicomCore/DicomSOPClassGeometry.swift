@@ -40,22 +40,32 @@ public struct DicomSOPClassGeometry: Equatable, Sendable {
     public var origin: SIMD3<Double>?
     /// Image Orientation (Patient): the row and column directions.
     public var orientation: (row: SIMD3<Double>, column: SIMD3<Double>)?
+    /// Whether the in-plane spacing came from one of the attributes above rather than the 1 mm default (issue #3037).
+    public var isInPlaneSpacingCalibrated: Bool
+    /// The attribute the frame step came from (issue #3037).
+    public var frameStepSource: DicomSeriesVolumeGeometryProvenance.SliceSpacingSource
 
     /// Nil when `sopClassUID` is not one this policy covers.
     public init?(dataSet: DicomDataSet, sopClassUID: String) {
         let sopClassUID = sopClassUID.trimmingCharacters(in: .whitespacesAndNewlines.union(.init(charactersIn: "\0")))
         guard Self.coveredSOPClassUIDs.contains(sopClassUID) else { return nil }
-        let inPlane: SIMD2<Double>
+        let declaredInPlane: SIMD2<Double>?
         if sopClassUID == Self.secondaryCaptureSOPClassUID {
-            inPlane = Self.pixelSpacing(dataSet, 0x0028_0030) ?? Self.pixelSpacing(dataSet, 0x0018_2010) ?? .one
+            declaredInPlane = Self.pixelSpacing(dataSet, 0x0028_0030) ?? Self.pixelSpacing(dataSet, 0x0018_2010)
         } else if Self.ultrasoundSOPClassUIDs.contains(sopClassUID) {
-            inPlane = Self.ultrasoundSpacing(dataSet) ?? .one
+            declaredInPlane = Self.ultrasoundSpacing(dataSet)
         } else {
-            inPlane = Self.pixelSpacing(dataSet, 0x0028_0030) ?? .one
+            declaredInPlane = Self.pixelSpacing(dataSet, 0x0028_0030)
         }
-        let step = [0x0018_0088, 0x0018_0050].lazy.compactMap { dataSet.floats(for: $0).first }
-            .first { $0.isFinite && $0 > 0 } ?? 1
-        spacing = SIMD3(inPlane.x, inPlane.y, step)
+        let inPlane = declaredInPlane ?? .one
+        isInPlaneSpacingCalibrated = declaredInPlane != nil
+        let steps: [(tag: Int, source: DicomSeriesVolumeGeometryProvenance.SliceSpacingSource)] = [
+            (0x0018_0088, .spacingBetweenSlices), (0x0018_0050, .sliceThickness)
+        ]
+        let step = steps.lazy.compactMap { entry in dataSet.floats(for: entry.tag).first.map { ($0, entry.source) } }
+            .first { $0.0.isFinite && $0.0 > 0 }
+        frameStepSource = step?.1 ?? .defaultValue
+        spacing = SIMD3(inPlane.x, inPlane.y, step?.0 ?? 1)
 
         var positioned = dataSet
         if sopClassUID == Self.nuclearMedicineSOPClassUID, dataSet.floats(for: 0x0020_0032).count < 3,

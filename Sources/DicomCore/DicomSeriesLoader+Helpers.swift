@@ -42,6 +42,40 @@ extension DicomSeriesLoader {
         return nil
     }
 
+    /// Whether Pixel Spacing (0028,0030) holds two positive values, so the in-plane spacing comes from the object
+    /// rather than the decoder's 1 mm default (issue #3037).
+    func hasDeclaredPixelSpacing(_ decoder: any DicomDecoderProtocol) -> Bool {
+        let values = decimalValues(from: decoder.info(for: .pixelSpacing))
+        guard values.count >= 2, let row = values[0], let column = values[1] else { return false }
+        return row.isFinite && column.isFinite && row > 0 && column > 0
+    }
+
+    /// The attribute the decoder's slice interval came from: Spacing Between Slices wins over Slice Thickness, as
+    /// the decoder reads them; with neither, the interval is the 1 mm default (issue #3037).
+    func headerSliceSpacingSource(
+        _ decoder: any DicomDecoderProtocol
+    ) -> DicomSeriesVolumeGeometryProvenance.SliceSpacingSource {
+        if decimalValues(from: decoder.info(for: .sliceSpacing)).first.flatMap({ $0 }) != nil {
+            return .spacingBetweenSlices
+        }
+        return decimalValues(from: decoder.info(for: .sliceThickness)).first.flatMap({ $0 }) != nil
+            ? .sliceThickness : .defaultValue
+    }
+
+    /// A classic slice's own VOI: the window the loader selects and the valid VOI LUT Sequence items; nil when it
+    /// has neither (issue #3037).
+    func imageVOI(from decoder: any DicomDecoderProtocol, window: (center: Double, width: Double)?) -> DicomFrameVOI? {
+        let windows = window.flatMap { DicomFrameVOIWindow(center: $0.center, width: $0.width) }.map { [$0] } ?? []
+        let voiLUTs = (decoder as? DCMDecoder)?.validatedVOILookupTables().accepted ?? []
+        guard !windows.isEmpty || !voiLUTs.isEmpty else { return nil }
+        return DicomFrameVOI(windows: windows, voiLUTs: voiLUTs, lutFunction: nonEmptyText(decoder.info(for: .voiLUTFunction)))
+    }
+
+    private func nonEmptyText(_ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
     private func decimalValues(from value: String) -> [Double?] {
         value.split(separator: "\\", omittingEmptySubsequences: false).map { component in
             Double(component.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -247,14 +281,18 @@ extension DicomSeriesLoader {
             )
         }
 
+        // `getPixels8/16` invert MONOCHROME1 over the full sample range for display; the volume keeps the values
+        // written, and the inversion stays a display step after the modality rescale and VOI (issue #3032).
+        let isMonochrome1 = pixelFormat.photometricInterpretation == "MONOCHROME1"
         switch pixelFormat.bitsAllocated {
         case 8:
             guard let pixels = decoder.getPixels8(), pixels.count == expectedPixelCount else {
                 throw DicomSeriesLoaderError.failedToDecode(url)
             }
             for index in 0..<expectedPixelCount {
+                let pixel = isMonochrome1 ? UInt8.max - pixels[index] : pixels[index]
                 buffer[index] = Int16(clamping: normalizedStoredValue(
-                    Int(pixels[index]),
+                    Int(pixel),
                     pixelFormat: pixelFormat
                 ))
             }
@@ -271,12 +309,13 @@ extension DicomSeriesLoader {
             }
             if pixelFormat.pixelRepresentation == 1 {
                 for index in 0..<expectedPixelCount {
-                    let signed = Int32(pixels[index]) + Int32(Int16.min)
+                    let pixel = isMonochrome1 ? UInt16.max - pixels[index] : pixels[index]
+                    let signed = Int32(pixel) + Int32(Int16.min)
                     buffer[index] = Int16(truncatingIfNeeded: signed)
                 }
             } else {
                 for index in 0..<expectedPixelCount {
-                    buffer[index] = Int16(bitPattern: pixels[index])
+                    buffer[index] = Int16(bitPattern: isMonochrome1 ? UInt16.max - pixels[index] : pixels[index])
                 }
             }
             maskNarrow16BitSamples(in: &buffer, count: expectedPixelCount, pixelFormat: pixelFormat)
@@ -310,7 +349,7 @@ extension DicomSeriesLoader {
     ) throws -> Int {
         let frame: DicomDecodedFrame
         do {
-            frame = try DicomDecodedFrameReader(decoder: decoder).frame(at: 0)
+            frame = try DicomDecodedFrameReader(decoder: decoder).volumeFrame(at: 0)
         } catch let error as DicomDecodedFrameReader.ReadError {
             switch error {
             case .unsupportedTransferSyntax, .unusableEncapsulation:
@@ -320,6 +359,15 @@ extension DicomSeriesLoader {
             }
         } catch {
             throw DicomSeriesLoaderError.failedToDecode(url)
+        }
+
+        if frame.metadata.photometricInterpretation == "MONOCHROME1" {
+            guard buffer.count >= expectedPixelCount else { throw DicomSeriesLoaderError.failedToDecode(url) }
+            let stored = try buffer.withUnsafeMutableBufferPointer { destination in
+                try storeGrayFrame(frame, format: pixelFormat, count: expectedPixelCount, into: destination, at: 0, url: url)
+            }
+            guard stored else { throw DicomSeriesLoaderError.unsupportedPixelFormat(pixelFormat) }
+            return expectedPixelCount
         }
 
         switch frame.pixels {
@@ -348,7 +396,7 @@ extension DicomSeriesLoader {
                 }
             }
             maskNarrow16BitSamples(in: &buffer, count: expectedPixelCount, pixelFormat: pixelFormat)
-        case .rgb8:
+        case .rgb8, .rgb16:
             throw DicomSeriesLoaderError.unsupportedPixelFormat(pixelFormat)
         }
 

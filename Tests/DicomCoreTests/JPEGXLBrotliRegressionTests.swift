@@ -15,6 +15,13 @@ final class JPEGXLBrotliRegressionTests: XCTestCase {
         // Reference Brotli (Node zlib.brotliDecompressSync) accepts this stream.
         XCTAssertEqual(try BrotliDecoder.decode(Data([0x1A])), Data())
     }
+    /// RFC 7932 §3.4 (issue #3010): with three symbols the first one in the stream takes the 1-bit
+    /// code even when it is not the smallest. The stream is the upstream SwiftJXL regression case.
+    func test_simplePrefixCodeWithThreeSymbols_assignsLengthsInStreamOrder() throws {
+        let stream = Data([0x42, 0x00, 0x00, 0x00, 0x64, 0x50, 0x80, 0x40, 0x60, 0x10, 0x80, 0x06])
+        XCTAssertEqual(try BrotliDecoder.decode(stream), Data([0x41, 0x01, 0x02]))
+    }
+
     func test_metadata_isSkippedBetweenUncompressedBlocks() throws {
         var writer = BitWriter()
         writer.writeBit(false) // WBITS = 16

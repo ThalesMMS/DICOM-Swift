@@ -7,7 +7,11 @@ extension DicomTranscoder {
         // Little Endian its samples change byte order, or every value is read
         // with its bytes swapped (3 becomes 768).
         let source = DicomTransferSyntax(uid: decoder.info(for: .transferSyntaxUID)) ?? .explicitVRLittleEndian
-        if !decoder.compressedImage, (source == .explicitVRBigEndian) != (destination == .explicitVRBigEndian),
+        let swapsByteOrder = (source == .explicitVRBigEndian) != (destination == .explicitVRBigEndian)
+        if swapsByteOrder {
+            dataSet = Self.swappingWordValueByteOrder(in: dataSet)
+        }
+        if !decoder.compressedImage, swapsByteOrder,
            let width = decoder.pixelDataDescriptor.map({ $0.bitsAllocated / 8 }), width > 1,
            let element = dataSet[DicomTag.pixelData], case .bytes(let bytes) = element.value {
             dataSet.set(DicomDataElement(tag: DicomTag.pixelData.rawValue, vr: element.vr,
@@ -15,6 +19,28 @@ extension DicomTranscoder {
         }
         return try write(dataSet, decoder: decoder, transferSyntax: destination)
     }
+
+    /// Binary values other than Pixel Data that the data set carries as raw bytes keep the source byte order, so
+    /// between Big and Little Endian each value is swapped by its VR's unit, inside sequences too (PS3.5 7.3,
+    /// issue #3012). Values decoded to numbers are written in the destination order already.
+    static func swappingWordValueByteOrder(in dataSet: DicomDataSet) -> DicomDataSet {
+        DicomDataSet(elements: dataSet.elements.map { element in
+            switch element.value {
+            case .bytes(let bytes) where element.tag != DicomTag.pixelData.rawValue:
+                guard let width = wordWidth[element.vr] else { return element }
+                return DicomDataElement(tag: element.tag, vr: element.vr,
+                                        value: .bytes(swappingByteOrder(of: bytes, width: width)), name: element.name)
+            case .sequence(let items):
+                return DicomDataElement(tag: element.tag, vr: element.vr, value: .sequence(items.map {
+                    DicomSequenceItem(dataSet: swappingWordValueByteOrder(in: $0.dataSet))
+                }), name: element.name)
+            default:
+                return element
+            }
+        })
+    }
+
+    private static let wordWidth: [DicomVR: Int] = [.OW: 2, .OL: 4, .OF: 4, .OD: 8, .OV: 8]
 
     /// Each `width`-byte value of `bytes` with its bytes reversed; a trailing
     /// partial value is left as it is.
@@ -60,7 +86,7 @@ extension DicomTranscoder {
                     reason: (error as? LocalizedError)?.errorDescription ?? "\(error)"
                 )
             }
-            if case .rgb8 = frame.pixels { samplesPerPixel = 3 }
+            if frame.pixels.isColor { samplesPerPixel = 3 }
             pixelBytes.append(try storedBytes(from: frame, decoder: decoder))
         }
         if !pixelBytes.count.isMultiple(of: 2) {
@@ -388,7 +414,7 @@ extension DicomTranscoder {
                     reason: (error as? LocalizedError)?.errorDescription ?? "\(error)"
                 )
             }
-            if case .rgb8 = frame.pixels { samplesPerPixel = 3 }
+            if frame.pixels.isColor { samplesPerPixel = 3 }
             pixelBytes.append(try storedBytes(from: frame, decoder: decoder))
         }
         if pixelBytes.count % 2 != 0 {

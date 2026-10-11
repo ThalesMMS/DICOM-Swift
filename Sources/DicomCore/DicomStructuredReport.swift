@@ -71,6 +71,8 @@ public struct DicomSRContentItem: Equatable, Sendable {
     public let observationDateTime: DicomDateTime?
     public let observationUID: String?
     public let contentTemplate: DicomSRTemplateIdentification?
+    /// The value of a TABLE content item (PS3.3 C.18.10).
+    public let table: DicomSRTable?
 
     public var isByReference: Bool { referencedContentItemIdentifier != nil }
 
@@ -109,7 +111,8 @@ public struct DicomSRContentItem: Equatable, Sendable {
         rationalDenominatorValue: Int? = nil,
         observationDateTime: DicomDateTime? = nil,
         observationUID: String? = nil,
-        contentTemplate: DicomSRTemplateIdentification? = nil
+        contentTemplate: DicomSRTemplateIdentification? = nil,
+        table: DicomSRTable? = nil
     ) {
         self.relationshipType = relationshipType?.dicomSRNonEmptyValue?.uppercased()
         self.valueType = valueType.dicomSRNonEmptyValue?.uppercased() ?? "CONTAINER"
@@ -144,6 +147,7 @@ public struct DicomSRContentItem: Equatable, Sendable {
         self.observationDateTime = observationDateTime
         self.observationUID = observationUID
         self.contentTemplate = contentTemplate
+        self.table = table
     }
 
     public var flattened: [DicomSRContentItem] {
@@ -1080,7 +1084,8 @@ enum DicomSRParser {
             rationalDenominatorValue: measuredValue?.int(for: 0x0040A163),
             observationDateTime: dataSet.dateTime(for: 0x0040A032),
             observationUID: dataSet.string(for: 0x0040A171),
-            contentTemplate: template(in: dataSet)
+            contentTemplate: template(in: dataSet),
+            table: DicomSRTable(contentItem: dataSet)
         )
     }
 

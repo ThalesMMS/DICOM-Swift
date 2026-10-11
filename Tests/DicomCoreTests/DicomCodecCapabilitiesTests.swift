@@ -26,7 +26,7 @@ final class DicomCodecCapabilitiesTests: XCTestCase {
         XCTAssertEqual(status.source, .packageLinked)
         XCTAssertEqual(status.operations, ["decode", "encode"])
         XCTAssertEqual(status.supportedGrayscaleBitDepths, 8...16)
-        XCTAssertEqual(status.supportedColorBitDepths, 8...8)
+        XCTAssertEqual(status.supportedColorBitDepths, 8...16)
         XCTAssertEqual(
             Set(status.decodeTransferSyntaxUIDs),
             DicomJLSwiftBackend.transferSyntaxes

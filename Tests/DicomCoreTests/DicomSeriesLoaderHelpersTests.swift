@@ -362,7 +362,7 @@ final class DicomSeriesLoaderHelpersTests: XCTestCase {
         XCTAssertEqual(BufferPool.shared.statistics.totalAcquires, 0)
     }
 
-    func testDecodeSliceIntoBufferForSigned16Monochrome1PreservesLegacyInversionWithoutPixelPool() throws {
+    func testDecodeSliceIntoBufferForSigned16Monochrome1KeepsStoredSamplesWithoutPixelPool() throws {
         let samples: [Int16] = [-2, -1, 0, 1]
         let url = try makeSigned16Dicom(width: 2, height: 2, samples: samples, photometricInterpretation: "MONOCHROME1")
         defer { try? FileManager.default.removeItem(at: url) }
@@ -381,7 +381,8 @@ final class DicomSeriesLoaderHelpersTests: XCTestCase {
         )
 
         XCTAssertEqual(count, samples.count)
-        XCTAssertEqual(Array(output.prefix(count)), samples.map { ~$0 })
+        // Issue #3032: MONOCHROME1 voxels are the values written; the inversion is a display step.
+        XCTAssertEqual(Array(output.prefix(count)), samples)
         XCTAssertEqual(BufferPool.shared.statistics.totalAcquires, 0)
     }
 

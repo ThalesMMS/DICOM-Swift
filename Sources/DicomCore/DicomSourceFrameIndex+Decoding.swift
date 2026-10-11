@@ -22,7 +22,8 @@ extension DicomSourceFrameIndex {
         let rows = dataSet.int(for: .rows) ?? 0
         let columns = dataSet.int(for: .columns) ?? 0
         let components = dataSet.int(for: .samplesPerPixel) ?? 1
-        guard rows > 0, columns > 0, components == 1 || (components == 3 && allocated == 8) else { throw Failure.invalidLayout }
+        // Three-sample frames decode as 8-bit or, since issue #3034, 16-bit colour.
+        guard rows > 0, columns > 0, components == 1 || (components == 3 && allocated != 1) else { throw Failure.invalidLayout }
         let pixels = rows.multipliedReportingOverflow(by: columns)
         guard !pixels.overflow else { throw Failure.frameLimit }
         // Palette color expands to RGB, even though its stored component count is one.

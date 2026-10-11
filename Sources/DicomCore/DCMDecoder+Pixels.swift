@@ -50,7 +50,8 @@ extension DCMDecoder {
     ///
     /// This is intentionally internal to preserve the public `getPixels16()` contract, which returns
     /// normalized UInt16 samples. Volume assembly needs stored Int16 voxels, so it can avoid the
-    /// normalize-then-denormalize roundtrip for native signed CT/MR slices.
+    /// normalize-then-denormalize roundtrip for native signed CT/MR slices. MONOCHROME1 samples stay as written:
+    /// the inversion is a display step after the modality rescale and VOI (issue #3032).
     func copyNativeSigned16Pixels(into buffer: inout [Int16], expectedPixelCount: Int) -> Bool {
         synchronized {
             guard fileReadSucceeded,
@@ -87,12 +88,6 @@ extension DCMDecoder {
                             destinationBase[index] = Int16(bitPattern: value)
                         }
                     }
-                }
-            }
-
-            if photometricInterpretation == "MONOCHROME1" {
-                for index in 0..<expectedPixelCount {
-                    buffer[index] = ~buffer[index]
                 }
             }
 

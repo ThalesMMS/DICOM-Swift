@@ -39,7 +39,9 @@ struct DicomJ2KSwiftBackend: DicomFrameCodecBackend {
         encodeTransferSyntaxUIDs: allFrameTransferSyntaxes.union(part2TransferSyntaxes),
         operations: [.decode, .encode],
         supportedGrayscaleBitDepths: 1...16,
-        supportedColorBitDepths: 1...8,
+        // Colour decodes up to 16 bits since issue #3034 (unsigned RGB/YBR_RCT/YBR_ICT); `validateEncoding` still
+        // limits colour encoding to unsigned 8-bit RGB.
+        supportedColorBitDepths: 1...16,
         maximumComponents: 3,
         supportsSignedSamples: true,
         partialDecode: DicomPartialDecodeCapabilities(
@@ -90,6 +92,15 @@ struct DicomJ2KSwiftBackend: DicomFrameCodecBackend {
         }
         // The SIZ must describe the dataset's frame before the decoder allocates for it (#2901).
         try Self.checkSIZ(inspection, descriptor: request.descriptor, partial: request.partialRequest != nil)
+        // Issue #3035: subsampled components (SIZ XRsiz/YRsiz above 1) have no place in the full-resolution frame
+        // contract. Refuse them by their header instead of failing later inside the entropy decoder.
+        if let index = inspection.components.firstIndex(where: { $0.horizontalSeparation != 1 || $0.verticalSeparation != 1 }) {
+            let component = inspection.components[index]
+            throw DicomJ2KSwiftBackendError.unsupportedShape(
+                transferSyntaxUID: uid,
+                reason: "component \(index) is subsampled \(component.horizontalSeparation)x\(component.verticalSeparation);"
+                    + " frames hold full-resolution samples only")
+        }
         let image: J2KImage
         var codecBytesAvoided: Int?
         if let partial = request.partialRequest,
@@ -258,7 +269,11 @@ struct DicomJ2KSwiftBackend: DicomFrameCodecBackend {
               descriptor.samplesPerPixel == 1
                 || descriptor.samplesPerPixel == 3
                     && descriptor.bitsAllocated == 8
-                    && descriptor.bitsStored <= 8 else {
+                    && descriptor.bitsStored <= 8
+                || descriptor.samplesPerPixel == 3
+                    && descriptor.bitsAllocated == 16
+                    && descriptor.pixelRepresentation == 0
+                    && ["RGB", "YBR_RCT", "YBR_ICT"].contains(descriptor.photometricInterpretation.uppercased()) else {
             throw DicomJ2KSwiftBackendError.unsupportedShape(
                 transferSyntaxUID: descriptor.transferSyntaxUID,
                 reason: "the declared frame shape is outside the full-frame decoder limits"
@@ -564,17 +579,22 @@ struct DicomJ2KSwiftBackend: DicomFrameCodecBackend {
                 pixelRepresentation: descriptor.pixelRepresentation
             )
         } else {
-            guard bitsPerSample <= 8 else {
+            guard image.components.allSatisfy({ $0.bitDepth == bitsPerSample }) else {
                 throw DicomJ2KSwiftBackendError.unsupportedShape(
                     transferSyntaxUID: uid,
-                    reason: "color output above 8 bits per component is not qualified"
+                    reason: "color components of different precisions are not representable as RGB"
                 )
             }
-            bytes = try interleavedColorBytes(
-                image.components,
-                pixelCount: image.width * image.height,
-                transferSyntaxUID: uid
-            )
+            guard bitsPerSample <= 8 || descriptor.bitsAllocated == 16 && !image.components.contains(where: \.signed) else {
+                throw DicomJ2KSwiftBackendError.unsupportedShape(
+                    transferSyntaxUID: uid,
+                    reason: "color output above 8 bits per component needs unsigned components and Bits Allocated 16"
+                )
+            }
+            bytes = try bitsPerSample <= 8
+                ? interleavedColorBytes(image.components, pixelCount: image.width * image.height, transferSyntaxUID: uid)
+                : interleavedDeepColorBytes(image.components, pixelCount: image.width * image.height,
+                                            transferSyntaxUID: uid)
         }
 
         return DicomCodecDecodedFrame(
@@ -677,6 +697,49 @@ struct DicomJ2KSwiftBackend: DicomFrameCodecBackend {
         for pixelIndex in 0..<pixelCount {
             for componentIndex in 0..<3 {
                 output[pixelIndex * 3 + componentIndex] = components[componentIndex].data[pixelIndex]
+            }
+        }
+        return output
+    }
+}
+
+// MARK: - 16-bit colour (issue #3034)
+
+extension DicomJ2KSwiftBackend {
+    /// Interleaves three 9- to 16-bit components as little-endian words, the layout of every other decoded
+    /// 16-bit frame buffer.
+    static func interleavedDeepColorBytes(
+        _ components: [J2KComponent],
+        pixelCount: Int,
+        transferSyntaxUID: String
+    ) throws -> Data {
+        guard components.count == 3, components.allSatisfy({ $0.data.count == pixelCount * 2 }) else {
+            throw DicomJ2KSwiftBackendError.metadataMismatch(
+                transferSyntaxUID: transferSyntaxUID,
+                reason: "16-bit color component byte counts do not match the image dimensions"
+            )
+        }
+        let bigEndian = try components.map { component -> Bool in
+            guard let order = component.sampleByteOrder else {
+                throw DicomJ2KSwiftBackendError.metadataMismatch(
+                    transferSyntaxUID: transferSyntaxUID,
+                    reason: "high-bit color component does not declare its sample byte order"
+                )
+            }
+            if case .bigEndian = order { return true }
+            return false
+        }
+        var output = Data(count: pixelCount * 6)
+        output.withUnsafeMutableBytes { (target: UnsafeMutableRawBufferPointer) in
+            for (componentIndex, component) in components.enumerated() {
+                let bigEndian = bigEndian[componentIndex]
+                component.data.withUnsafeBytes { (source: UnsafeRawBufferPointer) in
+                    for pixelIndex in 0..<pixelCount {
+                        let destination = (pixelIndex * 3 + componentIndex) * 2
+                        target[destination] = source[pixelIndex * 2 + (bigEndian ? 1 : 0)]
+                        target[destination + 1] = source[pixelIndex * 2 + (bigEndian ? 0 : 1)]
+                    }
+                }
             }
         }
         return output

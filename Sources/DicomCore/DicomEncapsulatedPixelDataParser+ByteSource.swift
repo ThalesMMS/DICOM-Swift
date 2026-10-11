@@ -102,10 +102,17 @@ extension DicomEncapsulatedPixelDataParser {
             mapped = fragments.map { [$0.index] }
         } else {
             guard !singleFragment else { throw Failure.invalidFragmentation(transferSyntax.rawValue) }
-            mapped = try await DicomJPEGFrameBoundaryScanner.map(
-                source: source, fragments: fragments, numberOfFrames: numberOfFrames,
-                syntax: transferSyntax, maximumScanBytes: maximumBoundaryScanBytes
-            )
+            if transferSyntax == .jpeg2000Lossless || transferSyntax == .jpeg2000 {
+                mapped = try await DicomJ2KFrameBoundaryScanner.map(
+                    source: source, fragments: fragments, numberOfFrames: numberOfFrames,
+                    maximumScanBytes: maximumBoundaryScanBytes
+                )
+            } else {
+                mapped = try await DicomJPEGFrameBoundaryScanner.map(
+                    source: source, fragments: fragments, numberOfFrames: numberOfFrames,
+                    syntax: transferSyntax, maximumScanBytes: maximumBoundaryScanBytes
+                )
+            }
         }
         guard !singleFragment || mapped.allSatisfy({ $0.count == 1 }) else {
             throw Failure.invalidFragmentation(transferSyntax.rawValue)

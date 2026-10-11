@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Generate the versioned PS3.15 Annex E table used by DicomDeidentifier.
 
-Reads the DocBook source of PS3.15 (Table E.1-1 Application Level Confidentiality Profile Attributes and
-Table E.3.10-1 Safe Private Attributes) and writes DicomData's resource JSON. Every attribute row keeps its
+Reads the DocBook source of PS3.15 (Table E.1-1 Application Level Confidentiality Profile Attributes, Table
+E.3.4-1 Content Item Concept Names for the Clean Structured Content Option and Table E.3.10-1 Safe Private
+Attributes) and writes DicomData's resource JSON. Every attribute row keeps its
 basic-profile action code and the per-option codes verbatim (X, Z, D, U, K, C and the compound codes); the
 JSON is the single source the toolkit consults, so a standard revision is a regeneration, not a code change.
 
@@ -20,6 +21,10 @@ OPTION_COLUMNS = [
     "retainSafePrivate", "retainUIDs", "retainDeviceIdentity", "retainInstitutionIdentity",
     "retainPatientCharacteristics", "retainLongitudinalFullDates", "retainLongitudinalModifiedDates",
     "cleanDescriptors", "cleanStructuredContent", "cleanGraphics",
+]
+STRUCTURED_CONTENT_OPTION_COLUMNS = [
+    "retainUIDs", "retainDeviceIdentity", "retainInstitutionIdentity", "retainPatientCharacteristics",
+    "retainLongitudinalFullDates", "retainLongitudinalModifiedDates", "cleanDescriptors",
 ]
 CODES = {"X", "Z", "D", "U", "K", "C", "X/Z", "X/D", "Z/D", "X/Z/D", "X/Z/U*"}
 
@@ -80,6 +85,24 @@ def main():
             raise SystemExit(f"unrecognised tag {tag_text!r}")
         attributes.append(entry)
 
+    structured_content = []
+    e34 = table(root, "E.3.4-1")
+    header = [text(th) for th in e34.find(".//d:thead", NS).iter("{http://docbook.org/ns/docbook}th")]
+    if len(header) != 7 + len(STRUCTURED_CONTENT_OPTION_COLUMNS) or header[6] != "Basic Prof.":
+        raise SystemExit(f"E.3.4-1 has an unexpected header: {header!r}")
+    for row in rows(e34):
+        if len(row) != len(header):
+            raise SystemExit(f"E.3.4-1 row has an unexpected column count: {row!r}")
+        meaning, code_value, scheme, value_type, retired, in_template, basic = row[:7]
+        options = {column: code for column, code in zip(STRUCTURED_CONTENT_OPTION_COLUMNS, row[7:]) if code}
+        if basic not in CODES or not all(code in {"K", "C"} for code in options.values()):
+            raise SystemExit(f"E.3.4-1 row {meaning!r} has invalid actions {basic!r} {options!r}")
+        entry = {"meaning": meaning, "codeValue": code_value, "scheme": scheme, "valueType": value_type, "basic": basic,
+                 "retired": retired.startswith("Y")}
+        if options:
+            entry["options"] = options
+        structured_content.append(entry)
+
     safe_private = []
     for row in rows(table(root, "E.3.10-1")):
         element, creator, vr, vm, meaning = row[:5]
@@ -93,10 +116,11 @@ def main():
         "sourceSHA256": hashlib.sha256(args.part15.read_bytes()).hexdigest(),
         "optionColumns": OPTION_COLUMNS,
         "attributes": sorted(attributes, key=lambda e: (e["tag"], e["name"])),
+        "structuredContent": sorted(structured_content, key=lambda e: (e["scheme"], e["codeValue"], e["valueType"])),
         "safePrivateAttributes": sorted(safe_private, key=lambda e: (e["creator"], e["element"])),
     }
     args.output.write_text(json.dumps(document, indent=1, ensure_ascii=False, sort_keys=True) + "\n")
-    print(f"{len(attributes)} attributes, {len(safe_private)} safe private attributes -> {args.output}")
+    print(f"{len(attributes)} attributes, {len(structured_content)} structured content concepts, {len(safe_private)} safe private attributes -> {args.output}")
 
 
 if __name__ == "__main__":

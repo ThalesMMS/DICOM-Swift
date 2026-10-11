@@ -712,7 +712,7 @@ public struct DicomEnhancedMultiframeConverter: Sendable {
                     ? UInt8(bitPattern: Int8(truncatingIfNeeded: Int(unInverted) - 128))
                     : unInverted
             })
-        case .rgb8:
+        case .rgb8, .rgb16:
             throw ConversionError.unsupportedPixelFormat(
                 "requires one MONOCHROME1/MONOCHROME2 sample per pixel"
             )

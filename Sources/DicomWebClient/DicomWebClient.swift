@@ -108,6 +108,8 @@ public struct DicomWebClientConfiguration: Equatable, Sendable {
 
     public var allowedOrigins: Set<URL> = []
     public var multipartLimits = DicomWebMultipartLimits()
+    /// Opt-in interoperability for nodes with broken Part 10 MIME framing. Strict by default.
+    public var multipartCompatibility = DicomWebMultipartCompatibility.strict
     /// Largest search response, and largest single data set of a WADO-RS metadata response. Metadata is read one
     /// data set at a time, so a whole metadata response may be larger.
     public var maximumMetadataBytes = 64 * 1024 * 1024
@@ -758,7 +760,8 @@ public struct DicomWebClient: Sendable {
         do {
             let contentType = response.headers.dicomWebHeaderValue("Content-Type") ?? "application/octet-stream"
             if contentType.lowercased().hasPrefix("multipart/") {
-                var parser = try DicomWebMultipartStreamParser(contentType: contentType, limits: configuration.multipartLimits)
+                var parser = try DicomWebMultipartStreamParser(contentType: contentType, limits: configuration.multipartLimits,
+                                                               compatibility: configuration.multipartCompatibility.forResponse(headers: response.headers))
                 for try await chunk in response.body {
                     try Task.checkCancellation()
                     // Bound event batches even when an injected transport yields a large Data value.

@@ -68,7 +68,7 @@ extension DicomWebServer {
                 let objects = try documents.flatMap { try JSONSerialization.jsonObject(with: $0) as! [Any] }
                 response.body = try JSONSerialization.data(withJSONObject: objects, options: [.sortedKeys])
             }
-            return streamed(response)
+            return streamed(taggingBody(response, request: request))
         }
         if suffix == ["thumbnail"] || suffix == ["rendered"] || suffix.first == "frames" {
             let isRaw = suffix.count == 2 && suffix[0] == "frames"
@@ -123,12 +123,13 @@ extension DicomWebServer {
                 response = error(406, "Media type disabled by configuration.")
             }
             if !isRaw, response.statusCode == 422 { response.statusCode = 406 }
-            return streamed(response)
+            return streamed(taggingBody(response, request: request))
         }
         guard suffix.isEmpty else { return streamed(notFound()) }
         let sets = try await storage.metadata(study: study, series: series, instance: instance)
         guard !sets.isEmpty else { throw DicomWebServerFailure(404, "Resource not found.") }
         var parts: [DicomWebInstancePlan] = []
+        var version = Data()
         for set in sets {
             guard let r = set.string(for: .seriesInstanceUID), let i = set.string(for: .sopInstanceUID) else {
                 throw DicomWebServerFailure(500, "Metadata lacks identity.")
@@ -136,6 +137,7 @@ extension DicomWebServer {
             let resource = DicomResourceRef.instance(study: set.string(for: .studyInstanceUID) ?? study, series: r, instance: i)
             _ = try await DicomRequestAuthorization.current?.check(.readBytes, resource)
             let stored = try await storage.instance(study: study, series: r, instance: i)
+            version += Self.entityVersion(of: stored)
             if let resolver = representationResolver,
                let archive = try await resolver.representations(for: i) {
                 guard archive.original.contentSHA256 == DicomArchiveRepresentation.hash(stored.part10Data) else {
@@ -168,6 +170,7 @@ extension DicomWebServer {
                     }
                     parts.append(.init(study: study, series: r, instance: i, syntax: selected.transferSyntax.rawValue,
                                        archiveRepresentation: selected))
+                    version += Data(selected.contentSHA256.utf8)
                     continue
                 }
             }
@@ -180,7 +183,10 @@ extension DicomWebServer {
         }
         // Preflight the entire aggregate. PS3.18 2026c does not assign 206 to an incomplete set of instances.
         let producer = try DicomWebInstanceResponse(parts: parts, base: baseURL(request), storage: storage, transcoder: transcoding, resolver: representationResolver, access: DicomRequestAuthorization.current)
-        return .init(statusCode: 200, headers: ["Content-Type": producer.contentType],
+        // The parts' identities, negotiated syntaxes and stored versions tag the aggregate without streaming it.
+        version += Data(parts.map { "\($0.instance)|\($0.syntax)" }.joined(separator: ",").utf8)
+        return .init(statusCode: 200, headers: ["Content-Type": producer.contentType, "Vary": "Accept",
+                                                "ETag": entityTag(for: request, contentType: producer.contentType, version: version)],
                      body: AsyncThrowingStream(unfolding: { try await producer.next() }))
     }
 

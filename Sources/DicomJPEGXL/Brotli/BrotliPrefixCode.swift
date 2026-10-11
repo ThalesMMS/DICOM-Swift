@@ -286,11 +286,11 @@ package enum BrotliPrefixCodeReader {
             lengths[Int(symbols[0])] = 1
             lengths[Int(symbols[1])] = 1
         case 3:
-            // 3 symbols, lengths 1, 2, 2 — sorted by value.
-            let sorted = symbols.sorted()
-            lengths[Int(sorted[0])] = 1
-            lengths[Int(sorted[1])] = 2
-            lengths[Int(sorted[2])] = 2
+            // 3 symbols, lengths 1, 2, 2 in stream order (RFC 7932 §3.4); only the canonical
+            // codes of the two length-2 symbols follow their values (issue #3010).
+            lengths[Int(symbols[0])] = 1
+            lengths[Int(symbols[1])] = 2
+            lengths[Int(symbols[2])] = 2
         case 4:
             let treeSelect: UInt32
             do { treeSelect = try r.read(bits: 1) }

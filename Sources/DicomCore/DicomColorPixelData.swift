@@ -549,14 +549,19 @@ extension DCMDecoder {
             }
             let samples = photometric == "PALETTE COLOR" ? 1 : 3
             let bitsAllocated: Int
+            var bitsStored = metadata.bitsStored
             switch decodedFrame.pixels {
             case .gray16: bitsAllocated = 16
             case .gray8, .rgb8: bitsAllocated = 8
+            case .rgb16:
+                // 16-bit RGB (issue #3034) is scaled to RGB8 by the precision the decoded frame reports.
+                bitsAllocated = 16
+                bitsStored = decodedFrame.metadata.bitsStored
             }
             guard let descriptor = DicomPixelDataDescriptor(
                 rows: decodedFrame.metadata.height, columns: decodedFrame.metadata.width, numberOfFrames: 1,
-                bitsAllocated: bitsAllocated, bitsStored: min(metadata.bitsStored, bitsAllocated),
-                highBit: min(metadata.bitsStored, bitsAllocated) - 1, pixelRepresentation: 0,
+                bitsAllocated: bitsAllocated, bitsStored: min(bitsStored, bitsAllocated),
+                highBit: min(bitsStored, bitsAllocated) - 1, pixelRepresentation: 0,
                 samplesPerPixel: samples, planarConfiguration: samples == 3 ? 0 : nil,
                 photometricInterpretation: photometric, pixelDataOffset: 0
             ) else {

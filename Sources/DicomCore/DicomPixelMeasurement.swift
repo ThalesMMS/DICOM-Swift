@@ -100,6 +100,18 @@ public enum DicomPixelMeasurement {
                         }
                     }
                 }
+            case .rgb16(let interleaved):
+                // Luminance of the stored 16-bit values (issue #3034), in the stored range.
+                interleaved.withUnsafeBufferPointer { input in
+                    for row in area.y..<(area.y + area.height) {
+                        let base = row * width
+                        for column in area.x..<(area.x + area.width) {
+                            let offset = (base + column) * 3
+                            output[cursor] = 0.299 * Double(input[offset]) + 0.587 * Double(input[offset + 1]) + 0.114 * Double(input[offset + 2])
+                            cursor += 1
+                        }
+                    }
+                }
             }
         }
         let count = Double(values.count)

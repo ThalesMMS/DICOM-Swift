@@ -1,3 +1,51 @@
+# 2.0.3
+
+This patch adds opt-in recovery of legacy WADO-RS multipart framing to
+`DicomWebClient`. Swift tools 6.2, Swift 6 language mode, Apple-platform 26.0
+minimums and the announced products remain unchanged. Existing callers retain
+strict parsing by default.
+
+## Added
+
+- `DicomWebMultipartCompatibility` offers explicit `pixeonLegacyFraming` and
+  response-identified `identifiedPixeonLegacyFraming` modes. The latter requires
+  the `DicomWebServices ` Server header before enabling recovery.
+- The compatibility decoder handles an omitted opening boundary and boundaries
+  attached directly to Part 10 objects. It follows DICOM element and item
+  lengths, including encapsulated Pixel Data, instead of replacing byte patterns
+  inside payloads. Extracted files preserve their bytes exactly.
+- Resource budgets, cancellation, malformed headers, truncation and ambiguous
+  framing remain enforced. Ordinary valid multipart responses use the strict
+  parser even when compatibility is selected.
+
+## Canonical source synchronization
+
+This release also includes previously committed fixes since 2.0.2: JPEG,
+JPEG-LS, JPEG 2000/HTJ2K and JPEG XL decoding corrections; fragmented JPEG 2000
+frame indexing; typed deep-colour and residual YBR handling; stored-sample,
+VOI, units and volume-geometry preservation; ISO 2022 metadata and explicit
+trailing-data recovery; structured-report TABLE support; de-identification
+clean options; MPEG-2 Program Stream demuxing; relational DIMSE retrieval and
+priority; and DICOMweb entity tags. These changes retain their earlier focused
+canonical qualification. Optional codec runtimes and volume performance limits
+remain specific to their documented paths; this patch does not claim universal
+runtime support or production readiness of every volume path.
+
+## Validation and limits
+
+Focused parser validation covered 18 XCTest cases, with 17 functional cases
+under AddressSanitizer and in Release plus the existing adversarial parser
+performance case in Debug and Release. Captured two-instance and single-instance
+responses preserved SHA-256 hashes and SOP Instance UIDs across chunk sizes.
+The minimal public client consumer was checked in Debug and Release.
+
+Recovery requires recognizable Part 10 data and supported Explicit VR transfer
+syntaxes. Implicit VR and whole-dataset deflate are deliberately rejected in
+legacy framing mode. Strict, standards-compliant retrieval remains unchanged.
+Earlier source changes reuse their recorded focused qualification; they were
+not all re-executed during publication. The full suite, broad release gate and
+optional codec runtime matrix were not run for this patch. This change does not resolve intermittent server timeouts.
+
 # 2.0.2
 
 This patch release fixes DICOMweb behaviour found by an edge-case cross test of

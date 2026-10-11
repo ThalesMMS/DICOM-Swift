@@ -75,6 +75,7 @@ public actor DicomSourceFrameSession {
             case .gray8(let pixels): pixels.count
             case .gray16(let pixels): pixels.count * 2
             case .rgb8(let pixels): pixels.count
+            case .rgb16(let pixels): pixels.count * 2
             }
         }
 

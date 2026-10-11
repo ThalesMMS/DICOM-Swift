@@ -54,9 +54,11 @@ internal enum DicomCompressedPixelBackendRegistry {
         case .deflatedImageFrameCompression:
             return selected(.nativeDeflatedFrames)
         case .jpegLSLossless, .jpegLSNearLossless:
-            if let samplesPerPixel, samplesPerPixel > 1, let requestedBitDepth, requestedBitDepth > 8 {
+            // 16-bit colour is delivered for RGB (issue #3034); other photometrics stay at 8 bits.
+            if let samplesPerPixel, samplesPerPixel > 1, let requestedBitDepth, requestedBitDepth > 8,
+               !Self.isDeepColorRGB(photometricInterpretation, samplesPerPixel: samplesPerPixel, allowsWaveletTransforms: false) {
                 return unsupported(
-                    "JPEG-LS multi-component output above 8 bits per component is unsupported (\(componentContext))."
+                    "JPEG-LS multi-component output above 8 bits per component is delivered for RGB only (\(componentContext))."
                 )
             }
             return selected(.nativeJPEGLS)
@@ -66,20 +68,32 @@ internal enum DicomCompressedPixelBackendRegistry {
                 let photometric = photometricInterpretation?
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 // Lossless JPEG keeps the components as coded: YBR_FULL(_422) samples come out as stored and the
-                // caller converts them (issue #2821).
+                // caller converts them (issue #2821); RGB keeps up to 16 bits (issue #3034).
                 if samplesPerPixel == 3, ["RGB", "YBR_FULL", "YBR_FULL_422"].contains(photometric ?? ""),
                    let storedBits, storedBits <= 8 {
                     return selected(.nativeJPEGLossless)
                 }
+                if samplesPerPixel == 3, photometric == "RGB", let storedBits, storedBits <= 16 {
+                    return selected(.nativeJPEGLossless)
+                }
                 return unsupported(
                     "\(transferSyntax.registryEntry.name) (transfer syntax \(transferSyntax.rawValue)) multi-component"
-                        + " decode supports 8-bit RGB, YBR_FULL and YBR_FULL_422 only; "
+                        + " decode supports RGB up to 16 bits and 8-bit YBR_FULL and YBR_FULL_422 only; "
                         + "\(storedBits.map { "\($0)-bit" } ?? "unknown-depth")"
                         + " output for \(componentContext) has no unambiguous mapping."
                 )
             }
             return selected(.nativeJPEGLossless)
         case .jpegBaseline, .jpegExtended:
+            // Issue #3036: every DCT decoder here applies the full-range JFIF YCbCr transform. Partial-range YBR would
+            // need the PS3.3 C.7.6.3.1.2 partial-range equations, so it is refused instead of converted with the wrong range.
+            if samplesPerPixel == 3, photometricInterpretation?.trimmingCharacters(in: .whitespacesAndNewlines)
+                .uppercased().hasPrefix("YBR_PARTIAL") == true {
+                return unsupported(
+                    "\(transferSyntax.registryEntry.name) (transfer syntax \(transferSyntax.rawValue)) colour decode applies "
+                        + "the full-range YCbCr transform; partial-range YBR (\(componentContext)) has no conversion."
+                )
+            }
             if DicomJPEGSwiftRolloutMode(environment: environment) != .disabled,
                Self.ownJPEGHandles(bitsStored: bitsStored ?? requestedBitDepth, requestedBitDepth: requestedBitDepth,
                                    samplesPerPixel: samplesPerPixel, photometricInterpretation: photometricInterpretation,
@@ -94,9 +108,10 @@ internal enum DicomCompressedPixelBackendRegistry {
                     "JPEG 2000 \(requestedBitDepth)-bit output exceeds the supported 16-bit grayscale backend path."
                 )
             }
-            if let samplesPerPixel, samplesPerPixel > 1, let requestedBitDepth, requestedBitDepth > 8 {
+            if let samplesPerPixel, samplesPerPixel > 1, let requestedBitDepth, requestedBitDepth > 8,
+               !Self.isDeepColorRGB(photometricInterpretation, samplesPerPixel: samplesPerPixel, allowsWaveletTransforms: true) {
                 return unsupported(
-                    "JPEG 2000 color output above 8 bits per component has no precision-preserving backend path "
+                    "JPEG 2000 color output above 8 bits per component is delivered for RGB, YBR_RCT and YBR_ICT only "
                         + "(\(componentContext))."
                 )
             }
@@ -157,9 +172,10 @@ internal enum DicomCompressedPixelBackendRegistry {
                     "HTJ2K \(requestedBitDepth)-bit output exceeds the supported 16-bit grayscale backend path."
                 )
             }
-            if let samplesPerPixel, samplesPerPixel > 1, let requestedBitDepth, requestedBitDepth > 8 {
+            if let samplesPerPixel, samplesPerPixel > 1, let requestedBitDepth, requestedBitDepth > 8,
+               !Self.isDeepColorRGB(photometricInterpretation, samplesPerPixel: samplesPerPixel, allowsWaveletTransforms: true) {
                 return unsupported(
-                    "HTJ2K color output above 8 bits per component has no precision-preserving backend path "
+                    "HTJ2K color output above 8 bits per component is delivered for RGB, YBR_RCT and YBR_ICT only "
                         + "(\(componentContext))."
                 )
             }
@@ -210,6 +226,7 @@ internal enum DicomCompressedPixelBackendRegistry {
                 families: [.jpeg],
                 syntaxes: [.jpegLossless, .jpegLosslessFirstOrder],
                 grayscale: 1...16,
+                color: 1...16,
                 source: .packageLinked
             ),
             capability(
@@ -255,6 +272,15 @@ internal enum DicomCompressedPixelBackendRegistry {
                 syntaxes: [.htj2kLossless, .htj2kLosslessRPCL, .htj2k]
             )
         ]
+    }
+
+    /// Three-sample colour that the decoders deliver as 16-bit RGB (issue #3034): RGB, plus the JPEG 2000
+    /// reversible/irreversible colour transforms, which the wavelet decoders undo into RGB samples.
+    static func isDeepColorRGB(_ photometricInterpretation: String?, samplesPerPixel: Int,
+                               allowsWaveletTransforms: Bool) -> Bool {
+        let photometric = photometricInterpretation?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() ?? ""
+        let accepted: Set<String> = allowsWaveletTransforms ? ["RGB", "YBR_RCT", "YBR_ICT"] : ["RGB"]
+        return samplesPerPixel == 3 && accepted.contains(photometric)
     }
 
     private static func selected(_ backend: DicomCompressedPixelBackend) -> DicomCompressedPixelBackendDecision {

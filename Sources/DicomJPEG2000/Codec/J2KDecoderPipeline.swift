@@ -1101,6 +1101,12 @@ struct DecoderPipeline: Sendable {
         // Number of components
         let componentCount = Int(try reader.readUInt16())
 
+        // The decoder divides by the tile and subsampling sizes and multiplies the extents, so a SIZ that the
+        // backend inspector would refuse must not reach it from a caller that skips the inspector (T.800 A.5.1,
+        // #3018).
+        try Self.validateSIZ(width: width, height: height, xOsiz: xOsiz, yOsiz: yOsiz, tileWidth: tileWidth,
+                             tileHeight: tileHeight, xtOsiz: xtOsiz, ytOsiz: ytOsiz, componentCount: componentCount)
+
         // Parse component information
         var components: [CodestreamMetadata.ComponentInfo] = []
         for _ in 0..<componentCount {
@@ -1109,6 +1115,9 @@ struct DecoderPipeline: Sendable {
             let bitDepth = Int((ssiz & 0x7F)) + 1
             let subsamplingX = Int(try reader.readUInt8())
             let subsamplingY = Int(try reader.readUInt8())
+            guard subsamplingX > 0, subsamplingY > 0 else {
+                throw J2KError.invalidComponentConfiguration("SIZ component subsampling must be at least 1")
+            }
 
             components.append(CodestreamMetadata.ComponentInfo(
                 bitDepth: bitDepth,
@@ -1139,6 +1148,33 @@ struct DecoderPipeline: Sendable {
             quantizationGuardBits: 2,
             bandKbValues: [:]
         )
+    }
+
+    /// The SIZ constraints of T.800 Table A.9 and Equation B-3 that keep the decoder's arithmetic defined.
+    static func validateSIZ(width: Int, height: Int, xOsiz: Int, yOsiz: Int, tileWidth: Int, tileHeight: Int,
+                            xtOsiz: Int, ytOsiz: Int, componentCount: Int) throws {
+        guard (1...16_384).contains(componentCount) else {
+            throw J2KError.invalidComponentConfiguration("SIZ declares \(componentCount) components")
+        }
+        guard width > xOsiz, height > yOsiz else {
+            throw J2KError.invalidDimensions("SIZ image offset (\(xOsiz), \(yOsiz)) is not inside \(width)x\(height)")
+        }
+        guard tileWidth > 0, tileHeight > 0 else {
+            throw J2KError.invalidTileConfiguration("SIZ tile size \(tileWidth)x\(tileHeight) is empty")
+        }
+        guard xtOsiz <= xOsiz, ytOsiz <= yOsiz, xtOsiz + tileWidth > xOsiz, ytOsiz + tileHeight > yOsiz else {
+            throw J2KError.invalidTileConfiguration("SIZ tile offset (\(xtOsiz), \(ytOsiz)) does not cover the image offset")
+        }
+        let tilesAcross = (width - xtOsiz + tileWidth - 1) / tileWidth
+        let tilesDown = (height - ytOsiz + tileHeight - 1) / tileHeight
+        let tiles = tilesAcross.multipliedReportingOverflow(by: tilesDown)
+        guard !tiles.overflow, tiles.partialValue <= 65_535 else {
+            throw J2KError.invalidTileConfiguration("SIZ declares \(tilesAcross)x\(tilesDown) tiles")
+        }
+        let samples = (width - xOsiz).multipliedReportingOverflow(by: height - yOsiz)
+        guard !samples.overflow, !samples.partialValue.multipliedReportingOverflow(by: componentCount).overflow else {
+            throw J2KError.invalidDimensions("SIZ extent \(width - xOsiz)x\(height - yOsiz)x\(componentCount) overflows")
+        }
     }
 
     /// Parses the COD marker segment.

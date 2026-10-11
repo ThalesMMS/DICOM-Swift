@@ -108,6 +108,7 @@ extension DicomDIMSEServiceSCU {
                                                             requestWasSent: tracker?.requestWasSent ?? false)
                 if !retryPolicy.allowsReplay(safety) {
                     if case DicomNetworkError.dimseStatusFailure = error { throw error }
+                    if error is DicomRetrieveFailure { throw error }
                     let uncertain = DicomNetworkError.outcomeUncertain(operation.rawValue)
                     recordAudit(operation: operation, outcome: .failed, attempt: attempt, error: uncertain)
                     throw uncertain
@@ -603,13 +604,25 @@ extension DicomDIMSEServiceSCU {
         }
     }
 
-    func validateRetrieveStatus(_ command: DicomDIMSECommandSet) throws {
-        guard let status = command.status else {
+    /// The final C-MOVE or C-GET response as a result, with the Failed SOP Instance UID List of its
+    /// identifier; a failure status throws `DicomRetrieveFailure` carrying that result (issue #3004).
+    func finalRetrieveResult(_ response: DicomDIMSECommandSet,
+                             identifier: DicomDataSet?,
+                             queryModelUID: String,
+                             association: DicomAssociation) throws -> DicomDIMSEOperationResult {
+        guard let status = response.status else {
             throw DicomNetworkError.malformedCommandSet("Response is missing Status (0000,0900).")
         }
+        var result = operationResult(from: response)
+        result.negotiatedQueryModelUID = queryModelUID
+        result.acceptedExtendedNegotiation = association.accept.extendedNegotiation(for: queryModelUID)
+        result.failedSOPInstanceUIDs = identifier?.element(for: 0x0008_0058)?.stringValues
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty } ?? []
         guard status == 0 || status & 0xFF00 == 0xB000 else {
-            throw DicomNetworkError.dimseStatusFailure(status)
+            throw DicomRetrieveFailure(result: result)
         }
+        return result
     }
 
     func isPending(_ status: UInt16) -> Bool {

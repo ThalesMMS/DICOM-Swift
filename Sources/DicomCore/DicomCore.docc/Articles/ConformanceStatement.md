@@ -654,6 +654,13 @@ Photometric Interpretation, Samples per Pixel, Planar Configuration, Bits
 Allocated, and Transfer Syntax context. RGB alpha or extra samples are rejected
 explicitly rather than displayed as grayscale.
 
+`DicomDecodedFrameReader` delivers native 8-bit YBR_FULL (Planar Configuration 0
+or 1) and YBR_FULL_422 as one Y Cb Cr triplet per pixel under the original label;
+`DCMDecoder.displayRGB8(decodedFrame:)` converts them for display. Native
+YBR_PARTIAL_422, YBR_PARTIAL_420, YBR_RCT and YBR_ICT, YBR_FULL_422 with an odd
+number of columns, and JPEG Baseline/Extended under a partial-range label are
+refused with a typed `decodeFailed` or `unsupportedTransferSyntax` error.
+
 ### 4.2 Pixel Data Processing
 
 **Supported Operations:**

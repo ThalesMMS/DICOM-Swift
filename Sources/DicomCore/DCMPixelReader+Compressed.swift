@@ -328,12 +328,26 @@ extension DCMPixelReader {
         do {
             let losslessResult = try decoder.decode(data: compressedData)
             if losslessResult.componentCount == 3 {
-                guard losslessResult.bitDepth <= 8 else {
-                    logger?.warning(
-                        "JPEG Lossless interleaved color decode supports 8 bits per component; "
-                            + "the stream declares \(losslessResult.bitDepth) (Photometric Interpretation=\(photometricInterpretation))"
+                if losslessResult.bitDepth > 8 {
+                    // Issue #3034: 9- to 16-bit RGB keeps its precision; deeper YBR has no typed conversion.
+                    guard photometricInterpretation == "RGB", pixelRepresentation == 0 else {
+                        logger?.warning(
+                            "JPEG Lossless colour above 8 bits per component is delivered for unsigned RGB only; "
+                                + "got \(photometricInterpretation)"
+                        )
+                        return nil
+                    }
+                    return DCMPixelReadResult(
+                        pixels8: nil,
+                        pixels16: nil,
+                        pixels24: nil,
+                        signedImage: false,
+                        width: losslessResult.width,
+                        height: losslessResult.height,
+                        bitDepth: losslessResult.bitDepth,
+                        samplesPerPixel: 3,
+                        pixels48: losslessResult.pixels
                     )
-                    return nil
                 }
                 // Lossless JPEG applies no colour transform: YBR_FULL(_422) samples come out as coded (issue #2821).
                 guard ["RGB", "YBR_FULL", "YBR_FULL_422"].contains(photometricInterpretation) else {
@@ -609,14 +623,16 @@ extension DCMPixelReader {
             guard bitsPerSample <= 16, bytes.count >= sampleCount * 2 else {
                 return nil
             }
+            // Read through one raw buffer: per-byte `Data` subscripts dominated this conversion (issue #3041).
             var pixels = [UInt16](repeating: 0, count: sampleCount)
-            for index in 0..<sampleCount {
-                let byteIndex = index * 2
-                let sample = UInt16(bytes[byteIndex]) | (UInt16(bytes[byteIndex + 1]) << 8)
-                if pixelRepresentation == 1 {
-                    pixels[index] = UInt16(Int(Int16(bitPattern: sample)) - Int(Int16.min))
-                } else {
-                    pixels[index] = sample
+            let signed = pixelRepresentation == 1
+            bytes.withUnsafeBytes { (input: UnsafeRawBufferPointer) in
+                pixels.withUnsafeMutableBufferPointer { output in
+                    for index in 0..<sampleCount {
+                        let byteIndex = index * 2
+                        let sample = UInt16(input[byteIndex]) | (UInt16(input[byteIndex + 1]) << 8)
+                        output[index] = signed ? UInt16(Int(Int16(bitPattern: sample)) - Int(Int16.min)) : sample
+                    }
                 }
             }
             if photometricInterpretation == "MONOCHROME1" {
@@ -649,6 +665,30 @@ extension DCMPixelReader {
                 height: height,
                 bitDepth: bitsPerSample,
                 samplesPerPixel: 3
+            )
+        }
+
+        // 9- to 16-bit colour (issue #3034): little-endian interleaved words, unsigned only.
+        if componentCount == 3 && bitsPerSample <= 16 {
+            guard pixelRepresentation == 0, bytes.count >= sampleCount * 6 else { return nil }
+            let samples = bytes.withUnsafeBytes { raw in
+                [UInt16](unsafeUninitializedCapacity: sampleCount * 3) { buffer, count in
+                    for index in 0..<(sampleCount * 3) {
+                        buffer[index] = UInt16(raw[index * 2]) | (UInt16(raw[index * 2 + 1]) << 8)
+                    }
+                    count = sampleCount * 3
+                }
+            }
+            return DCMPixelReadResult(
+                pixels8: nil,
+                pixels16: nil,
+                pixels24: nil,
+                signedImage: false,
+                width: width,
+                height: height,
+                bitDepth: bitsPerSample,
+                samplesPerPixel: 3,
+                pixels48: samples
             )
         }
 

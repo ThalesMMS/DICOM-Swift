@@ -501,6 +501,7 @@ final class DicomDecodedFrameDataBufferTests: XCTestCase {
         case .gray8: return "gray8"
         case .gray16: return "gray16"
         case .rgb8: return "rgb8"
+        case .rgb16: return "rgb16"
         }
     }
 

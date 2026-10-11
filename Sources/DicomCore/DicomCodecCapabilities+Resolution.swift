@@ -167,6 +167,11 @@ extension DicomCodecCapabilities {
     ) -> DicomCodecDecision {
         let mode = DicomJPEGSwiftRolloutMode(environment: environment)
         let candidate = DicomJPEGSwiftBackend().capabilities
+        // Issue #3036: no DCT decoder here converts partial-range YBR; the registry refuses it with the reason.
+        if request.descriptor.samplesPerPixel == 3,
+           request.descriptor.photometricInterpretation.trimmingCharacters(in: .whitespaces).uppercased().hasPrefix("YBR_PARTIAL") {
+            return resolveLegacyDecode(request, syntax: syntax, environment: environment)
+        }
         if request.partialDecode != nil {
             guard mode != .disabled else { return rejected(request, .profileForbidden, "The own JPEG backend is disabled.") }
             return qualify(request, backend: candidate, qualification: mode == .forcedForTests ? .testOnly : .qualified)
@@ -365,9 +370,10 @@ extension DicomCodecCapabilities {
     }
 
     private static func nativeCapability(_ identifier: String, syntax: DicomTransferSyntax) -> DicomFrameCodecCapabilities {
+        // Native colour is read up to 16 bits since issue #3034 (unsigned RGB as `rgb16`).
         DicomFrameCodecCapabilities(identifier: .init(rawValue: identifier), families: [],
                                     transferSyntaxUIDs: [syntax.rawValue], supportedGrayscaleBitDepths: 1...16,
-                                    executionClass: .cpu, source: .packageLinked)
+                                    supportedColorBitDepths: 1...16, executionClass: .cpu, source: .packageLinked)
     }
 
     private static func selected(

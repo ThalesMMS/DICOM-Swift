@@ -178,6 +178,13 @@ private struct CodecDecodeCommand: AsyncParsableCommand {
                 }
                 bytes = buffer; samples = 1
             case .rgb8(let interleaved): bytes = Data(interleaved); samples = 3
+            case .rgb16(let interleaved):
+                var buffer = Data(count: interleaved.count * 2)
+                buffer.withUnsafeMutableBytes { raw in
+                    let target = raw.bindMemory(to: UInt16.self)
+                    for (offset, value) in interleaved.enumerated() { target[offset] = value.littleEndian }
+                }
+                bytes = buffer; samples = 3
             }
             artifact.append(bytes)
             frameReports.append(PartialFrameReport(frame: index, width: frame.metadata.width, height: frame.metadata.height,

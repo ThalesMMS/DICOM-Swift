@@ -186,6 +186,8 @@ public enum DicomImageComparison {
             stored = decoded.storedSampleData().map { signed ? Double(Int8(bitPattern: $0)) : Double($0) }
         case .rgb8(let pixels):
             return pixels.map(Double.init)
+        case .rgb16(let pixels):
+            return pixels.map(Double.init)
         }
         guard stage != .stored else { return stored }
         let rescale = decoder.rescaleParametersV2

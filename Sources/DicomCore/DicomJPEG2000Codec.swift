@@ -195,8 +195,24 @@ internal enum DicomJPEG2000Codec {
             )
         }
 
-        guard bitsPerSample <= 8 else {
-            throw DICOMError.invalidPixelData(reason: "JPEG 2000 color output above 8 bits per component is unsupported")
+        if bitsPerSample > 8 {
+            // Issue #3034: 9- to 16-bit colour as interleaved little-endian words, the layout of the own decoder.
+            guard !components.contains(where: { $0.sgnd != 0 }) else {
+                throw DICOMError.invalidPixelData(reason: "JPEG 2000 signed color output above 8 bits is unsupported")
+            }
+            var output = Data(count: pixelCount * 6)
+            output.withUnsafeMutableBytes { (target: UnsafeMutableRawBufferPointer) in
+                for componentIndex in 0..<3 {
+                    let samples = UnsafeBufferPointer(start: components[componentIndex].data, count: pixelCount)
+                    for pixelIndex in 0..<pixelCount {
+                        let value = wordValue(from: samples[pixelIndex], signed: false)
+                        let offset = (pixelIndex * 3 + componentIndex) * 2
+                        target[offset] = UInt8(truncatingIfNeeded: value)
+                        target[offset + 1] = UInt8(truncatingIfNeeded: value >> 8)
+                    }
+                }
+            }
+            return DecodedFrame(bytes: output, width: width, height: height, bitsPerSample: bitsPerSample, componentCount: 3)
         }
 
         var output = [UInt8](repeating: 0, count: pixelCount * 3)

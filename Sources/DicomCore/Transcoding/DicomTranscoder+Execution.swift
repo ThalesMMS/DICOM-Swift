@@ -515,8 +515,9 @@ public extension DicomTranscoder {
         let photometric: String
         switch DicomCodecFamily.family(for: destination) {
         case .jpeg2000, .htj2k: photometric = intent.isLossy ? "YBR_ICT" : "YBR_RCT"
-        // DCT JPEG carries YCbCr at full chroma resolution; lossless JPEG carries RGB without a transform.
-        case .jpeg: photometric = DicomJPEGSwiftBackend.losslessTransferSyntaxes.contains(destination.rawValue) ? "RGB" : "YBR_FULL"
+        // DCT JPEG carries YCbCr with chroma halved horizontally (PS3.5 Table 8.2.1-1, issue #3019); lossless JPEG
+        // carries RGB without a transform.
+        case .jpeg: photometric = DicomJPEGSwiftBackend.losslessTransferSyntaxes.contains(destination.rawValue) ? "RGB" : "YBR_FULL_422"
         default: photometric = "RGB"
         }
         dataSet.set(DicomDataElement(tag: DicomTag.photometricInterpretation.rawValue, vr: .CS, value: .strings([photometric])))

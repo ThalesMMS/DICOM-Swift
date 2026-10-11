@@ -2,24 +2,56 @@ import Foundation
 
 public enum DicomDataSetParser {
     /// Reads through the existing parser with explicit value validation and a bounded recovery report.
-    public static func read(from data: Data, transferSyntax: DicomTransferSyntax = .explicitVRLittleEndian,
+    ///
+    /// The data set starts `offset` bytes into `data` and is parsed where it lies, without copying it out first.
+    /// Recovery also ends the root data set where its Pixel Data value ends when the bytes that follow a complete Pixel
+    /// Data element do not parse as data elements, or parse into elements no data set can hold: the elements before it
+    /// are kept, Pixel Data stays skipped, and a `trailingBytesAfterPixelData` diagnostic gives the offset of the first
+    /// byte that is not read (issue #3039).
+    /// Corruption anywhere else, an incomplete Pixel Data value, an exhausted diagnostic budget, cancellation and the
+    /// structural limits still throw.
+    public static func read(from data: Data, startingAt offset: Int = 0,
+                            transferSyntax: DicomTransferSyntax = .explicitVRLittleEndian,
                             mode: DicomDataSetReadMode = .strict, limits: DicomDataSetParseLimits = .default,
                             privateDictionary: DicomPrivateDictionary = .standard,
                             maximumDiagnostics: Int = 128, dictionary: DCMDictionary = DCMDictionary(),
                             purpose: DicomDataSetPurpose = .instance) throws -> DicomDataSetReadResult {
-        var state = DicomDataSetParseState(limits: limits, privateDictionary: privateDictionary,
-                                          mode: mode, maximumDiagnostics: maximumDiagnostics, resolvesContext: true,
-                                          dictionary: dictionary, purpose: purpose)
-        let dataSet = try readDataSet(from: data, transferSyntax: transferSyntax, state: &state)
-        return DicomDataSetReadResult(dataSet: dataSet, diagnostics: state.diagnostics)
+        func state() -> DicomDataSetParseState {
+            DicomDataSetParseState(limits: limits, privateDictionary: privateDictionary,
+                                   mode: mode, maximumDiagnostics: maximumDiagnostics, resolvesContext: true,
+                                   dictionary: dictionary, purpose: purpose)
+        }
+        var first = state()
+        do {
+            let dataSet = try readDataSet(from: data, startingAt: offset, transferSyntax: transferSyntax, state: &first)
+            return DicomDataSetReadResult(dataSet: dataSet, diagnostics: first.diagnostics,
+                                          pixelDataHeader: first.rootPixelDataHeader)
+        } catch let error where error is DicomSequenceValueParserError
+                    || error is DicomDataSetReadResult.Diagnostic && !first.diagnosticBudgetExhausted {
+            // After a complete Pixel Data element a data set holds at most Digital Signatures and Trailing Padding
+            // (PS3.3 C.12.1): bytes that fail to parse there, or parse into conflicting elements, are not its elements.
+            guard mode == .recover, let pixelDataEnd = first.rootPixelDataEnd else { throw error }
+            var bounded = state()
+            let dataSet = try readDataSet(from: data, startingAt: offset, end: pixelDataEnd,
+                                          transferSyntax: transferSyntax, state: &bounded)
+            let pixelData = DicomTag.pixelData.rawValue
+            try bounded.diagnose(.trailingBytesAfterPixelData, tag: pixelData, offset: pixelDataEnd, path: [pixelData])
+            return DicomDataSetReadResult(dataSet: dataSet, diagnostics: bounded.diagnostics,
+                                          pixelDataHeader: bounded.rootPixelDataHeader)
+        }
     }
 
-    static func readDataSet(from data: Data, transferSyntax: DicomTransferSyntax,
+    /// `end` bounds the parse within the (inflated) payload; nil reads to its end.
+    static func readDataSet(from data: Data, startingAt offset: Int = 0, end: Int? = nil,
+                            transferSyntax: DicomTransferSyntax,
                             state: inout DicomDataSetParseState) throws -> DicomDataSet {
         try Task.checkCancellation()
-        let payload = transferSyntax.usesDataSetDeflate ? try DicomDeflatedDataSetCodec.inflate(data) : data
-        var offset = 0
-        let parsed = try DicomSequenceValueParser.parseDataSet(in: payload, offset: &offset, end: payload.count,
+        let payload = transferSyntax.usesDataSetDeflate
+            ? try DicomDeflatedDataSetCodec.inflate(offset == 0 ? data : Data(data.dropFirst(offset)))
+            : data
+        try Task.checkCancellation()
+        var offset = transferSyntax.usesDataSetDeflate ? 0 : offset
+        let parsed = try DicomSequenceValueParser.parseDataSet(in: payload, offset: &offset, end: end ?? payload.count,
             littleEndian: !transferSyntax.isBigEndian, explicitVR: transferSyntax.isExplicitVR, state: &state)
         return try DicomContextualVRResolver.resolve(parsed, state: &state)
     }
@@ -294,6 +326,7 @@ package enum DicomSequenceValueParser {
                    let definition, !definition.valueRepresentations.contains(elementHeader.vr) {
                     try state.diagnose(.incompatibleVR, tag: tag, offset: offset)
                 }
+                let valueOffset = offset
                 try skipPixelData(
                     in: data,
                     offset: &offset,
@@ -302,6 +335,10 @@ package enum DicomSequenceValueParser {
                     littleEndian: littleEndian,
                     state: &state
                 )
+                if sequenceDepth == 0 {
+                    state.recordRootPixelData(vr: elementHeader.vr, length: elementHeader.length,
+                                              valueOffset: valueOffset, end: offset)
+                }
                 continue
             }
 

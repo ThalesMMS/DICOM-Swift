@@ -331,7 +331,7 @@ extension DicomSeriesLoader {
                 }
                 let decoded: DicomDecodedFrame
                 do {
-                    decoded = try frameReader.frame(at: frame.index)
+                    decoded = try frameReader.volumeFrame(at: frame.index)
                 } catch let error as DicomDecodedFrameReader.ReadError {
                     if case .unsupportedTransferSyntax(_, let diagnostics) = error {
                         throw enhancedError(format, sopClassUID: sopClassUID,
@@ -388,13 +388,24 @@ extension DicomSeriesLoader {
             frameOfReferenceUID: nonEmptyValue(decoder.info(for: .frameOfReferenceUID)),
             sliceRescaleParameters: sliceRescale,
             sliceVOIs: sliceVOIs,
-            enhancedFrameReferences: orderedFrames.map(\.reference)
+            enhancedFrameReferences: orderedFrames.map(\.reference),
+            units: nonEmptyValue(decoder.info(for: .units)),
+            // Every frame was checked above to carry Pixel Measures, Plane Orientation and Plane Position, and two
+            // or more positions gave the interval.
+            geometryProvenance: DicomSeriesVolumeGeometryProvenance(
+                sliceOrdering: .imagePositionPatient, sliceSpacingSource: .imagePositionPatient,
+                isInPlaneSpacingCalibrated: true, hasDeclaredOrientation: true
+            )
         )
     }
 
     /// Copies one decoded grayscale frame's stored values into `destination` from `base`; false for a colour frame.
     func storeGrayFrame(_ decoded: DicomDecodedFrame, format: DicomSeriesLoaderPixelFormat, count pixelsPerFrame: Int,
                         into destination: UnsafeMutableBufferPointer<Int16>, at base: Int, url: URL) throws -> Bool {
+        if decoded.metadata.photometricInterpretation == "MONOCHROME1" {
+            return try storeMonochrome1Frame(decoded, format: format, count: pixelsPerFrame, into: destination,
+                                             at: base, url: url)
+        }
         switch decoded.pixels {
         case .gray16(let pixels):
             guard pixels.count == pixelsPerFrame else { throw DicomSeriesLoaderError.failedToDecode(url) }
@@ -420,8 +431,37 @@ extension DicomSeriesLoader {
                     destination[base + index] = Int16(pixels[index])
                 }
             }
-        case .rgb8:
+        case .rgb8, .rgb16:
             return false
+        }
+        return true
+    }
+
+    /// The decoded surface inverts MONOCHROME1 for display; the volume keeps the values written in the object, and the
+    /// inversion stays a display step after the modality rescale and VOI, as GDCM and the stream deliver them
+    /// (issue #3032). `storedSampleData()` undoes the display normalisation.
+    private func storeMonochrome1Frame(_ decoded: DicomDecodedFrame, format: DicomSeriesLoaderPixelFormat,
+                                       count pixelsPerFrame: Int, into destination: UnsafeMutableBufferPointer<Int16>,
+                                       at base: Int, url: URL) throws -> Bool {
+        let bytesPerSample: Int
+        switch decoded.pixels {
+        case .gray16: bytesPerSample = 2
+        case .gray8: bytesPerSample = 1
+        case .rgb8, .rgb16: return false
+        }
+        let bytes = decoded.storedSampleData()
+        guard bytes.count == pixelsPerFrame * bytesPerSample, base + pixelsPerFrame <= destination.count else {
+            throw DicomSeriesLoaderError.failedToDecode(url)
+        }
+        bytes.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
+            for index in 0..<pixelsPerFrame {
+                if bytesPerSample == 2 {
+                    destination[base + index] = Int16(bitPattern: UInt16(raw[index * 2]) | (UInt16(raw[index * 2 + 1]) << 8))
+                } else {
+                    destination[base + index] = format.pixelRepresentation == 1
+                        ? Int16(Int8(bitPattern: raw[index])) : Int16(raw[index])
+                }
+            }
         }
         return true
     }

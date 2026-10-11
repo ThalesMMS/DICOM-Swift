@@ -65,6 +65,26 @@ final class JPEGSequentialScanTests: XCTestCase {
         }
     }
 
+    /// Issue #3011: decodes running at once must not race on shared buffers. The full-resolution
+    /// path used to write the count of the shared empty-array singleton; run this case under
+    /// Thread Sanitizer (`swift test --sanitize=thread`) to see a race come back.
+    func test_concurrentFullResolutionDecodes_matchTheSerialDecode() async throws {
+        let bytes = Array(try fixture("sequential_2x2_interleaved"))
+        let expected = try JLIDecoder().decode(from: bytes)
+        let results = try await withThrowingTaskGroup(of: JLIImage.self) { group in
+            for _ in 0..<16 {
+                group.addTask { try JLIDecoder().decode(from: bytes) }
+            }
+            return try await group.reduce(into: []) { $0.append($1) }
+        }
+        XCTAssertEqual(results.count, 16)
+        for image in results {
+            XCTAssertEqual(image.width, expected.width)
+            XCTAssertEqual(image.height, expected.height)
+            XCTAssertEqual(image.data, expected.data)
+        }
+    }
+
     private func fixture(_ name: String, extension ext: String = "jpg") throws -> Data {
         try Data(contentsOf: XCTUnwrap(Bundle.module.url(forResource: name, withExtension: ext)))
     }

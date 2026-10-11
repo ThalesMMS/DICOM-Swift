@@ -20,6 +20,8 @@ public enum DicomStructuredReportRenderer {
         public let referencedSOPInstanceUIDs: [String]
         public let graphicType: String?
         public let children: [Node]
+        /// A TABLE item's grid: a header row of column concepts, then each row's concept and cell texts.
+        public var table: [[String]]? = nil
     }
 
     public struct Document: Codable, Equatable, Sendable {
@@ -41,7 +43,32 @@ public enum DicomStructuredReportRenderer {
              dateTime: item.dateTimeValue?.rawValue ?? item.dateValue?.rawValue ?? item.timeValue?.rawValue,
              uid: item.uidValue, personName: item.personNameValue?.rawValue,
              referencedSOPInstanceUIDs: item.referencedSOPs.compactMap(\.referencedSOPInstanceUID),
-             graphicType: item.graphicType, children: item.children.map(node))
+             graphicType: item.graphicType, children: item.children.map(node), table: item.table.map(tableRows))
+    }
+
+    /// A TABLE value as rows of text (PS3.3 C.18.10): a header of column concepts, then for each row its concept
+    /// and its cells, empty where the sparse table has none.
+    public static func tableRows(_ table: DicomSRTable) -> [[String]] {
+        func label(_ definition: DicomSRTable.AxisDefinition?, _ number: Int) -> String {
+            definition?.conceptName.map { $0.codeMeaning ?? $0.codeValue } ?? String(number)
+        }
+        func cellText(row: Int, column: Int) -> String {
+            guard let cell = table.cell(row: row, column: column) else { return "" }
+            switch cell.value {
+            case .text(let text): return text
+            case .dateTime(let value): return value
+            case .code(let code): return code.codeMeaning ?? code.codeValue
+            case .reference(let identifier): return "→ " + identifier.map(String.init).joined(separator: ".")
+            case .unavailable(let qualifier): return "— (" + (qualifier.codeMeaning ?? qualifier.codeValue) + ")"
+            case .numeric(let value):
+                let formatted = Int(exactly: value).map(String.init) ?? String(value)
+                return formatted + (table.units(row: row, column: column).map { " " + $0.codeValue } ?? "")
+            }
+        }
+        let header = [""] + (1...table.columnCount).map { label(table.columnDefinition($0), $0) }
+        return [header] + (1...table.rowCount).map { row in
+            [label(table.rowDefinition(row), row)] + (1...table.columnCount).map { cellText(row: row, column: $0) }
+        }
     }
 
     public static func document(_ document: DicomSRDocument) -> Document {
@@ -67,6 +94,11 @@ public enum DicomStructuredReportRenderer {
         case "IMAGE", "COMPOSITE", "WAVEFORM": return node.referencedSOPInstanceUIDs.joined(separator: ", ")
         case "SCOORD", "SCOORD3D", "TCOORD": return node.graphicType ?? node.valueType
         case "CONTAINER": return ""
+        case "TABLE":
+            guard let rows = node.table else { return "" }
+            return rows.dropFirst().map { row in
+                (row.first ?? "") + ": " + zip(rows[0].dropFirst(), row.dropFirst()).map { $0 + " " + $1 }.joined(separator: " | ")
+            }.joined(separator: "; ")
         default: return node.text ?? ""
         }
     }
@@ -94,7 +126,14 @@ public enum DicomStructuredReportRenderer {
         func walk(_ node: Node) {
             let label = escape(node.concept ?? node.valueType)
             let value = escape(valueText(node))
-            output += "<li><span class=\"vt\">" + escape(node.valueType) + "</span> <b>" + label + "</b>" + (value.isEmpty ? "" : ": " + value)
+            output += "<li><span class=\"vt\">" + escape(node.valueType) + "</span> <b>" + label + "</b>"
+            if let rows = node.table {
+                output += "<table>" + rows.enumerated().map { index, row in
+                    "<tr>" + row.map { (index == 0 ? "<th>" : "<td>") + escape($0) + (index == 0 ? "</th>" : "</td>") }.joined() + "</tr>"
+                }.joined() + "</table>"
+            } else if !value.isEmpty {
+                output += ": " + value
+            }
             if !node.children.isEmpty {
                 output += "<ul>"
                 for child in node.children { walk(child) }

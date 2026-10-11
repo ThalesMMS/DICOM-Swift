@@ -64,7 +64,7 @@ extension DicomSeriesLoader {
                 try Task.checkCancellation()
                 let decoded: DicomDecodedFrame
                 do {
-                    decoded = try reader.frame(at: frame)
+                    decoded = try reader.volumeFrame(at: frame)
                 } catch {
                     throw DicomSeriesLoaderError.failedToDecode(url)
                 }
@@ -105,7 +105,13 @@ extension DicomSeriesLoader {
             seriesInstanceUID: text(.seriesInstanceUID),
             frameOfReferenceUID: text(.frameOfReferenceUID),
             sliceRescaleParameters: Array(repeating: .init(slope: rescale.slope, intercept: rescale.intercept),
-                                          count: frameCount)
+                                          count: frameCount),
+            units: text(.units),
+            geometryProvenance: DicomSeriesVolumeGeometryProvenance(
+                sliceOrdering: .storedFrames, sliceSpacingSource: geometry.frameStepSource,
+                isInPlaneSpacingCalibrated: geometry.isInPlaneSpacingCalibrated,
+                hasDeclaredOrientation: geometry.orientation != nil
+            )
         )
     }
 }

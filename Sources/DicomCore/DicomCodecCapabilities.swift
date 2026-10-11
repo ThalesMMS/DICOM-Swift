@@ -22,6 +22,7 @@
 
 import Darwin
 import Foundation
+import Synchronization
 
 /// Where the active backend library was resolved from.
 public enum DicomCodecBackendSource: String, Codable, Sendable {
@@ -218,8 +219,9 @@ public enum DicomCodecCapabilities {
     }
 
     private static func colorBitDepths(for runtime: DicomCodecRuntime) -> ClosedRange<Int> {
-        // The shared pixel pipeline materializes color as 8-bit interleaved
-        // RGB; the backend resolver rejects deeper color output.
+        // The runtimes are qualified for 8-bit colour only: they do not check the
+        // photometric or the signedness of deeper colour, which the own backends
+        // decode and validate since issue #3034.
         switch runtime {
         case .charLS:
             return 2...8
@@ -245,13 +247,23 @@ public enum DicomCodecCapabilities {
         return Int(first)
     }
 
+    /// The version of one loaded runtime library, read once per process and path (issue #3041): capability reports
+    /// are built several times per decoded frame, and every dlopen/dlclose pair re-ran the library initializers.
     private static func loadVersion(for runtime: DicomCodecRuntime, at path: String) -> String? {
-        guard let handle = dlopen(path, RTLD_NOW | RTLD_LOCAL) else {
-            return nil
+        let key = runtime.rawValue + "\u{1F}" + path
+        if let cached = versionMemo.withLock({ $0[key] }) { return cached }
+        let loaded: String?
+        if let handle = dlopen(path, RTLD_NOW | RTLD_LOCAL) {
+            loaded = version(fromHandle: handle, runtime: runtime)
+            dlclose(handle)
+        } else {
+            loaded = nil
         }
-        defer { dlclose(handle) }
-        return version(fromHandle: handle, runtime: runtime)
+        versionMemo.withLock { $0[key] = .some(loaded) }
+        return loaded
     }
+
+    private static let versionMemo = Mutex<[String: String?]>([:])
 
     /// Reads the version string from an already-open library handle.
     internal static func version(

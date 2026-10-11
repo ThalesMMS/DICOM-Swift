@@ -325,6 +325,14 @@ extension DCMDecoder {
         }
     }
 
+    /// The Modality LUT Sequence (0028,3000) items that form lookup tables, as `displayTransformProfile` reads
+    /// them, without building the rest of the profile (issue #3037).
+    public var modalityLookupTables: [DicomLookupTable] {
+        synchronized {
+            makeLookupTablesUnsafe(sequenceTag: .modalityLUTSequence, typeTag: .modalityLUTType)
+        }
+    }
+
     /// The VOI LUT Sequence (0028,3010), item by item, with a typed reason
     /// for every rejected item (issue #1865 phase A). Accepted tables are the
     /// ones `displayTransformProfile.voiLUTs` keeps; the rejections are what

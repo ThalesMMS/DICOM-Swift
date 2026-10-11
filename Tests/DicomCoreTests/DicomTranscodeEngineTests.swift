@@ -59,7 +59,7 @@ final class DicomTranscodeEngineTests: XCTestCase {
         let reader = DicomDecodedFrameReader(decoder: decoder)
         return try (0..<max(1, reader.frameCount)).map { index -> Data in
             switch try reader.frame(at: index).pixels {
-            case .gray16(let values): return values.withUnsafeBufferPointer { Data(buffer: $0) }
+            case .gray16(let values), .rgb16(let values): return values.withUnsafeBufferPointer { Data(buffer: $0) }
             case .gray8(let values): return Data(values)
             case .rgb8(let values): return Data(values)
             }

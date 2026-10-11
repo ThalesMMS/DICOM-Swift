@@ -37,12 +37,14 @@ struct DicomISO2022Codec {
         repertoires = available
     }
 
-    func decode(_ data: Data, vr: DicomVR) throws -> String {
+    /// `escapesInAlphabeticGroup` lets a compatibility read decode a PN whose first group designates a repertoire,
+    /// which validated reads refuse; every other rule still applies.
+    func decode(_ data: Data, vr: DicomVR, escapesInAlphabeticGroup: Bool = false) throws -> String {
         let bytes = Array(data)
         var index = 0
         var g0 = initialG0
         var g1 = initialG1
-        var alphabetic = vr == .PN
+        var alphabetic = vr == .PN && !escapesInAlphabeticGroup
         var result = ""
         while index < bytes.count {
             let byte = bytes[index]
@@ -62,7 +64,7 @@ struct DicomISO2022Codec {
                 }
                 result.unicodeScalars.append(Unicode.Scalar(byte))
                 if vr == .PN, byte == 0x3D { alphabetic = false }
-                if vr == .PN, byte == 0x5C { alphabetic = true }
+                if vr == .PN, byte == 0x5C { alphabetic = !escapesInAlphabeticGroup }
                 g0 = initialG0
                 g1 = initialG1
                 index += 1

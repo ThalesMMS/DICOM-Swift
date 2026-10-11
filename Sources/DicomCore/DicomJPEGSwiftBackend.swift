@@ -54,7 +54,9 @@ struct DicomJPEGSwiftBackend: DicomFrameCodecBackend {
         encodeTransferSyntaxUIDs: transferSyntaxes,
         operations: [.decode, .encode],
         supportedGrayscaleBitDepths: 2...16,
-        supportedColorBitDepths: 8...8,
+        // Lossless (SOF3) RGB decodes up to 16 bits since issue #3034; `validateDescriptor` keeps DCT colour and
+        // every colour encode at 8 bits.
+        supportedColorBitDepths: 8...16,
         maximumComponents: 3,
         supportsSignedSamples: true,
         partialDecode: DicomPartialDecodeCapabilities(supportsResolutionLevels: true),
@@ -317,12 +319,20 @@ struct DicomJPEGSwiftBackend: DicomFrameCodecBackend {
         guard descriptor.pixelRepresentation == 0 else {
             throw DicomJPEGSwiftBackendError.unsupportedShape(transferSyntaxUID: uid, reason: "DCT JPEG encoding is qualified for unsigned samples only")
         }
-        var configuration = JLIEncoderConfiguration(quality: max(1, min(100, (quality * 100).rounded())), chromaSubsampling: .yuv444, colorSpace: .yCbCr,
+        // PS3.5 Table 8.2.1-1 has three-sample entries only for JPEG Baseline, as YBR_FULL_422 or RGB (issue #3019).
+        if descriptor.samplesPerPixel == 3, uid == DicomTransferSyntax.jpegExtended.rawValue {
+            throw DicomJPEGSwiftBackendError.unsupportedShape(transferSyntaxUID: uid, reason: "PS3.5 Table 8.2.1-1 has no three-sample entry for JPEG Extended; colour lossy JPEG is JPEG Baseline (1.2.840.10008.1.2.4.50)")
+        }
+        var configuration = JLIEncoderConfiguration(quality: max(1, min(100, (quality * 100).rounded())),
+                                                    chromaSubsampling: descriptor.samplesPerPixel == 3 ? .yuv422 : .yuv444, colorSpace: .yCbCr,
                                                     progressive: false, restartInterval: 0, optimiseHuffman: true, adaptiveQuantization: false,
                                                     perceptualQuantTables: false)
         // PS3.5 A.4.1: the Extended syntax is Process 2 & 4, so an 8-bit frame under .51 is written as SOF1, not as a
         // Process 1 baseline frame the validator rightly refuses (issue #2487).
         configuration.extendedSequential = uid == DicomTransferSyntax.jpegExtended.rawValue
+        // Colour is YBR_FULL_422 (chroma halved horizontally) and the JFIF APP0 segment is left out, as PS3.5 8.2.1
+        // recommends.
+        configuration.writesJFIFMarker = false
         return .dct(configuration)
     }
 
@@ -354,8 +364,14 @@ struct DicomJPEGSwiftBackend: DicomFrameCodecBackend {
                 throw DicomJPEGSwiftBackendError.unsupportedShape(transferSyntaxUID: uid, reason: "single-component JPEG does not accept \(descriptor.photometricInterpretation)")
             }
         } else {
-            guard descriptor.samplesPerPixel == 3, descriptor.bitsAllocated == 8, descriptor.pixelRepresentation == 0 else {
-                throw DicomJPEGSwiftBackendError.unsupportedShape(transferSyntaxUID: uid, reason: "three-component JPEG is qualified for unsigned 8-bit samples only")
+            // Issue #3034: lossless RGB above 8 bits is decoded (SOF3 carries up to 16-bit components); encoding stays
+            // at 8 bits.
+            let deepLosslessDecode = lossless && operation == .decode && descriptor.bitsAllocated == 16
+            guard descriptor.samplesPerPixel == 3, descriptor.bitsAllocated == 8 || deepLosslessDecode,
+                  descriptor.pixelRepresentation == 0 else {
+                throw DicomJPEGSwiftBackendError.unsupportedShape(transferSyntaxUID: uid, reason: deepLosslessDecode || descriptor.bitsAllocated == 8
+                    ? "three-component JPEG is qualified for unsigned samples only"
+                    : "three-component JPEG is qualified for unsigned 8-bit samples only (16-bit lossless RGB is decoded, not encoded)")
             }
             if lossless {
                 guard photometric == "RGB" else {

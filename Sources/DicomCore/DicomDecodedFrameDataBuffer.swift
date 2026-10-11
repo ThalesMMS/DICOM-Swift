@@ -56,7 +56,7 @@ public struct DicomDecodedFrameDataBuffer: Equatable, Sendable {
             return .gray8(Array(data))
         case .rgb8Interleaved:
             return .rgb8(interleaved: Array(data))
-        case .gray16NormalizedUnsigned:
+        case .gray16NormalizedUnsigned, .rgb16Interleaved:
             let samples = [UInt16](unsafeUninitializedCapacity: componentSampleCount) { buffer, count in
                 for index in 0..<componentSampleCount {
                     let byteIndex = index * 2
@@ -64,7 +64,7 @@ public struct DicomDecodedFrameDataBuffer: Equatable, Sendable {
                 }
                 count = componentSampleCount
             }
-            return .gray16(samples)
+            return format == .rgb16Interleaved ? .rgb16(interleaved: samples) : .gray16(samples)
         }
     }
 }
