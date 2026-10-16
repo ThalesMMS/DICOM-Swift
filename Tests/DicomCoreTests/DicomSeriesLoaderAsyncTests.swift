@@ -623,9 +623,11 @@ final class DicomSeriesLoaderAsyncTests: XCTestCase, @unchecked Sendable {
         let sliceCount = 10
         try createFiles(in: directory, count: sliceCount)
 
+        // Both APIs report progress, so both take the ordered slice loop: without a callback the loader decodes on
+        // several workers (#3041), which is not the API overhead this test compares.
         let callbackStart = Date()
         let callbackVolume = try await makeLoader(width: 512, height: 512, pixelValue: 100)
-            .loadSeries(in: directory, progress: nil)
+            .loadSeries(in: directory, progress: { _, _, _, _ in })
         let callbackDuration = Date().timeIntervalSince(callbackStart)
 
         let streamStart = Date()

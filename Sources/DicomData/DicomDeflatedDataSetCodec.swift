@@ -45,8 +45,17 @@ public enum DicomDeflatedDataSetCodec {
 
     package static func inflatedPart10DataIfNeeded(_ data: Data,
                                            inflatedSizeLimit: Int = defaultInflatedSizeLimit) throws -> Data {
-        guard let layout = try part10Layout(in: data),
-              layout.transferSyntax.usesDataSetDeflate else {
+        let found: Part10Layout?
+        do {
+            found = try part10Layout(in: data)
+        } catch DicomDeflatedDataSetError.malformedFileMetaInformation {
+            // Issue #3053: a File Meta Information Group Length that does not end on an element boundary is wrong;
+            // group 0002 ends where its elements end, as GDCM, DCMTK and pydicom read it. Deflated bytes can
+            // resemble group 0002, so a deflated data set still needs a correct length.
+            found = try part10Layout(in: data, honouringGroupLength: false)
+            if found?.transferSyntax.usesDataSetDeflate == true { throw DicomDeflatedDataSetError.malformedFileMetaInformation }
+        }
+        guard let layout = found, layout.transferSyntax.usesDataSetDeflate else {
             return data
         }
 
@@ -57,14 +66,14 @@ public enum DicomDeflatedDataSetCodec {
         return inflated
     }
 
-    private static func part10Layout(in data: Data) throws -> Part10Layout? {
+    private static func part10Layout(in data: Data, honouringGroupLength: Bool = true) throws -> Part10Layout? {
         guard data.count >= 132 else { return nil }
         guard String(bytes: data[128..<132], encoding: .ascii) == "DICM" else { return nil }
 
         var offset = 132
         var transferSyntax: DicomTransferSyntax?
         var declaredMetaEnd: Int?
-        if data.dicomIntegerIfPresent(at: offset, as: UInt32.self, littleEndian: true) == 0x0000_0002 {
+        if honouringGroupLength, data.dicomIntegerIfPresent(at: offset, as: UInt32.self, littleEndian: true) == 0x0000_0002 {
             guard data.count >= 144, String(bytes: data[136..<138], encoding: .ascii) == "UL",
                   data.dicomIntegerIfPresent(at: 138, as: UInt16.self, littleEndian: true) == 4,
                   let length = data.dicomIntegerIfPresent(at: 140, as: UInt32.self, littleEndian: true),

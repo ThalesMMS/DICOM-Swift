@@ -458,7 +458,8 @@ struct DecoderPipeline: Sendable {
         tileData: Data,
         progress: ((DecoderProgressUpdate) -> Void)?
     ) async throws -> J2KImage {
-        let profileDecode = ProcessInfo.processInfo.environment["J2K_PROFILE_DECODE"] != nil
+        // getenv reads one variable; `ProcessInfo.environment` copied the whole environment per frame (#3051).
+        let profileDecode = getenv("J2K_PROFILE_DECODE") != nil
 
         // Stage 2: Extract tile data
         try Task.checkCancellation()
@@ -978,6 +979,10 @@ struct DecoderPipeline: Sendable {
         var quantizationSteps: (steps: [String: Double], guardBits: Int, bandKb: [String: Int]) = ([:], 2, [:])
         var tiles: [(tileIndex: Int, tileData: Data)] = []
         var part2 = J2KPart2ComponentTransforms()
+        // Main-header COD and QCD bodies, for tile-part headers that only restate them (#3076).
+        var mainCOD: Data?
+        var mainQCD: Data?
+        var mainComponentOverrides = false
 
         // Parse main header markers
         while reader.position < data.count {
@@ -990,10 +995,17 @@ struct DecoderPipeline: Sendable {
 
             case J2KMarker.cod.rawValue:
                 // Parse COD marker
+                mainCOD = try Self.segmentBody(at: reader)
                 configuration = try parseCODMarker(&reader)
+
+            case J2KMarker.coc.rawValue, J2KMarker.qcc.rawValue:
+                // Main-header component overrides are skipped, as before; tile-part restatements then stay refused.
+                mainComponentOverrides = true
+                try reader.skip(try Self.segmentBody(at: reader).count + 2)
 
             case J2KMarker.qcd.rawValue:
                 // Parse QCD marker
+                mainQCD = try Self.segmentBody(at: reader)
                 let bitDepth = metadata?.components.first?.bitDepth ?? 8
                 quantizationSteps = try parseQCDMarker(&reader, config: configuration, bitDepth: bitDepth)
 
@@ -1014,7 +1026,12 @@ struct DecoderPipeline: Sendable {
 
             case J2KMarker.sot.rawValue:
                 // Tile-parts of one tile are concatenated in codestream order (T.800 A.4.2: TPsot ascending).
-                let (tileIndex, tilepartData) = try parseSOTMarker(&reader)
+                let (tileIndex, tilepartData) = try parseSOTMarker(
+                    &reader,
+                    mainCOD: mainComponentOverrides ? nil : mainCOD,
+                    mainQCD: mainComponentOverrides ? nil : mainQCD,
+                    componentCount: metadata?.components.count ?? 0
+                )
                 if let existing = tiles.firstIndex(where: { $0.tileIndex == tileIndex }) {
                     tiles[existing].tileData.append(tilepartData)
                 } else {
@@ -1410,7 +1427,12 @@ struct DecoderPipeline: Sendable {
     /// payload matches the J2KSwift block-format signature that
     /// signals `.conformant` HTJ2K blocks.
     /// Parses the SOT marker segment and extracts tile data.
-    private func parseSOTMarker(_ reader: inout J2KBitReader) throws -> (Int, Data) {
+    private func parseSOTMarker(
+        _ reader: inout J2KBitReader,
+        mainCOD: Data?,
+        mainQCD: Data?,
+        componentCount: Int
+    ) throws -> (Int, Data) {
         // SOT: Lsot, Isot, Psot, TPsot, TNsot. Psot counts from the first byte of the SOT marker (which the reader has
         // already consumed) to the end of the tile-part data; 0 means "until EOC" (last tile-part only).
         let segmentStart = reader.position - 2
@@ -1421,7 +1443,14 @@ struct DecoderPipeline: Sendable {
         _ = try reader.readUInt8() // TPsot
         _ = try reader.readUInt8() // TNsot
         // Tile-part header marker segments before SOD (T.800 A.4.2). Packet-length and comment segments carry no
-        // decoding state; per-tile coding-parameter overrides are not implemented and fail typed.
+        // decoding state. Coding and quantization segments that restate the main header change nothing (#3076: the
+        // GDCM/OpenJPEG 2.0 encoder writes COC and QCC for every component); real per-tile overrides are not
+        // implemented and fail typed.
+        func unsupported(_ marker: UInt16) -> J2KError {
+            J2KError.notImplemented(
+                "tile-part header marker 0x\(String(marker, radix: 16, uppercase: true)) (tile-specific coding "
+                + "parameters, progression change or packed packet headers) is not supported")
+        }
         while true {
             let marker = try reader.readMarker()
             if marker == J2KMarker.sod.rawValue { break }
@@ -1430,11 +1459,13 @@ struct DecoderPipeline: Sendable {
                 let length = Int(try reader.readUInt16())
                 guard length >= 2 else { throw J2KError.decodingError("Invalid tile-part header segment length \(length)") }
                 try reader.skip(length - 2)
-            case J2KMarker.cod.rawValue, J2KMarker.coc.rawValue, J2KMarker.qcd.rawValue, J2KMarker.qcc.rawValue,
-                 J2KMarker.rgn.rawValue, J2KMarker.poc.rawValue, J2KMarker.ppt.rawValue:
-                throw J2KError.notImplemented(
-                    "tile-part header marker 0x\(String(marker, radix: 16, uppercase: true)) (tile-specific coding "
-                    + "parameters, progression change or packed packet headers) is not supported")
+            case J2KMarker.cod.rawValue, J2KMarker.coc.rawValue, J2KMarker.qcd.rawValue, J2KMarker.qcc.rawValue:
+                let body = try Self.segmentBody(at: reader)
+                guard Self.restatesMainHeader(marker: marker, body: body, mainCOD: mainCOD, mainQCD: mainQCD,
+                                              componentCount: componentCount) else { throw unsupported(marker) }
+                try reader.skip(body.count + 2)
+            case J2KMarker.rgn.rawValue, J2KMarker.poc.rawValue, J2KMarker.ppt.rawValue:
+                throw unsupported(marker)
             default:
                 throw J2KError.decodingError("Unexpected marker 0x\(String(marker, radix: 16, uppercase: true)) in tile-part header")
             }
@@ -1451,6 +1482,43 @@ struct DecoderPipeline: Sendable {
         guard tilepartLength >= headerBytes else { throw J2KError.decodingError("SOT Psot \(tilepartLength) is shorter than its header") }
         let tileData = try reader.readBytes(tilepartLength - headerBytes)
         return (tileIndex, tileData)
+    }
+
+    /// The body of the marker segment at the reader's position (just after its marker), without consuming it.
+    private static func segmentBody(at reader: J2KBitReader) throws -> Data {
+        var peek = reader
+        let length = Int(try peek.readUInt16())
+        guard length >= 2 else { throw J2KError.decodingError("Invalid marker segment length \(length)") }
+        return try peek.readBytes(length - 2)
+    }
+
+    /// Whether a tile-part COD, COC, QCD or QCC carries exactly the parameters the main header's COD and QCD already
+    /// give (T.800 A.6): the same COD or QCD body, a COC with the same precinct flag and SPcod, a QCC with the same
+    /// Sqcd and SPqcd.
+    private static func restatesMainHeader(
+        marker: UInt16,
+        body: Data,
+        mainCOD: Data?,
+        mainQCD: Data?,
+        componentCount: Int
+    ) -> Bool {
+        guard let mainCOD, let mainQCD, mainCOD.count > 5 else { return false }
+        let indexBytes = componentCount < 257 ? 1 : 2
+        switch marker {
+        case J2KMarker.cod.rawValue:
+            return body == mainCOD
+        case J2KMarker.qcd.rawValue:
+            return body == mainQCD
+        case J2KMarker.coc.rawValue:
+            guard body.count > indexBytes else { return false }
+            let scoc = body[body.startIndex + indexBytes]
+            return scoc & 0x01 == mainCOD[mainCOD.startIndex] & 0x01
+                && body.dropFirst(indexBytes + 1).elementsEqual(mainCOD.dropFirst(5))
+        case J2KMarker.qcc.rawValue:
+            return body.count > indexBytes && body.dropFirst(indexBytes).elementsEqual(mainQCD)
+        default:
+            return false
+        }
     }
 
     // MARK: - Stage 2: Tile Extraction
@@ -2609,43 +2677,33 @@ struct DecoderPipeline: Sendable {
             // E-cores (3–4× slower than P-cores).
             //
             // Fix (bit-exact — output is keyed by block index, so work
-            // *distribution* is free to change): distribute blocks across
-            // `2 × coreCount` buckets using LPT (longest-processing-time-first):
-            // sort blocks by descending estimated cost (encoded byte length is a
-            // good proxy for entropy-decode work) and greedily assign each to the
-            // least-loaded bucket. Oversubscription + greedy balancing keeps the
-            // tail short; child tasks inherit visible or shadow priority from the caller.
-            // This is the decode-side analogue of the encoder's Tier1ChunkPlan.
+            // *distribution* is free to change): blocks are taken largest first
+            // (encoded byte length is a good proxy for entropy-decode work); child
+            // tasks inherit visible or shadow priority from the caller.
+            //
+            // Issue #3051: v10.25 fixed the assignment before decoding (LPT over
+            // `2 × coreCount` buckets), so a bucket that landed on an efficiency
+            // core (4 of 12 on an M4 Pro) gated the stage. Now one worker per core
+            // takes the next block from a shared cursor as soon as it finishes the
+            // previous one, so slower cores take fewer blocks.
             let coreCount = ProcessInfo.processInfo.processorCount
-            let bucketCount = min(blockCount, max(1, coreCount * 2))
-            let buckets: [[Int]] = {
-                var b = [[Int]](repeating: [], count: bucketCount)
-                var load = [Int](repeating: 0, count: bucketCount)
-                // GPU-pre-decoded blocks cost ~nothing here (just a copy); weight
-                // them at 1 so they don't distort balancing.
-                let order = (0..<blockCount).sorted {
-                    blocks[$0].data.count > blocks[$1].data.count
-                }
-                for idx in order {
-                    var lo = 0
-                    for k in 1..<bucketCount where load[k] < load[lo] { lo = k }
-                    b[lo].append(idx)
-                    load[lo] += max(1, blocks[idx].data.count)
-                }
-                return b
-            }()
+            let workerCount = min(blockCount, max(1, coreCount))
+            let order = (0..<blockCount).sorted {
+                blocks[$0].data.count > blocks[$1].data.count
+            }
+            let cursor = J2KBlockCursor(count: blockCount)
 
             let allResults: [([Int32], [Bool])?] = try await withThrowingTaskGroup(
                 of: [(Int, [Int32], [Bool])].self
             ) { group in
-                for bucket in buckets where !bucket.isEmpty {
+                for _ in 0..<workerCount {
                     group.addTask {
                         try Task.checkCancellation()
                         var chunkResults: [(Int, [Int32], [Bool])] = []
-                        chunkResults.reserveCapacity(bucket.count)
-                        // One scratch buffer per task — reused across all blocks in the bucket
+                        // One scratch buffer per worker — reused across all blocks it takes
                         let scratch = useHT ? nil : DecoderScratchBuffers()
-                        for i in bucket {
+                        while let position = cursor.next() {
+                            let i = order[position]
                             try Task.checkCancellation()
                             // Skip blocks already decoded on GPU. The
                             // empty `htPartiallyRefined` mask matches the

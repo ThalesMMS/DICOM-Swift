@@ -337,7 +337,6 @@ extension JPEGLosslessDecoder {
     ///   - sos: Parsed SOS scan information containing component selectors and scan parameters.
     /// - Throws: `DICOMError.invalidDICOMFormat` when any of the following conditions are violated:
     ///   - SOF3 and SOS declare a different number of components.
-    ///   - SOS `endSpectral` (Se) is not 0 for lossless mode.
     ///   - SOS `successiveApproximationHigh`/`successiveApproximationLow` (Ah/Al) are not both 0.
     ///   - SOS `selectionValue` (predictor) is outside the range 0–7.
     ///   - Any SOS component references an undefined DC Huffman table.
@@ -347,9 +346,10 @@ extension JPEGLosslessDecoder {
             throw DICOMError.invalidDICOMFormat(reason: "Component count mismatch: SOF3=\(sof3.numberOfComponents), SOS=\(sos.numberOfComponents)")
         }
 
-        // Validate lossless mode parameters
-        guard sos.endSpectral == 0 else {
-            throw DICOMError.invalidDICOMFormat(reason: "SOS Se (end spectral) must be 0 for lossless mode, found \(sos.endSpectral)")
+        // Issue #3053: Se has no meaning in a lossless scan (T.81 H.2.2 says it shall be 0). Encoders that write
+        // another value still produce a decodable scan, which libjpeg and GDCM decode; it is ignored.
+        if sos.endSpectral != 0 {
+            logger?.debug("SOS Se (end spectral) \(sos.endSpectral) ignored in a lossless scan")
         }
 
         guard sos.successiveApproximationHigh == 0 else {

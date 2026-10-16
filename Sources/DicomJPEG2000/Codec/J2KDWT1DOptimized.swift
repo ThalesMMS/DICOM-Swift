@@ -617,26 +617,96 @@ public struct J2KDWT2DOptimizer: Sendable {
     ///   - evenCount: Number of even (lowpass) samples.
     ///   - oddCount: Number of odd (highpass) samples.
     ///   - stride s: Distance in elements between adjacent samples.
-    /// Cache-friendly tiled transpose of an Int32 `rows × cols` matrix.
-    /// Tile size 64 keeps each tile in L1 cache (16 KB on Apple Silicon).
-    @inline(__always)
-    static func transposeInt32(
-        src: UnsafePointer<Int32>, dst: UnsafeMutablePointer<Int32>,
-        rows: Int, cols: Int
+    /// `inverseLift53InPlace` applied to every column in `columns` of a row-major plane whose rows hold the
+    /// interleaved vertical signal (row `2i` lowpass, row `2i + 1` highpass). Each lifting step runs over a
+    /// contiguous row segment, so the loops vectorize and no transpose is needed (#3051). The arithmetic per
+    /// column, including both symmetric boundaries, is exactly that of `inverseLift53InPlace`.
+    static func inverseLift53Columns(
+        _ base: UnsafeMutablePointer<Int32>,
+        rowStride: Int,
+        columns: Range<Int>,
+        evenCount: Int,
+        oddCount: Int
     ) {
-        let tileSize = 64
-        for tileRow in stride(from: 0, to: rows, by: tileSize) {
-            let rowEnd = min(tileRow + tileSize, rows)
-            for tileCol in stride(from: 0, to: cols, by: tileSize) {
-                let colEnd = min(tileCol + tileSize, cols)
-                for r in tileRow..<rowEnd {
-                    let srcRow = src + r &* cols
-                    for c in tileCol..<colEnd {
-                        dst[c &* rows &+ r] = srcRow[c]
-                    }
-                }
-            }
+        guard evenCount > 0 && oddCount > 0, !columns.isEmpty else { return }
+        let width = columns.count
+        @inline(__always) func row(_ index: Int) -> UnsafeMutablePointer<Int32> {
+            base + (index &* rowStride &+ columns.lowerBound)
         }
+        // dst[c] -= (a[c] + b[c] + 2) >> 2
+        @inline(__always) func undoUpdate(_ dst: UnsafeMutablePointer<Int32>,
+                                          _ a: UnsafeMutablePointer<Int32>, _ b: UnsafeMutablePointer<Int32>) {
+            for c in 0..<width { dst[c] = dst[c] &- ((a[c] &+ b[c] &+ 2) >> 2) }
+        }
+        // dst[c] += (a[c] + b[c]) >> 1
+        @inline(__always) func undoPredict(_ dst: UnsafeMutablePointer<Int32>,
+                                           _ a: UnsafeMutablePointer<Int32>, _ b: UnsafeMutablePointer<Int32>) {
+            for c in 0..<width { dst[c] = dst[c] &+ ((a[c] &+ b[c]) >> 1) }
+        }
+
+        // Step 1: undo update, left boundary hp[-1] = hp[0].
+        undoUpdate(row(0), row(1), row(1))
+        let limit = min(evenCount, oddCount)
+        for i in 1..<max(1, limit) {
+            undoUpdate(row(i &* 2), row(i &* 2 &- 1), row(i &* 2 &+ 1))
+        }
+        if evenCount > oddCount {
+            let lastHP = row(oddCount &* 2 &- 1)
+            undoUpdate(row((evenCount &- 1) &* 2), lastHP, lastHP)
+        }
+
+        // Step 2: undo predict; the last odd sample takes even[evenCount - 1] as its right neighbour.
+        let lastOdd = oddCount &- 1
+        for i in 0..<lastOdd {
+            undoPredict(row(i &* 2 &+ 1), row(i &* 2), row(i &* 2 &+ 2))
+        }
+        let evenRightIdx = min((lastOdd &+ 1) &* 2, (evenCount &- 1) &* 2)
+        undoPredict(row(lastOdd &* 2 &+ 1), row(lastOdd &* 2), row(evenRightIdx))
+    }
+
+    /// The row pass of the multi-level 5/3 inverse: `row` holds `lowCount` lowpass then `highCount` highpass
+    /// samples and receives the interleaved reconstruction. The result equals interleaving the two halves and
+    /// running `inverseLift53InPlace` with stride 1; computing the even outputs, then the odd ones, from the separate
+    /// halves keeps every loop contiguous so it vectorizes (#3051). `scratch` holds `lowCount + highCount` samples.
+    /// Only the dyadic shapes (`lowCount` equal to `highCount` or one more) take the direct path.
+    static func inverseLift53Row(
+        _ row: UnsafeMutablePointer<Int32>,
+        lowCount: Int,
+        highCount: Int,
+        scratch: UnsafeMutablePointer<Int32>
+    ) {
+        let width = lowCount &+ highCount
+        let low = row
+        let high = row + lowCount
+        guard highCount > 0, lowCount == highCount || lowCount == highCount &+ 1 else {
+            for i in 0..<lowCount { scratch[i &* 2] = low[i] }
+            for i in 0..<highCount { scratch[i &* 2 &+ 1] = high[i] }
+            inverseLift53InPlace(scratch, evenCount: lowCount, oddCount: highCount, stride: 1)
+            row.update(from: scratch, count: width)
+            return
+        }
+        let even = scratch
+        let odd = scratch + lowCount
+        // Step 1: undo update, hp[-1] = hp[0]; with one more even sample the last takes hp[highCount - 1] twice.
+        even[0] = low[0] &- ((high[0] &+ high[0] &+ 2) >> 2)
+        for i in 1..<highCount {
+            even[i] = low[i] &- ((high[i &- 1] &+ high[i] &+ 2) >> 2)
+        }
+        if lowCount > highCount {
+            let lastHP = high[highCount &- 1]
+            even[highCount] = low[highCount] &- ((lastHP &+ lastHP &+ 2) >> 2)
+        }
+        // Step 2: undo predict; the last odd sample takes even[lowCount - 1] as its right neighbour.
+        let lastOdd = highCount &- 1
+        for i in 0..<lastOdd {
+            odd[i] = high[i] &+ ((even[i] &+ even[i &+ 1]) >> 1)
+        }
+        odd[lastOdd] = high[lastOdd] &+ ((even[lastOdd] &+ even[min(lastOdd &+ 1, lowCount &- 1)]) >> 1)
+        for i in 0..<highCount {
+            row[i &* 2] = even[i]
+            row[i &* 2 &+ 1] = odd[i]
+        }
+        if lowCount > highCount { row[width &- 1] = even[highCount] }
     }
 
     @inline(__always)
@@ -790,7 +860,7 @@ public struct J2KDWT2DOptimizer: Sendable {
                 }
             }
 
-            // Row lifting (FIRST): interleave low/high cols into temp, lift in-place, copy back.
+            // Row lifting (FIRST): lift each row's low/high cols through temp, write back interleaved.
             // After placement each row has: low cols 0..<curW (even = H lowpass),
             // high cols curW..<outW (odd = H highpass). Applying H inverse per row gives
             // back the full-width horizontal-reconstructed rows. The even/odd row
@@ -799,7 +869,8 @@ public struct J2KDWT2DOptimizer: Sendable {
             let safeBaseRow = SendablePointer(base)
             if outH >= 128 {
                 let coreCount = ProcessInfo.processInfo.processorCount
-                let chunkSize = max(1, outH / coreCount)
+                // At least 32 rows per task: a task per handful of rows cost more to start than to run (#3051).
+                let chunkSize = max(32, outH / coreCount)
                 await withTaskGroup(of: Void.self) { group in
                     for chunkStart in stride(from: 0, to: outH, by: chunkSize) {
                         let chunkEnd = min(chunkStart + chunkSize, outH)
@@ -810,13 +881,9 @@ public struct J2KDWT2DOptimizer: Sendable {
                             tmp.withUnsafeMutableBufferPointer { tmpBuf in
                                 let tp = tmpBuf.baseAddress!
                                 for r in chunkStart..<chunkEnd {
-                                    let rowBase = b + r &* outW
-                                    for i in 0..<lowCols { tp[i &* 2] = rowBase[i] }
-                                    for i in 0..<hlW { tp[i &* 2 &+ 1] = rowBase[lowCols &+ i] }
-                                    J2KDWT2DOptimizer.inverseLift53InPlace(
-                                        tp, evenCount: lowCols, oddCount: hlW, stride: 1
+                                    J2KDWT2DOptimizer.inverseLift53Row(
+                                        b + r &* outW, lowCount: lowCols, highCount: hlW, scratch: tp
                                     )
-                                    rowBase.update(from: tp, count: outW)
                                 }
                             }
                         }
@@ -827,44 +894,39 @@ public struct J2KDWT2DOptimizer: Sendable {
                 tmp.withUnsafeMutableBufferPointer { tmpBuf in
                     let tp = tmpBuf.baseAddress!
                     for r in 0..<outH {
-                        let rowBase = base + r &* outW
-                        for i in 0..<lowCols { tp[i &* 2] = rowBase[i] }
-                        for i in 0..<hlW { tp[i &* 2 &+ 1] = rowBase[lowCols &+ i] }
-                        J2KDWT2DOptimizer.inverseLift53InPlace(
-                            tp, evenCount: lowCols, oddCount: hlW, stride: 1
+                        J2KDWT2DOptimizer.inverseLift53Row(
+                            base + r &* outW, lowCount: lowCols, highCount: hlW, scratch: tp
                         )
-                        rowBase.update(from: tp, count: outW)
                     }
                 }
             }
 
-            // Column lifting (SECOND): transpose → stride-1 lift → untranspose.
-            // Transposing first eliminates the stride-outW cache thrash that
-            // occurs when lifting each column directly in the row-major buffer.
+            // Column lifting (SECOND): every column's lifting runs row by row over a
+            // band of columns (`inverseLift53Columns`), so the inner loop reads and
+            // writes contiguous row segments. Same per-column arithmetic as
+            // `inverseLift53InPlace`, without the two full-plane transposes it
+            // needed for a stride-1 column (#3051).
             let evenRows = curH
             let coreCountCol = ProcessInfo.processInfo.processorCount
             if outH >= 32 && outW >= 32 {
-                let tBuf = UnsafeMutablePointer<Int32>.allocate(capacity: bufSize)
-                defer { tBuf.deallocate() }
-                // Transpose: outH×outW → outW×outH  (cols become stride-1 rows)
-                J2KDWT2DOptimizer.transposeInt32(src: base, dst: tBuf, rows: outH, cols: outW)
-                let safeT = SendablePointer(tBuf)
-                let colChunk = max(1, outW / coreCountCol)
-                await withTaskGroup(of: Void.self) { group in
-                    for chunkStart in stride(from: 0, to: outW, by: colChunk) {
-                        let chunkEnd = min(chunkStart + colChunk, outW)
-                        group.addTask {
-                            let tp = safeT.pointer
-                            for col in chunkStart..<chunkEnd {
-                                J2KDWT2DOptimizer.inverseLift53InPlace(
-                                    tp + col &* outH, evenCount: evenRows, oddCount: lhH, stride: 1
+                let colChunk = (max(64, (outW + coreCountCol - 1) / coreCountCol) + 15) & ~15
+                if colChunk >= outW {
+                    J2KDWT2DOptimizer.inverseLift53Columns(
+                        base, rowStride: outW, columns: 0..<outW, evenCount: evenRows, oddCount: lhH
+                    )
+                } else {
+                    await withTaskGroup(of: Void.self) { group in
+                        for chunkStart in stride(from: 0, to: outW, by: colChunk) {
+                            let chunkEnd = min(chunkStart + colChunk, outW)
+                            group.addTask {
+                                J2KDWT2DOptimizer.inverseLift53Columns(
+                                    safeBaseRow.pointer, rowStride: outW, columns: chunkStart..<chunkEnd,
+                                    evenCount: evenRows, oddCount: lhH
                                 )
                             }
                         }
                     }
                 }
-                // Untranspose: outW×outH → outH×outW
-                J2KDWT2DOptimizer.transposeInt32(src: tBuf, dst: base, rows: outW, cols: outH)
             } else {
                 for col in 0..<outW {
                     J2KDWT2DOptimizer.inverseLift53InPlace(

@@ -329,6 +329,12 @@ extension DCMDecoder {
         imagePosition = context.imagePosition
         rescaleIntercept = context.rescaleIntercept
         rescaleSlope = context.rescaleSlope
+        if rescaleSlope == 0 {
+            // Issue #3053: a Rescale Slope of 0 maps every sample to the intercept, a blank image. GDCM reads it as 1,
+            // and so does this decoder; the stored value stays readable through `info(for: .rescaleSlope)`.
+            rescaleSlope = 1
+            logger.warning("Corrected data: Rescale Slope (0028,1053) is 0; treated as 1, as GDCM does")
+        }
         reds = context.reds
         greens = context.greens
         blues = context.blues

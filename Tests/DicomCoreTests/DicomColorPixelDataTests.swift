@@ -17,6 +17,24 @@ final class DicomColorPixelDataTests: XCTestCase {
         XCTAssertEqual(try decoder.displayRGB8(decodedFrame: frame), expected)
     }
 
+    /// Issue #3117: signed palette indices (Pixel Representation 1) display through the palette, as Horos shows them; a
+    /// negative index takes the first entry, as any index below the first mapped value does.
+    func test_signedPaletteIndices_displayThroughThePalette_negativeAsTheFirstEntry() throws {
+        let url = try makeTemporaryDICOM(
+            photometricInterpretation: "PALETTE COLOR", samplesPerPixel: 1, width: 3, height: 1,
+            bitsAllocated: 16, pixelRepresentation: 1, pixelBytes: [1, 0, 0xFB, 0xFF, 2, 0], paletteDescriptor: [3, 0, 16],
+            redPalette: [0x1000, 0x8000, 0xF000], greenPalette: [0x2000, 0x9000, 0xE000], bluePalette: [0x3000, 0xA000, 0xD000])
+        defer { try? FileManager.default.removeItem(at: url) }
+        let decoder = try DCMDecoder(contentsOf: url)
+        let frame = try DicomDecodedFrameReader(decoder: decoder).frame(at: 0)
+        XCTAssertEqual(frame.metadata.pixelRepresentation, 1)
+        XCTAssertEqual(try decoder.displayRGB8(decodedFrame: frame), Data([
+            0x80, 0x90, 0xA0, // 1
+            0x10, 0x20, 0x30, // -5 takes the first entry
+            0xF0, 0xE0, 0xD0  // 2
+        ]))
+    }
+
     func test_segmentedPaletteColor2x2_rendersExactRGBBytes() throws {
         var data = Data(count: 128)
         data.append(contentsOf: "DICM".utf8)
@@ -595,6 +613,7 @@ final class DicomColorPixelDataTests: XCTestCase {
         height: UInt16,
         bitsAllocated: UInt16,
         bitsStored: UInt16? = nil,
+        pixelRepresentation: UInt16 = 0,
         pixelBytes: [UInt8],
         paletteDescriptor: [UInt16]? = nil,
         redPalette: [UInt16]? = nil,
@@ -619,7 +638,7 @@ final class DicomColorPixelDataTests: XCTestCase {
         appendUS(&data, group: 0x0028, element: 0x0100, value: bitsAllocated)
         appendUS(&data, group: 0x0028, element: 0x0101, value: storedBits)
         appendUS(&data, group: 0x0028, element: 0x0102, value: storedBits - 1)
-        appendUS(&data, group: 0x0028, element: 0x0103, value: 0)
+        appendUS(&data, group: 0x0028, element: 0x0103, value: pixelRepresentation)
 
         if let paletteDescriptor {
             appendUSValues(&data, group: 0x0028, element: 0x1101, values: paletteDescriptor)

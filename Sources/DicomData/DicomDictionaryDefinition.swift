@@ -22,6 +22,15 @@ public struct DicomDictionaryDefinition: Codable, Equatable, Sendable {
         guard isValid else { throw Failure.invalidDefinition }
     }
 
+    /// Generated standard table entries, validated against the definitions JSON by tests rather than per launch.
+    init(standardVRs: [String], multiplicity: String, name: String, keyword: String, retired: Bool) {
+        vrs = standardVRs
+        vm = multiplicity
+        self.name = name
+        self.keyword = keyword
+        self.retired = retired
+    }
+
     private enum CodingKeys: String, CodingKey { case vrs, vm, name, keyword, retired }
 
     public init(from decoder: any Decoder) throws {

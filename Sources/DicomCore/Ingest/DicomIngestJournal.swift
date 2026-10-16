@@ -3,7 +3,8 @@ import Foundation
 /// Every line repeats the complete recovery metadata. No dataset or patient attributes are stored.
 public struct DicomIngestJournalEntry: Codable, Sendable {
     public enum Phase: String, Codable, Sendable { case intent, done }
-    public enum Disposition: String, Codable, Sendable { case duplicate, quarantined, discarded }
+    /// `lost`: neither the temporary nor the final file exists, so replay closes the ingest once instead of retrying it.
+    public enum Disposition: String, Codable, Sendable { case duplicate, quarantined, discarded, lost }
     public var ingestID: UUID
     public var stage: DicomIngestStage
     public var phase: Phase
@@ -11,6 +12,9 @@ public struct DicomIngestJournalEntry: Codable, Sendable {
     public var temporaryPath: URL
     public var finalPath: URL?
     public var checksum: String?
+    /// The SHA-256 of the bytes validation saw, when the ingest had them in memory. Staged bytes that
+    /// hash to anything else are never published (issue #3080).
+    public var expectedChecksum: String?
     public var sopClassUID: String?
     public var sopInstanceUID: String?
     public var transferSyntaxUID: String?

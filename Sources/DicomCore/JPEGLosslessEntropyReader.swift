@@ -15,16 +15,32 @@ struct JPEGLosslessEntropyReader {
     private let end: Int
     private var accumulator: UInt64 = 0
     private var bitCount: Int = 0
+    private let cornellCategory16: Bool
 
-    init(bytes: UnsafeBufferPointer<UInt8>, start: Int, end: Int) {
+    init(bytes: UnsafeBufferPointer<UInt8>, start: Int, end: Int, cornellCategory16: Bool = false) {
         self.bytes = bytes
         position = start
         self.end = end
+        self.cornellCategory16 = cornellCategory16
     }
 
     /// Loads whole bytes until the accumulator holds more than 56 bits or a marker/end of data is reached.
     @inline(__always)
     private mutating func fill() {
+        // Fast path (#3079): when the next eight bytes hold no 0xFF, append as many as fit with one load.
+        if position + 8 <= end {
+            let word = UInt64(bigEndian: UnsafeRawPointer(bytes.baseAddress! + position).loadUnaligned(as: UInt64.self))
+            let inverted = ~word
+            if (inverted &- 0x0101_0101_0101_0101) & ~inverted & 0x8080_8080_8080_8080 == 0 {
+                let byteCount = (63 - bitCount) >> 3
+                if byteCount > 0 {
+                    let shift = UInt64(byteCount << 3)
+                    accumulator = (accumulator &<< shift) | (word &>> (64 - shift))
+                    position += byteCount
+                    bitCount += byteCount << 3
+                }
+            }
+        }
         while bitCount <= 56, position < end {
             let byte = bytes[position]
             if byte == JPEGMarker.prefix {
@@ -88,11 +104,35 @@ struct JPEGLosslessEntropyReader {
         throw DICOMError.invalidDICOMFormat(reason: "Invalid Huffman code encountered")
     }
 
-    /// The signed difference for category `ssss` (T.81 H.1.2.2 / Table H.2); SSSS 16 carries no extra bits.
+    /// One sample's difference in one step (#3079): with at least 32 bits buffered, a lookup-table code of category
+    /// 0...15 and its extra bits (at most 9 + 15 bits) are read from the accumulator directly. Returns nil, consuming
+    /// nothing, for every other case (long code, category 16 or above, end of data), which `decodeSymbol` and
+    /// `readDifference` then handle with their checks.
+    @inline(__always)
+    mutating func decodeShortDifference(_ table: JPEGLosslessDecodingTable) -> Int? {
+        if bitCount < 32 { fill() }
+        guard bitCount >= 32 else { return nil }
+        let lookupBits = HuffmanTable.lookupBits
+        let entry = table.lookup[Int(truncatingIfNeeded: accumulator &>> UInt64(bitCount - lookupBits)) & ((1 << lookupBits) - 1)]
+        let ssss = Int(entry & 0xFF)
+        guard entry != 0, ssss <= 15 else { return nil }
+        bitCount -= Int(entry >> 8) + ssss
+        guard ssss > 0 else { return 0 }
+        let bits = Int(truncatingIfNeeded: accumulator &>> UInt64(bitCount)) & ((1 << ssss) - 1)
+        return bits < (1 << (ssss - 1)) ? bits - (1 << ssss) + 1 : bits
+    }
+
+    /// The signed difference for category `ssss` (T.81 H.1.2.2 / Table H.2); SSSS 16 carries no extra bits, except
+    /// in streams of the Cornell encoder, which writes 16 (the libjpeg `WORKAROUND_BUGGY_CORNELL_16BIT_JPEG_ENCODER`
+    /// reading of GDCM and DCMTK, issue #3053).
     @inline(__always)
     mutating func readDifference(category ssss: Int) throws -> Int {
         if ssss == 0 { return 0 }
-        if ssss == 16 { return 32768 }
+        if ssss == 16 {
+            guard cornellCategory16 else { return 32768 }
+            let bits = try readBits(16)
+            return bits < 32768 ? bits - 65535 : bits
+        }
         let bits = try readBits(ssss)
         return bits < (1 << (ssss - 1)) ? bits - (1 << ssss) + 1 : bits
     }

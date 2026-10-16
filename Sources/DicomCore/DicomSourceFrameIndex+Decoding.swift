@@ -16,7 +16,9 @@ extension DicomSourceFrameIndex {
     func decodedByteCount() throws -> Int {
         let dataSet = metadata.dataSet
         let allocated = dataSet.int(for: .bitsAllocated) ?? 0
-        guard metadata.pixelDataTag == DicomTag.pixelData.rawValue, [1, 8, 16].contains(allocated) else {
+        // Issue #3053: compressed samples under Bits Allocated 12 decode into 16-bit words, as GDCM delivers them.
+        let compressedTwelve = allocated == 12 && metadata.pixelDataIsEncapsulated
+        guard metadata.pixelDataTag == DicomTag.pixelData.rawValue, [1, 8, 16].contains(allocated) || compressedTwelve else {
             throw Failure.unsupportedLayout("Display decoding requires qualified integer 1/8/16-bit pixels; raw extraction preserves wider and floating samples.")
         }
         let rows = dataSet.int(for: .rows) ?? 0

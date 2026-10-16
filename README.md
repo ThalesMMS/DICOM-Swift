@@ -610,7 +610,7 @@ Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/ThalesMMS/DICOM-Swift.git", from: "2.0.0")
+    .package(url: "https://github.com/ThalesMMS/DICOM-Swift.git", from: "3.0.0")
 ]
 ```
 
@@ -841,7 +841,7 @@ See [USAGE_EXAMPLES.md](USAGE_EXAMPLES.md#type-safe-value-types-v2-apis) for det
 
 1. File -> Add Packages...
 2. Paste `https://github.com/ThalesMMS/DICOM-Swift.git`
-3. Select version `2.0.0` or later
+3. Select version `3.0.0` or later
 4. Add Package
 
 ### Via Package.swift
@@ -849,7 +849,7 @@ See [USAGE_EXAMPLES.md](USAGE_EXAMPLES.md#type-safe-value-types-v2-apis) for det
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/ThalesMMS/DICOM-Swift.git", from: "2.0.0")
+    .package(url: "https://github.com/ThalesMMS/DICOM-Swift.git", from: "3.0.0")
 ],
 targets: [
     .target(
@@ -1400,7 +1400,7 @@ Add DicomSwiftUI to your SwiftUI project:
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/ThalesMMS/DICOM-Swift.git", from: "2.0.0")
+    .package(url: "https://github.com/ThalesMMS/DICOM-Swift.git", from: "3.0.0")
 ],
 targets: [
     .target(
@@ -2054,7 +2054,13 @@ Bounded Data/file/injected-range sources, explicit leases and selective metadata
 `DicomSourceFrameSession` reuses one revision-bound native/BOT/EOT index and shares compatible raw, decoded and partial
 frame requests with independent cancellation and bounded reservations. `dicomtool extract --bounded` uses this path;
 see [Selective frame sessions](DISTRIBUTION.md) for codec boundaries, raw wide/float qualification,
-independent fixtures and measured memory. Existing full-buffer APIs remain available.
+independent fixtures and measured memory. Existing full-buffer APIs remain available. The session's
+`storedSampleFrame(at:)` reads native monochrome 8/16-bit frames at their offset in the stored-sample convention, without
+a Part 10 copy of the pixels or a second parse, byte-identical to `frame(at:)` followed by `storedSampleData()`; the frame
+metadata of a series whose headers differ only in per-instance identity, time and position is parsed once (#3111).
+`DicomSourceMetadata.readPart10` parses memory and buffered-file headers out of 16 KiB blocks instead of awaiting one
+read per element, and `DicomByteSource.fileIdentity` exposes the status a local file had when it was opened, which every
+validating read checks.
 It compares all frames/components and metadata with pinned pydicom-generated expectations, independently rereads Swift
 rewrites, detects deliberate pixel/frame/geometry changes, and exercises parser, RLE and remote-origin failures.
 The external Python reader is test tooling only and requires Python 3.12 or newer for the pinned

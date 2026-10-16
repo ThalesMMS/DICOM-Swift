@@ -1030,13 +1030,15 @@ package enum DicomSequenceValueParser {
             let text = characterSet.decodePreservingWhitespace(value, vr: vr)
             return text.isEmpty ? .empty : .strings([text])
         }
-        let text = characterSet.decode(data, vr: vr)
-            .trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "\0")))
+        let text = characterSet.decode(data, vr: vr).trimmingCharacters(in: valuePadding)
         let values = text.split(separator: "\\", omittingEmptySubsequences: false).map {
-            String($0).trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "\0")))
+            String($0).trimmingCharacters(in: valuePadding)
         }
         return values.isEmpty || (values.count == 1 && values[0].isEmpty) ? .empty : .strings(values)
     }
+
+    /// Built once instead of twice per text value (issue #3051).
+    private static let valuePadding = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "\0"))
 
     private static func validatedValue(for vr: DicomVR, data: Data, littleEndian: Bool,
                                        characterSet: DicomSpecificCharacterSet?, purpose: DicomDataSetPurpose,

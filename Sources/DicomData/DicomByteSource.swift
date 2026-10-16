@@ -84,16 +84,25 @@ public actor DicomByteSource {
     public nonisolated let count: Int
     public nonisolated let revision: UUID
     public nonisolated let limits: Limits
+    /// The status of a local file when it was opened (`DicomFileIdentity`); nil for memory and remote sources.
+    public nonisolated let fileIdentity: DicomFileIdentity?
     private var storage: Storage
     private let lifetime = DicomByteSourceLifetime()
     private var counters = Metrics()
     private var activeReads = 0
     private var closed = false
+    /// The block that the last unvalidated read of a buffered local file fetched (issue #3051). A metadata scan
+    /// asks for one element at a time; serving those small reads from one block replaces about one file read per
+    /// element. Requested ranges and received bytes stay the logical ones; the block's copy is counted in
+    /// `storageCopiedBytes`. The next validating read drops it.
+    private var scanBlock: (lowerBound: Int, bytes: Data)?
+    static let scanBlockBytes = 16 * 1024
 
     public init(data: Data, limits: Limits = Limits()) {
         count = data.count
         revision = UUID()
         self.limits = limits
+        fileIdentity = nil
         storage = .memory(data)
     }
 
@@ -101,6 +110,7 @@ public actor DicomByteSource {
         count = file.count
         revision = UUID()
         self.limits = limits
+        fileIdentity = file.identity
         self.storage = .file(file, storage)
     }
 
@@ -123,6 +133,7 @@ public actor DicomByteSource {
         self.count = count
         revision = UUID()
         self.limits = limits
+        fileIdentity = nil
         storage = .remote(remote, entityTag: entityTag, maximumFullResponseBytes: max(0, maximumFullResponseBytes))
     }
 
@@ -140,6 +151,12 @@ public actor DicomByteSource {
     }
 
     public func read(_ range: Range<Int>) async throws -> DicomByteLease {
+        try await read(range, validatesRevision: true)
+    }
+
+    /// `validatesRevision: false` skips a local file's revision check for this read only. The caller must finish its
+    /// sequence of reads with a validating read and discard what it read when that one fails (issue #3051).
+    package func read(_ range: Range<Int>, validatesRevision: Bool) async throws -> DicomByteLease {
         try Task.checkCancellation()
         guard !closed else { throw Failure.closed }
         guard range.lowerBound >= 0, range.upperBound <= count else { throw Failure.invalidRange }
@@ -166,8 +183,13 @@ public actor DicomByteSource {
                 let lower = data.startIndex + range.lowerBound
                 bytes = data[lower..<(lower + range.count)]
             case .file(let file, let mode):
-                bytes = try await file.read(range, mapped: mode == .mappedSnapshot)
-                counters.storageCopiedBytes += bytes.count
+                if !validatesRevision, mode == .buffer, !range.isEmpty {
+                    bytes = try await scanBlockRead(range, from: file)
+                } else {
+                    if validatesRevision { scanBlock = nil }
+                    bytes = try await file.read(range, mapped: mode == .mappedSnapshot, validatesRevision: validatesRevision)
+                    counters.storageCopiedBytes += bytes.count
+                }
             case .remote(let transport, let entityTag, let maximumFullResponseBytes):
                 if range.isEmpty {
                     bytes = Data()
@@ -208,6 +230,71 @@ public actor DicomByteSource {
         return DicomByteLease(bytes: bytes, range: range, lifetime: lifetime)
     }
 
+    /// The bytes from `lowerBound`, at least `minimumCount` of them and up to `scanBlockBytes`, for a metadata scan
+    /// that parses them in place (issue #3111): a memory source's slice, or one unvalidated read of a buffered local
+    /// file. Nil for a remote or mapped source, whose scan keeps its per-element reads so it never fetches bytes it was
+    /// not asked for. Nothing is counted as requested here: the scan reports the ranges it consumed with
+    /// `recordScanReads(_:)` and validates the revision with a last read, as for its unvalidated reads.
+    package func scanBlock(from lowerBound: Int, minimumCount: Int) async throws -> Data? {
+        try Task.checkCancellation()
+        guard !closed else { throw Failure.closed }
+        guard lowerBound >= 0, minimumCount >= 0, minimumCount <= count - lowerBound else { throw Failure.invalidRange }
+        let upper = min(count, lowerBound + max(minimumCount, Self.scanBlockBytes))
+        switch storage {
+        case .memory(let data):
+            return data[(data.startIndex + lowerBound)..<(data.startIndex + upper)]
+        case .file(let file, .buffer):
+            let block: Data
+            do {
+                block = try await file.read(lowerBound..<upper, mapped: false, validatesRevision: false)
+            } catch {
+                if error as? Failure == .changed {
+                    closed = true
+                    lifetime.close()
+                    await file.close()
+                }
+                throw error
+            }
+            try Task.checkCancellation()
+            guard !closed else { throw Failure.closed }
+            guard block.count == upper - lowerBound else {
+                throw Failure.shortRead(expected: upper - lowerBound, actual: block.count)
+            }
+            counters.storageCopiedBytes += block.count
+            return block
+        case .file, .remote:
+            return nil
+        }
+    }
+
+    /// Counts the ranges a metadata scan consumed from `scanBlock(from:minimumCount:)` as the requests they replace:
+    /// requested, budgeted and received bytes, and the first 128 ranges.
+    package func recordScanReads(_ ranges: [Range<Int>]) throws {
+        let total = ranges.reduce(0) { $0 + $1.count }
+        guard total <= limits.maximumTotalReadBytes - counters.budgetedBytes else { throw Failure.totalReadLimit }
+        counters.readCount += ranges.count
+        counters.requestedBytes += total
+        counters.budgetedBytes += total
+        counters.receivedBytes += total
+        for range in ranges where counters.ranges.count < 128 { counters.ranges.append(range) }
+    }
+
+    /// An unvalidated read of a buffered local file, served from `scanBlock` or from a new block that starts at
+    /// `range` and holds at least `scanBlockBytes` (fewer at the end of the file).
+    private func scanBlockRead(_ range: Range<Int>, from file: DicomFileByteStorage) async throws -> Data {
+        if let block = scanBlock, range.lowerBound >= block.lowerBound,
+           range.upperBound <= block.lowerBound + block.bytes.count {
+            let start = block.bytes.startIndex + (range.lowerBound - block.lowerBound)
+            return Data(block.bytes[start..<(start + range.count)])
+        }
+        let upper = min(count, range.lowerBound + max(range.count, Self.scanBlockBytes))
+        let block = try await file.read(range.lowerBound..<upper, mapped: false, validatesRevision: false)
+        counters.storageCopiedBytes += block.count
+        guard block.count > range.count else { return block }
+        scanBlock = (range.lowerBound, block)
+        return Data(block.prefix(range.count))
+    }
+
     private func validContentRange(_ header: String?, for range: Range<Int>) -> Bool {
         guard let header else { return false }
         let fields = header.trimmingCharacters(in: .whitespaces).split(separator: " ", omittingEmptySubsequences: false)
@@ -224,6 +311,7 @@ public actor DicomByteSource {
 
     public func close() async {
         closed = true
+        scanBlock = nil
         lifetime.close()
         let previous = storage
         storage = .memory(Data())

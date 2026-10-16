@@ -124,16 +124,16 @@ final class DicomSourceFrameIndexTests: XCTestCase {
         catch { XCTAssertEqual(error as? DicomSourceFrameIndex.Failure, .invalidOffsetTable) }
     }
 
-    func test_truncationOddFragmentsAndIndexBudget_failBeforeMaterialization() async throws {
+    func test_truncationAndIndexBudget_failBeforeMaterialization() async throws {
         let valid = encapsulated(bot: [], fragments: [Data([1, 2])])
         for cut in 0..<valid.count {
             let source = DicomByteSource(data: Data(valid.prefix(cut)))
             do { _ = try await parse(source, frames: 1); XCTFail("Truncation \(cut) accepted") }
             catch { XCTAssertNotNil(error as? DicomSourceFrameIndex.Failure) }
         }
-        let odd = DicomByteSource(data: encapsulated(bot: [], fragments: [Data([1])]))
-        do { _ = try await parse(odd, frames: 1); XCTFail("Odd fragment accepted") }
-        catch { XCTAssertEqual(error as? DicomSourceFrameIndex.Failure, .truncatedItems) }
+        // Issue #3053: an odd fragment length is kept as declared, as GDCM reads it.
+        let odd = try await parse(DicomByteSource(data: encapsulated(bot: [], fragments: [Data([1])])), frames: 1)
+        XCTAssertEqual(odd.fragments.map(\.length), [1])
         let many = DicomByteSource(data: encapsulated(bot: [], fragments: Array(repeating: Data([1, 2]), count: 3)))
         do { _ = try await parse(many, frames: 3, budget: 128); XCTFail("Index limit ignored") }
         catch { XCTAssertEqual(error as? DicomSourceFrameIndex.Failure, .indexLimit) }

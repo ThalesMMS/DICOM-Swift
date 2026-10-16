@@ -318,6 +318,42 @@ final class DicomJLSwiftBackendTests: XCTestCase {
         XCTAssertNotNil(parity)
     }
 
+    func test_charLSDecodingAFrameTheOwnDecoderDeclines_isCountedAsAFallback() async throws {
+        try requireCharLS()
+        // 7 bits stored in 8 (the `JLSL_08_07_0_1F` shape): the own decoder declines it, CharLS decodes it (#3086).
+        let source = Self.grayscaleBytes(width: 7, height: 5, bitsStored: 7)
+        let encoded = try DicomJPEGLSCodec.encodeForTesting(bytes: source, width: 7, height: 5, bitsPerSample: 7)
+        let request = Self.decodeRequest(frameData: encoded, descriptor: Self.descriptor(bitsStored: 7))
+        let fallbacks = DicomJ2KFallbackLedger()
+        let frame = try await DicomJLSwiftFrameDecoder.decode(
+            request, environment: [DicomJLSwiftRolloutMode.environmentKey: "preferred"], fallbacks: fallbacks
+        )
+        XCTAssertEqual(frame?.buffer.data, source)
+        XCTAssertEqual(fallbacks.count, 1)
+        XCTAssertNotNil(fallbacks.lastReason)
+
+        let ownRequest = Self.decodeRequest(
+            frameData: try DicomJPEGLSCodec.encodeForTesting(
+                bytes: Self.grayscaleBytes(width: 7, height: 5, bitsStored: 8), width: 7, height: 5, bitsPerSample: 8
+            ),
+            descriptor: Self.descriptor(bitsStored: 8)
+        )
+        _ = try await DicomJLSwiftFrameDecoder.decode(
+            ownRequest, environment: [DicomJLSwiftRolloutMode.environmentKey: "preferred"], fallbacks: fallbacks
+        )
+        XCTAssertEqual(fallbacks.count, 1, "a frame the own decoder produced is not a fallback")
+
+        // The synchronous pixel reader counts its CharLS fallback in the shared ledger too. Its own decoder declines
+        // a 7-bit codestream declared as 8 bits stored; CharLS reads the codestream as coded.
+        let before = DicomJ2KFallbackLedger.shared.count
+        let result = DCMPixelReader.decodeCompressedFrameData(
+            data: encoded, transferSyntax: .jpegLSLossless, width: 7, height: 5, bitDepth: 8, samplesPerPixel: 1,
+            bitsStored: 8, environment: [DicomJLSwiftRolloutMode.environmentKey: "preferred"]
+        )
+        XCTAssertNotNil(result)
+        XCTAssertEqual(DicomJ2KFallbackLedger.shared.count, before + 1)
+    }
+
     func test_forcedModeRejectsAmbiguousHighBitDepthColorWithContext() async throws {
         // 12-bit RGB decodes since issue #3034; deeper colour of any other photometric stays refused.
         let descriptor = Self.descriptor(

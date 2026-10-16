@@ -216,9 +216,17 @@ def main() -> None:
              "        let groupMacros: [Usage]",
              "    }",
              ""]
-    lines.append("    static let iods: [String: IOD] = [")
+    # One statement per IOD and per table: one dictionary literal holding all of them took the type checker more
+    # than 30 GB per frontend (#3094).
+    lines += ["    static let iods: [String: IOD] = makeIODs()",
+              "",
+              "    static let tables: [String: [Row]] = makeTables()",
+              "",
+              "    // One statement per IOD and per table; a single dictionary literal exhausted compiler memory (#3094).",
+              "    private static func makeIODs() -> [String: IOD] {",
+              "        var iods: [String: IOD] = [:]"]
     for key, iod in iods.items():
-        lines.append(f"        \"{key}\": IOD(sopClassUID: \"{iod['uid']}\", modules: [")
+        lines.append(f"        iods[\"{key}\"] = IOD(sopClassUID: \"{iod['uid']}\", modules: [")
         for m in iod["modules"]:
             usage = m["use"].split(" ")[0]
             lines.append(f"            Usage(name: \"{m['name']}\", table: \"{m['ref']}\", usage: \"{usage}\"),")
@@ -226,14 +234,13 @@ def main() -> None:
         for m in iod["groupMacros"]:
             usage = m["use"].split(" ")[0]
             lines.append(f"            Usage(name: \"{m['name']}\", table: \"{m['ref']}\", usage: \"{usage}\"),")
-        lines.append("        ]),")
-    lines.append("    ]")
-    lines.append("")
-    lines.append("    static let tables: [String: [Row]] = [")
+        lines.append("        ])")
+    lines += ["        return iods", "    }", "", "    private static func makeTables() -> [String: [Row]] {",
+              "        var tables: [String: [Row]] = [:]"]
     for ref in sorted(extracted):
         entry = extracted[ref]
         lines.append(f"        // {entry['caption']} ({entry['id']})")
-        lines.append(f"        \"{ref}\": [")
+        lines.append(f"        tables[\"{ref}\"] = [")
         for row in entry["rows"]:
             # US Image repeats Overlay Subtype over 60xx; the US composer resolves each referenced group.
             if ref == "C.8.5.6" and row.get("tag") == "(60xx,0045)":
@@ -248,9 +255,8 @@ def main() -> None:
             if row["mayBePresent"]:
                 parts.append("may: true")
             lines.append(f"            Row({', '.join(parts)}), // {row['name']}")
-        lines.append("        ],")
-    lines.append("    ]")
-    lines.append("}")
+        lines.append("        ]")
+    lines += ["        return tables", "    }", "}"]
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text("\n".join(lines) + "\n")
     print(f"{len(extracted)} tables, {sum(len(t['rows']) for t in extracted.values())} rows -> {args.output}")

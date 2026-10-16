@@ -35,8 +35,14 @@ enum DicomEnhancedImageTables {
         let groupMacros: [Usage]
     }
 
-    static let iods: [String: IOD] = [
-        "ultrasound": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.6.1", modules: [
+    static let iods: [String: IOD] = makeIODs()
+
+    static let tables: [String: [Row]] = makeTables()
+
+    // One statement per IOD and per table; a single dictionary literal exhausted compiler memory (#3094).
+    private static func makeIODs() -> [String: IOD] {
+        var iods: [String: IOD] = [:]
+        iods["ultrasound"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.6.1", modules: [
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
             Usage(name: "Clinical Trial Subject", table: "C.7.1.3", usage: "U"),
@@ -63,8 +69,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "US Region Calibration", table: "C.8.5.5", usage: "U"),
             Usage(name: "VOI LUT", table: "C.11.2", usage: "U"),
         ], groupMacros: [
-        ]),
-        "videoEndoscopic": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.77.1.1.1", modules: [
+        ])
+        iods["videoEndoscopic"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.77.1.1.1", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "M"),
             Usage(name: "Cine", table: "C.7.6.5", usage: "M"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
@@ -88,8 +94,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Specimen", table: "C.7.6.22", usage: "C"),
             Usage(name: "VL Image", table: "C.8.12.1", usage: "M"),
         ], groupMacros: [
-        ]),
-        "videoMicroscopic": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.77.1.2.1", modules: [
+        ])
+        iods["videoMicroscopic"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.77.1.2.1", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "M"),
             Usage(name: "Cine", table: "C.7.6.5", usage: "M"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
@@ -113,8 +119,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Specimen", table: "C.7.6.22", usage: "C"),
             Usage(name: "VL Image", table: "C.8.12.1", usage: "M"),
         ], groupMacros: [
-        ]),
-        "videoPhotographic": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.77.1.4.1", modules: [
+        ])
+        iods["videoPhotographic"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.77.1.4.1", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "M"),
             Usage(name: "Cine", table: "C.7.6.5", usage: "M"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
@@ -139,8 +145,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Synchronization", table: "C.7.4.2", usage: "U"),
             Usage(name: "VL Image", table: "C.8.12.1", usage: "M"),
         ], groupMacros: [
-        ]),
-        "vlWholeSlideMicroscopy": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.77.1.6", modules: [
+        ])
+        iods["vlWholeSlideMicroscopy"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.77.1.6", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "M"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
@@ -178,8 +184,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Referenced Image", table: "C.7.6.16.2.5", usage: "U"),
             Usage(name: "Specimen Reference", table: "C.8.12.6.3", usage: "U"),
             Usage(name: "Whole Slide Microscopy Image Frame Type", table: "C.8.12.9", usage: "M"),
-        ]),
-        "spatialRegistration": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.66.1", modules: [
+        ])
+        iods["spatialRegistration"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.66.1", modules: [
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
             Usage(name: "Clinical Trial Subject", table: "C.7.1.3", usage: "U"),
@@ -195,8 +201,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Spatial Registration", table: "C.20.2", usage: "M"),
             Usage(name: "Spatial Registration Series", table: "C.20.1", usage: "M"),
         ], groupMacros: [
-        ]),
-        "deformableSpatialRegistration": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.66.3", modules: [
+        ])
+        iods["deformableSpatialRegistration"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.66.3", modules: [
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
             Usage(name: "Clinical Trial Subject", table: "C.7.1.3", usage: "U"),
@@ -213,8 +219,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "SOP Common", table: "C.12.1", usage: "M"),
             Usage(name: "Spatial Registration Series", table: "C.20.1", usage: "M"),
         ], groupMacros: [
-        ]),
-        "surfaceSegmentation": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.66.5", modules: [
+        ])
+        iods["surfaceSegmentation"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.66.5", modules: [
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
             Usage(name: "Clinical Trial Subject", table: "C.7.1.3", usage: "U"),
@@ -232,8 +238,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Surface Mesh", table: "C.27.1", usage: "M"),
             Usage(name: "Surface Segmentation", table: "C.8.23.1", usage: "M"),
         ], groupMacros: [
-        ]),
-        "enhancedCT": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.2.1", modules: [
+        ])
+        iods["enhancedCT"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.2.1", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "M"),
             Usage(name: "CT Series", table: "C.8.15.1", usage: "M"),
             Usage(name: "Cardiac Synchronization", table: "C.7.6.18.1", usage: "C"),
@@ -293,8 +299,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Referenced Image", table: "C.7.6.16.2.5", usage: "C"),
             Usage(name: "Respiratory Synchronization", table: "C.7.6.16.2.17", usage: "C"),
             Usage(name: "Temporal Position", table: "C.7.6.16.2.23", usage: "U"),
-        ]),
-        "enhancedMR": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.4.1", modules: [
+        ])
+        iods["enhancedMR"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.4.1", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "M"),
             Usage(name: "Bulk Motion Synchronization", table: "C.7.6.18.3", usage: "C"),
             Usage(name: "Cardiac Synchronization", table: "C.7.6.18.1", usage: "C"),
@@ -355,8 +361,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Referenced Image", table: "C.7.6.16.2.5", usage: "C"),
             Usage(name: "Respiratory Synchronization", table: "C.7.6.16.2.17", usage: "C"),
             Usage(name: "Temporal Position", table: "C.7.6.16.2.23", usage: "U"),
-        ]),
-        "enhancedXA": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.12.1.1", modules: [
+        ])
+        iods["enhancedXA"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.12.1.1", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "M"),
             Usage(name: "Cardiac Synchronization", table: "C.7.6.18.1", usage: "C"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
@@ -418,8 +424,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "X-Ray Positioner", table: "C.8.19.6.10", usage: "C"),
             Usage(name: "X-Ray Projection Pixel Calibration", table: "C.8.19.6.9", usage: "C"),
             Usage(name: "X-Ray Table Position", table: "C.8.19.6.11", usage: "C"),
-        ]),
-        "segmentation": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.66.4", modules: [
+        ])
+        iods["segmentation"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.66.4", modules: [
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
             Usage(name: "Clinical Trial Subject", table: "C.7.1.3", usage: "U"),
@@ -454,8 +460,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Derivation Image", table: "C.7.6.16.2.6", usage: "C"),
             Usage(name: "Frame Content", table: "C.7.6.16.2.2", usage: "C"),
             Usage(name: "Segmentation", table: "C.8.20.3.1", usage: "C"),
-        ]),
-        "parametricMap": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.30", modules: [
+        ])
+        iods["parametricMap"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.30", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "M"),
             Usage(name: "Bulk Motion Synchronization", table: "C.7.6.18.3", usage: "U"),
             Usage(name: "Cardiac Synchronization", table: "C.7.6.18.1", usage: "U"),
@@ -508,8 +514,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Parametric Map Frame Type", table: "C.8.32.3.1", usage: "M"),
             Usage(name: "Unassigned Shared Converted Attributes", table: "C.7.6.16.2.25.1", usage: "U"),
             Usage(name: "Unassigned Per-Frame Converted Attributes", table: "C.7.6.16.2.25.2", usage: "U"),
-        ]),
-        "grayscaleSoftcopyPS": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.11.1", modules: [
+        ])
+        iods["grayscaleSoftcopyPS"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.11.1", modules: [
             Usage(name: "Bitmap Display Shutter", table: "C.7.6.15", usage: "C"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
@@ -539,8 +545,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Spatial Transformation", table: "C.10.6", usage: "C"),
             Usage(name: "Specimen", table: "C.7.6.22", usage: "U"),
         ], groupMacros: [
-        ]),
-        "colorSoftcopyPS": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.11.2", modules: [
+        ])
+        iods["colorSoftcopyPS"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.11.2", modules: [
             Usage(name: "Bitmap Display Shutter", table: "C.7.6.15", usage: "C"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
@@ -566,8 +572,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Spatial Transformation", table: "C.10.6", usage: "C"),
             Usage(name: "Specimen", table: "C.7.6.22", usage: "U"),
         ], groupMacros: [
-        ]),
-        "pseudoColorSoftcopyPS": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.11.3", modules: [
+        ])
+        iods["pseudoColorSoftcopyPS"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.11.3", modules: [
             Usage(name: "Bitmap Display Shutter", table: "C.7.6.15", usage: "C"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
@@ -598,8 +604,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Spatial Transformation", table: "C.10.6", usage: "C"),
             Usage(name: "Specimen", table: "C.7.6.22", usage: "U"),
         ], groupMacros: [
-        ]),
-        "blendingSoftcopyPS": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.11.4", modules: [
+        ])
+        iods["blendingSoftcopyPS"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.11.4", modules: [
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
             Usage(name: "Clinical Trial Subject", table: "C.7.1.3", usage: "U"),
@@ -621,8 +627,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Spatial Transformation", table: "C.10.6", usage: "C"),
             Usage(name: "Specimen", table: "C.7.6.22", usage: "U"),
         ], groupMacros: [
-        ]),
-        "rtDose": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.481.2", modules: [
+        ])
+        iods["rtDose"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.481.2", modules: [
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
             Usage(name: "Clinical Trial Subject", table: "C.7.1.3", usage: "U"),
@@ -642,8 +648,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "RT Series", table: "C.8.8.1", usage: "M"),
             Usage(name: "SOP Common", table: "C.12.1", usage: "M"),
         ], groupMacros: [
-        ]),
-        "rtStructureSet": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.481.3", modules: [
+        ])
+        iods["rtStructureSet"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.481.3", modules: [
             Usage(name: "Approval", table: "C.8.8.16", usage: "U"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
@@ -661,8 +667,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "SOP Common", table: "C.12.1", usage: "M"),
             Usage(name: "Structure Set", table: "C.8.8.5", usage: "M"),
         ], groupMacros: [
-        ]),
-        "rtPlan": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.481.5", modules: [
+        ])
+        iods["rtPlan"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.481.5", modules: [
             Usage(name: "Approval", table: "C.8.8.16", usage: "U"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
@@ -684,8 +690,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "RT Tolerance Tables", table: "C.8.8.11", usage: "U"),
             Usage(name: "SOP Common", table: "C.12.1", usage: "M"),
         ], groupMacros: [
-        ]),
-        "twelveLeadECG": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.1.1", modules: [
+        ])
+        iods["twelveLeadECG"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.1.1", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "M"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
@@ -701,8 +707,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Waveform Annotation", table: "C.10.10", usage: "C"),
             Usage(name: "Waveform Identification", table: "C.10.8", usage: "M"),
         ], groupMacros: [
-        ]),
-        "generalECG": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.1.2", modules: [
+        ])
+        iods["generalECG"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.1.2", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "M"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
@@ -718,8 +724,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Waveform Annotation", table: "C.10.10", usage: "C"),
             Usage(name: "Waveform Identification", table: "C.10.8", usage: "M"),
         ], groupMacros: [
-        ]),
-        "ambulatoryECG": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.1.3", modules: [
+        ])
+        iods["ambulatoryECG"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.1.3", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "U"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
@@ -735,8 +741,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Waveform Annotation", table: "C.10.10", usage: "C"),
             Usage(name: "Waveform Identification", table: "C.10.8", usage: "M"),
         ], groupMacros: [
-        ]),
-        "general32BitECG": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.1.4", modules: [
+        ])
+        iods["general32BitECG"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.1.4", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "M"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
@@ -753,8 +759,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Waveform Annotation", table: "C.10.10", usage: "C"),
             Usage(name: "Waveform Identification", table: "C.10.8", usage: "M"),
         ], groupMacros: [
-        ]),
-        "hemodynamic": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.2.1", modules: [
+        ])
+        iods["hemodynamic"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.2.1", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "M"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
@@ -770,8 +776,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Waveform Annotation", table: "C.10.10", usage: "C"),
             Usage(name: "Waveform Identification", table: "C.10.8", usage: "M"),
         ], groupMacros: [
-        ]),
-        "cardiacElectrophysiology": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.3.1", modules: [
+        ])
+        iods["cardiacElectrophysiology"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.3.1", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "M"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
@@ -787,8 +793,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Waveform Annotation", table: "C.10.10", usage: "C"),
             Usage(name: "Waveform Identification", table: "C.10.8", usage: "M"),
         ], groupMacros: [
-        ]),
-        "basicVoiceAudio": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.4.1", modules: [
+        ])
+        iods["basicVoiceAudio"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.4.1", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "M"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
@@ -804,8 +810,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Waveform Annotation", table: "C.10.10", usage: "U"),
             Usage(name: "Waveform Identification", table: "C.10.8", usage: "M"),
         ], groupMacros: [
-        ]),
-        "generalAudio": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.4.2", modules: [
+        ])
+        iods["generalAudio"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.4.2", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "M"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
@@ -822,8 +828,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Waveform Annotation", table: "C.10.10", usage: "C"),
             Usage(name: "Waveform Identification", table: "C.10.8", usage: "M"),
         ], groupMacros: [
-        ]),
-        "arterialPulse": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.5.1", modules: [
+        ])
+        iods["arterialPulse"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.5.1", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "M"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
@@ -840,8 +846,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Waveform Annotation", table: "C.10.10", usage: "C"),
             Usage(name: "Waveform Identification", table: "C.10.8", usage: "M"),
         ], groupMacros: [
-        ]),
-        "respiratory": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.6.1", modules: [
+        ])
+        iods["respiratory"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.6.1", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "M"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
@@ -858,8 +864,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Waveform Annotation", table: "C.10.10", usage: "C"),
             Usage(name: "Waveform Identification", table: "C.10.8", usage: "M"),
         ], groupMacros: [
-        ]),
-        "multichannelRespiratory": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.6.2", modules: [
+        ])
+        iods["multichannelRespiratory"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.6.2", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "U"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
@@ -876,8 +882,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Waveform Annotation", table: "C.10.10", usage: "C"),
             Usage(name: "Waveform Identification", table: "C.10.8", usage: "M"),
         ], groupMacros: [
-        ]),
-        "routineScalpEEG": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.7.1", modules: [
+        ])
+        iods["routineScalpEEG"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.7.1", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "M"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
@@ -894,8 +900,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Waveform Annotation", table: "C.10.10", usage: "C"),
             Usage(name: "Waveform Identification", table: "C.10.8", usage: "M"),
         ], groupMacros: [
-        ]),
-        "electromyogram": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.7.2", modules: [
+        ])
+        iods["electromyogram"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.7.2", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "U"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
@@ -912,8 +918,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Waveform Annotation", table: "C.10.10", usage: "C"),
             Usage(name: "Waveform Identification", table: "C.10.8", usage: "M"),
         ], groupMacros: [
-        ]),
-        "electrooculogram": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.7.3", modules: [
+        ])
+        iods["electrooculogram"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.7.3", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "U"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
@@ -930,8 +936,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Waveform Annotation", table: "C.10.10", usage: "C"),
             Usage(name: "Waveform Identification", table: "C.10.8", usage: "M"),
         ], groupMacros: [
-        ]),
-        "sleepEEG": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.7.4", modules: [
+        ])
+        iods["sleepEEG"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.9.7.4", modules: [
             Usage(name: "Acquisition Context", table: "C.7.6.14", usage: "U"),
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
@@ -948,8 +954,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Waveform Annotation", table: "C.10.10", usage: "C"),
             Usage(name: "Waveform Identification", table: "C.10.8", usage: "M"),
         ], groupMacros: [
-        ]),
-        "encapsulatedPDF": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.104.1", modules: [
+        ])
+        iods["encapsulatedPDF"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.104.1", modules: [
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
             Usage(name: "Clinical Trial Subject", table: "C.7.1.3", usage: "U"),
@@ -962,8 +968,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "SC Equipment", table: "C.8.6.1", usage: "M"),
             Usage(name: "SOP Common", table: "C.12.1", usage: "M"),
         ], groupMacros: [
-        ]),
-        "encapsulatedCDA": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.104.2", modules: [
+        ])
+        iods["encapsulatedCDA"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.104.2", modules: [
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
             Usage(name: "Clinical Trial Subject", table: "C.7.1.3", usage: "U"),
@@ -976,8 +982,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "SC Equipment", table: "C.8.6.1", usage: "M"),
             Usage(name: "SOP Common", table: "C.12.1", usage: "M"),
         ], groupMacros: [
-        ]),
-        "encapsulatedSTL": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.104.3", modules: [
+        ])
+        iods["encapsulatedSTL"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.104.3", modules: [
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
             Usage(name: "Clinical Trial Subject", table: "C.7.1.3", usage: "U"),
@@ -994,8 +1000,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Patient Study", table: "C.7.2.2", usage: "U"),
             Usage(name: "SOP Common", table: "C.12.1", usage: "M"),
         ], groupMacros: [
-        ]),
-        "encapsulatedOBJ": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.104.4", modules: [
+        ])
+        iods["encapsulatedOBJ"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.104.4", modules: [
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
             Usage(name: "Clinical Trial Subject", table: "C.7.1.3", usage: "U"),
@@ -1012,8 +1018,8 @@ enum DicomEnhancedImageTables {
             Usage(name: "Patient Study", table: "C.7.2.2", usage: "U"),
             Usage(name: "SOP Common", table: "C.12.1", usage: "M"),
         ], groupMacros: [
-        ]),
-        "encapsulatedMTL": IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.104.5", modules: [
+        ])
+        iods["encapsulatedMTL"] = IOD(sopClassUID: "1.2.840.10008.5.1.4.1.1.104.5", modules: [
             Usage(name: "Clinical Trial Series", table: "C.7.3.2", usage: "U"),
             Usage(name: "Clinical Trial Study", table: "C.7.2.3", usage: "U"),
             Usage(name: "Clinical Trial Subject", table: "C.7.1.3", usage: "U"),
@@ -1029,12 +1035,14 @@ enum DicomEnhancedImageTables {
             Usage(name: "Patient Study", table: "C.7.2.2", usage: "U"),
             Usage(name: "SOP Common", table: "C.12.1", usage: "M"),
         ], groupMacros: [
-        ]),
-    ]
+        ])
+        return iods
+    }
 
-    static let tables: [String: [Row]] = [
+    private static func makeTables() -> [String: [Row]] {
+        var tables: [String: [Row]] = [:]
         // Waveform Annotation Module Attributes (table_C.10-11)
-        "C.10.10": [
+        tables["C.10.10"] = [
             Row(0x0040B020, "1", 0, items: 1...Int.max), // Waveform Annotation Sequence
             Row(0x00700006, "1C", 1), // Unformatted Text Value
             Row(0x0040A043, "1C", 1, items: 1...1), // Concept Name Code Sequence
@@ -1054,16 +1062,16 @@ enum DicomEnhancedImageTables {
             Row(0x0040A138, "1C", 1), // Referenced Time Offsets
             Row(0x0040A13A, "1C", 1), // Referenced DateTime
             Row(0x0040A180, "3", 1), // Annotation Group Number
-        ],
+        ]
         // Graphic Group Module Attributes (table_C.10-12)
-        "C.10.11": [
+        tables["C.10.11"] = [
             Row(0x00700234, "1", 0, items: 1...Int.max), // Graphic Group Sequence
             Row(0x00700295, "1", 1), // Graphic Group ID
             Row(0x00700207, "1", 1), // Graphic Group Label
             Row(0x00700208, "3", 1), // Graphic Group Description
-        ],
+        ]
         // Displayed Area Module Attributes (table_C.10-4)
-        "C.10.4": [
+        tables["C.10.4"] = [
             Row(0x0070005A, "1", 0, items: 1...Int.max), // Displayed Area Selection Sequence
             Row(0x00081140, "1C", 1, items: 1...Int.max), // Referenced Image Sequence
             Row(include: "table_10-3", 2),
@@ -1074,9 +1082,9 @@ enum DicomEnhancedImageTables {
             Row(0x00700101, "1C", 1), // Presentation Pixel Spacing
             Row(0x00700102, "1C", 1), // Presentation Pixel Aspect Ratio
             Row(0x00700103, "1C", 1), // Presentation Pixel Magnification Ratio
-        ],
+        ]
         // Graphic Annotation Module Attributes (table_C.10-5)
-        "C.10.5": [
+        tables["C.10.5"] = [
             Row(0x00700001, "1", 0, items: 1...Int.max), // Graphic Annotation Sequence
             Row(0x00081140, "1C", 1, items: 1...Int.max), // Referenced Image Sequence
             Row(include: "table_10-3", 2),
@@ -1130,23 +1138,23 @@ enum DicomEnhancedImageTables {
             Row(0x00700024, "1C", 2), // Graphic Filled
             Row(include: "table_C.10-5c", 2),
             Row(0x00700295, "3", 2), // Graphic Group ID
-        ],
+        ]
         // Spatial Transformation Module Attributes (table_C.10-6)
-        "C.10.6": [
+        tables["C.10.6"] = [
             Row(0x00700042, "1", 0), // Image Rotation
             Row(0x00700041, "1", 0), // Image Horizontal Flip
-        ],
+        ]
         // Graphic Layer Module Attributes (table_C.10-7)
-        "C.10.7": [
+        tables["C.10.7"] = [
             Row(0x00700060, "1", 0, items: 1...Int.max), // Graphic Layer Sequence
             Row(0x00700002, "1", 1), // Graphic Layer
             Row(0x00700062, "1", 1), // Graphic Layer Order
             Row(0x00700066, "3", 1), // Graphic Layer Recommended Display Grayscale Value
             Row(0x00700401, "3", 1), // Graphic Layer Recommended Display CIELab Value
             Row(0x00700068, "3", 1), // Graphic Layer Description
-        ],
+        ]
         // Waveform Identification Module Attributes (table_C.10-8)
-        "C.10.8": [
+        tables["C.10.8"] = [
             Row(0x00200013, "1", 0), // Instance Number
             Row(0x00080023, "1", 0), // Content Date
             Row(0x00080033, "1", 0), // Content Time
@@ -1155,9 +1163,9 @@ enum DicomEnhancedImageTables {
             Row(include: "table_10-11", 1),
             Row(0x0040A170, "3", 1, items: 1...1), // Purpose of Reference Code Sequence
             Row(include: "table_8.8-1", 2),
-        ],
+        ]
         // Waveform Module Attributes (table_C.10-9)
-        "C.10.9": [
+        tables["C.10.9"] = [
             Row(0x54000100, "1", 0, items: 1...Int.max), // Waveform Sequence
             Row(0x00181068, "1C", 1, may: true), // Multiplex Group Time Offset
             Row(0x00181069, "1C", 1), // Trigger Time Offset
@@ -1226,35 +1234,35 @@ enum DicomEnhancedImageTables {
             Row(0x003A0246, "3", 2), // Display Shading Flag
             Row(0x003A0247, "1C", 2, may: true), // Fractional Channel Display Scale
             Row(0x003A0248, "1C", 2, may: true), // Absolute Channel Display Scale
-        ],
+        ]
         // Modality LUT Module Attributes (table_C.11-1)
-        "C.11.1": [
+        tables["C.11.1"] = [
             Row(include: "table_C.11-1b", 0),
-        ],
+        ]
         // Presentation State Identification Module Attributes (table_C.11.10-1)
-        "C.11.10": [
+        tables["C.11.10"] = [
             Row(0x00700082, "1", 0), // Presentation Creation Date
             Row(0x00700083, "1", 0), // Presentation Creation Time
             Row(include: "table_10-12", 0),
-        ],
+        ]
         // Presentation State Relationship Module Attributes (table_C.11.11-1)
-        "C.11.11": [
+        tables["C.11.11"] = [
             Row(include: "table_C.11.11-1b", 0),
-        ],
+        ]
         // Presentation State Shutter Module Attributes (table_C.11.12-1)
-        "C.11.12": [
+        tables["C.11.12"] = [
             Row(0x00181622, "1C", 0), // Shutter Presentation Value
             Row(0x00181624, "1C", 0), // Shutter Presentation Color CIELab Value
-        ],
+        ]
         // Presentation State Mask Module Attributes (table_C.11.13-1)
-        "C.11.13": [
+        tables["C.11.13"] = [
             Row(0x00286100, "1C", 0, items: 1...1), // Mask Subtraction Sequence
             Row(0x00286101, "1", 1), // Mask Operation
             Row(0x00286112, "1C", 1), // Contrast Frame Averaging
             Row(0x00281090, "1C", 0), // Recommended Viewing Mode
-        ],
+        ]
         // Presentation State Blending Module Attributes (table_C.11.14-1)
-        "C.11.14": [
+        tables["C.11.14"] = [
             Row(0x00700402, "1", 0, items: 2...2), // Blending Sequence
             Row(0x00700405, "1", 1), // Blending Position
             Row(0x0020000D, "1", 1), // Study Instance UID
@@ -1267,44 +1275,44 @@ enum DicomEnhancedImageTables {
             Row(0x00700403, "1", 0), // Relative Opacity
             Row(0x00700404, "3", 0, items: 1...Int.max), // Referenced Spatial Registration Sequence
             Row(include: "table_C.17-3", 1),
-        ],
+        ]
         // VOI LUT Module Attributes (table_C.11-2)
-        "C.11.2": [
+        tables["C.11.2"] = [
             Row(include: "table_C.11-2b", 0),
-        ],
+        ]
         // Softcopy Presentation LUT Module Attributes (table_C.11.6-1)
-        "C.11.6": [
+        tables["C.11.6"] = [
             Row(0x20500010, "1C", 0, items: 1...1), // Presentation LUT Sequence
             Row(0x00283002, "1", 1), // LUT Descriptor
             Row(0x00283003, "3", 1), // LUT Explanation
             Row(0x00283006, "1", 1), // LUT Data
             Row(0x20500020, "1C", 0), // Presentation LUT Shape
-        ],
+        ]
         // Softcopy VOI LUT Module Attributes (table_C.11.8-1)
-        "C.11.8": [
+        tables["C.11.8"] = [
             Row(0x00283110, "1", 0, items: 1...Int.max), // Softcopy VOI LUT Sequence
             Row(0x00081140, "1C", 1, items: 1...Int.max), // Referenced Image Sequence
             Row(include: "table_10-3", 2),
             Row(include: "table_C.11-2b", 1),
-        ],
+        ]
         // Presentation Series Module Attributes (table_C.11.9-1)
-        "C.11.9": [
+        tables["C.11.9"] = [
             Row(0x00080060, "1", 0), // Modality
-        ],
+        ]
         // Frame Extraction Module Attributes (table_C.12-9)
-        "C.12.3": [
+        tables["C.12.3"] = [
             Row(0x00081164, "1", 0, items: 1...Int.max), // Frame Extraction Sequence
             Row(0x00081167, "1", 1), // Multi-frame Source SOP Instance UID
             Row(0x00081161, "1C", 1), // Simple Frame List
             Row(0x00081162, "1C", 1), // Calculated Frame List
             Row(0x00081163, "1C", 1), // Time Range
-        ],
+        ]
         // Spatial Registration Series Module Attributes (table_C.20.1-1)
-        "C.20.1": [
+        tables["C.20.1"] = [
             Row(0x00080060, "1", 0), // Modality
-        ],
+        ]
         // Spatial Registration Module Attributes (table_C.20.2-1)
-        "C.20.2": [
+        tables["C.20.2"] = [
             Row(0x00080023, "1", 0), // Content Date
             Row(0x00080033, "1", 0), // Content Time
             Row(include: "table_10-12", 0),
@@ -1328,9 +1336,9 @@ enum DicomEnhancedImageTables {
             Row(0x00700315, "3", 1, items: 1...Int.max), // Used RT Structure Set ROI Sequence
             Row(include: "table_10-11", 2),
             Row(0x30060084, "1", 2), // Referenced ROI Number
-        ],
+        ]
         // Deformable Spatial Registration Module Attributes (table_C.20.3-1)
-        "C.20.3": [
+        tables["C.20.3"] = [
             Row(0x00080023, "1", 0), // Content Date
             Row(0x00080033, "1", 0), // Content Time
             Row(include: "table_10-12", 0),
@@ -1356,9 +1364,9 @@ enum DicomEnhancedImageTables {
             Row(0x00700314, "3", 1, items: 1...Int.max), // Used Fiducials Sequence
             Row(include: "table_10-11", 2),
             Row(0x0070031A, "1", 2), // Fiducial UID
-        ],
+        ]
         // Encapsulated Document Series Module Attributes (table_C.24-1)
-        "C.24.1": [
+        tables["C.24.1"] = [
             Row(0x00080060, "1", 0), // Modality
             Row(0x0020000E, "1", 0), // Series Instance UID
             Row(0x00200011, "1", 0), // Series Number
@@ -1374,9 +1382,9 @@ enum DicomEnhancedImageTables {
             Row(include: "table_10-9", 1),
             Row(include: "table_10-16", 0),
             Row(0x300A0700, "3", 0), // Treatment Session UID
-        ],
+        ]
         // Encapsulated Document Module Attributes (table_C.24-2)
-        "C.24.2": [
+        tables["C.24.2"] = [
             Row(0x00200013, "1", 0), // Instance Number
             Row(0x00080023, "2", 0), // Content Date
             Row(0x00080033, "2", 0), // Content Time
@@ -1423,9 +1431,9 @@ enum DicomEnhancedImageTables {
             Row(0x00080105, "1", 1), // Mapping Resource
             Row(0x00080118, "3", 1), // Mapping Resource UID
             Row(0x0040DB00, "1", 1), // Template Identifier
-        ],
+        ]
         // Surface Mesh Module Attributes (table_C.27-1)
-        "C.27.1": [
+        tables["C.27.1"] = [
             Row(0x00660001, "1", 0), // Number of Surfaces
             Row(0x00660002, "1", 0, items: 1...Int.max), // Surface Sequence
             Row(0x00660003, "1", 1), // Surface Number
@@ -1453,9 +1461,9 @@ enum DicomEnhancedImageTables {
             Row(include: "table_C.27-3", 2),
             Row(0x00660013, "1", 1, items: 1...1), // Surface Mesh Primitives Sequence
             Row(include: "table_C.27-4", 2),
-        ],
+        ]
         // Manufacturing 3D Model Module Attributes (table_C.35.1-1)
-        "C.35.1": [
+        tables["C.35.1"] = [
             Row(0x004008EA, "1", 0, items: 1...1), // Measurement Units Code Sequence
             Row(include: "table_8.8-1", 1),
             Row(0x00687001, "3", 0), // Model Modification
@@ -1470,22 +1478,22 @@ enum DicomEnhancedImageTables {
             Row(0x00687004, "3", 0), // Model Group UID
             Row(0x0062000D, "3", 0), // Recommended Display CIELab Value
             Row(0x0066000C, "3", 0), // Recommended Presentation Opacity
-        ],
+        ]
         // Multi-Resolution Pyramid Module Attributes (table_C.7.11.1-1)
-        "C.7.11.1": [
+        tables["C.7.11.1"] = [
             Row(0x00080019, "1", 0), // Pyramid UID
             Row(0x00200027, "3", 0), // Pyramid Label
             Row(0x00081088, "3", 0), // Pyramid Description
-        ],
+        ]
         // Enhanced General Equipment Module Attributes (table_C.7-8b)
-        "C.7.5.2": [
+        tables["C.7.5.2"] = [
             Row(0x00080070, "1", 0), // Manufacturer
             Row(0x00081090, "1", 0), // Manufacturer's Model Name
             Row(0x00181000, "1", 0), // Device Serial Number
             Row(0x00181020, "1", 0), // Software Versions
-        ],
+        ]
         // Mask Module Attributes (table_C.7-16)
-        "C.7.6.10": [
+        tables["C.7.6.10"] = [
             Row(0x00286100, "1", 0, items: 1...Int.max), // Mask Subtraction Sequence
             Row(0x00286101, "1", 1), // Mask Operation
             Row(0x00289416, "1C", 1, may: true), // Subtraction Item ID
@@ -1497,13 +1505,13 @@ enum DicomEnhancedImageTables {
             Row(0x00286190, "3", 1), // Mask Operation Explanation
             Row(0x00289454, "3", 1), // Mask Selection Mode
             Row(0x00281090, "2", 0), // Recommended Viewing Mode
-        ],
+        ]
         // Display Shutter Module Attributes (table_C.7-17)
-        "C.7.6.11": [
+        tables["C.7.6.11"] = [
             Row(include: "table_C.7-17a", 0),
-        ],
+        ]
         // Intervention Module Attributes (table_C.7-19)
-        "C.7.6.13": [
+        tables["C.7.6.13"] = [
             Row(0x00180036, "3", 0, items: 1...Int.max), // Intervention Sequence
             Row(include: "table_8.8-1", 1),
             Row(0x00180038, "2", 1), // Intervention Status
@@ -1514,22 +1522,22 @@ enum DicomEnhancedImageTables {
             Row(0x00540302, "3", 1, items: 1...1), // Administration Route Code Sequence
             Row(include: "table_8.8-1", 2),
             Row(0x0018003A, "3", 1), // Intervention Description
-        ],
+        ]
         // Acquisition Context Module Attributes (table_C.7.6.14-1)
-        "C.7.6.14": [
+        tables["C.7.6.14"] = [
             Row(0x00400555, "2", 0, items: 0...Int.max), // Acquisition Context Sequence
             Row(include: "table_10.2.1-1", 1),
             Row(0x00400556, "3", 0), // Acquisition Context Description
-        ],
+        ]
         // Bitmap Display Shutter Module Attributes (table_C.7.6.15-1)
-        "C.7.6.15": [
+        tables["C.7.6.15"] = [
             Row(0x00181600, "1", 0), // Shutter Shape
             Row(0x00181623, "1", 0), // Shutter Overlay Group
             Row(0x00181622, "1", 0), // Shutter Presentation Value
             Row(0x00181624, "3", 0), // Shutter Presentation Color CIELab Value
-        ],
+        ]
         // Multi-frame Functional Groups Module Attributes (table_C.7.6.16-1)
-        "C.7.6.16": [
+        tables["C.7.6.16"] = [
             Row(0x52009229, "1", 0, items: 1...1), // Shared Functional Groups Sequence
             Row(0x52009230, "1C", 0, items: 1...Int.max), // Per-Frame Functional Groups Sequence
             Row(0x00200013, "1", 0), // Instance Number
@@ -1544,65 +1552,65 @@ enum DicomEnhancedImageTables {
             Row(0x00209162, "1C", 0), // In-concatenation Number
             Row(0x00209163, "3", 0), // In-concatenation Total Number
             Row(0x7FE00003, "3", 0), // Encapsulated Pixel Data Value Total Length
-        ],
+        ]
         // Pixel Measures Macro Attributes (table_C.7.6.16-2)
-        "C.7.6.16.2.1": [
+        tables["C.7.6.16.2.1"] = [
             Row(0x00289110, "1", 0, items: 1...1), // Pixel Measures Sequence
             Row(0x00280030, "1C", 1, may: true), // Pixel Spacing
             Row(0x00180050, "1C", 1, may: true), // Slice Thickness
             Row(0x00180088, "1C", 1, may: true), // Spacing Between Slices
-        ],
+        ]
         // Frame VOI LUT Macro Attributes (table_C.7.6.16-11)
-        "C.7.6.16.2.10": [
+        tables["C.7.6.16.2.10"] = [
             Row(0x00289132, "1", 0, items: 1...1), // Frame VOI LUT Sequence
             Row(0x00281050, "1", 1), // Window Center
             Row(0x00281051, "1", 1), // Window Width
             Row(0x00281055, "3", 1), // Window Center & Width Explanation
             Row(0x00281056, "3", 1), // VOI LUT Function
-        ],
+        ]
         // Frame VOI LUT with LUT Macro Attributes (table_C.7.6.16-11b)
-        "C.7.6.16.2.10b": [
+        tables["C.7.6.16.2.10b"] = [
             Row(0x00289132, "1", 0, items: 1...1), // Frame VOI LUT Sequence
             Row(include: "table_C.11-2b", 1),
-        ],
+        ]
         // Real World Value Mapping Macro Attributes (table_C.7.6.16-12)
-        "C.7.6.16.2.11": [
+        tables["C.7.6.16.2.11"] = [
             Row(0x00409096, "1", 0, items: 1...Int.max), // Real World Value Mapping Sequence
             Row(include: "table_C.7.6.16-12b", 1),
-        ],
+        ]
         // Contrast/Bolus Usage Macro Attributes (table_C.7.16-13)
-        "C.7.6.16.2.12": [
+        tables["C.7.6.16.2.12"] = [
             Row(0x00189341, "1", 0, items: 1...Int.max), // Contrast/Bolus Usage Sequence
             Row(0x00189337, "1", 1), // Contrast/Bolus Agent Number
             Row(0x00189342, "1", 1), // Contrast/Bolus Agent Administered
             Row(0x00189343, "2", 1), // Contrast/Bolus Agent Detected
             Row(0x00189344, "2C", 1, may: true), // Contrast/Bolus Agent Phase
-        ],
+        ]
         // Pixel Intensity Relationship LUT Macro Attributes (table_C.7.6.16-14)
-        "C.7.6.16.2.13": [
+        tables["C.7.6.16.2.13"] = [
             Row(0x00289422, "1", 0, items: 1...Int.max), // Pixel Intensity Relationship LUT Sequence
             Row(0x00283002, "1", 1), // LUT Descriptor
             Row(0x00283006, "1", 1), // LUT Data
             Row(0x00289474, "1", 1), // LUT Function
-        ],
+        ]
         // Frame Pixel Shift Macro Attributes (table_C.7.6.16-15)
-        "C.7.6.16.2.14": [
+        tables["C.7.6.16.2.14"] = [
             Row(0x00289415, "1", 0, items: 1...Int.max), // Frame Pixel Shift Sequence
             Row(0x00289416, "1", 1), // Subtraction Item ID
             Row(0x00286114, "1", 1), // Mask Sub-pixel Shift
-        ],
+        ]
         // Patient Orientation in Frame Macro Attributes (table_C.7.6.16-16)
-        "C.7.6.16.2.15": [
+        tables["C.7.6.16.2.15"] = [
             Row(0x00209450, "1", 0, items: 1...1), // Patient Orientation in Frame Sequence
             Row(0x00200020, "1", 1), // Patient Orientation
-        ],
+        ]
         // Frame Display Shutter Macro Attributes (table_C.7.6.16-17)
-        "C.7.6.16.2.16": [
+        tables["C.7.6.16.2.16"] = [
             Row(0x00189472, "1", 0, items: 1...1), // Frame Display Shutter Sequence
             Row(include: "table_C.7-17a", 1),
-        ],
+        ]
         // Respiratory Synchronization Macro Attributes (table_C.7.6.16-18)
-        "C.7.6.16.2.17": [
+        tables["C.7.6.16.2.17"] = [
             Row(0x00209253, "1", 0, items: 1...1), // Respiratory Synchronization Sequence
             Row(0x00209254, "1C", 1), // Respiratory Interval Time
             Row(0x00209245, "1C", 1, may: true), // Nominal Percentage of Respiratory Phase
@@ -1612,14 +1620,14 @@ enum DicomEnhancedImageTables {
             Row(0x00209247, "1C", 1), // Starting Respiratory Phase
             Row(0x00209248, "1C", 1), // Ending Respiratory Amplitude
             Row(0x00209249, "1C", 1), // Ending Respiratory Phase
-        ],
+        ]
         // Irradiation Event Identification Macro Attributes (table_C.7.6.16-19)
-        "C.7.6.16.2.18": [
+        tables["C.7.6.16.2.18"] = [
             Row(0x00189477, "1", 0, items: 1...1), // Irradiation Event Identification Sequence
             Row(0x00083010, "1", 1), // Irradiation Event UID
-        ],
+        ]
         // Frame Content Macro Attributes (table_C.7.6.16-3)
-        "C.7.6.16.2.2": [
+        tables["C.7.6.16.2.2"] = [
             Row(0x00209111, "1", 0, items: 1...1), // Frame Content Sequence
             Row(0x00209156, "3", 1), // Frame Acquisition Number
             Row(0x00189151, "1C", 1, may: true), // Frame Reference DateTime
@@ -1633,45 +1641,45 @@ enum DicomEnhancedImageTables {
             Row(0x00209057, "1C", 1), // In-Stack Position Number
             Row(0x00209158, "3", 1), // Frame Comments
             Row(0x00209453, "3", 1), // Frame Label
-        ],
+        ]
         // Temporal Position Macro Attributes (table_C.7.6.16.2.23-1)
-        "C.7.6.16.2.23": [
+        tables["C.7.6.16.2.23"] = [
             Row(0x00209310, "1", 0, items: 1...1), // Temporal Position Sequence
             Row(0x0020930D, "1", 1), // Temporal Position Time Offset
-        ],
+        ]
         // Unassigned Shared Converted Attributes Macro Attributes (table_C.7.6.16.2.25.1-1)
-        "C.7.6.16.2.25.1": [
+        tables["C.7.6.16.2.25.1"] = [
             Row(0x00209170, "1C", 0, items: 1...1), // Unassigned Shared Converted Attributes Sequence
-        ],
+        ]
         // Unassigned Per-Frame Converted Attributes Macro Attributes (table_C.7.6.16.2.25.2-1)
-        "C.7.6.16.2.25.2": [
+        tables["C.7.6.16.2.25.2"] = [
             Row(0x00209171, "1C", 0, items: 1...1), // Unassigned Per-Frame Converted Attributes Sequence
-        ],
+        ]
         // Stored Value Color Range Macro Attributes (table_C.7.6.16.2.26-1)
-        "C.7.6.16.2.26": [
+        tables["C.7.6.16.2.26"] = [
             Row(0x00281230, "1", 0, items: 1...1), // Stored Value Color Range Sequence
             Row(0x00281231, "1", 1), // Minimum Stored Value Mapped
             Row(0x00281232, "1", 1), // Maximum Stored Value Mapped
-        ],
+        ]
         // Plane Position (Patient) Macro Attributes (table_C.7.6.16-4)
-        "C.7.6.16.2.3": [
+        tables["C.7.6.16.2.3"] = [
             Row(0x00209113, "1", 0, items: 1...1), // Plane Position Sequence
             Row(0x00200032, "1C", 1, may: true), // Image Position (Patient)
-        ],
+        ]
         // Plane Orientation (Patient) Macro Attributes (table_C.7.6.16-5)
-        "C.7.6.16.2.4": [
+        tables["C.7.6.16.2.4"] = [
             Row(0x00209116, "1", 0, items: 1...1), // Plane Orientation Sequence
             Row(0x00200037, "1C", 1, may: true), // Image Orientation (Patient)
-        ],
+        ]
         // Referenced Image Macro Attributes (table_C.7.6.16-6)
-        "C.7.6.16.2.5": [
+        tables["C.7.6.16.2.5"] = [
             Row(0x00081140, "2", 0, items: 0...Int.max), // Referenced Image Sequence
             Row(include: "table_10-3", 1),
             Row(0x0040A170, "1C", 1, items: 1...1, may: true), // Purpose of Reference Code Sequence
             Row(include: "table_8.8-1", 2),
-        ],
+        ]
         // Derivation Image Macro Attributes (table_C.7.6.16-7)
-        "C.7.6.16.2.6": [
+        tables["C.7.6.16.2.6"] = [
             Row(0x00089124, "2", 0, items: 0...Int.max), // Derivation Image Sequence
             Row(0x00082111, "3", 1), // Derivation Description
             Row(0x00089215, "1C", 1, items: 1...Int.max, may: true), // Derivation Code Sequence
@@ -1682,9 +1690,9 @@ enum DicomEnhancedImageTables {
             Row(include: "table_8.8-1", 3),
             Row(0x0028135A, "3", 2), // Spatial Locations Preserved
             Row(0x00200020, "1C", 2), // Patient Orientation
-        ],
+        ]
         // Cardiac Synchronization Macro Attributes (table_C.7.6.16-8)
-        "C.7.6.16.2.7": [
+        tables["C.7.6.16.2.7"] = [
             Row(0x00189118, "1", 0, items: 1...1), // Cardiac Synchronization Sequence
             Row(0x00209241, "1C", 1, may: true), // Nominal Percentage of Cardiac Phase
             Row(0x00209153, "1", 1), // Nominal Cardiac Trigger Delay Time
@@ -1697,29 +1705,29 @@ enum DicomEnhancedImageTables {
             Row(0x00209251, "1C", 1, may: true), // R-R Interval Time Nominal
             Row(0x00181081, "3", 1), // Low R-R Value
             Row(0x00181082, "3", 1), // High R-R Value
-        ],
+        ]
         // Frame Anatomy Macro Attributes (table_C.7.6.16-9)
-        "C.7.6.16.2.8": [
+        tables["C.7.6.16.2.8"] = [
             Row(0x00209071, "1", 0, items: 1...1), // Frame Anatomy Sequence
             Row(0x00209072, "1", 1), // Frame Laterality
             Row(include: "table_10-5", 1),
-        ],
+        ]
         // Pixel Value Transformation Macro Attributes (table_C.7.6.16-10)
-        "C.7.6.16.2.9": [
+        tables["C.7.6.16.2.9"] = [
             Row(0x00289145, "1", 0, items: 1...1), // Pixel Value Transformation Sequence
             Row(0x00281052, "1", 1), // Rescale Intercept
             Row(0x00281053, "1", 1), // Rescale Slope
             Row(0x00281054, "1", 1), // Rescale Type
-        ],
+        ]
         // Identity Pixel Value Transformation Macro Attributes (table_C.7.6.16-10b)
-        "C.7.6.16.2.9b": [
+        tables["C.7.6.16.2.9b"] = [
             Row(0x00289145, "1", 0, items: 1...1), // Pixel Value Transformation Sequence
             Row(0x00281052, "1", 1), // Rescale Intercept
             Row(0x00281053, "1", 1), // Rescale Slope
             Row(0x00281054, "1", 1), // Rescale Type
-        ],
+        ]
         // Multi-frame Dimension Module Attributes (table_C.7.6.17-1)
-        "C.7.6.17": [
+        tables["C.7.6.17"] = [
             Row(0x00209221, "1", 0, items: 1...Int.max), // Dimension Organization Sequence
             Row(0x00209164, "1", 1), // Dimension Organization UID
             Row(0x00209311, "3", 0), // Dimension Organization Type
@@ -1730,9 +1738,9 @@ enum DicomEnhancedImageTables {
             Row(0x00209238, "1C", 1), // Functional Group Private Creator
             Row(0x00209164, "1", 1), // Dimension Organization UID
             Row(0x00209421, "3", 1), // Dimension Description Label
-        ],
+        ]
         // Cardiac Synchronization Module Attributes (table_C.7.6.18-1)
-        "C.7.6.18.1": [
+        tables["C.7.6.18.1"] = [
             Row(0x00189037, "1C", 0, may: true), // Cardiac Synchronization Technique
             Row(0x00189085, "1C", 0, may: true), // Cardiac Signal Source
             Row(0x00189070, "1C", 0, may: true), // Cardiac R-R Interval Specified
@@ -1743,39 +1751,39 @@ enum DicomEnhancedImageTables {
             Row(0x00181084, "2C", 0, may: true), // Intervals Rejected
             Row(0x00181086, "3", 0), // Skip Beats
             Row(0x00181064, "1C", 0, may: true), // Cardiac Framing Type
-        ],
+        ]
         // Respiratory Synchronization Module Attributes (table_C.7.6.18-2)
-        "C.7.6.18.2": [
+        tables["C.7.6.18.2"] = [
             Row(0x00189170, "1C", 0, may: true), // Respiratory Motion Compensation Technique
             Row(0x00189171, "1C", 0, may: true), // Respiratory Signal Source
             Row(0x00209256, "1C", 0, may: true), // Respiratory Trigger Delay Threshold
             Row(0x00209250, "1C", 0, may: true), // Respiratory Trigger Type
-        ],
+        ]
         // Bulk Motion Synchronization Module Attributes (table_C.7.6.18-3)
-        "C.7.6.18.3": [
+        tables["C.7.6.18.3"] = [
             Row(0x00189172, "1C", 0, may: true), // Bulk Motion Compensation Technique
             Row(0x00189173, "1C", 0, may: true), // Bulk Motion Signal Source
-        ],
+        ]
         // Supplemental Palette Color Lookup Table Module Attributes (table_C.7.6.19-1)
-        "C.7.6.19": [
+        tables["C.7.6.19"] = [
             Row(0x00281101, "1", 0), // Red Palette Color Lookup Table Descriptor
             Row(0x00281102, "1", 0), // Green Palette Color Lookup Table Descriptor
             Row(0x00281103, "1", 0), // Blue Palette Color Lookup Table Descriptor
             Row(0x00281201, "1", 0), // Red Palette Color Lookup Table Data
             Row(0x00281202, "1", 0), // Green Palette Color Lookup Table Data
             Row(0x00281203, "1", 0), // Blue Palette Color Lookup Table Data
-        ],
+        ]
         // Image Plane Module Attributes (table_C.7-10)
-        "C.7.6.2": [
+        tables["C.7.6.2"] = [
             Row(0x00280030, "1", 0), // Pixel Spacing
             Row(0x00200037, "1", 0), // Image Orientation (Patient)
             Row(0x00200032, "1", 0), // Image Position (Patient)
             Row(0x00180050, "2", 0), // Slice Thickness
             Row(0x00180088, "3", 0), // Spacing Between Slices
             Row(0x00201041, "3", 0), // Slice Location
-        ],
+        ]
         // Floating Point Image Pixel Module Attributes (table_PS3.3_C.7.6.24-1)
-        "C.7.6.24": [
+        tables["C.7.6.24"] = [
             Row(0x00280002, "1", 0), // Samples per Pixel
             Row(0x00280004, "1", 0), // Photometric Interpretation
             Row(0x00280010, "1", 0), // Rows
@@ -1785,9 +1793,9 @@ enum DicomEnhancedImageTables {
             Row(0x00280034, "1C", 0), // Pixel Aspect Ratio
             Row(0x00280122, "3", 0), // Float Pixel Padding Value
             Row(0x00280124, "1C", 0), // Float Pixel Padding Range Limit
-        ],
+        ]
         // Double Floating Point Image Pixel Module Attributes (table_PS3.3_C.7.6.25-1)
-        "C.7.6.25": [
+        tables["C.7.6.25"] = [
             Row(0x00280002, "1", 0), // Samples per Pixel
             Row(0x00280004, "1", 0), // Photometric Interpretation
             Row(0x00280010, "1", 0), // Rows
@@ -1797,18 +1805,18 @@ enum DicomEnhancedImageTables {
             Row(0x00280034, "1C", 0), // Pixel Aspect Ratio
             Row(0x00280123, "3", 0), // Double Float Pixel Padding Value
             Row(0x00280125, "1C", 0), // Double Float Pixel Padding Range Limit
-        ],
+        ]
         // Image Pixel Module Attributes (table_C.7-11a)
-        "C.7.6.3": [
+        tables["C.7.6.3"] = [
             Row(include: "table_C.7-11c", 0),
             Row(0x7FE00010, "1C", 0), // Pixel Data
             Row(0x00287FE0, "1C", 0), // Pixel Data Provider URL
             Row(0x00280121, "1C", 0), // Pixel Padding Range Limit
             Row(0x7FE00001, "3", 0), // Extended Offset Table
             Row(0x7FE00002, "1C", 0), // Extended Offset Table Lengths
-        ],
+        ]
         // Contrast/Bolus Module Attributes (table_C.7-12)
-        "C.7.6.4": [
+        tables["C.7.6.4"] = [
             Row(0x00180010, "2", 0), // Contrast/Bolus Agent
             Row(0x00180012, "3", 0, items: 1...Int.max), // Contrast/Bolus Agent Sequence
             Row(include: "table_8.8-1", 1),
@@ -1825,9 +1833,9 @@ enum DicomEnhancedImageTables {
             Row(0x00181047, "3", 0), // Contrast Flow Duration
             Row(0x00181048, "3", 0), // Contrast/Bolus Ingredient
             Row(0x00181049, "3", 0), // Contrast/Bolus Ingredient Concentration
-        ],
+        ]
         // Enhanced Contrast/Bolus Module Attributes (table_C.7-12b)
-        "C.7.6.4b": [
+        tables["C.7.6.4b"] = [
             Row(0x00180012, "1", 0, items: 1...Int.max), // Contrast/Bolus Agent Sequence
             Row(include: "table_8.8-1", 1),
             Row(0x00189337, "1", 1), // Contrast/Bolus Agent Number
@@ -1846,9 +1854,9 @@ enum DicomEnhancedImageTables {
             Row(0x00181043, "3", 2), // Contrast/Bolus Stop Time
             Row(0x00181046, "3", 2), // Contrast Flow Rate
             Row(0x00181047, "3", 2), // Contrast Flow Duration
-        ],
+        ]
         // Cine Module Attributes (table_C.7-13)
-        "C.7.6.5": [
+        tables["C.7.6.5"] = [
             Row(0x00181244, "3", 0), // Preferred Playback Sequencing
             Row(0x00181063, "1C", 0), // Frame Time
             Row(0x00181065, "1C", 0), // Frame Time Vector
@@ -1865,20 +1873,20 @@ enum DicomEnhancedImageTables {
             Row(0x003A0302, "1", 1), // Channel Mode
             Row(0x003A0208, "1", 1, items: 1...1), // Channel Source Sequence
             Row(include: "table_8.8-1", 2),
-        ],
+        ]
         // Multi-frame Module Attributes (table_C.7-14)
-        "C.7.6.6": [
+        tables["C.7.6.6"] = [
             Row(0x00280008, "1", 0), // Number of Frames
             Row(0x00280009, "1", 0), // Frame Increment Pointer
             Row(0x00220028, "3", 0), // Stereo Pairs Present
             Row(0x7FE00003, "3", 0), // Encapsulated Pixel Data Value Total Length
-        ],
+        ]
         // Palette Color Lookup Table Module Attributes (table_C.7-22)
-        "C.7.9": [
+        tables["C.7.9"] = [
             Row(include: "table_C.7-22a", 0),
-        ],
+        ]
         // VL Image Module Attributes (table_C.8-77)
-        "C.8.12.1": [
+        tables["C.8.12.1"] = [
             Row(0x00080008, "1", 0), // Image Type
             Row(0x00280004, "1", 0), // Photometric Interpretation
             Row(0x00280100, "1", 0), // Bits Allocated
@@ -1909,9 +1917,9 @@ enum DicomEnhancedImageTables {
             Row(include: "table_8.8-1", 1),
             Row(0x00280030, "3", 0), // Pixel Spacing
             Row(0x00181164, "3", 0), // Imager Pixel Spacing
-        ],
+        ]
         // Microscope Slide Layer Tile Organization Module Attributes (table_C.8.12.14-1)
-        "C.8.12.14": [
+        tables["C.8.12.14"] = [
             Row(0x00480006, "1", 0), // Total Pixel Matrix Columns
             Row(0x00480007, "1", 0), // Total Pixel Matrix Rows
             Row(0x00480303, "1C", 0, may: true), // Total Pixel Matrix Focal Planes
@@ -1921,15 +1929,15 @@ enum DicomEnhancedImageTables {
             Row(0x0040074A, "1C", 1, may: true), // Z Offset in Slide Coordinate System
             Row(0x00480102, "1C", 0, may: true), // Image Orientation (Slide)
             Row(0x00480304, "3", 0), // Tiles Overlap
-        ],
+        ]
         // Whole Slide Microscopy Series Module Attributes (table_C.8.12.3-1)
-        "C.8.12.3": [
+        tables["C.8.12.3"] = [
             Row(0x00080060, "1", 0), // Modality
             Row(0x00081111, "1C", 0, items: 1...1), // Referenced Performed Procedure Step Sequence
             Row(include: "table_10-11", 1),
-        ],
+        ]
         // Whole Slide Microscopy Image Module Attributes (table_C.8.12.4-1)
-        "C.8.12.4": [
+        tables["C.8.12.4"] = [
             Row(0x00080008, "1", 0), // Image Type
             Row(0x00480001, "1C", 0, may: true), // Imaged Volume Width
             Row(0x00480002, "1C", 0, may: true), // Imaged Volume Height
@@ -1960,9 +1968,9 @@ enum DicomEnhancedImageTables {
             Row(0x00181400, "3", 0), // Acquisition Device Processing Description
             Row(0x00181210, "3", 0), // Convolution Kernel
             Row(0x00480015, "3", 0), // Recommended Absent Pixel CIELab Value
-        ],
+        ]
         // Optical Path Module Attributes (table_C.8.12.5-1)
-        "C.8.12.5": [
+        tables["C.8.12.5"] = [
             Row(0x00480302, "1C", 0, may: true), // Number of Optical Paths
             Row(0x00480105, "1", 0, items: 1...Int.max), // Optical Path Sequence
             Row(0x00480106, "1", 1), // Optical Path Identifier
@@ -1993,38 +2001,38 @@ enum DicomEnhancedImageTables {
             Row(include: "table_C.7-22a", 2),
             Row(0x00282000, "1C", 1), // ICC Profile
             Row(0x00282002, "3", 1), // Color Space
-        ],
+        ]
         // Plane Position (Slide) Macro Attributes (table_C.8.12.6.1-1)
-        "C.8.12.6.1": [
+        tables["C.8.12.6.1"] = [
             Row(0x0048021A, "1", 0, items: 1...1), // Plane Position (Slide) Sequence
             Row(0x0048021E, "1", 1), // Column Position In Total Image Pixel Matrix
             Row(0x0048021F, "1", 1), // Row Position In Total Image Pixel Matrix
             Row(0x0040072A, "1", 1), // X Offset in Slide Coordinate System
             Row(0x0040073A, "1", 1), // Y Offset in Slide Coordinate System
             Row(0x0040074A, "1", 1), // Z Offset in Slide Coordinate System
-        ],
+        ]
         // Optical Path Identification Macro Attributes (table_C.8.12.6.2-1)
-        "C.8.12.6.2": [
+        tables["C.8.12.6.2"] = [
             Row(0x00480207, "1", 0, items: 1...1), // Optical Path Identification Sequence
             Row(0x00480106, "1", 1), // Optical Path Identifier
-        ],
+        ]
         // Specimen Reference Macro Attributes (table_C.8.12.6.3-1)
-        "C.8.12.6.3": [
+        tables["C.8.12.6.3"] = [
             Row(0x00480110, "2", 0, items: 0...Int.max), // Specimen Reference Sequence
             Row(0x00400554, "1", 1), // Specimen UID
-        ],
+        ]
         // Slide Label Module Attributes (table_C.8.12.8-1)
-        "C.8.12.8": [
+        tables["C.8.12.8"] = [
             Row(0x22000005, "2", 0), // Barcode Value
             Row(0x22000002, "2", 0), // Label Text
-        ],
+        ]
         // Whole Slide Microscopy Image Frame Type Macro Attributes (table_C.8.12.9-1)
-        "C.8.12.9": [
+        tables["C.8.12.9"] = [
             Row(0x00400710, "1", 0, items: 1...1), // Whole Slide Microscopy Image Frame Type Sequence
             Row(0x00089007, "1", 1), // Frame Type
-        ],
+        ]
         // Enhanced MR Image Module Attributes (table_C.8-79)
-        "C.8.13.1": [
+        tables["C.8.13.1"] = [
             Row(include: "table_C.8-83", 0),
             Row(0x00080008, "1", 0), // Image Type
             Row(include: "table_C.8-131", 0),
@@ -2046,9 +2054,9 @@ enum DicomEnhancedImageTables {
             Row(include: "table_C.7-11b", 1),
             Row(include: "table_10-25", 0),
             Row(include: "table_C.36.2.4.12-1", 0),
-        ],
+        ]
         // MR Pulse Sequence Module Attributes (table_C.8-87)
-        "C.8.13.4": [
+        tables["C.8.13.4"] = [
             Row(0x00189005, "1C", 0, may: true), // Pulse Sequence Name
             Row(0x00180023, "1C", 0, may: true), // MR Acquisition Type
             Row(0x00189008, "1C", 0, may: true), // Echo Pulse Sequence
@@ -2069,28 +2077,28 @@ enum DicomEnhancedImageTables {
             Row(0x00189033, "1C", 0, may: true), // Segmented k-Space Traversal
             Row(0x00189094, "1C", 0, may: true), // Coverage of k-Space
             Row(0x00189093, "1C", 0, may: true), // Number of k-Space Trajectories
-        ],
+        ]
         // MR Image Frame Type Macro Attributes (table_C.8-88)
-        "C.8.13.5.1": [
+        tables["C.8.13.5.1"] = [
             Row(0x00189226, "1", 0, items: 1...1), // MR Image Frame Type Sequence
             Row(0x00089007, "1", 1), // Frame Type
             Row(include: "table_C.8-131", 1),
             Row(include: "table_C.8-84", 1),
-        ],
+        ]
         // MR Averages Macro Attributes (table_C.8-97)
-        "C.8.13.5.10": [
+        tables["C.8.13.5.10"] = [
             Row(0x00189119, "1", 0, items: 1...1), // MR Averages Sequence
             Row(0x00180083, "1C", 1, may: true), // Number of Averages
-        ],
+        ]
         // MR Spatial Saturation Macro Attributes (table_C.8-98)
-        "C.8.13.5.11": [
+        tables["C.8.13.5.11"] = [
             Row(0x00189107, "2", 0, items: 0...Int.max), // MR Spatial Saturation Sequence
             Row(0x00189104, "1", 1), // Slab Thickness
             Row(0x00189105, "1", 1), // Slab Orientation
             Row(0x00189106, "1", 1), // Mid Slab Position
-        ],
+        ]
         // MR Metabolite Map Macro Attributes (table_C.8-99)
-        "C.8.13.5.12": [
+        tables["C.8.13.5.12"] = [
             Row(0x00189152, "1", 0, items: 1...1), // MR Metabolite Map Sequence
             Row(0x00189080, "1C", 1, may: true), // Metabolite Map Description
             Row(0x00189083, "3", 1, items: 1...1), // Metabolite Map Code Sequence
@@ -2098,16 +2106,16 @@ enum DicomEnhancedImageTables {
             Row(0x00189084, "3", 1, items: 1...Int.max), // Chemical Shift Sequence
             Row(0x00189295, "1", 2), // Chemical Shift Minimum Integration Limit in ppm
             Row(0x00189296, "1", 2), // Chemical Shift Maximum Integration Limit in ppm
-        ],
+        ]
         // MR Velocity Encoding Macro Attributes (table_C.8-100)
-        "C.8.13.5.13": [
+        tables["C.8.13.5.13"] = [
             Row(0x00189197, "1", 0, items: 1...Int.max), // MR Velocity Encoding Sequence
             Row(0x00189090, "1C", 1, may: true), // Velocity Encoding Direction
             Row(0x00189091, "1C", 1, may: true), // Velocity Encoding Minimum Value
             Row(0x00189217, "1C", 1, may: true), // Velocity Encoding Maximum Value
-        ],
+        ]
         // MR Arterial Spin Labeling Macro Attributes (table_C.8-100b)
-        "C.8.13.5.14": [
+        tables["C.8.13.5.14"] = [
             Row(0x00189251, "1", 0, items: 1...Int.max), // MR Arterial Spin Labeling Sequence
             Row(0x00189252, "2", 1), // ASL Technique Description
             Row(0x00189257, "1C", 1, may: true), // ASL Context
@@ -2125,15 +2133,15 @@ enum DicomEnhancedImageTables {
             Row(0x0018925D, "1C", 1, items: 1...1), // ASL Bolus Cut-off Timing Sequence
             Row(0x0018925F, "1", 2), // ASL Bolus Cut-off Delay Time
             Row(0x0018925E, "2", 2), // ASL Bolus Cut-off Technique
-        ],
+        ]
         // Functional MR Macro Attributes (table_C.8-100c)
-        "C.8.13.5.15": [
+        tables["C.8.13.5.15"] = [
             Row(0x00189621, "1", 0, items: 1...1), // Functional MR Sequence
             Row(0x00189624, "1C", 1), // Settling Phase Frame
             Row(0x00189623, "1", 1), // Functional Sync Pulse
-        ],
+        ]
         // MR Timing and Related Parameters Macro Attributes (table_C.8-89)
-        "C.8.13.5.2": [
+        tables["C.8.13.5.2"] = [
             Row(0x00189112, "1", 0, items: 1...1), // MR Timing and Related Parameters Sequence
             Row(0x00180080, "1C", 1, may: true), // Repetition Time
             Row(0x00181314, "1C", 1, may: true), // Flip Angle
@@ -2148,9 +2156,9 @@ enum DicomEnhancedImageTables {
             Row(0x00189176, "1C", 1, items: 1...Int.max, may: true), // Operating Mode Sequence
             Row(0x00189177, "1", 2), // Operating Mode Type
             Row(0x00189178, "1", 2), // Operating Mode
-        ],
+        ]
         // MR FOV/Geometry Macro Attributes (table_C.8-90)
-        "C.8.13.5.3": [
+        tables["C.8.13.5.3"] = [
             Row(0x00189125, "1", 0, items: 1...1), // MR FOV/Geometry Sequence
             Row(0x00181312, "1C", 1, may: true), // In-plane Phase Encoding Direction
             Row(0x00189058, "1C", 1, may: true), // MR Acquisition Frequency Encoding Steps
@@ -2158,14 +2166,14 @@ enum DicomEnhancedImageTables {
             Row(0x00189232, "1C", 1, may: true), // MR Acquisition Phase Encoding Steps out-of-plane
             Row(0x00180093, "1C", 1, may: true), // Percent Sampling
             Row(0x00180094, "1C", 1, may: true), // Percent Phase Field of View
-        ],
+        ]
         // MR Echo Macro Attributes (table_C.8-91)
-        "C.8.13.5.4": [
+        tables["C.8.13.5.4"] = [
             Row(0x00189114, "1", 0, items: 1...1), // MR Echo Sequence
             Row(0x00189082, "1C", 1, may: true), // Effective Echo Time
-        ],
+        ]
         // MR Modifier Macro Attributes (table_C.8-92)
-        "C.8.13.5.5": [
+        tables["C.8.13.5.5"] = [
             Row(0x00189115, "1", 0, items: 1...1), // MR Modifier Sequence
             Row(0x00189009, "1C", 1, may: true), // Inversion Recovery
             Row(0x00189079, "1C", 1, may: true), // Inversion Times
@@ -2182,9 +2190,9 @@ enum DicomEnhancedImageTables {
             Row(0x00189069, "1C", 1, may: true), // Parallel Reduction Factor In-plane
             Row(0x00189155, "1C", 1, may: true), // Parallel Reduction Factor out-of-plane
             Row(0x00189168, "1C", 1, may: true), // Parallel Reduction Factor Second In-plane
-        ],
+        ]
         // MR Imaging Modifier Macro Attributes (table_C.8-93)
-        "C.8.13.5.6": [
+        tables["C.8.13.5.6"] = [
             Row(0x00189006, "1", 0, items: 1...1), // MR Imaging Modifier Sequence
             Row(0x00189020, "1C", 1, may: true), // Magnetization Transfer
             Row(0x00189022, "1C", 1, may: true), // Blood Signal Nulling
@@ -2197,9 +2205,9 @@ enum DicomEnhancedImageTables {
             Row(0x00189184, "3", 1), // Tagging Delay
             Row(0x00189098, "1C", 1, may: true), // Transmitter Frequency
             Row(0x00180095, "1C", 1, may: true), // Pixel Bandwidth
-        ],
+        ]
         // MR Receive Coil Macro Attributes (table_C.8-94)
-        "C.8.13.5.7": [
+        tables["C.8.13.5.7"] = [
             Row(0x00189042, "1", 0, items: 1...Int.max), // MR Receive Coil Sequence
             Row(0x00181250, "1C", 1, may: true), // Receive Coil Name
             Row(0x00189041, "2C", 1, may: true), // Receive Coil Manufacturer Name
@@ -2209,16 +2217,16 @@ enum DicomEnhancedImageTables {
             Row(0x00189047, "1", 2), // Multi-Coil Element Name
             Row(0x00189048, "1", 2), // Multi-Coil Element Used
             Row(0x00189046, "3", 1), // Multi-Coil Configuration
-        ],
+        ]
         // MR Transmit Coil Macro Attributes (table_C.8-95)
-        "C.8.13.5.8": [
+        tables["C.8.13.5.8"] = [
             Row(0x00189049, "1", 0, items: 1...1), // MR Transmit Coil Sequence
             Row(0x00181251, "1C", 1, may: true), // Transmit Coil Name
             Row(0x00189050, "2C", 1, may: true), // Transmit Coil Manufacturer Name
             Row(0x00189051, "1C", 1, may: true), // Transmit Coil Type
-        ],
+        ]
         // MR Diffusion Macro Attributes (table_C.8-96)
-        "C.8.13.5.9": [
+        tables["C.8.13.5.9"] = [
             Row(0x00189117, "1", 0, items: 1...1), // MR Diffusion Sequence
             Row(0x00189087, "1C", 1, may: true), // Diffusion b-value
             Row(0x00189075, "1C", 1, may: true), // Diffusion Directionality
@@ -2232,22 +2240,22 @@ enum DicomEnhancedImageTables {
             Row(0x00189606, "1", 2), // Diffusion b-value YZ
             Row(0x00189607, "1", 2), // Diffusion b-value ZZ
             Row(0x00189147, "1C", 1), // Diffusion Anisotropy Type
-        ],
+        ]
         // MR Series Module Attributes (table_C.8-101)
-        "C.8.13.6": [
+        tables["C.8.13.6"] = [
             Row(0x00080060, "1", 0), // Modality
             Row(0x00081111, "1C", 0, items: 1...1), // Referenced Performed Procedure Step Sequence
             Row(include: "table_10-11", 1),
-        ],
+        ]
         // CT Series Module Attributes (table_C.8-113)
-        "C.8.15.1": [
+        tables["C.8.15.1"] = [
             Row(0x00080060, "1", 0), // Modality
             Row(0x00081111, "1C", 0, items: 1...1), // Referenced Performed Procedure Step Sequence
             Row(include: "table_10-11", 1),
             Row(0x00080068, "1C", 0, may: true), // Presentation Intent Type
-        ],
+        ]
         // Enhanced CT Image Module Attributes (table_C.8-114)
-        "C.8.15.2": [
+        tables["C.8.15.2"] = [
             Row(0x00080008, "1", 0), // Image Type
             Row(0x00189361, "3", 0), // Multi-energy CT Acquisition
             Row(include: "table_C.8-131", 0),
@@ -2272,22 +2280,22 @@ enum DicomEnhancedImageTables {
             Row(include: "table_C.7-11b", 1),
             Row(include: "table_10-25", 0),
             Row(include: "table_C.36.2.4.12-1", 0),
-        ],
+        ]
         // CT Image Frame Type Macro Attributes (table_C.8-117)
-        "C.8.15.3.1": [
+        tables["C.8.15.3.1"] = [
             Row(0x00189329, "1", 0, items: 1...1), // CT Image Frame Type Sequence
             Row(0x00089007, "1", 1), // Frame Type
             Row(include: "table_C.8-131", 1),
-        ],
+        ]
         // CT Pixel Value Transformation Macro Attributes (table_C.8-126)
-        "C.8.15.3.10": [
+        tables["C.8.15.3.10"] = [
             Row(0x00289145, "1", 0, items: 1...1), // Pixel Value Transformation Sequence
             Row(0x00281052, "1", 1), // Rescale Intercept
             Row(0x00281053, "1", 1), // Rescale Slope
             Row(0x00281054, "1", 1), // Rescale Type
-        ],
+        ]
         // CT Additional X-Ray Source Macro Attributes (table_C.8-126b)
-        "C.8.15.3.11": [
+        tables["C.8.15.3.11"] = [
             Row(0x00189360, "1", 0, items: 1...Int.max), // CT Additional X-Ray Source Sequence
             Row(0x00180060, "1", 1), // KVP
             Row(0x00189330, "1", 1), // X-Ray Tube Current in mA
@@ -2297,18 +2305,18 @@ enum DicomEnhancedImageTables {
             Row(0x00187050, "1", 1), // Filter Material
             Row(0x00189332, "1", 1), // Exposure in mAs
             Row(0x00189353, "1C", 1, may: true), // Energy Weighting Factor
-        ],
+        ]
         // Multi-energy CT Characteristics Macro Attributes (table_C.8.15.3.12-1)
-        "C.8.15.3.12": [
+        tables["C.8.15.3.12"] = [
             Row(0x00189364, "1C", 0, items: 1...1, may: true), // Multi-energy CT Characteristics Sequence
             Row(0x0018937C, "1C", 1, may: true), // Monoenergetic Energy Equivalent
             Row(0x00221612, "3", 1, items: 1...Int.max), // Derivation Algorithm Sequence
             Row(include: "table_10-19", 2),
             Row(0x00741212, "3", 1, items: 1...Int.max), // Performed Processing Parameters Sequence
             Row(include: "table_10.2.1-1", 2),
-        ],
+        ]
         // Multi-energy CT Processing Macro Attributes (table_C.8.15.3.13-1)
-        "C.8.15.3.13": [
+        tables["C.8.15.3.13"] = [
             Row(0x00189363, "3", 0, items: 1...1), // Multi-energy CT Processing Sequence
             Row(0x0018937E, "1", 1), // Decomposition Method
             Row(0x0018937F, "3", 1), // Decomposition Description
@@ -2320,29 +2328,29 @@ enum DicomEnhancedImageTables {
             Row(0x00189382, "3", 2), // Material Attenuation Sequence
             Row(0x00189383, "1", 3), // Photon Energy
             Row(0x00189384, "1", 3), // X-Ray Mass Attenuation Coefficient
-        ],
+        ]
         // RT Cone-Beam Imaging Macro Attributes (table_C.8.15.3.14-1)
-        "C.8.15.3.14": [
+        tables["C.8.15.3.14"] = [
             Row(0x30020136, "1", 0, items: 1...1), // RT Cone-Beam Imaging Geometry Sequence
             Row(include: "table_C.36.2.4.5-2", 1),
-        ],
+        ]
         // Metal Artifact Reduction Macro Attributes (table_C.8.15.3.15-1)
-        "C.8.15.3.15": [
+        tables["C.8.15.3.15"] = [
             Row(0x00189390, "1", 0, items: 1...1), // Metal Artifact Reduction Sequence
             Row(0x00189391, "1", 1), // Metal Artifact Reduction Applied
             Row(0x00189392, "3", 1, items: 1...1), // Metal Artifact Reduction Algorithm Identification Sequence
             Row(include: "table_10-19", 2),
-        ],
+        ]
         // CT Acquisition Type Macro Attributes (table_C.8-118)
-        "C.8.15.3.2": [
+        tables["C.8.15.3.2"] = [
             Row(0x00189301, "1", 0, items: 1...1), // CT Acquisition Type Sequence
             Row(0x00189302, "1C", 1, may: true), // Acquisition Type
             Row(0x00189303, "1C", 1, may: true), // Tube Angle
             Row(0x00189333, "1C", 1, may: true), // Constant Volume Flag
             Row(0x00189334, "1C", 1, may: true), // Fluoroscopy Flag
-        ],
+        ]
         // CT Acquisition Details Macro Attributes (table_C.8-119)
-        "C.8.15.3.3": [
+        tables["C.8.15.3.3"] = [
             Row(0x00189304, "1", 0, items: 1...1), // CT Acquisition Details Sequence
             Row(0x00189378, "1C", 1), // Referenced Path Index
             Row(0x00181140, "1C", 1, may: true), // Rotation Direction
@@ -2352,30 +2360,30 @@ enum DicomEnhancedImageTables {
             Row(0x00181130, "1C", 1, may: true), // Table Height
             Row(0x00181120, "1C", 1, may: true), // Gantry/Detector Tilt
             Row(0x00180090, "1C", 1, may: true), // Data Collection Diameter
-        ],
+        ]
         // CT Table Dynamics Macro Attributes (table_C.8-120)
-        "C.8.15.3.4": [
+        tables["C.8.15.3.4"] = [
             Row(0x00189308, "1", 0, items: 1...1), // CT Table Dynamics Sequence
             Row(0x00189309, "1C", 1, may: true), // Table Speed
             Row(0x00189310, "1C", 1, may: true), // Table Feed per Rotation
             Row(0x00189311, "1C", 1, may: true), // Spiral Pitch Factor
-        ],
+        ]
         // CT Position Macro Attributes (table_C.8-121)
-        "C.8.15.3.5": [
+        tables["C.8.15.3.5"] = [
             Row(0x00189326, "1", 0, items: 1...1), // CT Position Sequence
             Row(0x00189327, "1C", 1, may: true), // Table Position
             Row(0x00189313, "1C", 1, may: true), // Data Collection Center (Patient)
             Row(0x00189318, "1C", 1, may: true), // Reconstruction Target Center (Patient)
-        ],
+        ]
         // CT Geometry Macro Attributes (table_C.8-122)
-        "C.8.15.3.6": [
+        tables["C.8.15.3.6"] = [
             Row(0x00189312, "1", 0, items: 1...1), // CT Geometry Sequence
             Row(0x00189378, "1C", 1), // Referenced Path Index
             Row(0x00181110, "1C", 1, may: true), // Distance Source to Detector
             Row(0x00189335, "1C", 1, may: true), // Distance Source to Data Collection Center
-        ],
+        ]
         // CT Reconstruction Macro Attributes (table_C.8-123)
-        "C.8.15.3.7": [
+        tables["C.8.15.3.7"] = [
             Row(0x00189314, "1", 0, items: 1...1), // CT Reconstruction Sequence
             Row(0x00189315, "1C", 1, may: true), // Reconstruction Algorithm
             Row(0x00181210, "1C", 1, may: true), // Convolution Kernel
@@ -2385,9 +2393,9 @@ enum DicomEnhancedImageTables {
             Row(0x00189322, "1C", 1, may: true), // Reconstruction Pixel Spacing
             Row(0x00189319, "1C", 1, may: true), // Reconstruction Angle
             Row(0x00189320, "1C", 1), // Image Filter
-        ],
+        ]
         // CT Exposure Macro Attributes (table_C.8-124)
-        "C.8.15.3.8": [
+        tables["C.8.15.3.8"] = [
             Row(0x00189321, "1", 0, items: 1...1), // CT Exposure Sequence
             Row(0x00189377, "1C", 1), // Referenced X-Ray Source Index
             Row(0x00189328, "1C", 1, may: true), // Exposure Time in ms
@@ -2401,9 +2409,9 @@ enum DicomEnhancedImageTables {
             Row(0x00181272, "1C", 1, items: 1...1), // Water Equivalent Diameter Calculation Method Code Sequence
             Row(include: "table_8.8-1", 2),
             Row(0x0018115E, "3", 1), // Image and Fluoroscopy Area Dose Product
-        ],
+        ]
         // CT X-Ray Details Macro Attributes (table_C.8-125)
-        "C.8.15.3.9": [
+        tables["C.8.15.3.9"] = [
             Row(0x00189325, "1", 0, items: 1...1), // CT X-Ray Details Sequence
             Row(0x00189378, "1C", 1), // Referenced Path Index
             Row(0x00180060, "1C", 1, may: true), // KVP
@@ -2413,22 +2421,22 @@ enum DicomEnhancedImageTables {
             Row(0x00189351, "3", 1), // Calcium Scoring Mass Factor Patient
             Row(0x00189352, "3", 1), // Calcium Scoring Mass Factor Device
             Row(0x00189353, "1C", 1, may: true), // Energy Weighting Factor
-        ],
+        ]
         // Enhanced Multi-energy CT Acquisition Module Attributes (table_C.8.15.4-1)
-        "C.8.15.4": [
+        tables["C.8.15.4"] = [
             Row(include: "table_C.8.2.2-2", 0),
             Row(include: "table_C.8.2.2-3", 0),
             Row(include: "table_C.8.2.2-4", 0),
-        ],
+        ]
         // XA/XRF Series Module Attributes (table_C.8.19.1-1)
-        "C.8.19.1": [
+        tables["C.8.19.1"] = [
             Row(0x00080060, "1", 0), // Modality
             Row(0x00200011, "1", 0), // Series Number
             Row(0x00081111, "1C", 0, items: 1...1), // Referenced Performed Procedure Step Sequence
             Row(include: "table_10-11", 1),
-        ],
+        ]
         // Enhanced XA/XRF Image Module Table (table_C.8.19.2-1)
-        "C.8.19.2": [
+        tables["C.8.19.2"] = [
             Row(0x00080008, "1", 0), // Image Type
             Row(0x00189410, "1", 0), // Planes in Acquisition
             Row(0x00189457, "1C", 0), // Plane Identification
@@ -2471,9 +2479,9 @@ enum DicomEnhancedImageTables {
             Row(0x00880200, "3", 0, items: 1...1), // Icon Image Sequence
             Row(include: "table_C.7-11b", 1),
             Row(0x20500020, "1", 0), // Presentation LUT Shape
-        ],
+        ]
         // XA/XRF Acquisition Module Attributes (table_C.8.19.3-1)
-        "C.8.19.3": [
+        tables["C.8.19.3"] = [
             Row(0x00180060, "1", 0), // KVP
             Row(0x00181155, "1", 0), // Radiation Setting
             Row(0x00189330, "1C", 0, may: true), // X-Ray Tube Current in mA
@@ -2490,37 +2498,37 @@ enum DicomEnhancedImageTables {
             Row(0x00181508, "1", 0), // Positioner Type
             Row(0x00189474, "1C", 0), // C-arm Positioner Tabletop Relationship
             Row(0x00189473, "2", 0), // Acquired Image Area Dose Product
-        ],
+        ]
         // X-Ray Image Intensifier Module Attributes (table_C.8.19.4-1)
-        "C.8.19.4": [
+        tables["C.8.19.4"] = [
             Row(0x00181162, "1", 0), // Intensifier Size
             Row(0x00189427, "1", 0), // Intensifier Active Shape
             Row(0x00189428, "1", 0), // Intensifier Active Dimension(s)
-        ],
+        ]
         // X-Ray Detector Module Attributes (table_C.8.19.5-1)
-        "C.8.19.5": [
+        tables["C.8.19.5"] = [
             Row(include: "table_C.8-71b", 0),
             Row(0x00189429, "1", 0), // Physical Detector Size
             Row(0x00189430, "1C", 0), // Position of Isocenter Projection
-        ],
+        ]
         // X-Ray Frame Characteristics Macro Attributes (table_C.8.19.6-1)
-        "C.8.19.6.1": [
+        tables["C.8.19.6.1"] = [
             Row(0x00189412, "1", 0, items: 1...1), // XA/XRF Frame Characteristics Sequence
             Row(0x00082111, "3", 1), // Derivation Description
             Row(0x00089215, "3", 1, items: 1...Int.max), // Derivation Code Sequence
             Row(include: "table_8.8-1", 2),
             Row(0x00181400, "3", 1), // Acquisition Device Processing Description
             Row(0x00181401, "3", 1), // Acquisition Device Processing Code
-        ],
+        ]
         // X-Ray Positioner Macro Attributes (table_C.8.19.6-10)
-        "C.8.19.6.10": [
+        tables["C.8.19.6.10"] = [
             Row(0x00189405, "1", 0, items: 1...1), // Positioner Position Sequence
             Row(0x00181510, "1C", 1), // Positioner Primary Angle
             Row(0x00181511, "1C", 1), // Positioner Secondary Angle
             Row(0x00189447, "1C", 1), // Column Angulation (Patient)
-        ],
+        ]
         // X-Ray Table Position Macro Attributes (table_C.8.19.6-11)
-        "C.8.19.6.11": [
+        tables["C.8.19.6.11"] = [
             Row(0x00189406, "1", 0, items: 1...1), // Table Position Sequence
             Row(0x300A0128, "1", 1), // Table Top Vertical Position
             Row(0x300A0129, "1", 1), // Table Top Longitudinal Position
@@ -2528,9 +2536,9 @@ enum DicomEnhancedImageTables {
             Row(0x00189469, "1", 1), // Table Horizontal Rotation Angle
             Row(0x00189470, "1", 1), // Table Head Tilt Angle
             Row(0x00189471, "1", 1), // Table Cradle Tilt Angle
-        ],
+        ]
         // X-Ray Collimator Macro Attributes (table_C.8.19.6-12)
-        "C.8.19.6.12": [
+        tables["C.8.19.6.12"] = [
             Row(0x00189407, "1", 0, items: 1...1), // Collimator Shape Sequence
             Row(0x00181700, "1", 1), // Collimator Shape
             Row(0x00181702, "1C", 1), // Collimator Left Vertical Edge
@@ -2540,9 +2548,9 @@ enum DicomEnhancedImageTables {
             Row(0x00181710, "1C", 1), // Center of Circular Collimator
             Row(0x00181712, "1C", 1), // Radius of Circular Collimator
             Row(0x00181720, "1C", 1), // Vertices of the Polygonal Collimator
-        ],
+        ]
         // X-Ray Isocenter Reference System Macro Attributes (table_C.8.19.6-13)
-        "C.8.19.6.13": [
+        tables["C.8.19.6.13"] = [
             Row(0x00189462, "1", 0, items: 1...1), // Isocenter Reference System Sequence
             Row(0x00189463, "1", 1), // Positioner Isocenter Primary Angle
             Row(0x00189464, "1", 1), // Positioner Isocenter Secondary Angle
@@ -2553,15 +2561,15 @@ enum DicomEnhancedImageTables {
             Row(0x00189469, "1", 1), // Table Horizontal Rotation Angle
             Row(0x00189470, "1", 1), // Table Head Tilt Angle
             Row(0x00189471, "1", 1), // Table Cradle Tilt Angle
-        ],
+        ]
         // X-Ray Geometry Macro Attributes (table_C.8.19.6-14)
-        "C.8.19.6.14": [
+        tables["C.8.19.6.14"] = [
             Row(0x00189476, "1", 0, items: 1...1), // X-Ray Geometry Sequence
             Row(0x00189402, "1", 1), // Distance Source to Isocenter
             Row(0x00181110, "1", 1), // Distance Source to Detector
-        ],
+        ]
         // X-Ray Field of View Macro Attributes (table_C.8.19.6-2)
-        "C.8.19.6.2": [
+        tables["C.8.19.6.2"] = [
             Row(0x00189432, "1", 0, items: 1...1), // Field of View Sequence
             Row(0x00181147, "3", 1), // Field of View Shape
             Row(0x00189461, "3", 1), // Field of View Dimension(s) in Float
@@ -2569,9 +2577,9 @@ enum DicomEnhancedImageTables {
             Row(0x00187032, "1", 1), // Field of View Rotation
             Row(0x00187034, "1", 1), // Field of View Horizontal Flip
             Row(0x00189433, "3", 1), // Field of View Description
-        ],
+        ]
         // X-Ray Exposure Control Sensing Regions Macro Attributes (table_C.8.19.6-3)
-        "C.8.19.6.3": [
+        tables["C.8.19.6.3"] = [
             Row(0x00189434, "1", 0, items: 1...Int.max), // Exposure Control Sensing Regions Sequence
             Row(0x00189435, "1", 1), // Exposure Control Sensing Region Shape
             Row(0x00189436, "1C", 1), // Exposure Control Sensing Region Left Vertical Edge
@@ -2581,9 +2589,9 @@ enum DicomEnhancedImageTables {
             Row(0x00189440, "1C", 1), // Center of Circular Exposure Control Sensing Region
             Row(0x00189441, "1C", 1), // Radius of Circular Exposure Control Sensing Region
             Row(0x00189442, "1C", 1), // Vertices of the Polygonal Exposure Control Sensing Region
-        ],
+        ]
         // X-Ray Frame Pixel Data Properties Macro Attributes (table_C.8.19.6-4)
-        "C.8.19.6.4": [
+        tables["C.8.19.6.4"] = [
             Row(0x00289443, "1", 0, items: 1...1), // Frame Pixel Data Properties Sequence
             Row(0x00089007, "1", 1), // Frame Type
             Row(0x00281040, "1", 1), // Pixel Intensity Relationship
@@ -2594,41 +2602,41 @@ enum DicomEnhancedImageTables {
             Row(0x00289444, "1", 1), // Geometrical Properties
             Row(0x00289445, "2C", 1), // Geometric Maximum Distortion
             Row(0x00289446, "1", 1), // Image Processing Applied
-        ],
+        ]
         // X-Ray Frame Detector Parameters Macro Attributes (table_C.8.19.6-5)
-        "C.8.19.6.5": [
+        tables["C.8.19.6.5"] = [
             Row(0x00189451, "1", 0, items: 1...1), // Frame Detector Parameters Sequence
             Row(0x00187014, "3", 1), // Detector Active Time
             Row(0x00187016, "3", 1), // Detector Activation Offset From Exposure
-        ],
+        ]
         // X-Ray Calibration Device Usage Macro Attributes (table_C.8.19.6-6)
-        "C.8.19.6.6": [
+        tables["C.8.19.6.6"] = [
             Row(0x00189455, "1", 0, items: 1...1), // Calibration Sequence
             Row(0x00500004, "1", 1), // Calibration Image
-        ],
+        ]
         // X-Ray Object Thickness Macro Attributes (table_C.8.19.6-7)
-        "C.8.19.6.7": [
+        tables["C.8.19.6.7"] = [
             Row(0x00189456, "1", 0, items: 1...1), // Object Thickness Sequence
             Row(0x00189452, "1", 1), // Calculated Anatomy Thickness
-        ],
+        ]
         // X-Ray Frame Acquisition Macro Attributes (table_C.8.19.6-8)
-        "C.8.19.6.8": [
+        tables["C.8.19.6.8"] = [
             Row(0x00189417, "1", 0, items: 1...1), // Frame Acquisition Sequence
             Row(0x00180060, "1", 1), // KVP
             Row(0x00189330, "1", 1), // X-Ray Tube Current in mA
             Row(0x00189328, "3", 1), // Exposure Time in ms
             Row(0x00189332, "3", 1), // Exposure in mAs
-        ],
+        ]
         // X-Ray Projection Pixel Calibration Macro Attributes (table_C.8.19.6-9)
-        "C.8.19.6.9": [
+        tables["C.8.19.6.9"] = [
             Row(0x00189401, "1", 0, items: 1...1), // Projection Pixel Calibration Sequence
             Row(0x00189403, "2", 1), // Distance Object to Table Top
             Row(0x00189404, "1C", 1), // Object Pixel Spacing in Center of Beam
             Row(0x00181130, "1C", 1, may: true), // Table Height
             Row(0x00189449, "1C", 1, may: true), // Beam Angle
-        ],
+        ]
         // XA/XRF Multi-frame Presentation Module Attributes (table_C.8.19.7-1)
-        "C.8.19.7": [
+        tables["C.8.19.7"] = [
             Row(0x00181244, "3", 0), // Preferred Playback Sequencing
             Row(0x00089458, "3", 0, items: 1...Int.max), // Frame Display Sequence
             Row(0x00082142, "1", 1), // Start Trim
@@ -2638,16 +2646,16 @@ enum DicomEnhancedImageTables {
             Row(0x00281090, "2", 1), // Recommended Viewing Mode
             Row(0x00289411, "2", 1), // Display Filter Percentage
             Row(0x00289478, "1C", 1), // Mask Visibility Percentage
-        ],
+        ]
         // Segmentation Series Module Attributes (table_C.8.20-1)
-        "C.8.20.1": [
+        tables["C.8.20.1"] = [
             Row(0x00080060, "1", 0), // Modality
             Row(0x00200011, "1", 0), // Series Number
             Row(0x00081111, "1C", 0, items: 1...1), // Referenced Performed Procedure Step Sequence
             Row(include: "table_10-11", 1),
-        ],
+        ]
         // Segmentation Image Module Attributes (table_C.8.20-2)
-        "C.8.20.2": [
+        tables["C.8.20.2"] = [
             Row(0x00080008, "1", 0), // Image Type
             Row(include: "table_10-12", 0),
             Row(0x00280002, "1", 0), // Samples per Pixel
@@ -2670,14 +2678,14 @@ enum DicomEnhancedImageTables {
             Row(include: "table_10-19", 2),
             Row(0x0062000C, "3", 1), // Recommended Display Grayscale Value
             Row(0x0062000D, "3", 1), // Recommended Display CIELab Value
-        ],
+        ]
         // Segmentation Macro Attributes (table_C.8.20-3)
-        "C.8.20.3.1": [
+        tables["C.8.20.3.1"] = [
             Row(0x0062000A, "1", 0, items: 1...1), // Segment Identification Sequence
             Row(0x0062000B, "1", 1), // Referenced Segment Number
-        ],
+        ]
         // Surface Segmentation Module Attributes (table_C.8.23-1)
-        "C.8.23.1": [
+        tables["C.8.23.1"] = [
             Row(include: "table_10-12", 0),
             Row(0x00080023, "1", 0), // Content Date
             Row(0x00080033, "1", 0), // Content Time
@@ -2690,16 +2698,16 @@ enum DicomEnhancedImageTables {
             Row(include: "table_10-19", 3),
             Row(0x0066002E, "2", 2, items: 0...Int.max), // Segment Surface Source Instance Sequence
             Row(include: "table_10-3", 3),
-        ],
+        ]
         // Parametric Map Series Module Attributes (table_PS3.3_C.8.32-1)
-        "C.8.32.1": [
+        tables["C.8.32.1"] = [
             Row(0x00080060, "1", 0), // Modality
             Row(0x00200011, "1", 0), // Series Number
             Row(0x00081111, "1C", 0, items: 1...1), // Referenced Performed Procedure Step Sequence
             Row(include: "table_10-11", 1),
-        ],
+        ]
         // Parametric Map Image Module Attributes (table_PS3.3_C.8.32-2)
-        "C.8.32.2": [
+        tables["C.8.32.2"] = [
             Row(0x00080008, "1", 0), // Image Type
             Row(include: "table_10-12", 0),
             Row(0x00089205, "3", 0), // Pixel Presentation
@@ -2718,14 +2726,14 @@ enum DicomEnhancedImageTables {
             Row(0x00281199, "1C", 0), // Palette Color Lookup Table UID
             Row(0x00282000, "1C", 0), // ICC Profile
             Row(0x00282002, "3", 0), // Color Space
-        ],
+        ]
         // Parametric Map Frame Type Macro Attributes (table_PS3.3_C.8.32-3)
-        "C.8.32.3.1": [
+        tables["C.8.32.3.1"] = [
             Row(0x00409092, "1", 0, items: 1...1), // Parametric Map Frame Type Sequence
             Row(0x00089007, "1", 1), // Frame Type
-        ],
+        ]
         // US Region Calibration Module Attributes (table_C.8-17)
-        "C.8.5.5": [
+        tables["C.8.5.5"] = [
             Row(0x00186011, "1", 0, items: 1...Int.max), // Sequence of Ultrasound Regions
             Row(0x00186018, "1", 1), // Region Location Min x0
             Row(0x0018601A, "1", 1), // Region Location Min y0
@@ -2767,9 +2775,9 @@ enum DicomEnhancedImageTables {
             Row(0x00186041, "3", 1), // TM-Line Position X1
             Row(0x00186043, "3", 1), // TM-Line Position Y1
             Row(0x00186070, "3", 1), // Active Image Area Overlay Group
-        ],
+        ]
         // US Image Module Attributes (table_C.8-18)
-        "C.8.5.6": [
+        tables["C.8.5.6"] = [
             Row(0x00280002, "1", 0), // Samples per Pixel
             Row(0x00280004, "1", 0), // Photometric Interpretation
             Row(0x00280100, "1", 0), // Bits Allocated
@@ -2822,9 +2830,9 @@ enum DicomEnhancedImageTables {
             Row(0x00185028, "3", 0), // Soft Tissue-focus Thermal Index
             Row(0x00185029, "3", 0), // Soft Tissue-surface Thermal Index
             Row(0x00185050, "3", 0), // Depth of Scan Field
-        ],
+        ]
         // SC Equipment Module Attributes (table_C.8-24)
-        "C.8.6.1": [
+        tables["C.8.6.1"] = [
             Row(0x00080064, "1", 0), // Conversion Type
             Row(0x00080060, "3", 0), // Modality
             Row(0x00181010, "3", 0), // Secondary Capture Device ID
@@ -2833,18 +2841,18 @@ enum DicomEnhancedImageTables {
             Row(0x00181019, "3", 0), // Secondary Capture Device Software Versions
             Row(0x00181022, "3", 0), // Video Image Format Acquired
             Row(0x00181023, "3", 0), // Digital Image Format Acquired
-        ],
+        ]
         // X-Ray Filtration Module Attributes (table_C.8-35)
-        "C.8.7.10": [
+        tables["C.8.7.10"] = [
             Row(include: "table_C.8-35a", 0),
-        ],
+        ]
         // X-Ray Grid Module Attributes (table_C.8-36)
-        "C.8.7.11": [
+        tables["C.8.7.11"] = [
             Row(0x00181166, "3", 0), // Grid
             Row(include: "table_C.8-36b", 0),
-        ],
+        ]
         // RT Series Module Attributes (table_C.8-37)
-        "C.8.8.1": [
+        tables["C.8.8.1"] = [
             Row(0x00080060, "1", 0), // Modality
             Row(0x0020000E, "1", 0), // Series Instance UID
             Row(0x00200011, "2", 0), // Series Number
@@ -2862,9 +2870,9 @@ enum DicomEnhancedImageTables {
             Row(include: "table_10-9", 1),
             Row(include: "table_10-16", 0),
             Row(0x300A0700, "3", 0), // Treatment Session UID
-        ],
+        ]
         // RT Prescription Module Attributes (table_C.8-46)
-        "C.8.8.10": [
+        tables["C.8.8.10"] = [
             Row(0x300A000E, "3", 0), // Prescription Description
             Row(0x300A0010, "3", 0, items: 1...Int.max), // Dose Reference Sequence
             Row(0x300A0012, "1", 1), // Dose Reference Number
@@ -2888,9 +2896,9 @@ enum DicomEnhancedImageTables {
             Row(0x300A002B, "3", 1), // Organ at Risk Limit Dose
             Row(0x300A002C, "3", 1), // Organ at Risk Maximum Dose
             Row(0x300A002D, "3", 1), // Organ at Risk Overdose Volume Fraction
-        ],
+        ]
         // RT Tolerance Tables Module Attributes (table_C.8-47)
-        "C.8.8.11": [
+        tables["C.8.8.11"] = [
             Row(0x300A0040, "3", 0, items: 1...Int.max), // Tolerance Table Sequence
             Row(0x300A0042, "1", 1), // Tolerance Table Number
             Row(0x300A0043, "3", 1), // Tolerance Table Label
@@ -2907,9 +2915,9 @@ enum DicomEnhancedImageTables {
             Row(0x300A0051, "3", 1), // Table Top Vertical Position Tolerance
             Row(0x300A0052, "3", 1), // Table Top Longitudinal Position Tolerance
             Row(0x300A0053, "3", 1), // Table Top Lateral Position Tolerance
-        ],
+        ]
         // RT Patient Setup Module Attributes (table_C.8-48)
-        "C.8.8.12": [
+        tables["C.8.8.12"] = [
             Row(0x300A0180, "1", 0, items: 1...Int.max), // Patient Setup Sequence
             Row(0x300A0182, "1", 1), // Patient Setup Number
             Row(0x300A0183, "3", 1), // Patient Setup Label
@@ -2951,9 +2959,9 @@ enum DicomEnhancedImageTables {
             Row(0x00189171, "1", 2), // Respiratory Signal Source
             Row(0x00189185, "3", 2), // Respiratory Motion Compensation Technique Description
             Row(0x00189186, "3", 2), // Respiratory Signal Source ID
-        ],
+        ]
         // RT Fraction Scheme Module Attributes (table_C.8-49)
-        "C.8.8.13": [
+        tables["C.8.8.13"] = [
             Row(0x300A0070, "1", 0, items: 1...Int.max), // Fraction Group Sequence
             Row(0x300A0071, "1", 1), // Fraction Group Number
             Row(0x300A0072, "3", 1), // Fraction Group Description
@@ -3005,9 +3013,9 @@ enum DicomEnhancedImageTables {
             Row(0x300A00A2, "3", 2), // Brachy Application Setup Dose Specification Point
             Row(0x300A00A4, "3", 2), // Brachy Application Setup Dose
             Row(0x300A0083, "3", 2), // Referenced Dose Reference UID
-        ],
+        ]
         // RT Beams Module Attributes (table_C.8-50)
-        "C.8.8.14": [
+        tables["C.8.8.14"] = [
             Row(0x300A00B0, "1", 0, items: 1...Int.max), // Beam Sequence
             Row(0x300A00C0, "1", 1), // Beam Number
             Row(0x300A00C2, "3", 1), // Beam Name
@@ -3192,9 +3200,9 @@ enum DicomEnhancedImageTables {
             Row(0x300A0133, "3", 2), // External Contour Entry Point
             Row(0x300A0130, "3", 2), // Source to Surface Distance
             Row(0x300A0132, "3", 2), // Source to External Contour Distance
-        ],
+        ]
         // RT Brachy Application Setups Module Attributes (table_C.8-51)
-        "C.8.8.15": [
+        tables["C.8.8.15"] = [
             Row(0x300A0200, "1", 0), // Brachy Treatment Technique
             Row(0x300A0202, "1", 0), // Brachy Treatment Type
             Row(0x300A0206, "1", 0, items: 1...1), // Treatment Machine Sequence
@@ -3293,16 +3301,16 @@ enum DicomEnhancedImageTables {
             Row(0x300C0055, "3", 3, items: 1...Int.max), // Brachy Referenced Dose Reference Sequence
             Row(0x300C0051, "1", 4), // Referenced Dose Reference Number
             Row(0x300A010C, "1", 4), // Cumulative Dose Reference Coefficient
-        ],
+        ]
         // Approval Module Attributes (table_C.8-52)
-        "C.8.8.16": [
+        tables["C.8.8.16"] = [
             Row(0x300E0002, "1", 0), // Approval Status
             Row(0x300E0004, "2C", 0), // Review Date
             Row(0x300E0005, "2C", 0), // Review Time
             Row(0x300E0008, "2C", 0), // Reviewer Name
-        ],
+        ]
         // RT Dose Module Attributes (table_C.8-39)
-        "C.8.8.3": [
+        tables["C.8.8.3"] = [
             Row(0x00280002, "1C", 0), // Samples per Pixel
             Row(0x00280004, "1C", 0), // Photometric Interpretation
             Row(0x00280100, "1C", 0), // Bits Allocated
@@ -3380,9 +3388,9 @@ enum DicomEnhancedImageTables {
             Row(include: "table_10-11", 2),
             Row(0x00081140, "1C", 1, items: 1...Int.max), // Referenced Image Sequence
             Row(include: "table_10-11", 2),
-        ],
+        ]
         // RT DVH Module Attributes (table_C.8-40)
-        "C.8.8.4": [
+        tables["C.8.8.4"] = [
             Row(0x300C0060, "1", 0, items: 1...1), // Referenced Structure Set Sequence
             Row(include: "table_10-11", 1),
             Row(0x30040040, "3", 0), // DVH Normalization Point
@@ -3401,9 +3409,9 @@ enum DicomEnhancedImageTables {
             Row(0x30040070, "3", 1), // DVH Minimum Dose
             Row(0x30040072, "3", 1), // DVH Maximum Dose
             Row(0x30040074, "3", 1), // DVH Mean Dose
-        ],
+        ]
         // Structure Set Module Attributes (table_C.8-41)
-        "C.8.8.5": [
+        tables["C.8.8.5"] = [
             Row(0x30060002, "1", 0), // Structure Set Label
             Row(0x30060004, "3", 0), // Structure Set Name
             Row(0x30060006, "3", 0), // Structure Set Description
@@ -3451,9 +3459,9 @@ enum DicomEnhancedImageTables {
             Row(0x0070031B, "1C", 2), // Referenced Fiducial UID
             Row(0x30060018, "3", 0, items: 1...1), // Predecessor Structure Set Sequence
             Row(include: "table_10-11", 1),
-        ],
+        ]
         // ROI Contour Module Attributes (table_C.8-42)
-        "C.8.8.6": [
+        tables["C.8.8.6"] = [
             Row(0x30060039, "3", 0, items: 1...Int.max), // ROI Contour Sequence
             Row(0x30060084, "1", 1), // Referenced ROI Number
             Row(0x3006002A, "3", 1), // ROI Display Color
@@ -3476,9 +3484,9 @@ enum DicomEnhancedImageTables {
             Row(0x30060042, "1", 2), // Contour Geometric Type
             Row(0x30060046, "1", 2), // Number of Contour Points
             Row(0x30060050, "1", 2), // Contour Data
-        ],
+        ]
         // RT ROI Observations Module Attributes (table_C.8-44)
-        "C.8.8.8": [
+        tables["C.8.8.8"] = [
             Row(0x30060080, "3", 0, items: 1...Int.max), // RT ROI Observations Sequence
             Row(0x30060082, "1", 1), // Observation Number
             Row(0x30060084, "1", 1), // Referenced ROI Number
@@ -3512,9 +3520,9 @@ enum DicomEnhancedImageTables {
             Row(0x300600B7, "1", 3), // ROI Elemental Composition Atomic Number
             Row(0x300600B8, "1", 3), // ROI Elemental Composition Atomic Mass Fraction
             Row(0x300600B4, "1", 2), // ROI Physical Property Value
-        ],
+        ]
         // RT General Plan Module Attributes (table_C.8-45)
-        "C.8.8.9": [
+        tables["C.8.8.9"] = [
             Row(0x300A0002, "1", 0), // RT Plan Label
             Row(0x300A0003, "3", 0), // RT Plan Name
             Row(0x300A0004, "3", 0), // RT Plan Description
@@ -3539,9 +3547,9 @@ enum DicomEnhancedImageTables {
             Row(include: "table_10-11", 1),
             Row(0x300A0055, "1", 1), // RT Plan Relationship
             Row(0x0070030B, "3", 0), // Frame of Reference to Displayed Coordinate System Transformation Matrix
-        ],
+        ]
         // Content Identification Macro Attributes (table_10-12)
-        "table_10-12": [
+        tables["table_10-12"] = [
             Row(0x00200013, "1", 0), // Instance Number
             Row(0x00700080, "1", 0), // Content Label
             Row(0x00700081, "2", 0), // Content Description
@@ -3554,9 +3562,9 @@ enum DicomEnhancedImageTables {
             Row(0x0040A043, "3", 1, items: 1...1), // Concept Name Code Sequence
             Row(include: "table_8.8-1", 2),
             Row(include: "table_10.9.3-1", 0),
-        ],
+        ]
         // Performed Procedure Step Summary Macro Attributes (table_10-16)
-        "table_10-16": [
+        tables["table_10-16"] = [
             Row(0x00400253, "3", 0), // Performed Procedure Step ID
             Row(0x00400244, "3", 0), // Performed Procedure Step Start Date
             Row(0x00400245, "3", 0), // Performed Procedure Step Start Time
@@ -3570,59 +3578,59 @@ enum DicomEnhancedImageTables {
             Row(0x00400441, "3", 2, items: 1...Int.max), // Content Item Modifier Sequence
             Row(include: "table_10-2", 3),
             Row(0x00400280, "3", 0), // Comments on the Performed Procedure Step
-        ],
+        ]
         // Exposure Index Macro Attributes (table_10-23)
-        "table_10-23": [
+        tables["table_10-23"] = [
             Row(0x00181411, "3", 0), // Exposure Index
             Row(0x00181412, "3", 0), // Target Exposure Index
             Row(0x00181413, "3", 0), // Deviation Index
-        ],
+        ]
         // Optional View and Slice Progression Direction Macro Attributes (table_10-25)
-        "table_10-25": [
+        tables["table_10-25"] = [
             Row(0x00540220, "3", 0, items: 1...1), // View Code Sequence
             Row(include: "table_8.8-1", 1),
             Row(0x00540222, "3", 1, items: 1...Int.max), // View Modifier Code Sequence
             Row(include: "table_8.8-1", 2),
             Row(0x00540500, "3", 0), // Slice Progression Direction
-        ],
+        ]
         // General Anatomy Mandatory Macro Attributes (table_10-5)
-        "table_10-5": [
+        tables["table_10-5"] = [
             Row(0x00082218, "1", 0, items: 1...1), // Anatomic Region Sequence
             Row(include: "table_8.8-1", 1),
             Row(0x00082220, "3", 1, items: 1...Int.max), // Anatomic Region Modifier Sequence
             Row(include: "table_8.8-1", 2),
             Row(include: "table_10-8", 0),
-        ],
+        ]
         // General Anatomy Optional Macro Attributes (table_10-7)
-        "table_10-7": [
+        tables["table_10-7"] = [
             Row(0x00082218, "3", 0, items: 1...1), // Anatomic Region Sequence
             Row(include: "table_8.8-1", 1),
             Row(0x00082220, "3", 1, items: 1...Int.max), // Anatomic Region Modifier Sequence
             Row(include: "table_8.8-1", 2),
             Row(include: "table_10-8", 0),
-        ],
+        ]
         // Multiple Site General Anatomy Optional Macro Attributes (table_10-7b)
-        "table_10-7b": [
+        tables["table_10-7b"] = [
             Row(0x00082218, "3", 0, items: 1...Int.max), // Anatomic Region Sequence
             Row(include: "table_8.8-1", 1),
             Row(0x00082220, "3", 1, items: 1...Int.max), // Anatomic Region Modifier Sequence
             Row(include: "table_8.8-1", 2),
             Row(include: "table_10-8", 0),
-        ],
+        ]
         // Primary Anatomic Structure Macro Attributes (table_10-8)
-        "table_10-8": [
+        tables["table_10-8"] = [
             Row(0x00082228, "3", 0, items: 1...Int.max), // Primary Anatomic Structure Sequence
             Row(include: "table_8.8-1", 1),
             Row(0x00082230, "3", 1, items: 1...Int.max), // Primary Anatomic Structure Modifier Sequence
             Row(include: "table_8.8-1", 2),
-        ],
+        ]
         // UDI Macro Attributes (table_10.29-1)
-        "table_10.29-1": [
+        tables["table_10.29-1"] = [
             Row(0x00181009, "1", 0), // Unique Device Identifier
             Row(0x00500020, "3", 0), // Device Description
-        ],
+        ]
         // Assertion Macro Attributes (table_10.30-1)
-        "table_10.30-1": [
+        tables["table_10.30-1"] = [
             Row(0x00440101, "1", 0, items: 1...1), // Assertion Code Sequence
             Row(include: "table_8.8-1", 1),
             Row(0x00440102, "1", 0), // Assertion UID
@@ -3638,9 +3646,9 @@ enum DicomEnhancedImageTables {
             Row(0x0040E010, "3", 1), // Retrieve URI
             Row(0x00440107, "3", 0, items: 1...Int.max), // Related Assertion Sequence
             Row(0x00440108, "1", 1), // Referenced Assertion UID
-        ],
+        ]
         // Conceptual Volume Macro Attributes (table_10.33-1)
-        "table_10.33-1": [
+        tables["table_10.33-1"] = [
             Row(0x30100006, "1", 0), // Conceptual Volume UID
             Row(0x30100007, "1C", 0, items: 1...1), // Originating SOP Instance Reference Sequence
             Row(include: "table_10-11", 1),
@@ -3659,15 +3667,15 @@ enum DicomEnhancedImageTables {
             Row(0x30100020, "1", 3), // Referenced Segment Reference Index
             Row(0x30100016, "3", 1, items: 1...Int.max), // Conceptual Volume Derivation Algorithm Sequence
             Row(include: "table_10-19", 2),
-        ],
+        ]
         // Device Model Macro Attributes (table_10.35-1)
-        "table_10.35-1": [
+        tables["table_10.35-1"] = [
             Row(0x00080070, "2", 0), // Manufacturer
             Row(0x00081090, "2", 0), // Manufacturer's Model Name
             Row(0x3010001A, "2", 0), // Manufacturer's Model Version
-        ],
+        ]
         // Device Identification Macro Attributes (table_10.36-1)
-        "table_10.36-1": [
+        tables["table_10.36-1"] = [
             Row(0x3010002E, "1", 0, items: 1...1), // Device Type Code Sequence
             Row(include: "table_8.8-1", 1),
             Row(0x3010002D, "1", 0), // Device Label
@@ -3682,9 +3690,9 @@ enum DicomEnhancedImageTables {
             Row(0x3010001B, "2", 0), // Device Alternate Identifier
             Row(0x3010001C, "1C", 0), // Device Alternate Identifier Type
             Row(0x3010001D, "1C", 0), // Device Alternate Identifier Format
-        ],
+        ]
         // Outline Definition Macro Attributes (table_10.38-1)
-        "table_10.38-1": [
+        tables["table_10.38-1"] = [
             Row(0x00181630, "1", 0), // Outline Shape Type
             Row(0x00181631, "1C", 0), // Outline Left Vertical Edge
             Row(0x00181632, "1C", 0), // Outline Right Vertical Edge
@@ -3694,9 +3702,9 @@ enum DicomEnhancedImageTables {
             Row(0x00181636, "1C", 0), // Diameter of Circular Outline
             Row(0x00181637, "1C", 0), // Number of Polygonal Vertices
             Row(0x00181638, "1C", 0), // Vertices of the Polygonal Outline
-        ],
+        ]
         // Hierarchical Evidence Reference Macro Attributes (table_10.42-1)
-        "table_10.42-1": [
+        tables["table_10.42-1"] = [
             Row(0x00089121, "3", 0, items: 1...Int.max), // Referenced Raw Data Sequence
             Row(include: "table_C.17-3", 1),
             Row(0x0008113A, "3", 0, items: 1...Int.max), // Referenced Waveform Sequence
@@ -3707,15 +3715,15 @@ enum DicomEnhancedImageTables {
             Row(include: "table_C.17-3", 1),
             Row(0x00089237, "1C", 0, items: 1...Int.max), // Referenced Presentation State Sequence
             Row(include: "table_C.17-3", 1),
-        ],
+        ]
         // Content Creator Macro Attributes (table_10.9.3-1)
-        "table_10.9.3-1": [
+        tables["table_10.9.3-1"] = [
             Row(0x00700084, "3", 0), // Content Creator's Name
             Row(0x00700086, "3", 0, items: 1...1), // Content Creator's Identification Code Sequence
             Row(include: "table_10-1", 1),
-        ],
+        ]
         // Text Style Sequence Macro Attributes (table_C.10-5a)
-        "table_C.10-5a": [
+        tables["table_C.10-5a"] = [
             Row(0x00700231, "3", 0, items: 1...1), // Text Style Sequence
             Row(0x00700227, "3", 1), // Font Name
             Row(0x00700228, "1C", 1), // Font Name Type
@@ -3731,9 +3739,9 @@ enum DicomEnhancedImageTables {
             Row(0x00700248, "1", 1), // Underlined
             Row(0x00700249, "1", 1), // Bold
             Row(0x00700250, "1", 1), // Italic
-        ],
+        ]
         // Line Style Sequence Macro Attributes (table_C.10-5b)
-        "table_C.10-5b": [
+        tables["table_C.10-5b"] = [
             Row(0x00700232, "3", 0, items: 1...1), // Line Style Sequence
             Row(0x00700251, "1", 1), // Pattern On Color CIELab Value
             Row(0x00700252, "3", 1), // Pattern Off Color CIELab Value
@@ -3747,9 +3755,9 @@ enum DicomEnhancedImageTables {
             Row(0x00700246, "1", 1), // Shadow Offset Y
             Row(0x00700247, "1", 1), // Shadow Color CIELab Value
             Row(0x00700258, "1", 1), // Shadow Opacity
-        ],
+        ]
         // Fill Style Sequence Macro Attributes (table_C.10-5c)
-        "table_C.10-5c": [
+        tables["table_C.10-5c"] = [
             Row(0x00700233, "3", 0, items: 1...1), // Fill Style Sequence
             Row(0x00700251, "1", 1), // Pattern On Color CIELab Value
             Row(0x00700252, "3", 1), // Pattern Off Color CIELab Value
@@ -3757,9 +3765,9 @@ enum DicomEnhancedImageTables {
             Row(0x00700285, "1", 1), // Pattern Off Opacity
             Row(0x00700257, "1", 1), // Fill Mode
             Row(0x00700256, "1C", 1), // Fill Pattern
-        ],
+        ]
         // Waveform Filter Characteristics Macro Attributes (table_C.10.12-1)
-        "table_C.10.12-1": [
+        tables["table_C.10.12-1"] = [
             Row(0x003A0322, "1", 0), // Waveform Filter Type
             Row(0x003A0220, "1C", 0), // Filter Low Frequency
             Row(0x003A0221, "1C", 0), // Filter High Frequency
@@ -3776,18 +3784,18 @@ enum DicomEnhancedImageTables {
             Row(0x003A0329, "3", 0), // Waveform Filter Description
             Row(0x003A032A, "3", 0), // Filter Lookup Table Sequence
             Row(include: "table_C.10.13-1", 1),
-        ],
+        ]
         // Waveform Filter Lookup Table Macro Attributes (table_C.10.13-1)
-        "table_C.10.13-1": [
+        tables["table_C.10.13-1"] = [
             Row(0x003A032B, "3", 0), // Filter Lookup Table Description
             Row(0x003A032C, "1", 0), // Frequency Encoding Code Sequence
             Row(include: "table_8.8-1", 1),
             Row(0x003A032D, "1", 0), // Magnitude Encoding Code Sequence
             Row(include: "table_8.8-1", 1),
             Row(0x003A032E, "1", 0), // Filter Lookup Table Data
-        ],
+        ]
         // Modality LUT Macro Attributes (table_C.11-1b)
-        "table_C.11-1b": [
+        tables["table_C.11-1b"] = [
             Row(0x00283000, "1C", 0, items: 1...1), // Modality LUT Sequence
             Row(0x00283002, "1", 1), // LUT Descriptor
             Row(0x00283003, "3", 1), // LUT Explanation
@@ -3796,9 +3804,9 @@ enum DicomEnhancedImageTables {
             Row(0x00281052, "1C", 0), // Rescale Intercept
             Row(0x00281053, "1C", 0), // Rescale Slope
             Row(0x00281054, "1C", 0), // Rescale Type
-        ],
+        ]
         // VOI LUT Macro Attributes (table_C.11-2b)
-        "table_C.11-2b": [
+        tables["table_C.11-2b"] = [
             Row(0x00283010, "1C", 0, items: 1...Int.max, may: true), // VOI LUT Sequence
             Row(0x00283002, "1", 1), // LUT Descriptor
             Row(0x00283003, "3", 1), // LUT Explanation
@@ -3807,16 +3815,16 @@ enum DicomEnhancedImageTables {
             Row(0x00281051, "1C", 0), // Window Width
             Row(0x00281055, "3", 0), // Window Center & Width Explanation
             Row(0x00281056, "3", 0), // VOI LUT Function
-        ],
+        ]
         // Presentation State Relationship Macro Attributes (table_C.11.11-1b)
-        "table_C.11.11-1b": [
+        tables["table_C.11.11-1b"] = [
             Row(0x00081115, "1", 0, items: 1...Int.max), // Referenced Series Sequence
             Row(0x0020000E, "1", 1), // Series Instance UID
             Row(0x00081140, "1", 1, items: 1...Int.max), // Referenced Image Sequence
             Row(include: "table_10-3", 2),
-        ],
+        ]
         // Identified Person or Device Macro Attributes (table_C.17-3b)
-        "table_C.17-3b": [
+        tables["table_C.17-3b"] = [
             Row(0x0040A084, "1", 0), // Observer Type
             Row(0x0040A123, "1C", 0), // Person Name
             Row(0x00401101, "2C", 0, items: 0...1), // Person Identification Code Sequence
@@ -3838,9 +3846,9 @@ enum DicomEnhancedImageTables {
             Row(0x00081040, "3", 0), // Institutional Department Name
             Row(0x00081041, "3", 0, items: 1...1), // Institutional Department Type Code Sequence
             Row(include: "table_8.8-1", 1),
-        ],
+        ]
         // Points Macro Attributes (table_C.27-2)
-        "table_C.27-2": [
+        tables["table_C.27-2"] = [
             Row(0x00660015, "1", 0), // Number Of Surface Points
             Row(0x00660016, "1", 0), // Point Coordinates Data
             Row(0x00660017, "3", 0), // Point Position Accuracy
@@ -3849,16 +3857,16 @@ enum DicomEnhancedImageTables {
             Row(0x0066001A, "3", 0), // Points Bounding Box Coordinates
             Row(0x0066001B, "3", 0), // Axis of Rotation
             Row(0x0066001C, "1C", 0, may: true), // Center of Rotation
-        ],
+        ]
         // Vectors Macro Attributes (table_C.27-3)
-        "table_C.27-3": [
+        tables["table_C.27-3"] = [
             Row(0x0066001E, "1", 0), // Number of Vectors
             Row(0x0066001F, "1", 0), // Vector Dimensionality
             Row(0x00660020, "3", 0), // Vector Accuracy
             Row(0x00660021, "1", 0), // Vector Coordinate Data
-        ],
+        ]
         // Surface Mesh Primitives Macro Attributes (table_C.27-4)
-        "table_C.27-4": [
+        tables["table_C.27-4"] = [
             Row(0x00660043, "2", 0), // Long Vertex Point Index List
             Row(0x00660042, "2", 0), // Long Edge Point Index List
             Row(0x00660041, "2", 0), // Long Triangle Point Index List
@@ -3870,18 +3878,18 @@ enum DicomEnhancedImageTables {
             Row(0x00660040, "1", 1), // Long Primitive Point Index List
             Row(0x00660034, "2", 0, items: 0...Int.max), // Facet Sequence
             Row(0x00660040, "1", 1), // Long Primitive Point Index List
-        ],
+        ]
         // Radiobiological Dose Effect Description Macro Attributes (table_C.36.2.1.5-1)
-        "table_C.36.2.1.5-1": [
+        tables["table_C.36.2.1.5-1"] = [
             Row(0x30100002, "1", 0), // Radiobiological Dose Effect Flag
             Row(0x30100003, "2C", 0, items: 0...Int.max), // Effective Dose Calculation Method Category Code Sequence
             Row(include: "table_8.8-1", 1),
             Row(0x30100004, "3", 1, items: 1...Int.max), // Effective Dose Calculation Method Code Sequence
             Row(include: "table_8.8-1", 2),
             Row(0x30100005, "2C", 0), // Effective Dose Calculation Method Description
-        ],
+        ]
         // RT Beam Limiting Device Definition Macro Attributes (table_C.36.2.2.19-1)
-        "table_C.36.2.2.19-1": [
+        tables["table_C.36.2.2.19-1"] = [
             Row(0x30100039, "1", 0), // Device Index
             Row(0x300A0602, "1C", 0), // Referenced Defined Device Index
             Row(include: "table_C.36.2.2.3-1", 0),
@@ -3898,26 +3906,26 @@ enum DicomEnhancedImageTables {
             Row(0x300800A4, "1C", 1), // Parallel RT Beam Delimiter Opening Extents
             Row(0x300A0646, "1C", 0, items: 1...1), // Fixed RT Beam Delimiter Device Sequence
             Row(include: "table_10.38-1", 1),
-        ],
+        ]
         // RT Beam Limiting Device Opening Definition Macro Attributes (table_C.36.2.2.20-1)
-        "table_C.36.2.2.20-1": [
+        tables["table_C.36.2.2.20-1"] = [
             Row(0x300A0607, "1", 0), // Referenced Device Index
             Row(0x300A064B, "1C", 0), // RT Beam Limiting Device Offset
             Row(0x300A064A, "1C", 0), // Parallel RT Beam Delimiter Positions
             Row(0x300A064C, "1C", 0, items: 1...1), // RT Beam Delimiter Geometry Sequence
             Row(include: "table_10.38-1", 1),
-        ],
+        ]
         // RT Accessory Device Identification Macro Attributes (table_C.36.2.2.3-1)
-        "table_C.36.2.2.3-1": [
+        tables["table_C.36.2.2.3-1"] = [
             Row(include: "table_10.35-1", 0),
             Row(include: "table_10.36-1", 0),
             Row(0x300A0615, "2C", 0), // RT Accessory Device Slot ID
             Row(0x300A0613, "2C", 0), // RT Accessory Slot Distance
             Row(0x300A060E, "2C", 0), // Referenced RT Accessory Holder Device Index
             Row(0x300A0611, "2C", 0), // RT Accessory Holder Slot ID
-        ],
+        ]
         // RT Patient Treatment Preparation Macro Attributes (table_C.36.2.3.4-1)
-        "table_C.36.2.3.4-1": [
+        tables["table_C.36.2.3.4-1"] = [
             Row(0x300A078D, "1", 0, items: 1...1), // Patient Treatment Preparation Method Code Sequence
             Row(include: "table_8.8-1", 1),
             Row(0x300A0792, "3", 0), // Patient Treatment Preparation Method Description
@@ -3934,9 +3942,9 @@ enum DicomEnhancedImageTables {
             Row(0x300A078E, "2", 1), // Patient Treatment Preparation Procedure Parameter Description
             Row(0x300A0793, "2", 1, items: 0...Int.max), // Patient Treatment Preparation Procedure Parameter Sequence
             Row(include: "table_10.2.1-1", 2),
-        ],
+        ]
         // RT Equipment Mapping and Plan Reference Macro Attributes (table_C.36.2.4.12-1)
-        "table_C.36.2.4.12-1": [
+        tables["table_C.36.2.4.12-1"] = [
             Row(0x300A0675, "1C", 0), // Equipment Frame of Reference UID
             Row(0x300A07A1, "3", 0, items: 1...1), // Imaging Equipment to Treatment Delivery Device Relationship Sequence
             Row(0x3002010F, "1", 1), // Device Position to Equipment Mapping Matrix
@@ -3953,9 +3961,9 @@ enum DicomEnhancedImageTables {
             Row(include: "table_10-11", 1),
             Row(0x300C0004, "3", 1, items: 1...Int.max), // Referenced Beam Sequence
             Row(0x300C0006, "1", 2), // Referenced Beam Number
-        ],
+        ]
         // Parameterized RT Imaging Geometry Macro Attributes (table_C.36.2.4.3-1)
-        "table_C.36.2.4.3-1": [
+        tables["table_C.36.2.4.3-1"] = [
             Row(0x3002010D, "1", 0, items: 1...1), // Imaging Source Position Sequence
             Row(0x300A0602, "1C", 1, may: true), // Referenced Defined Device Index
             Row(0x30020110, "1", 1, items: 1...Int.max), // Device Position Parameter Sequence
@@ -3964,18 +3972,18 @@ enum DicomEnhancedImageTables {
             Row(0x300A0602, "1C", 1, may: true), // Referenced Defined Device Index
             Row(0x30020110, "1", 1, items: 1...Int.max), // Device Position Parameter Sequence
             Row(include: "table_10-2", 2),
-        ],
+        ]
         // 3D RT Cone-Beam Imaging Geometry Optional Macro Attributes (table_C.36.2.4.5-2)
-        "table_C.36.2.4.5-2": [
+        tables["table_C.36.2.4.5-2"] = [
             Row(0x3002012E, "3", 0), // Scan Arc Type
             Row(0x3002012B, "3", 0, items: 1...1), // Scan Start Position Sequence
             Row(include: "table_C.36.2.4.3-1", 1),
             Row(0x3002012C, "3", 0, items: 1...1), // Scan Stop Position Sequence
             Row(include: "table_C.36.2.4.3-1", 1),
             Row(0x3002012F, "3", 0), // Detector Positioning Type
-        ],
+        ]
         // RT Dose Calculation Model Macro Attributes (table_C.36.2.5.1-1)
-        "table_C.36.2.5.1-1": [
+        tables["table_C.36.2.5.1-1"] = [
             Row(0x30040081, "3", 0, items: 1...1), // Dose Calculation Algorithm Sequence
             Row(include: "table_10-19", 1),
             Row(0x30040082, "3", 0), // Commissioning Status
@@ -3983,14 +3991,14 @@ enum DicomEnhancedImageTables {
             Row(include: "table_10-2", 1),
             Row(0x30040083, "3", 0, items: 1...Int.max), // Dose Calculation Model Parameter Sequence
             Row(include: "table_10.2.1-1", 1),
-        ],
+        ]
         // Image Pixel Macro Attributes (table_C.7-11b)
-        "table_C.7-11b": [
+        tables["table_C.7-11b"] = [
             Row(include: "table_C.7-11c", 0),
             Row(0x7FE00010, "1", 0), // Pixel Data
-        ],
+        ]
         // Image Pixel Description Macro Attributes (table_C.7-11c)
-        "table_C.7-11c": [
+        tables["table_C.7-11c"] = [
             Row(0x00280002, "1", 0), // Samples per Pixel
             Row(0x00280004, "1", 0), // Photometric Interpretation
             Row(0x00280010, "1", 0), // Rows
@@ -4011,9 +4019,9 @@ enum DicomEnhancedImageTables {
             Row(0x00281203, "1C", 0), // Blue Palette Color Lookup Table Data
             Row(0x00282000, "3", 0), // ICC Profile
             Row(0x00282002, "3", 0), // Color Space
-        ],
+        ]
         // Display Shutter Macro Attributes (table_C.7-17a)
-        "table_C.7-17a": [
+        tables["table_C.7-17a"] = [
             Row(0x00181600, "1", 0), // Shutter Shape
             Row(0x00181602, "1C", 0), // Shutter Left Vertical Edge
             Row(0x00181604, "1C", 0), // Shutter Right Vertical Edge
@@ -4024,9 +4032,9 @@ enum DicomEnhancedImageTables {
             Row(0x00181620, "1C", 0), // Vertices of the Polygonal Shutter
             Row(0x00181622, "3", 0), // Shutter Presentation Value
             Row(0x00181624, "3", 0), // Shutter Presentation Color CIELab Value
-        ],
+        ]
         // Palette Color Lookup Table Macro Attributes (table_C.7-22a)
-        "table_C.7-22a": [
+        tables["table_C.7-22a"] = [
             Row(0x00281101, "1", 0), // Red Palette Color Lookup Table Descriptor
             Row(0x00281102, "1", 0), // Green Palette Color Lookup Table Descriptor
             Row(0x00281103, "1", 0), // Blue Palette Color Lookup Table Descriptor
@@ -4037,24 +4045,24 @@ enum DicomEnhancedImageTables {
             Row(0x00281221, "1C", 0), // Segmented Red Palette Color Lookup Table Data
             Row(0x00281222, "1C", 0), // Segmented Green Palette Color Lookup Table Data
             Row(0x00281223, "1C", 0), // Segmented Blue Palette Color Lookup Table Data
-        ],
+        ]
         // Common CT/MR and Photoacoustic Image Description Macro Attributes (table_C.8-131)
-        "table_C.8-131": [
+        tables["table_C.8-131"] = [
             Row(0x00089205, "1", 0), // Pixel Presentation
             Row(0x00089206, "1", 0), // Volumetric Properties
             Row(0x00089207, "1", 0), // Volume Based Calculation Technique
-        ],
+        ]
         // X-Ray Filtration Macro Attributes (table_C.8-35a)
-        "table_C.8-35a": [
+        tables["table_C.8-35a"] = [
             Row(0x00181160, "3", 0), // Filter Type
             Row(0x00187050, "3", 0), // Filter Material
             Row(0x00187052, "3", 0), // Filter Thickness Minimum
             Row(0x00187054, "3", 0), // Filter Thickness Maximum
             Row(0x00187056, "3", 0), // Filter Beam Path Length Minimum
             Row(0x00187058, "3", 0), // Filter Beam Path Length Maximum
-        ],
+        ]
         // X-Ray Grid Description Macro Attributes (table_C.8-36b)
-        "table_C.8-36b": [
+        tables["table_C.8-36b"] = [
             Row(0x00187040, "3", 0), // Grid Absorbing Material
             Row(0x00187041, "3", 0), // Grid Spacing Material
             Row(0x00187042, "3", 0), // Grid Thickness
@@ -4063,9 +4071,9 @@ enum DicomEnhancedImageTables {
             Row(0x00187048, "3", 0), // Grid Period
             Row(0x0018704C, "3", 0), // Grid Focal Distance
             Row(0x00181006, "3", 0), // Grid ID
-        ],
+        ]
         // Digital X-Ray Detector Macro Attributes (table_C.8-71b)
-        "table_C.8-71b": [
+        tables["table_C.8-71b"] = [
             Row(0x00187004, "2", 0), // Detector Type
             Row(0x00187005, "3", 0), // Detector Configuration
             Row(0x00187006, "3", 0), // Detector Description
@@ -4089,9 +4097,9 @@ enum DicomEnhancedImageTables {
             Row(0x00187026, "3", 0), // Detector Active Dimension(s)
             Row(0x00187028, "3", 0), // Detector Active Origin
             Row(include: "table_10-23", 0),
-        ],
+        ]
         // MR Image and Spectroscopy Instance Macro Attributes (table_C.8-83)
-        "table_C.8-83": [
+        tables["table_C.8-83"] = [
             Row(0x00200012, "3", 0), // Acquisition Number
             Row(0x0008002A, "1C", 0, may: true), // Acquisition DateTime
             Row(0x00189073, "1C", 0, may: true), // Acquisition Duration
@@ -4105,15 +4113,15 @@ enum DicomEnhancedImageTables {
             Row(0x00204000, "3", 0), // Image Comments
             Row(0x300A012C, "3", 0), // Isocenter Position
             Row(0x00181320, "3", 0), // B1rms
-        ],
+        ]
         // MR Image Description Macro Attributes (table_C.8-84)
-        "table_C.8-84": [
+        tables["table_C.8-84"] = [
             Row(0x00089208, "1C", 0, may: true), // Complex Image Component
             Row(0x00089209, "1C", 0, may: true), // Acquisition Contrast
             Row(0x00189622, "3", 0), // Functional Settling Phase Frames Present
-        ],
+        ]
         // Multi-energy CT X-Ray Source Macro Attributes (table_C.8.2.2-2)
-        "table_C.8.2.2-2": [
+        tables["table_C.8.2.2-2"] = [
             Row(0x00189365, "1", 0, items: 1...Int.max), // Multi-energy CT X-Ray Source Sequence
             Row(0x00189366, "1", 1), // X-Ray Source Index
             Row(0x00189367, "1", 1), // X-Ray Source ID
@@ -4124,9 +4132,9 @@ enum DicomEnhancedImageTables {
             Row(0x0018936C, "3", 1), // Switching Phase Nominal Duration
             Row(0x0018936D, "3", 1), // Switching Phase Transition Duration
             Row(0x00181170, "3", 1), // Generator Power
-        ],
+        ]
         // Multi-energy CT X-Ray Detector Macro Attributes (table_C.8.2.2-3)
-        "table_C.8.2.2-3": [
+        tables["table_C.8.2.2-3"] = [
             Row(0x0018936F, "1", 0, items: 1...Int.max), // Multi-energy CT X-Ray Detector Sequence
             Row(0x00189370, "1", 1), // X-Ray Detector Index
             Row(0x00189371, "1", 1), // X-Ray Detector ID
@@ -4135,16 +4143,16 @@ enum DicomEnhancedImageTables {
             Row(0x00189374, "1C", 1, may: true), // Nominal Max Energy
             Row(0x00189375, "1C", 1, may: true), // Nominal Min Energy
             Row(0x0018936E, "3", 1), // Effective Bin Energy
-        ],
+        ]
         // Multi-energy CT Path Macro Attributes (table_C.8.2.2-4)
-        "table_C.8.2.2-4": [
+        tables["table_C.8.2.2-4"] = [
             Row(0x00189379, "1", 0), // Multi-energy CT Path Sequence
             Row(0x0018937A, "1", 1), // Multi-energy CT Path Index
             Row(0x00189377, "1", 1), // Referenced X-Ray Source Index
             Row(0x00189376, "1", 1), // Referenced X-Ray Detector Index
-        ],
+        ]
         // Segment Description Macro Attributes (table_C.8.20-4)
-        "table_C.8.20-4": [
+        tables["table_C.8.20-4"] = [
             Row(0x00620004, "1", 0), // Segment Number
             Row(0x00620005, "1", 0), // Segment Label
             Row(0x00620006, "3", 0), // Segment Description
@@ -4162,6 +4170,7 @@ enum DicomEnhancedImageTables {
             Row(include: "table_10-11", 1),
             Row(0x30060084, "1C", 1), // Referenced ROI Number
             Row(include: "table_10.9.3-1", 0),
-        ],
-    ]
+        ]
+        return tables
+    }
 }

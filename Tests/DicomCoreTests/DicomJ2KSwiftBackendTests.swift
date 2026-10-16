@@ -96,12 +96,24 @@ final class DicomJ2KSwiftBackendTests: XCTestCase {
         let request = Self.request(codestream: codestream, width: 8, height: 8,
                                    bitsStored: 8, samplesPerPixel: 1, pixelRepresentation: 0)
         let recorder = DicomJ2KSwiftTelemetryRecorder()
+        let fallbacks = DicomJ2KFallbackLedger()
         _ = try await DicomJ2KSwiftFrameDecoder.decode(
             request, environment: ["DICOM_J2KSWIFT_MODE": "preferred"],
-            candidate: FailingCandidate(error: J2KError.corruptedEntropyData("a code-block left 9 of 40 declared bytes unread"))
+            candidate: FailingCandidate(error: J2KError.corruptedEntropyData("a code-block left 9 of 40 declared bytes unread")),
+            fallbacks: fallbacks
         ) { recorder.record($0) }
         guard case .fellBack(let reason) = recorder.values.last?.outcome else { return XCTFail("Missing fallback telemetry") }
         XCTAssertTrue(reason.contains("Corrupted entropy data"), reason)
+        // The fallback is recorded where own-path harnesses can assert it never happened (#3077).
+        XCTAssertEqual(fallbacks.count, 1)
+        XCTAssertEqual(fallbacks.lastReason, reason)
+        _ = try await DicomJ2KSwiftFrameDecoder.decode(
+            request, environment: ["DICOM_J2KSWIFT_MODE": "preferred"], fallbacks: fallbacks
+        ) { recorder.record($0) }
+        XCTAssertEqual(fallbacks.count, 1, "a frame the own decoder produced is not a fallback")
+        fallbacks.reset()
+        XCTAssertEqual(fallbacks.count, 0)
+        XCTAssertNil(fallbacks.lastReason)
     }
 
     func test_preferredCandidateFailure_respectsStrictPreferenceCancellationAndCorruption() async throws {

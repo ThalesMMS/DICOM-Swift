@@ -13,6 +13,7 @@ enum DicomJ2KSwiftFrameDecoder {
         _ request: DicomFrameDecodeRequest,
         environment: [String: String] = ProcessInfo.processInfo.environment,
         candidate: any DicomFrameCodecBackend = DicomJ2KSwiftBackend(),
+        fallbacks: DicomJ2KFallbackLedger = .shared,
         report: @escaping TelemetryReporter = { _ in }
     ) async throws -> DicomCodecDecodedFrame? {
         try Task.checkCancellation()
@@ -97,6 +98,7 @@ enum DicomJ2KSwiftFrameDecoder {
                 ), environment: environment)
                 guard fallbackDecision.canExecute else { throw error }
                 let fallback = try await timedDecode(established, request: request, mode: mode, report: report)
+                fallbacks.record(backend: established.capabilities.identifier, reason: error.localizedDescription)
                 report(DicomJ2KSwiftDecodeTelemetry(
                     mode: mode, backend: established.capabilities.identifier, durationNanoseconds: 0,
                     width: fallback.width, height: fallback.height, outcome: .fellBack(error.localizedDescription)
@@ -104,6 +106,9 @@ enum DicomJ2KSwiftFrameDecoder {
                 return fallback
             }
             if let reason = decision.fallbackReason {
+                if backend.capabilities.identifier == established.capabilities.identifier {
+                    fallbacks.record(backend: established.capabilities.identifier, reason: reason)
+                }
                 report(DicomJ2KSwiftDecodeTelemetry(
                     mode: mode, backend: backend.capabilities.identifier, durationNanoseconds: 0,
                     width: frame.width, height: frame.height, outcome: .fellBack(reason)

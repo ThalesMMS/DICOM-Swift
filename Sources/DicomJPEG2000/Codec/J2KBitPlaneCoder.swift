@@ -1705,6 +1705,8 @@ final class DecoderScratchBuffers {
     var magnitudes: [UInt32]
     var states: [CoefficientState]
     var halfBits: [UInt32]
+    /// Flag and magnitude words of the C block decoder (#3078), grown on demand.
+    var nativeWords: [UInt32] = []
 
     init(capacity: Int = 4096) {
         self.capacity = capacity
@@ -1754,7 +1756,7 @@ struct BitPlaneDecoder: Sendable {
     private let neighborCalculator: NeighborCalculator
 
     /// Coding options for this decoder.
-    private let options: CodingOptions
+    let options: CodingOptions
 
     /// Creates a new bit-plane decoder for the specified dimensions and subband.
     ///
@@ -1806,6 +1808,35 @@ struct BitPlaneDecoder: Sendable {
             return [Int32](repeating: 0, count: count)
         }
 
+        #if !EBCOT_DEBUG_TRACE
+        // The C block decoder (#3078) covers every pipeline decode; the legacy run-length coding stays in Swift.
+        if options.useISOPositionEncoding {
+            return try decodeNative(
+                data: data, passCount: passCount, bitDepth: bitDepth, zeroBitPlanes: zeroBitPlanes,
+                passSegmentLengths: passSegmentLengths, irreversible: irreversible, scratch: scratch)
+        }
+        #endif
+        return try decodeInSwift(
+            data: data, passCount: passCount, bitDepth: bitDepth, zeroBitPlanes: zeroBitPlanes,
+            passSegmentLengths: passSegmentLengths, irreversible: irreversible, scratch: scratch)
+    }
+
+    /// The Swift implementation of `decode`: the legacy run-length coding, the debug trace, and the reference the
+    /// C block decoder is compared with.
+    func decodeInSwift(
+        data: Data,
+        passCount: Int,
+        bitDepth: Int,
+        zeroBitPlanes: Int,
+        passSegmentLengths: [Int] = [],
+        irreversible: Bool = false,
+        scratch: DecoderScratchBuffers? = nil
+    ) throws -> [Int32] {
+        let count = width * height
+        guard passCount > 0 else {
+            return [Int32](repeating: 0, count: count)
+        }
+
         // Use scratch buffers when provided.
         // "Steal" the arrays out of scratch so local vars have exclusive ownership
         // (refcount=1) — this prevents COW copies on every write into the arrays.
@@ -1847,24 +1878,8 @@ struct BitPlaneDecoder: Sendable {
         let dataPtr = rawBuf.baseAddress!.assumingMemoryBound(to: UInt8.self)
         let dataCount = rawBuf.count
 
-        // Pre-compute per-pass segment slices (offset + count into the
-        // borrowed buffer). Replaces the old [Data] approach which
-        // created a Data copy per segment.
-        var passSlices: [(offset: Int, count: Int)] = []
-        if usePerPassSegments {
-            passSlices.reserveCapacity(passSegmentLengths.count)
-            let totalSegmentLength = passSegmentLengths.reduce(0, +)
-            guard totalSegmentLength <= dataCount else {
-                throw J2KError.invalidParameter(
-                    "Pass segment lengths total (\(totalSegmentLength)) exceeds data size (\(dataCount))"
-                )
-            }
-            var offset = 0
-            for length in passSegmentLengths {
-                passSlices.append((offset: offset, count: length))
-                offset += length
-            }
-        }
+        let (passSlices, segmentOfPass) = try segmentPlan(
+            passCount: passCount, passSegmentLengths: passSegmentLengths, dataCount: dataCount)
 
         // Initialise MQ decoder and contexts
         var decoder = MQDecoder(unsafePtr: dataPtr, offset: 0, count: usePerPassSegments ? 0 : dataCount)
@@ -1873,56 +1888,45 @@ struct BitPlaneDecoder: Sendable {
         // RESET (style bit 1) and the encoder's `.predictable` mode reset the contexts at every pass boundary.
         let resetContextsEachPass = options.resetContextOnEachPass || options.resetOnEachPass
 
-        // The codeword segment each pass belongs to (Annex D): one per pass under RESTART or `.predictable`, and
-        // 10, 2, 1, 2, 1, ... passes under selective bypass. Contexts survive a segment boundary unless RESET asks.
-        var segmentOfPass: [Int] = []
-        if usePerPassSegments {
-            var counts = DecoderPipeline.segmentPassCounts(
-                numPasses: passCount,
-                terminateOnEachPass: options.terminateOnEachPass || options.terminationMode == .predictable,
-                bypass: options.bypassEnabled)
-            if counts.count != passSlices.count {
-                // A direct code-block caller that terminates every pass hands over one segment per pass; with the
-                // lengths in hand there is no packet header whose shape they must follow.
-                counts = [Int](repeating: 1, count: min(passCount, passSlices.count))
-            }
-            for (segment, passes) in counts.enumerated() {
-                segmentOfPass.append(contentsOf: repeatElement(segment, count: passes))
-            }
-        }
         var currentSegment = -1
         // Integrity accounting (#2899): which decoder holds the open segment, and the totals of closed ones.
         var liveDecoder: EntropySegmentKind = usePerPassSegments ? .none : .arithmetic
         var integrity = EntropyIntegrity()
+        // Over-read of the open segment when the last pass of a block cut by rate control began (#3095): only reads
+        // before it count.
+        var lastPassOverRead: Int?
         func closeSegment() {
             switch liveDecoder {
-            case .arithmetic: integrity.absorb(decoder)
+            case .arithmetic: integrity.absorb(decoder, overRead: lastPassOverRead ?? decoder.overReadCount)
             case .raw: integrity.absorb(rawDecoder)
             case .none: break
             }
         }
 
         let activeBitPlanes = bitDepth - zeroBitPlanes
+        let cutShort = passCount < 3 * activeBitPlanes - 2
         var passesDecoded = 0
 
         /// Prepares the next pass: resets contexts under RESET and opens the pass's codeword segment, raw or
         /// arithmetic. Returns false when the block has no segment left for it.
         func beginPass(raw: Bool) -> Bool {
             if resetContextsEachPass && passesDecoded > 0 { contextStates.reset() }
-            guard usePerPassSegments else { return true }
-            guard passesDecoded < segmentOfPass.count else { return false }
-            let segment = segmentOfPass[passesDecoded]
-            if segment != currentSegment {
-                closeSegment()
-                let slice = passSlices[segment]
-                if raw {
-                    rawDecoder = RawBypassDecoder(unsafePtr: dataPtr, offset: slice.offset, count: slice.count)
-                } else {
-                    decoder = MQDecoder(unsafePtr: dataPtr, offset: slice.offset, count: slice.count)
+            if usePerPassSegments {
+                guard passesDecoded < segmentOfPass.count else { return false }
+                let segment = segmentOfPass[passesDecoded]
+                if segment != currentSegment {
+                    closeSegment()
+                    let slice = passSlices[segment]
+                    if raw {
+                        rawDecoder = RawBypassDecoder(unsafePtr: dataPtr, offset: slice.offset, count: slice.count)
+                    } else {
+                        decoder = MQDecoder(unsafePtr: dataPtr, offset: slice.offset, count: slice.count)
+                    }
+                    liveDecoder = raw ? .raw : .arithmetic
+                    currentSegment = segment
                 }
-                liveDecoder = raw ? .raw : .arithmetic
-                currentSegment = segment
             }
+            if cutShort && passesDecoded == passCount - 1 { lastPassOverRead = decoder.overReadCount }
             return true
         }
 
@@ -2195,13 +2199,31 @@ struct BitPlaneDecoder: Sendable {
                     let statePtr = stateBuf.baseAddress!
                     let halfPtr = halfBuf.baseAddress!
 
+                    let rawStates = UnsafeRawPointer(statePtr)
                     contexts.withUnsafeMutableContextArray { ctxPtr in
                         for stripeY in stride(from: 0, to: h, by: stripeHeight) {
                             let stripeEnd = min(stripeY + stripeHeight, h)
                             causal.hideRow(stripeEnd, width: w, height: h, states: statePtr)
                             defer { causal.restore(width: w, states: statePtr) }
+                            let windowTop = max(stripeY &- 1, 0)
+                            let windowBottom = min(stripeEnd, h &- 1)
 
                             for x in 0..<w {
+                                // A stripe column whose 3-wide window (the rows above and below included)
+                                // holds no significant coefficient has nothing to code in this pass: every
+                                // coefficient in it is insignificant with no significant neighbour, which
+                                // sppSigContextOrSkip skips. One word per row decides it (#3051). Columns
+                                // 1...w-3 keep the 4-byte loads inside the block.
+                                if x > 0 && x < w &- 2 {
+                                    var window: UInt32 = 0
+                                    var row = windowTop
+                                    while row <= windowBottom {
+                                        window |= rawStates.loadUnaligned(fromByteOffset: row &* w &+ x &- 1,
+                                                                          as: UInt32.self)
+                                        row &+= 1
+                                    }
+                                    if window & 0x0001_0101 == 0 { continue }
+                                }
                                 for y in stripeY..<stripeEnd {
                                         let idx = y &* w &+ x
 
@@ -2857,11 +2879,19 @@ enum EntropySegmentKind {
 
 /// Declared and consumed bytes of one EBCOT code-block (#2899). The MQ decoder cannot fail: once desynchronised it
 /// decodes plausible garbage, and stops short of the bytes its packet header declared or reads far past them.
-/// Thresholds follow the J2KSwift calibration (commit 11ab594: 0 bytes under-read and at most 8 over-read over
-/// verified-correct Kakadu, OpenJPEG, OpenJPH and Grok streams). HT code-blocks are not covered.
+/// The under-read threshold follows the J2KSwift calibration (commit 11ab594: 0 bytes under-read over
+/// verified-correct Kakadu, OpenJPEG, OpenJPH and Grok streams). The over-read one is wider (#3077): an encoder may
+/// drop the trailing run of 0xFF 0x7F pairs of a segment, the all-ones tail that Annex C feeds back past the end, so a
+/// valid block can read that whole run past its declared bytes. MELANIX (1203 reversible slices) reads up to 21 bytes,
+/// and blocks whose last passes code only zeros strip 20 or more; the bits an all-MPS tail can carry are bounded by the
+/// adaptive contexts' climb to their most skewed state, a few tens of bytes. A block that declares fewer passes than its
+/// bit-planes hold was cut by rate control, and its encoder may also cut the last pass short; Annex C decodes the rest
+/// of that pass from the 0xFF fill, as OpenJPEG does (#3095). For such a block, the reads during its last pass do not
+/// count. A Gruselambix XA frame (lossy 5/3, ratio 4) has a block with 10 of 13 passes whose last cleanup pass has 20
+/// declared bytes and reads 222. HT code-blocks are not covered.
 struct EntropyIntegrity {
     static let maximumUnderRead = 4
-    static let maximumOverRead = 16
+    static let maximumOverRead = 64
 
     private(set) var declaredBytes = 0
     private(set) var consumedBytes = 0
@@ -2869,15 +2899,24 @@ struct EntropyIntegrity {
     /// over the one-pass segments of RESTART would grow with the pass count.
     private(set) var overReadCount = 0
 
-    mutating func absorb(_ decoder: MQDecoder) {
+    /// `overRead`: the segment's reads past its end that count (all of them, or those before the last pass of a block
+    /// cut by rate control).
+    mutating func absorb(_ decoder: MQDecoder, overRead: Int) {
         declaredBytes += decoder.segmentBytes
         consumedBytes += min(decoder.consumedBytes, decoder.segmentBytes)
-        overReadCount = max(overReadCount, decoder.overReadCount)
+        overReadCount = max(overReadCount, overRead)
     }
 
     mutating func absorb(_ decoder: RawBypassDecoder) {
         declaredBytes += decoder.segmentBytes
         consumedBytes += min(decoder.consumedBytes, decoder.segmentBytes)
+    }
+
+    /// Totals of a block decoded by the C decoder, which closes its segments the same way.
+    mutating func absorb(declared: Int, consumed: Int, overRead: Int) {
+        declaredBytes += declared
+        consumedBytes += consumed
+        overReadCount = max(overReadCount, overRead)
     }
 
     var anomaly: String? {

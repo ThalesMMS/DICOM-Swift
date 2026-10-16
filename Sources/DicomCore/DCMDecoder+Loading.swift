@@ -72,6 +72,17 @@ extension DCMDecoder {
         try loadDicomFile(at: path)
     }
 
+    /// Loads the file like `init(contentsOfFile:)` but memory-maps it whatever its size, so its bytes are clean
+    /// file-backed pages rather than a heap copy. The series loader parses every slice before it decodes any; a heap
+    /// copy of each file kept a second volume in the process footprint through the build (#3092).
+    convenience init(mappingContentsOfFile path: String) throws {
+        self.init()
+        guard FileManager.default.fileExists(atPath: path) else {
+            throw DICOMError.fileNotFound(path: path)
+        }
+        try loadDicomFile(at: path, alwaysMapped: true)
+    }
+
     /// Convenience initializer that loads DICOM Part 10 bytes directly from
     /// memory. The buffer is parsed immediately and retained by the decoder,
     /// so callers do not need to serialize sensitive inputs to a temporary
@@ -171,9 +182,9 @@ extension DCMDecoder {
     }
 
     /// Loads a DICOM file into the decoder, preserving original I/O errors for throwing APIs.
-    func loadDicomFile(at filename: String) throws {
+    func loadDicomFile(at filename: String, alwaysMapped: Bool = false) throws {
         try synchronized {
-            try loadDicomFileUnsafe(at: filename)
+            try loadDicomFileUnsafe(at: filename, alwaysMapped: alwaysMapped)
         }
     }
 
@@ -184,7 +195,7 @@ extension DCMDecoder {
         }
     }
 
-    private func loadDicomFileUnsafe(at filename: String) throws {
+    private func loadDicomFileUnsafe(at filename: String, alwaysMapped: Bool) throws {
         guard !filename.isEmpty else {
             return
         }
@@ -209,7 +220,7 @@ extension DCMDecoder {
             let startTime = CFAbsoluteTimeGetCurrent()
 
             let loadedData: Data
-            if fileSize > 10_000_000 { // >10MB - use memory mapping
+            if fileSize > 10_000_000 || alwaysMapped { // >10MB - use memory mapping
                 // Memory-mapped access for large files; dicomData owns the mapping lifetime.
                 loadedData = try Data(contentsOf: fileURL, options: .mappedIfSafe)
                 let elapsed = (CFAbsoluteTimeGetCurrent() - startTime) * 1000

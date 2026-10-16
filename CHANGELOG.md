@@ -9,6 +9,101 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.0.0] - 2026-10-16
+
+Major release of the reviewed canonical sources since 2.0.4. Swift tools 6.2, Swift 6 language mode,
+Apple-platform 26.0 minimums and the announced products are unchanged; the major version is for the public
+enumerations that gained cases and for series and palette inputs that used to throw and now load. The
+`DicomWebClient` and `DicomWebOIDC` sources are unchanged; the executed validation and the known limits are in
+RELEASE_NOTES.md.
+
+### Breaking
+
+- `DicomSeriesLoader` builds a single-frame series whose slice positions are unevenly spaced (a missing slice, two
+  stacks in one series) at the median interval, as GDCM and Horos build one, instead of throwing
+  `variableSliceSpacing` (IsiX issue #3116). The volume reports it in the new
+  `DicomSeriesVolumeGeometryProvenance.SliceSpacingSource.irregularImagePositionPatient`; its out-of-plane geometry
+  is approximate. Exhaustive switches over `SliceSpacingSource` need the new case.
+- `DicomSeriesLoader` builds a series whose Bits Stored and High Bit vary between slices instead of throwing
+  `unsupportedPixelFormat` (IsiX issue #3113). Bits Allocated, Pixel Representation, samples, photometric
+  interpretation and planar configuration must still match.
+- `DCMDecoder.displayRGB8(decodedFrame:)` displays signed PALETTE COLOR indices (Pixel Representation 1) like
+  unsigned ones instead of refusing them, a negative index taking the first entry, as Horos does (IsiX issue #3117).
+- `DicomIngestJournalEntry.Disposition` gains `lost`: replay closes once an ingest whose temporary and final files
+  are both gone instead of retrying it at every launch (IsiX issue #3070). Exhaustive switches need the new case.
+
+### Added
+
+- `DicomSourceFrameSession.storedSampleFrame(at:)` returns a `DicomStoredSampleFrame` for native monochrome 8- and
+  16-bit frames (`DicomSourceFrameIndex.readsStoredSamplesDirectly`), read at their offset in the stored-sample
+  convention without a Part 10 copy or a second parse, byte-identical to `frame(at:)` followed by
+  `storedSampleData()`. Frame metadata of a series whose headers differ only in per-instance identity, time and
+  position is parsed once (IsiX issue #3111).
+- `DicomByteSource.fileIdentity` (`DicomFileIdentity`) exposes the status a local file had when it was opened, which
+  every validating read of the source checks (IsiX issue #3111).
+- `DicomIngestJournalEntry.expectedChecksum` records the SHA-256 of validated batch bytes. A read-back mismatch closes
+  the item as discarded, and replay never publishes staged bytes that do not hash to it (IsiX issue #3080).
+- The public `DicomJ2KFallbackLedger` also counts the JPEG-LS frames that CharLS decodes because the own decoder
+  declined them in `preferred` mode (IsiX issue #3086).
+
+### Changed
+
+- `DicomSourceMetadata.readPart10` parses memory and buffered-file headers out of 16 KiB blocks instead of awaiting
+  one read per element; the read ranges, budget and parsed result are unchanged (IsiX issue #3111).
+- The JPEG 2000 EBCOT code-block decoder runs in plain C in `DicomJPEG2000NEON`, output bit-exact (IsiX issue #3078).
+- Faster JPEG lossless decode and series build (IsiX issue #3079). `DicomSeriesLoader` maps slice files and releases
+  each slice's decoder once its samples are copied, lowering the peak memory of a full build (IsiX issue #3092), and
+  parses the series in parallel (IsiX issue #3041).
+- `DicomDecodedFrameReader` no longer probes every optional codec runtime on each frame, and the standard dictionary
+  indexes load lazily (IsiX issues #3082 and #3041).
+- Ingest replay pins only the studies of open ingests against eviction, and a catalog intent without a receipt closes
+  as rejected once (IsiX issues #3080 and #3070).
+- Faster JPEG 2000 decode and per-file open, output bit-exact (IsiX issue #3051): the code-block decoders take the
+  next block from a shared cursor instead of fixed buckets; the significance-propagation pass skips stripe columns
+  with nothing to code; the inverse 5/3 transform lifts columns row by row without transposes and rows from their
+  halves; `DicomDecodedFrame.storedSampleData()` converts 16-bit samples without per-sample branches; the Part 10
+  metadata scan reads one block per refill on buffered local files with one revision check at the end of the scan
+  (requested ranges and received bytes unchanged), and the single-frame Part 10 bridge encodes its metadata once.
+- The standard VR/VM definitions are read from a compiled table instead of decoding `DCMDictionary-Definitions.json`
+  on the first parse of a process (IsiX issue #3041). `Scripts/Dictionary/generate_dictionary.py` emits the table
+  from the same data as the JSON, which stays the reviewed source and the bundled resource; `--check` covers both,
+  and `DicomStandardDictionaryTableTests` checks that they are equal. Lookups are unchanged.
+
+### Fixed
+
+- The generated tables of `DicomData` compile in about 0.5 GB per frontend instead of exhausting memory (more than
+  12 GB for the dictionary table and more than 30 GB for the enhanced IOD tables per frontend on every platform; IsiX
+  issue #3094). `DicomStandardDictionaryTable` is one string literal decoded once per process, and
+  `DicomEnhancedImageTables` builds each IOD and table in its own statement instead of one dictionary literal.
+- The JPEG 2000 decoder no longer refuses a tile-part header that only restates the main header (IsiX issue #3076).
+  The GDCM/OpenJPEG 2.0 encoder writes a COC and a QCC for every component in each tile-part; a tile-part COD, COC,
+  QCD or QCC whose parameters equal the main header's COD/QCD is now skipped. Real per-tile overrides, and any
+  tile-part override when the main header carries its own COC/QCC, are still refused typed.
+- The JPEG 2000 entropy-integrity check no longer refuses a valid code-block whose encoder dropped the trailing
+  0xFF 0x7F run of its segment (IsiX issue #3077). The MQ decoder reads that all-ones tail past the declared bytes, so
+  the over-read limit is now 64 bytes instead of 16. A MELANIX CT slice read 21 bytes past and was refused. In
+  `preferred` mode, a JPEG 2000 frame that OpenJPEG decodes in place of the own decoder now logs a warning and is
+  counted by the new public `DicomJ2KFallbackLedger`.
+- The JPEG 2000 entropy-integrity check no longer refuses a code-block cut by rate control whose last pass was also
+  cut short (IsiX issue #3095). Such a block declares fewer passes than its bit-planes hold, and Annex C decodes the
+  rest of its last pass from the 0xFF fill, as OpenJPEG does. For such a block, the reads past the end during its last
+  pass no longer count toward the over-read limit; a block with every pass declared is checked as before. A
+  Gruselambix XA frame (lossy 5/3, ratio 4) read 202 bytes past a 134-byte block and was refused.
+- Seven structures that GDCM reads are no longer refused; conformant objects take the same path and lossless output
+  stays bit-exact (IsiX issue #3053). The encapsulated parser keeps an odd fragment length as declared and ignores a
+  Basic Offset Table that addresses no item start only when the JPEG markers or J2K codestream ends delimit every
+  frame, with a warning diagnostic. Compatibility reads walk group 0002 to its end when the File Meta Group Length
+  ends inside an element or overruns the group; strict and recover modes still refuse it. Encapsulated Pixel Data
+  under a defined length is read as items when its value starts with an item tag. JPEG Lossless ignores Se in a
+  lossless scan and retries a failing 16-bit stream with the libjpeg reading of SSSS 16. Compressed Bits Allocated 12
+  decodes into 16-bit words.
+- `DCMDecoder` reads Rescale Slope 0 as 1, as GDCM does, and logs that the data was corrected; `info(for:)` keeps
+  the stored value (IsiX issue #3053).
+- The single-frame codec input keeps ASCII text, such as Rescale Type, when the declared Specific Character Set is
+  not a defined term; text outside ASCII is still left out (IsiX issue #3097).
+
+---
+
 ## [2.0.2] - 2026-10-04
 
 Patch release of DICOMweb client and server fixes; the executed validation and

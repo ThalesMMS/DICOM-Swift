@@ -44,7 +44,10 @@ public final class DCMDictionary: DicomDictionaryProtocol, @unchecked Sendable {
 
     private static let sharedStorage: Storage = loadStorage()
 
-    private let storage: Storage
+    /// `nil` stands for the shared bundled names. Tag lookups read the equal compiled definitions of
+    /// `DicomStandardDictionary`; only a hex-key lookup loads the plists (#3041).
+    private let ownStorage: Storage?
+    private var storage: Storage { ownStorage ?? Self.sharedStorage }
     private let localDefinitions: [Int: DicomDictionaryDefinition]
 
     private static func loadStorage() -> Storage {
@@ -128,12 +131,12 @@ public final class DCMDictionary: DicomDictionaryProtocol, @unchecked Sendable {
     /// Public initializer for dependency injection.
     /// Creates a new instance sharing the dictionary resources loaded from the bundle.
     public init() {
-        storage = Self.sharedStorage
+        ownStorage = nil
         localDefinitions = [:]
     }
 
     package init(entries: [String: String]) {
-        storage = Storage(valuesByKey: entries, valuesByTag: Self.integerKeyedDictionary(from: entries))
+        ownStorage = Storage(valuesByKey: entries, valuesByTag: Self.integerKeyedDictionary(from: entries))
         localDefinitions = [:]
     }
 
@@ -153,7 +156,7 @@ public final class DCMDictionary: DicomDictionaryProtocol, @unchecked Sendable {
                 throw ExtensionFailure.shadowsStandard(tag)
             }
         }
-        storage = Self.sharedStorage
+        ownStorage = nil
         localDefinitions = definitions
     }
 
@@ -192,6 +195,12 @@ public final class DCMDictionary: DicomDictionaryProtocol, @unchecked Sendable {
     /// This avoids formatting hot parse-loop tags as hex strings.
     public func value(forTag tag: Int) -> String? {
         if let definition = localDefinitions[tag] { return definition.legacyVR.code + definition.name }
+        if ownStorage == nil {
+            // Every bundled name equals the legacy VR and name of its standard definition, fixed or repeating-group
+            // (`DicomStandardDictionaryTableTests`): the parse's header info reads the compiled definitions instead of
+            // loading the name plists, about 18 ms on the first parse of a process (#3041).
+            return DicomStandardDictionary.shared.definition(for: tag).map { $0.legacyVR.code + $0.name }
+        }
         if let value = storage.valuesByTag[tag] {
             return value
         }
@@ -216,6 +225,10 @@ public final class DCMDictionary: DicomDictionaryProtocol, @unchecked Sendable {
 
     /// Returns just the VR code for a given integer tag.
     public func vrCode(forTag tag: Int) -> String? {
+        // As in `value(forTag:)`, without building the name string: the parse loop asks on every element (#3041).
+        if ownStorage == nil {
+            return (localDefinitions[tag] ?? DicomStandardDictionary.shared.definition(for: tag))?.legacyVR.code
+        }
         guard let value = value(forTag: tag),
               value.count >= 2 else { return nil }
         return String(value.prefix(2))

@@ -161,6 +161,71 @@ final class DicomIngestBatchTests: XCTestCase {
         }
     }
 
+    /// Issue #3080: staged bytes that do not hash to the validated bytes close the ingest as a
+    /// refusal, and no later replay publishes them.
+    func test_batch_stagedChecksumMismatch_closesAsRefusal_andReplayNeverPublishes() async throws {
+        let fixture = try IngestFixture()
+        defer { fixture.clean() }
+        let items = try (0..<3).map { try ingestBytes(uid: "2.25.3080\($0)", pixel: UInt8($0)) }
+        let coordinator = DicomIngestCoordinator(root: fixture.root, fileSystem: CorruptingFileSystem(corrupted: items[1]),
+            journal: fixture.journal, registrar: fixture.registrar)
+        let results = try await coordinator.ingest(part10Batch: items)
+        XCTAssertNoThrow(try results[0].get())
+        XCTAssertThrowsError(try results[1].get()) { error in
+            guard case DicomIngestError.checksumMismatch = error else { return XCTFail("\(error)") }
+        }
+        XCTAssertNoThrow(try results[2].get())
+
+        let restarted = try IngestFixture(root: fixture.root)
+        _ = try await DicomIngestRecovery.replay(journal: restarted.journal,
+            fileSystem: DicomLocalIngestFileSystem(), registrar: restarted.registrar)
+        try await assertRefused(items, refused: 1, root: fixture.root, journal: restarted.journal, registrar: restarted.registrar)
+    }
+
+    /// Issue #3080: a process stop between the read-back and the close still never publishes the
+    /// bytes, whichever side of the checksum commit it falls on.
+    func test_batch_crashAroundStagedChecksumMismatch_replayNeverPublishes() async throws {
+        let items = try (0..<3).map { try ingestBytes(uid: "2.25.3081\($0)", pixel: UInt8($0)) }
+        for after in [false, true] {
+            let fixture = try IngestFixture()
+            defer { fixture.clean() }
+            // The third commit carries the checksum results.
+            let journal = BatchFaultJournal(base: fixture.journal, nth: 3, after: after)
+            let coordinator = DicomIngestCoordinator(root: fixture.root, fileSystem: CorruptingFileSystem(corrupted: items[1]),
+                journal: journal, registrar: fixture.registrar)
+            do { _ = try await coordinator.ingest(part10Batch: items); XCTFail("Missing fault \(after)") }
+            catch is DicomIngestCrash {}
+            let restarted = try IngestFixture(root: fixture.root)
+            let report = try await DicomIngestRecovery.replay(journal: restarted.journal,
+                fileSystem: DicomLocalIngestFileSystem(), registrar: restarted.registrar)
+            XCTAssertFalse(report.items.contains { $0.outcome == .loss || $0.outcome == .failed }, "\(after)")
+            try await assertRefused(items, refused: 1, root: fixture.root, journal: restarted.journal, registrar: restarted.registrar)
+            let again = try await DicomIngestRecovery.replay(journal: restarted.journal,
+                fileSystem: DicomLocalIngestFileSystem(), registrar: restarted.registrar)
+            XCTAssertFalse(again.items.contains { $0.action != .none }, "\(after): the refusal is settled")
+        }
+    }
+
+    private func assertRefused(_ items: [Data], refused: Int, root: URL, journal: any DicomIngestJournaling,
+                               registrar: DicomJSONLIngestRegistrar, file: StaticString = #filePath, line: UInt = #line) async throws {
+        let refusedUID = try DicomStoreRequest(part10Data: items[refused]).sopInstanceUID
+        let records = try await registrar.records()
+        XCTAssertFalse(records.contains { $0.sopInstanceUID == refusedUID }, "bytes that failed verification are never published",
+                       file: file, line: line)
+        for path in try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
+            where path.pathExtension == "dcm" {
+            XCTAssertTrue(items.contains(try Data(contentsOf: path)), path.lastPathComponent, file: file, line: line)
+        }
+        let latest = try await journal.entries().last { $0.sopInstanceUID == refusedUID }
+        XCTAssertEqual(latest?.disposition, .discarded, file: file, line: line)
+        XCTAssertEqual(latest?.phase, .done, file: file, line: line)
+        XCTAssertEqual(latest?.expectedChecksum, SHA256.hash(data: items[refused]).map { String(format: "%02x", $0) }.joined(),
+                       "the refusal keeps the digest the bytes were expected to have", file: file, line: line)
+        XCTAssertNil(latest?.checksum, file: file, line: line)
+        XCTAssertFalse(try FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent(".ingest").path)
+            .contains { $0.hasSuffix(".part") }, file: file, line: line)
+    }
+
     func test_batch_journalCrash_leavesNoUnjournaledPublication() async throws {
         let items = try (0..<3).map { try ingestBytes(uid: "2.25.910\($0)", pixel: UInt8($0)) }
         for nth in 1...5 {
@@ -247,4 +312,24 @@ private struct CountingFileSystem: DicomIngestFileSystem {
     func lastByte(_ path: URL) throws -> UInt8? { try base.lastByte(path) }
     func contentsOf(_ directory: URL) throws -> [URL] { try base.contentsOf(directory) }
     func readChunks(_ path: URL, consume: (Data) throws -> Void) throws { try base.readChunks(path, consume: consume) }
+}
+
+/// Stages every item, except that the bytes of `corrupted` reach the disk with their last byte changed.
+private struct CorruptingFileSystem: DicomIngestFileSystem {
+    let base = DicomLocalIngestFileSystem()
+    let corrupted: Data
+    func createDirectory(_ path: URL) throws { try base.createDirectory(path) }
+    func write(_ data: Data, to path: URL, append: Bool) throws {
+        guard data == corrupted else { return try base.write(data, to: path, append: append) }
+        var changed = data
+        changed[changed.index(before: changed.endIndex)] ^= 0xFF
+        try base.write(changed, to: path, append: append)
+    }
+    func fsyncFile(_ path: URL) throws { try base.fsyncFile(path) }
+    func fsyncDirectory(_ path: URL) throws { try base.fsyncDirectory(path) }
+    func rename(_ source: URL, to destination: URL) throws { try base.rename(source, to: destination) }
+    func remove(_ path: URL) throws { try base.remove(path) }
+    func exists(_ path: URL) throws -> Bool { try base.exists(path) }
+    func read(_ path: URL) throws -> Data { try base.read(path) }
+    func contentsOf(_ directory: URL) throws -> [URL] { try base.contentsOf(directory) }
 }

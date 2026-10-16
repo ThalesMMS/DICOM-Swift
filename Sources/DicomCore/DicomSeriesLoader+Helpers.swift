@@ -385,14 +385,19 @@ extension DicomSeriesLoader {
             guard pixels.count == expectedPixelCount else {
                 throw DicomSeriesLoaderError.failedToDecode(url)
             }
-            if pixelFormat.pixelRepresentation == 1 {
-                for index in 0..<expectedPixelCount {
-                    let signed = Int32(pixels[index]) + Int32(Int16.min)
-                    buffer[index] = Int16(truncatingIfNeeded: signed)
-                }
-            } else {
-                for index in 0..<expectedPixelCount {
-                    buffer[index] = Int16(bitPattern: pixels[index])
+            // Through pointers (#3079): an array subscript checks uniqueness on every sample.
+            let signed = pixelFormat.pixelRepresentation == 1
+            buffer.withUnsafeMutableBufferPointer { destination in
+                pixels.withUnsafeBufferPointer { source in
+                    if signed {
+                        for index in 0..<expectedPixelCount {
+                            destination[index] = Int16(truncatingIfNeeded: Int32(source[index]) + Int32(Int16.min))
+                        }
+                    } else {
+                        for index in 0..<expectedPixelCount {
+                            destination[index] = Int16(bitPattern: source[index])
+                        }
+                    }
                 }
             }
             maskNarrow16BitSamples(in: &buffer, count: expectedPixelCount, pixelFormat: pixelFormat)
@@ -425,12 +430,18 @@ extension DicomSeriesLoader {
         count: Int,
         pixelFormat: DicomSeriesLoaderPixelFormat
     ) {
-        guard pixelFormat.bitsStored < 16 else { return }
-        for index in 0..<count {
-            buffer[index] = Int16(truncatingIfNeeded: normalizedStoredValue(
-                Int(UInt16(bitPattern: buffer[index])),
-                pixelFormat: pixelFormat
-            ))
+        // `normalizedStoredValue` with its shift, mask and sign hoisted out of the loop (#3079).
+        let bitsStored = pixelFormat.bitsStored
+        guard bitsStored > 0, bitsStored < 16 else { return }
+        let shift = max(0, pixelFormat.highBit - bitsStored + 1)
+        let mask = (1 << bitsStored) - 1
+        let signBit = pixelFormat.pixelRepresentation == 1 ? 1 << (bitsStored - 1) : 0
+        let range = 1 << bitsStored
+        buffer.withUnsafeMutableBufferPointer { samples in
+            for index in 0..<count {
+                let storedBits = (Int(UInt16(bitPattern: samples[index])) >> shift) & mask
+                samples[index] = Int16(truncatingIfNeeded: storedBits & signBit != 0 ? storedBits - range : storedBits)
+            }
         }
     }
 

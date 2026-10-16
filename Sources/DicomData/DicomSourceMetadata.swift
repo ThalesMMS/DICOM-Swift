@@ -56,22 +56,27 @@ public struct DicomSourceMetadata: Sendable {
                                    privateDictionary: DicomPrivateDictionary, dictionary: DCMDictionary,
                                    maximumDiagnostics: Int) async throws -> Self {
         var scanner = Scanner(source: source, maximumBytes: max(0, maximumMetadataBytes), limits: limits)
-        let signature = try await scanner.readBytes(132)
+        let signature = try await scanner.readBytes(132, followedByHeader: true)
         guard signature.suffix(4) == Data("DICM".utf8) else { throw Failure.missingPart10Signature }
         var meta = Data()
         var fileMetaEndOffset: Int?
         while scanner.offset < source.count {
             if scanner.offset == fileMetaEndOffset { break }
-            let groupBytes = try await source.read(scanner.offset..<scanner.boundedEnd(4)).retainedData()
+            let groupBytes = try await scanner.peekGroup()
             guard groupBytes.dicomInteger(at: 0, as: UInt16.self, littleEndian: true) == 2 else {
-                if fileMetaEndOffset != nil { throw Failure.invalidFileMetaLength }
+                // Compatibility reads take the end of group 0002 when the declared length runs past it (issue #3053).
+                if fileMetaEndOffset != nil, mode != nil { throw Failure.invalidFileMetaLength }
                 break
             }
             let header = try await scanner.header(syntax: .explicitVRLittleEndian)
             try scanner.append(header.bytes, to: &meta)
             guard header.length != UInt32.max else { throw DicomSequenceValueParserError.unsupportedUndefinedLengthElement(header.tag) }
-            if let end = fileMetaEndOffset {
-                guard scanner.offset <= end, Int(header.length) <= end - scanner.offset else { throw Failure.invalidFileMetaLength }
+            if let end = fileMetaEndOffset, scanner.offset > end || Int(header.length) > end - scanner.offset {
+                // Issue #3053: a File Meta Information Group Length that ends inside an element is wrong, not a
+                // boundary. Compatibility reads walk group 0002 to its end, as GDCM, DCMTK and pydicom do; the
+                // validated modes still refuse it. A length that ends on an element boundary is honoured.
+                guard mode == nil else { throw Failure.invalidFileMetaLength }
+                fileMetaEndOffset = nil
             }
             let value = try await scanner.readMetadataBytes(Int(header.length))
             try scanner.append(value, to: &meta)
@@ -83,7 +88,7 @@ public struct DicomSourceMetadata: Sendable {
             }
         }
         if mode != nil, fileMetaEndOffset == nil { throw Failure.invalidFileMetaLength }
-        if let end = fileMetaEndOffset, scanner.offset != end { throw Failure.invalidFileMetaLength }
+        if let end = fileMetaEndOffset, scanner.offset != end, mode != nil { throw Failure.invalidFileMetaLength }
         let fileMeta: DicomDataSetReadResult
         if let mode {
             fileMeta = try DicomDataSetParser.read(from: meta, mode: mode, limits: limits,
@@ -108,7 +113,16 @@ public struct DicomSourceMetadata: Sendable {
                 pixelVR = header.vr
                 encapsulated = header.length == UInt32.max
                 if encapsulated { try await scanner.skipFragments(syntax: syntax) }
-                else { scanner.offset = try scanner.boundedEnd(Int(header.length)) }
+                else {
+                    let end = try scanner.boundedEnd(Int(header.length))
+                    // Issue #3053: an encapsulated syntax's item sequence under a defined length (PS3.5 A.4 requires
+                    // an undefined one). GDCM and pydicom read the items; the parser checks them within the value.
+                    if syntax.isEncapsulated, header.tag == DicomTag.pixelData.rawValue, header.length >= 8,
+                       try await scanner.peekGroup() == Data([0xFE, 0xFF, 0x00, 0xE0]) {
+                        encapsulated = true
+                    }
+                    scanner.offset = end
+                }
                 pixelRange = start..<scanner.offset
                 if mode != nil, header.tag == DicomTag.pixelData.rawValue {
                     // Reuse the dataset parser's VR checks without copying the bulk value.
@@ -132,6 +146,10 @@ public struct DicomSourceMetadata: Sendable {
         } else {
             dataSet = .init(dataSet: try DicomDataSetParser.dataSet(from: metadata, transferSyntax: syntax, limits: limits), diagnostics: [])
         }
+        try await scanner.flushBlockReads()
+        // The scan's reads skip the per-read revision check: this one covers a change at any point since the
+        // source was opened, and a changed source discards everything the scan read.
+        _ = try await source.read(scanner.offset..<scanner.offset)
         try await source.checkOpen()
         return Self(dataSet: dataSet.dataSet, fileMetaInformation: fileMeta.dataSet, transferSyntax: syntax,
                     sourceRevision: source.revision, pixelDataRange: pixelRange,
@@ -162,16 +180,85 @@ public struct DicomSourceMetadata: Sendable {
             return offset + length
         }
 
-        mutating func readBytes(_ length: Int) async throws -> Data {
+        /// The start of the next element header, read with the value before it (issue #3051). Every element
+        /// header is at least `headerLookahead` bytes, so these bytes never belong to a value: the scan never
+        /// requests Pixel Data payload, and it costs one source read per element instead of two or three.
+        var lookahead = Data()
+        var lookaheadOffset = 0
+        static let headerLookahead = 8
+
+        /// Issue #3111: the header bytes come in blocks (`DicomByteSource.scanBlock`) and are parsed in place, so the
+        /// scan awaits the source once per block instead of once per element. The ranges it consumes are reported
+        /// to the source at the end (`flushBlockReads`), merged when contiguous. `blockMode` turns off for a source
+        /// that serves no block (remote, mapped), whose scan keeps the per-element reads.
+        var blockMode = true
+        var block = Data()
+        var blockOffset = 0
+        var blockReads: [Range<Int>] = []
+
+        /// Reads `length` bytes at `offset`. `followedByHeader` also reads the next element header's first bytes
+        /// when the caller knows an element header (or the end of the source) follows.
+        mutating func readBytes(_ length: Int, followedByHeader: Bool = false) async throws -> Data {
             let end = try boundedEnd(length)
-            let lease = try await source.read(offset..<end)
+            if blockMode, let bytes = try await blockBytes(end: end) { return bytes }
+            if offset >= lookaheadOffset, end <= lookaheadOffset + lookahead.count {
+                let lower = lookahead.startIndex + (offset - lookaheadOffset)
+                offset = end
+                return Data(lookahead[lower..<(lower + length)])
+            }
+            let extra = followedByHeader ? min(Self.headerLookahead, source.count - end) : 0
+            // `readSource` validates the source revision once, after the last read of the scan.
+            let lease = try await source.read(offset..<(end + extra), validatesRevision: false)
+            let bytes = try lease.retainedData()
             offset = end
-            return try lease.retainedData()
+            guard extra > 0 else { return bytes }
+            lookahead = Data(bytes.suffix(extra))
+            lookaheadOffset = end
+            return Data(bytes.prefix(length))
+        }
+
+        /// The bytes from `offset` to `end` out of the current block, fetching the next block when it does not hold
+        /// them; nil (and per-element reads from then on) when the source serves no block.
+        mutating func blockBytes(end: Int) async throws -> Data? {
+            let length = end - offset
+            guard length <= source.limits.maximumReadBytes else { throw DicomByteSource.Failure.readLimit }
+            if offset < blockOffset || end > blockOffset + block.count {
+                guard let next = try await source.scanBlock(from: offset, minimumCount: length) else {
+                    blockMode = false
+                    return nil
+                }
+                block = next
+                blockOffset = offset
+            }
+            let lower = block.startIndex + (offset - blockOffset)
+            if let last = blockReads.last, offset >= last.lowerBound, offset <= last.upperBound {
+                // Contiguous, or a re-read after `peekGroup`.
+                blockReads[blockReads.count - 1] = last.lowerBound..<max(last.upperBound, end)
+            } else if length > 0 {
+                blockReads.append(offset..<end)
+            }
+            offset = end
+            return Data(block[lower..<(lower + length)])
+        }
+
+        /// Reports the ranges consumed from blocks as the reads they replace.
+        mutating func flushBlockReads() async throws {
+            guard !blockReads.isEmpty else { return }
+            try await source.recordScanReads(blockReads)
+            blockReads.removeAll()
         }
 
         mutating func readMetadataBytes(_ length: Int) async throws -> Data {
             guard length <= maximumBytes - copiedBytes else { throw Failure.metadataLimit }
-            return try await readBytes(length)
+            return try await readBytes(length, followedByHeader: true)
+        }
+
+        /// The first four bytes of the next element header, without consuming them.
+        mutating func peekGroup() async throws -> Data {
+            let start = offset
+            let header = try await readBytes(4)
+            offset = start
+            return header
         }
 
         mutating func append(_ bytes: Data, to output: inout Data) throws {

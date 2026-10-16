@@ -165,6 +165,7 @@ extension DCMPixelReader {
             }
 
         case .nativeJPEGLS:
+            var ownDeclined = false
             if DicomJLSwiftRolloutMode(environment: environment) != .disabled,
                let width, let height, let samplesPerPixel, let stored = bitsStored ?? bitDepth {
                 // Own JPEG-LS decoder (vendored core) first; CharLS stays the fallback when it declines.
@@ -182,9 +183,14 @@ extension DCMPixelReader {
                     )
                 }
                 logger?.warning("Own JPEG-LS decode declined the frame; using the CharLS runtime")
+                ownDeclined = true
             }
             do {
                 let decoded = try DicomJPEGLSCodec.decode(compressedData, environment: environment)
+                if ownDeclined {
+                    // Counted like the frame-decoder fallbacks, so a silent CharLS decode cannot pass an own-path run (#3086).
+                    DicomJ2KFallbackLedger.shared.record(backend: .charLSCPU, reason: "The own JPEG-LS decoder declined the frame.")
+                }
                 return makeResult(
                     from: decoded,
                     pixelRepresentation: pixelRepresentation,

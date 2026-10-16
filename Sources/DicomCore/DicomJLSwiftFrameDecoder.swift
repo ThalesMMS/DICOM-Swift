@@ -12,6 +12,7 @@ enum DicomJLSwiftFrameDecoder {
         _ request: DicomFrameDecodeRequest,
         candidate: any DicomFrameCodecBackend = DicomJLSwiftBackend(),
         environment: [String: String] = ProcessInfo.processInfo.environment,
+        fallbacks: DicomJ2KFallbackLedger = .shared,
         report: @escaping TelemetryReporter = { _ in }
     ) async throws -> DicomCodecDecodedFrame? {
         try Task.checkCancellation()
@@ -83,6 +84,10 @@ enum DicomJLSwiftFrameDecoder {
                 ? candidate : established
             let frame = try await timedDecode(backend, request: request, mode: mode, report: report)
             if let reason = decision.fallbackReason {
+                // CharLS decoding a frame the own decoder declined is counted where own-path harnesses read it (#3086).
+                if backend.capabilities.identifier == established.capabilities.identifier {
+                    fallbacks.record(backend: established.capabilities.identifier, reason: reason)
+                }
                 report(DicomJLSwiftDecodeTelemetry(
                     mode: mode, backend: backend.capabilities.identifier, durationNanoseconds: 0,
                     width: frame.width, height: frame.height, outcome: .fellBack(reason)

@@ -60,10 +60,16 @@ enum DicomSingleFramePart10Writer {
                 try DicomDataSetWriter.part10Data(from: $0, options: .init(transferSyntax: transferSyntax))
             }
         }
-        dataSet = try encodable(dataSet) { _ = try DicomDataSetWriter.dataSetData(from: $0); return $0 }
+        // Issue #3053: Bits Allocated 12 describes no word size a codec delivers. The codestream's precision (at
+        // most Bits Stored) fits 16-bit words, which is what GDCM decodes it into; the codec input says so.
+        if dataSet.int(for: .bitsAllocated) == 12, (dataSet.int(for: .bitsStored) ?? 12) <= 12 {
+            dataSet.set(.init(tag: DicomTag.bitsAllocated.rawValue, vr: .US, value: .unsignedIntegers([16])))
+        }
         // Encapsulated syntax headers are Explicit VR Little Endian. Encode metadata
         // with the existing writer, then supply a standard empty BOT and single frame item.
-        var encoded = try DicomDataSetWriter.dataSetData(from: dataSet)
+        // The encoding that proves the dataset writable is the one used (it was encoded twice, issue #3051).
+        var encoded: Data
+        (dataSet, encoded) = try encodable(dataSet) { ($0, try DicomDataSetWriter.dataSetData(from: $0)) }
         encoded.append(contentsOf: [0xE0, 0x7F, 0x10, 0, 0x4F, 0x42, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF])
         encoded.append(contentsOf: [0xFE, 0xFF, 0, 0xE0, 0, 0, 0, 0])
         if bytes.count % 2 != 0 { bytes.append(0) }
@@ -97,7 +103,8 @@ enum DicomSingleFramePart10Writer {
     /// Runs `write` on the dataset as read. A value the writer refuses that has nothing to do with the pixels (an
     /// empty UID, text outside the declared character set, a private DS longer than 16 bytes) must not stop the
     /// frame from decoding (issue #2850): the write is retried without the top-level elements that do not encode
-    /// under the dataset's Specific Character Set (issue #3043: text valid alone can fail in that context), and with
+    /// under the dataset's Specific Character Set (issue #3043: text valid alone can fail in that context; an
+    /// unsupported declaration is dropped first, issue #3097), and with
     /// a placeholder SOP Instance UID. The functional groups carry each frame's rescale and geometry, so
     /// one that does not encode refuses the frame rather than decoding it with the wrong values.
     private static func encodable<Result>(
@@ -107,11 +114,19 @@ enum DicomSingleFramePart10Writer {
             return try write(dataSet)
         } catch let failure as DicomDataSetWriterError {
             var reduced = DicomDataSet()
-            let characterSet = dataSet.element(for: .specificCharacterSet)
+            // Issue #3097: under a declaration no defined term names (`ISO_2022_IR_6`), no SH/LO/PN/LT/ST/UC/UT
+            // encodes. The codec input drops it, so the ASCII text (the Rescale Type among it) keeps its value under
+            // the default repertoire, as GDCM reads it; text outside ASCII is still left out.
+            let declared = dataSet.element(for: .specificCharacterSet)
+            let supported = declared.map {
+                (try? DicomSpecificCharacterSet(definedTerms: $0.stringValues).validateDeclaration()) != nil
+            } ?? false
+            let characterSet = supported ? declared : nil
             let inContext = { (element: DicomDataElement) in
                 DicomDataSet(elements: [characterSet, element].compactMap { $0 })
             }
             for element in dataSet.elements {
+                if element.tag == DicomTag.specificCharacterSet.rawValue, !supported { continue }
                 if element.tag == DicomTag.sopInstanceUID.rawValue {
                     let valid = (try? DicomDataSetWriter.dataSetData(from: inContext(element))) != nil
                         && element.stringValue?.isEmpty == false

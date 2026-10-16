@@ -50,6 +50,21 @@ final class DicomSingleFrameMetadataToleranceTests: XCTestCase {
         XCTAssertEqual(frame, fragment, "the frame's codestream reaches the codec input unchanged")
     }
 
+    /// Issue #3097 (Merge CR, DICOM_Example): `ISO_2022_IR_6` is no defined term, so no SH/LO/PN/LT/ST/UC/UT
+    /// encodes under it. The ASCII text beside the pixels, the Rescale Type (LO) among it, must reach the frame.
+    func test_unsupportedCharacterSet_keepsTheAsciiRescaleType() async throws {
+        let charset = Self.element(0x0008, 0x0005, "CS", Data("ISO_2022_IR_6\0".utf8))
+        let rescale = Self.element(0x0028, 0x1052, "DS", Data("0 ".utf8)) + Self.element(0x0028, 0x1053, "DS", Data("1 ".utf8))
+            + Self.element(0x0028, 0x1054, "LO", Data("US".utf8))
+        let decoder = try DCMDecoder(data: Self.part10(pixelData: Self.element(0x7FE0, 0x0010, "OW", Data(count: 8)),
+                                                       extra: rescale, leading: charset))
+        let artifact = try decoder.singleFramePart10Data(at: 0)
+        let session = try await DicomSourceFrameSession.open(source: DicomByteSource(data: artifact))
+        let frame = try await session.frame(at: 0)
+        await session.close()
+        XCTAssertEqual(frame.metadata.rescaleType, "US")
+    }
+
     // MARK: - Explicit VR Little Endian by hand
 
     private static func part10(pixelData: Data, extra: Data = Data(), syntax: String = "1.2.840.10008.1.2.1",

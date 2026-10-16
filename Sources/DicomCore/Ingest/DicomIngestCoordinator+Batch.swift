@@ -128,6 +128,9 @@ private extension DicomIngestCoordinator {
                 try Task.checkCancellation()
                 reservedBytes += Int64(batch[index].bytes.count)
                 try capacity?.checkCapacity(required: reservedBytes, at: root)
+                // Every later checkpoint carries the validated digest, so a replay that rehashes the
+                // staged file can tell bytes that changed on the way to disk (issue #3080).
+                batch[index].entry.expectedChecksum = memoryHash
                 checkpoints.append(checkpoint(&batch[index].entry, .staged, .intent))
                 batch[index].request = request
                 batch[index].memoryHash = memoryHash
@@ -182,6 +185,7 @@ private extension DicomIngestCoordinator {
         try await journal.append(contentsOf: checkpoints)
         timings.add(\.journal, since: clock)
         checkpoints = []
+        var refused: [Int] = []
         clock = DispatchTime.now()
         for index in batch.indices where batch[index].isPending {
             do {
@@ -189,6 +193,11 @@ private extension DicomIngestCoordinator {
                 // The synced bytes must be the validated bytes. This replaces the lone ingest's
                 // re-read, re-hash and re-parse of the staging file before publication.
                 guard checksum == batch[index].memoryHash else {
+                    // Closed as a refusal in the same commit, so no replay rehashes and publishes
+                    // these bytes (issue #3080).
+                    batch[index].entry.disposition = .discarded
+                    checkpoints.append(checkpoint(&batch[index].entry, .checksummed, .intent))
+                    refused.append(index)
                     throw DicomIngestError.checksumMismatch(path: batch[index].entry.temporaryPath.path)
                 }
                 batch[index].entry.checksum = checksum
@@ -200,6 +209,7 @@ private extension DicomIngestCoordinator {
         timings.add(\.checksum, since: clock)
         clock = DispatchTime.now()
         try await journal.append(contentsOf: checkpoints)
+        if !refused.isEmpty { try await journal.append(contentsOf: discardStaged(&batch, refused, in: stagingDirectory)) }
         timings.add(\.journal, since: clock)
 
         try await publishBatch(&batch, timings: &timings)
@@ -359,6 +369,22 @@ private extension DicomIngestCoordinator {
                 try fail(&batch[index], error)
             }
         }
+    }
+
+    /// Removes the staged bytes of refused items and returns their closing checkpoints. When a
+    /// removal fails the items stay at their discard intent, which the next replay finishes.
+    func discardStaged(_ batch: inout [DicomIngestBatchItem], _ indices: [Int],
+                       in directory: URL) throws -> [DicomIngestJournalEntry] {
+        do {
+            for index in indices { try fileSystem.remove(batch[index].entry.temporaryPath) }
+            try fileSystem.fsyncDirectory(directory)
+        } catch {
+            if error is DicomIngestCrash { throw error }
+            return []
+        }
+        var checkpoints: [DicomIngestJournalEntry] = []
+        for index in indices { checkpoints.append(checkpoint(&batch[index].entry, .checksummed, .done)) }
+        return checkpoints
     }
 
     /// A crash is a process stop: nothing after it may run, so it leaves the batch immediately.

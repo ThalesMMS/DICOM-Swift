@@ -63,8 +63,10 @@ extension DicomEncapsulatedPixelDataParser {
                 foundDelimiter = true
                 break
             }
+            // Issue #3053: an odd fragment length breaks PS3.5 A.4, but the item still bounds its bytes exactly;
+            // GDCM, DCMTK and pydicom read it, so the fragment is kept as declared.
             guard header.tag == Self.itemTag, header.length != Self.undefinedLength,
-                  header.length > 0, header.length % 2 == 0 else { throw Failure.truncatedItems }
+                  header.length > 0 else { throw Failure.truncatedItems }
             let start = cursor + 8
             guard header.length <= pixelDataRange.upperBound - start else { throw Failure.truncatedItems }
             // Includes fragment storage, lookup dictionary and frame-map overhead.
@@ -77,6 +79,19 @@ extension DicomEncapsulatedPixelDataParser {
         }
         guard foundDelimiter, !fragments.isEmpty else { throw Failure.truncatedItems }
         let byOffset = Dictionary(uniqueKeysWithValues: fragments.map { ($0.relativeItemOffset, $0.index) })
+        /// Frame boundaries the codestreams themselves mark (JPEG markers, JPEG 2000 codestream ends).
+        func codestreamFrames() async throws -> [[Int]] {
+            if transferSyntax == .jpeg2000Lossless || transferSyntax == .jpeg2000 {
+                return try await DicomJ2KFrameBoundaryScanner.map(
+                    source: source, fragments: fragments, numberOfFrames: numberOfFrames,
+                    maximumScanBytes: maximumBoundaryScanBytes
+                )
+            }
+            return try await DicomJPEGFrameBoundaryScanner.map(
+                source: source, fragments: fragments, numberOfFrames: numberOfFrames,
+                syntax: transferSyntax, maximumScanBytes: maximumBoundaryScanBytes
+            )
+        }
         let mapped: [[Int]]
         if let extended {
             guard bot.isEmpty, extended.offsets.count == numberOfFrames, numberOfFrames == fragments.count,
@@ -90,29 +105,28 @@ extension DicomEncapsulatedPixelDataParser {
             }
             mapped = frames
         } else if !bot.isEmpty {
-            guard bot.offsets.count == numberOfFrames,
-                  let frames = Self.mapUsingOffsets(bot.offsets.map(UInt64.init), fragmentCount: fragments.count,
-                                                     fragmentIndexByRelativeItemOffset: byOffset, diagnostics: &diagnostics) else {
+            var tableDiagnostics: [DicomEncapsulatedPixelDataDiagnostic] = []
+            if bot.offsets.count == numberOfFrames,
+               let frames = Self.mapUsingOffsets(bot.offsets.map(UInt64.init), fragmentCount: fragments.count,
+                                                  fragmentIndexByRelativeItemOffset: byOffset, diagnostics: &tableDiagnostics) {
+                diagnostics += tableDiagnostics
+                mapped = frames
+            } else if !singleFragment, let frames = try? await codestreamFrames() {
+                // Issue #3053: a Basic Offset Table that names no item start is ignored, as GDCM ignores it, only
+                // when every frame is a complete codestream whose markers delimit it; any other table is refused.
+                diagnostics.append(.init(severity: .warning, message: "The Basic Offset Table does not address the "
+                    + "fragments; the codestream markers delimit the \(numberOfFrames) frames."))
+                mapped = frames
+            } else {
                 throw Failure.invalidOffsetTable
             }
-            mapped = frames
         } else if numberOfFrames == 1 {
             mapped = [Array(fragments.indices)]
         } else if fragments.count == numberOfFrames {
             mapped = fragments.map { [$0.index] }
         } else {
             guard !singleFragment else { throw Failure.invalidFragmentation(transferSyntax.rawValue) }
-            if transferSyntax == .jpeg2000Lossless || transferSyntax == .jpeg2000 {
-                mapped = try await DicomJ2KFrameBoundaryScanner.map(
-                    source: source, fragments: fragments, numberOfFrames: numberOfFrames,
-                    maximumScanBytes: maximumBoundaryScanBytes
-                )
-            } else {
-                mapped = try await DicomJPEGFrameBoundaryScanner.map(
-                    source: source, fragments: fragments, numberOfFrames: numberOfFrames,
-                    syntax: transferSyntax, maximumScanBytes: maximumBoundaryScanBytes
-                )
-            }
+            mapped = try await codestreamFrames()
         }
         guard !singleFragment || mapped.allSatisfy({ $0.count == 1 }) else {
             throw Failure.invalidFragmentation(transferSyntax.rawValue)

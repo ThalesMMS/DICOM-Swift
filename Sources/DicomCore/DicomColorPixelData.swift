@@ -533,8 +533,20 @@ extension DCMDecoder {
     /// per pixel, so it converts like YBR_FULL.
     public func displayRGB8(decodedFrame: DicomDecodedFrame) throws -> Data {
         try synchronized {
-            let stored = decodedFrame.storedSampleData()
+            var stored = decodedFrame.storedSampleData()
             let metadata = makeNativeColorMetadataUnsafe(descriptor: nil)
+            // Issue #3117: signed palette indices (Pixel Representation 1) are read like unsigned ones, as Horos reads
+            // them, except that a negative index takes the first entry, as any index below the first mapped value does.
+            if metadata.photometricInterpretation == .paletteColor, decodedFrame.metadata.pixelRepresentation == 1,
+               case .gray16 = decodedFrame.pixels {
+                stored.withUnsafeMutableBytes { bytes in
+                    // Little-endian words, as the conversion below reads them: the sign is the high byte's top bit.
+                    for offset in stride(from: 0, to: bytes.count - 1, by: 2) where bytes[offset + 1] & 0x80 != 0 {
+                        bytes[offset] = 0
+                        bytes[offset + 1] = 0
+                    }
+                }
+            }
             let context = makeColorConversionContextUnsafe(metadata: metadata)
             let photometric: String
             switch metadata.photometricInterpretation {

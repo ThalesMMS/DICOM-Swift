@@ -15,16 +15,36 @@ extension DicomDecodedFrame {
             let bits = StoredBits(metadata, width: 16)
             // Written in place: appending two bytes per sample cost more than the JPEG 2000 decode of a
             // 512x512 frame (issue #3041). Same per-sample conversion, little-endian words.
+            // `UInt16.max - value` is `~value`, and adding Int16.min to a 16-bit pattern flips its top bit, so the
+            // un-inversion and the signed shift are one XOR hoisted out of the loop (issue #3051).
+            let pattern: UInt16 = (inverted ? 0xFFFF : 0) ^ (signed ? 0x8000 : 0)
             var bytes = Data(count: values.count * 2)
             bytes.withUnsafeMutableBytes { (output: UnsafeMutableRawBufferPointer) in
-                for (index, value) in values.enumerated() {
-                    let unInverted = inverted ? UInt16.max - value : value
-                    let pattern: UInt16 = signed
-                        ? UInt16(bitPattern: Int16(truncatingIfNeeded: Int32(unInverted) + Int32(Int16.min)))
-                        : unInverted
-                    let stored = UInt16(truncatingIfNeeded: bits.sample(Int(pattern), signed: signed))
-                    output[index * 2] = UInt8(stored & 0xFF)
-                    output[index * 2 + 1] = UInt8(stored >> 8)
+                let words = output.bindMemory(to: UInt16.self)
+                values.withUnsafeBufferPointer { samples in
+                    guard let out = words.baseAddress, let source = samples.baseAddress else { return }
+                    let count = samples.count
+                    if bits.isWholeWord {
+                        for index in 0..<count {
+                            out[index] = (source[index] ^ pattern).littleEndian
+                        }
+                    } else {
+                        // `StoredBits.sample` truncated to 16 bits, without its branches: shifting the stored bits
+                        // to the top of the word and back sign-extends a signed sample. Every shift is below 16.
+                        let shift = UInt16(bits.shift)
+                        let mask = UInt16(truncatingIfNeeded: bits.mask)
+                        let lead = UInt16(16 - bits.mask.nonzeroBitCount)
+                        if signed {
+                            for index in 0..<count {
+                                let value = ((source[index] ^ pattern) &>> shift) & mask
+                                out[index] = UInt16(bitPattern: Int16(bitPattern: value &<< lead) &>> lead).littleEndian
+                            }
+                        } else {
+                            for index in 0..<count {
+                                out[index] = (((source[index] ^ pattern) &>> shift) & mask).littleEndian
+                            }
+                        }
+                    }
                 }
             }
             return bytes
@@ -52,8 +72,9 @@ extension DicomDecodedFrame {
 }
 
 /// PS3.5 8.1.1: only Bits Stored bits, ending at High Bit, belong to a sample; any others in the allocated
-/// word are ignored (issue #2851). A signed sample takes its sign from its own top bit.
-private struct StoredBits {
+/// word are ignored (issue #2851). A signed sample takes its sign from its own top bit. The direct native read
+/// applies it too (issue #3111).
+struct StoredBits {
     let shift: Int
     let mask: Int
     let signBit: Int

@@ -34,9 +34,12 @@ public enum DicomIngestRecovery {
             var outcome = DicomIngestRecoveryReport.Outcome.complete
             do {
                 if entry.disposition == .quarantined {
-                    action = .quarantine
-                    if entry.phase == .intent { try await coordinator.quarantine(&entry) }
+                    // A finished quarantine is retained evidence, not work: reporting it again made
+                    // every launch announce the same quarantine.
+                    if entry.phase == .intent { action = .quarantine; try await coordinator.quarantine(&entry) }
                     outcome = .quarantined
+                } else if entry.disposition == .lost && entry.phase == .done {
+                    outcome = .loss
                 } else if (entry.disposition == .discarded && entry.phase == .done) || (entry.stage == .registered && entry.phase == .done) {
                     outcome = entry.disposition == .discarded ? .discarded : .complete
                 } else if entry.promotionCanonical != nil {
@@ -48,7 +51,11 @@ public enum DicomIngestRecovery {
                     if try fileSystem.exists(entry.temporaryPath) { try fileSystem.remove(entry.temporaryPath) }
                     try fileSystem.fsyncDirectory(entry.temporaryPath.deletingLastPathComponent())
                     try await coordinator.mark(&entry, .registered, .done)
-                } else if entry.stage == .received || entry.stage == .validated || (entry.stage == .staged && entry.phase == .intent) {
+                } else if try entry.disposition == .discarded || entry.stage == .received || entry.stage == .validated
+                            || (entry.stage == .staged && entry.phase == .intent)
+                            || coordinator.stagedBytesFailVerification(entry) {
+                    // A refusal whose close was interrupted, and staged bytes that differ from the
+                    // validated ones, are discarded: replay never publishes them (issue #3080).
                     action = .discardPartial; entry.disposition = .discarded
                     try await coordinator.mark(&entry, .staged, .intent)
                     if try fileSystem.exists(entry.temporaryPath) {
@@ -62,7 +69,13 @@ public enum DicomIngestRecovery {
                     _ = try await coordinator.finish(&entry)
                 }
             } catch is DicomIngestCrash { throw DicomIngestCrash() }
-            catch DicomIngestError.missingFile { outcome = .loss }
+            catch DicomIngestError.missingFile {
+                outcome = .loss
+                // Neither name holds the bytes, so no later replay can finish this ingest. Closing it
+                // records the loss once; if the close itself fails the next replay tries again.
+                entry.disposition = .lost
+                try? await coordinator.mark(&entry, entry.stage, .done)
+            }
             catch {
                 if entry.disposition == .quarantined { action = .quarantine; outcome = .quarantined }
                 else { outcome = .failed }

@@ -120,7 +120,12 @@ public struct DicomIngestCoordinator: Sendable {
         }
         if entry.checksum == nil {
             try await mark(&entry, .checksummed, .intent)
-            entry.checksum = try fileSystem.checksum(entry.temporaryPath)
+            let checksum = try fileSystem.checksum(entry.temporaryPath)
+            // Bytes that changed on the way to disk are never published (issue #3080).
+            if let expected = entry.expectedChecksum, checksum != expected {
+                throw DicomIngestError.checksumMismatch(path: entry.temporaryPath.path)
+            }
+            entry.checksum = checksum
             try await mark(&entry, .checksummed, .done)
         }
         guard let hash = entry.checksum, !hash.isEmpty, let uid = entry.sopInstanceUID,
@@ -244,6 +249,12 @@ public struct DicomIngestCoordinator: Sendable {
         return .init(class: classification, message: "Ingest failed after publication")
     }
     var achieved: DicomDurabilityLevel { journal.isDurable ? registrar.durability : .fileSynced }
+    /// Staged bytes not yet checksummed that do not hash to the digest validation recorded (issue #3080).
+    func stagedBytesFailVerification(_ entry: DicomIngestJournalEntry) throws -> Bool {
+        guard entry.checksum == nil, let expected = entry.expectedChecksum,
+              try fileSystem.exists(entry.temporaryPath) else { return false }
+        return try fileSystem.checksum(entry.temporaryPath) != expected
+    }
     func verify(_ path: URL, entry: DicomIngestJournalEntry) throws {
         // One read serves both the hash and the parse.
         let bytes = try fileSystem.read(path)

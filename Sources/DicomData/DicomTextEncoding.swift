@@ -189,9 +189,9 @@ public struct DicomSpecificCharacterSet: Equatable, Hashable, Sendable {
         if let nullIndex = string.firstIndex(of: "\0") {
             string = String(string[..<nullIndex])
         }
-        return string
-            .trimmingCharacters(in: .whitespaces)
-            .precomposedStringWithCanonicalMapping
+        let trimmed = string.trimmingCharacters(in: .whitespaces)
+        // ASCII text is already in canonical composed form (issue #3051: most metadata values are ASCII).
+        return trimmed.utf8.allSatisfy { $0 < 0x80 } ? trimmed : trimmed.precomposedStringWithCanonicalMapping
     }
 }
 

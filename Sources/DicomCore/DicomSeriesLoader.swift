@@ -660,20 +660,20 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
 
     /// Required protocol initializer - uses default DCMDecoder.
     public convenience init() {
-        self.init(decoderFactory: { path in try DCMDecoder(contentsOfFile: path) })
+        self.init(decoderFactory: { path in try DCMDecoder(mappingContentsOfFile: path) })
     }
 
     /// Host allocation boundary for the final CPU volume. The allocator must return
     /// zero-initialized storage of exactly the requested length and retain its accounting.
     public convenience init(allocateVoxelData: @escaping @Sendable (Int) throws -> Data) {
-        self.init(decoderFactory: { path in try DCMDecoder(contentsOfFile: path) },
+        self.init(decoderFactory: { path in try DCMDecoder(mappingContentsOfFile: path) },
                   logger: DicomLogger.make(subsystem: "com.dicomcore", category: "series-loader"),
                   allocateVoxelData: allocateVoxelData)
     }
 
     /// Required protocol initializer with injected logging.
     public convenience init(logger: LoggerProtocol) {
-        self.init(decoderFactory: { path in try DCMDecoder(contentsOfFile: path) },
+        self.init(decoderFactory: { path in try DCMDecoder(mappingContentsOfFile: path) },
                   logger: logger)
     }
 
@@ -733,9 +733,11 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
         let decoderCacheLock = DicomLock()
         var decoderCache: [URL: DicomDecoderProtocol] = [:]
 
-        func cachedDecoder(for url: URL) -> DicomDecoderProtocol? {
+        // Pass 2 takes each slice's decoder out of the cache, so the file bytes and any pixel cache it holds are
+        // released once its slice is copied instead of at the end of the build (#3092).
+        func takeCachedDecoder(for url: URL) -> DicomDecoderProtocol? {
             decoderCacheLock.withLock {
-                decoderCache[url]
+                decoderCache.removeValue(forKey: url)
             }
         }
 
@@ -783,8 +785,11 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
         var baselinePixelFormat: DicomSeriesLoaderPixelFormat?
 
         var slices: [SliceMeta] = []
+        // Without a progress callback the files are parsed on several workers first (#3041); the pass still
+        // validates and orders them one after another, in listing order.
+        var parsed = progress == nil ? parseConcurrently(fileURLs, factory: decoderFactory) : nil
 
-        for url in fileURLs {
+        for (fileIndex, url) in fileURLs.enumerated() {
             if Task.isCancelled {
                 throw CancellationError()
             }
@@ -792,7 +797,7 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
             // Try to load DICOM file using factory
             let decoder: DicomDecoderProtocol
             do {
-                decoder = try decoderFactory(url.path)
+                decoder = try parsed?[fileIndex].get() ?? decoderFactory(url.path)
             } catch {
                 // Skip files that fail to load
                 continue
@@ -805,7 +810,8 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
                 .trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "\0")))
             let hasWaveformSequence: Bool
             if let concreteDecoder = decoder as? DCMDecoder {
-                hasWaveformSequence = concreteDecoder.dataSet.contains(.waveformSequence)
+                // One element, not the whole dataset materialized per slice (#3041).
+                hasWaveformSequence = concreteDecoder.dataElement(for: .waveformSequence) != nil
             } else {
                 hasWaveformSequence = false
             }
@@ -921,9 +927,12 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
                                     voi: imageVOI(from: decoder, window: window)))
         }
 
+        // From here the decoder cache holds the only reference to each slice's decoder (#3092).
+        parsed = nil
         guard !slices.isEmpty, firstDecoder != nil else {
             throw DicomSeriesLoaderError.noDicomFiles
         }
+        firstDecoder = nil
 
         // Sort slices by projection on the normal; fallback to Instance Number then filename.
         //
@@ -988,7 +997,16 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
         // ImagePositionPatient gives the actual center-to-center slice distance in patient space.
         // Tag-derived Z spacing may come from SliceThickness or SpacingBetweenSlices and can be
         // absent, nominal, or inconsistent with the real reconstructed slice positions.
-        let computedZ = try computeZSpacing(from: slices, normal: normal)
+        let computedZ: Double?
+        var isSliceSpacingIrregular = false
+        do {
+            computedZ = try computeZSpacing(from: slices, normal: normal)
+        } catch DicomSeriesLoaderError.variableSliceSpacing(let median, _) {
+            // Issue #3116: uneven positions (a missing slice, two stacks in one series) build one grid at the median
+            // interval, as GDCM and Horos build one, and the volume says so instead of refusing.
+            computedZ = median
+            isSliceSpacingIrregular = true
+        }
         spacing = SIMD3<Double>(spacing.x, spacing.y, computedZ ?? spacing.z)
         let sliceOrdering: DicomSeriesVolumeGeometryProvenance.SliceOrdering
         if slices.allSatisfy({ $0.projection != nil }) {
@@ -998,7 +1016,8 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
         }
         let geometryProvenance = DicomSeriesVolumeGeometryProvenance(
             sliceOrdering: sliceOrdering,
-            sliceSpacingSource: computedZ == nil ? headerSpacingSource : .imagePositionPatient,
+            sliceSpacingSource: computedZ == nil ? headerSpacingSource
+                : isSliceSpacingIrregular ? .irregularImagePositionPatient : .imagePositionPatient,
             isInPlaneSpacingCalibrated: isInPlaneSpacingCalibrated,
             hasDeclaredOrientation: everySliceDeclaresOrientation
         )
@@ -1056,45 +1075,96 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
             sliceBuffer.append(contentsOf: repeatElement(Int16(0), count: sliceVoxelCount - sliceBuffer.count))
         }
 
-        // Allocate voxel buffer and copy slices sequentially for safety.
-        voxelData.withUnsafeMutableBytes { rawBuffer in
-            let dest = rawBuffer.bindMemory(to: Int16.self)
-            for (index, slice) in slices.enumerated() {
-                if Task.isCancelled {
-                    loadError = CancellationError()
-                    break
-                }
-
-                // Decode directly into reused buffer
-                let pixelCount = try? self.decodeSliceIntoBuffer(
-                    at: slice.url,
-                    buffer: &sliceBuffer,
-                    expectedWidth: width,
-                    expectedHeight: height,
-                    pixelFormat: slice.pixelFormat,
-                    cachedDecoder: cachedDecoder(for:),
-                    cacheDecoder: cacheDecoder(_:for:),
-                    report32BitClamp: {
-                        self.report32BitClampIfNeeded(
-                            reported: &didReport32BitClamp,
-                            pixelFormat: slice.pixelFormat,
-                            url: slice.url
-                        )
+        // Without a progress callback, whose order is part of its contract, several workers decode the slices
+        // (#3041): each decodes into its own buffer and copies it into its slice of the volume, so the voxels are the
+        // ones the sequential loop writes, and the first failing slice in series order is reported, as there.
+        let workers = progress == nil
+            ? parallelSliceDecodeWorkers(sliceCount: depth, transferSyntaxUID: slices.first?.pixelFormat.transferSyntaxUID)
+            : 1
+        if workers > 1 {
+            let slices = slices
+            let (width, height) = (width, height)
+            loadError = voxelData.withUnsafeMutableBytes { rawBuffer -> Error? in
+                // Pass 1 cached a validated decoder for every slice.
+                let state = ParallelSliceDecodeState(
+                    destination: rawBuffer.bindMemory(to: Int16.self).baseAddress!,
+                    decoders: decoderCacheLock.withLock {
+                        defer { decoderCache.removeAll() }
+                        return decoderCache
                     }
                 )
-
-                guard let pixelCount, pixelCount == sliceVoxelCount else {
-                    loadError = DicomSeriesLoaderError.failedToDecode(slice.url)
-                    break
+                DispatchQueue.concurrentPerform(iterations: workers) { _ in
+                    var buffer = [Int16](repeating: 0, count: sliceVoxelCount)
+                    while let index = state.claim(count: slices.count) {
+                        let slice = slices[index]
+                        if Task.isCancelled {
+                            state.fail(index, CancellationError())
+                            return
+                        }
+                        let pixelCount = try? self.decodeSliceIntoBuffer(
+                            at: slice.url,
+                            buffer: &buffer,
+                            expectedWidth: width,
+                            expectedHeight: height,
+                            pixelFormat: slice.pixelFormat,
+                            cachedDecoder: state.takeDecoder(for:),
+                            report32BitClamp: {
+                                guard state.claimClampReport() else { return }
+                                var reported = false
+                                self.report32BitClampIfNeeded(reported: &reported, pixelFormat: slice.pixelFormat,
+                                                              url: slice.url)
+                            }
+                        )
+                        guard let pixelCount, pixelCount == sliceVoxelCount else {
+                            state.fail(index, DicomSeriesLoaderError.failedToDecode(slice.url))
+                            return
+                        }
+                        let base = state.destination.advanced(by: index * sliceVoxelCount)
+                        base.update(from: buffer, count: sliceVoxelCount)
+                    }
                 }
+                return state.firstFailure
+            }
+        } else {
+            // Allocate voxel buffer and copy slices sequentially for safety.
+            voxelData.withUnsafeMutableBytes { rawBuffer in
+                let dest = rawBuffer.bindMemory(to: Int16.self)
+                for (index, slice) in slices.enumerated() {
+                    if Task.isCancelled {
+                        loadError = CancellationError()
+                        break
+                    }
 
-                let base = dest.baseAddress!.advanced(by: index * sliceVoxelCount)
-                base.update(from: sliceBuffer, count: sliceVoxelCount)
+                    // Decode directly into reused buffer
+                    let pixelCount = try? self.decodeSliceIntoBuffer(
+                        at: slice.url,
+                        buffer: &sliceBuffer,
+                        expectedWidth: width,
+                        expectedHeight: height,
+                        pixelFormat: slice.pixelFormat,
+                        cachedDecoder: takeCachedDecoder(for:),
+                        report32BitClamp: {
+                            self.report32BitClampIfNeeded(
+                                reported: &didReport32BitClamp,
+                                pixelFormat: slice.pixelFormat,
+                                url: slice.url
+                            )
+                        }
+                    )
 
-                if let progress {
-                    let fraction = Double(index + 1) / Double(depth)
-                    let sliceData = Data(bytes: sliceBuffer, count: sliceVoxelCount * MemoryLayout<Int16>.size)
-                    progress(fraction, index + 1, sliceData, progressVolume)
+                    guard let pixelCount, pixelCount == sliceVoxelCount else {
+                        loadError = DicomSeriesLoaderError.failedToDecode(slice.url)
+                        break
+                    }
+
+                    let base = dest.baseAddress!.advanced(by: index * sliceVoxelCount)
+                    base.update(from: sliceBuffer, count: sliceVoxelCount)
+
+                    if let progress {
+                        let fraction = Double(index + 1) / Double(depth)
+                        let sliceData = Data(bytes: sliceBuffer, count: sliceVoxelCount * MemoryLayout<Int16>.size)
+                        progress(fraction, index + 1, sliceData, progressVolume)
+                    }
                 }
             }
         }
@@ -1132,6 +1202,101 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
 
         return volume
     }
+}
+
+/// Slices the full build decodes at once without a progress callback. A JPEG 2000 decode already spreads its
+/// code-blocks over every core, so a third of the active cores, at most four, overlap the per-file parse, the serial
+/// codec stages and the sample conversion. Every other codec decodes a slice on one core, so each active core takes a
+/// slice, as the GDCM full build does (#3079: two workers left four of the A15's six cores idle on JPEG lossless).
+private func parallelSliceDecodeWorkers(sliceCount: Int, transferSyntaxUID: String?) -> Int {
+    let cores = ProcessInfo.processInfo.activeProcessorCount
+    switch transferSyntaxUID.flatMap({ DicomTransferSyntaxRegistry.standard.entry(forUID: $0)?.codec }) {
+    case .jpeg2000?, .jpeg2000Part2?, .htj2k?, nil:
+        return min(sliceCount, max(1, min(4, cores / 3)))
+    default:
+        return min(sliceCount, max(1, cores))
+    }
+}
+
+/// Every file's decoder, or the error its parse threw. A parse runs on one core whatever the codec, so every active
+/// core takes a file (#3079).
+private func parseConcurrently(
+    _ urls: [URL], factory: @Sendable (String) throws -> DicomDecoderProtocol
+) -> [Result<DicomDecoderProtocol, Error>] {
+    let results = ParallelParseResults(count: urls.count)
+    let workers = min(urls.count, max(1, ProcessInfo.processInfo.activeProcessorCount))
+    DispatchQueue.concurrentPerform(iterations: workers) { _ in
+        while let index = results.claim() {
+            results.store(Result { try factory(urls[index].path) }, at: index)
+        }
+    }
+    return results.values
+}
+
+private final class ParallelParseResults: @unchecked Sendable {
+    private let lock = DicomLock()
+    private var next = 0
+    private var results: [Result<DicomDecoderProtocol, Error>?]
+
+    init(count: Int) { results = Array(repeating: nil, count: count) }
+
+    func claim() -> Int? {
+        lock.withLock {
+            guard next < results.count else { return nil }
+            defer { next += 1 }
+            return next
+        }
+    }
+
+    func store(_ result: Result<DicomDecoderProtocol, Error>, at index: Int) {
+        lock.withLock { results[index] = result }
+    }
+
+    var values: [Result<DicomDecoderProtocol, Error>] { lock.withLock { results.map { $0! } } }
+}
+
+/// Shared bookkeeping of the parallel full-build decode: the next slice to claim, the failures by slice index, the
+/// one 32-bit clamp warning, the decoders of pass 1 and the volume the workers write into, each slice by one worker.
+private final class ParallelSliceDecodeState: @unchecked Sendable {
+    let destination: UnsafeMutablePointer<Int16>
+    private var decoders: [URL: DicomDecoderProtocol]
+    private let lock = DicomLock()
+    private var nextSlice = 0
+    private var failures: [Int: Error] = [:]
+    private var reportedClamp = false
+
+    init(destination: UnsafeMutablePointer<Int16>, decoders: [URL: DicomDecoderProtocol]) {
+        self.destination = destination
+        self.decoders = decoders
+    }
+
+    /// The next slice, or nil once every slice was claimed or one failed.
+    func claim(count: Int) -> Int? {
+        lock.withLock {
+            guard failures.isEmpty, nextSlice < count else { return nil }
+            defer { nextSlice += 1 }
+            return nextSlice
+        }
+    }
+
+    func fail(_ index: Int, _ error: Error) {
+        lock.withLock { failures[index] = error }
+    }
+
+    /// The failure of the first slice in series order, as the sequential loop reports it.
+    var firstFailure: Error? {
+        lock.withLock { failures.min(by: { $0.key < $1.key })?.value }
+    }
+
+    func claimClampReport() -> Bool {
+        lock.withLock {
+            defer { reportedClamp = true }
+            return !reportedClamp
+        }
+    }
+
+    /// The slice's pass-1 decoder, handed out once so it is released when its slice is copied (#3092).
+    func takeDecoder(for url: URL) -> DicomDecoderProtocol? { lock.withLock { decoders.removeValue(forKey: url) } }
 }
 
 private func nonEmpty(_ value: String) -> String? {
@@ -1207,13 +1372,14 @@ private func validateCompressedBackend(_ pixelFormat: DicomSeriesLoaderPixelForm
     }
 }
 
+/// Bits Stored and High Bit may differ between slices (issue #3113: GE MR series mix 12, 13 and 14 bits): each slice
+/// is read by its own format, and the support matrix keeps every slice's stored bits from bit zero, so the voxels are
+/// the stored values in every slice.
 private func hasConsistentPixelFormat(
     _ lhs: DicomSeriesLoaderPixelFormat,
     comparedTo rhs: DicomSeriesLoaderPixelFormat
 ) -> Bool {
     lhs.bitsAllocated == rhs.bitsAllocated &&
-        lhs.bitsStored == rhs.bitsStored &&
-        lhs.highBit == rhs.highBit &&
         lhs.pixelRepresentation == rhs.pixelRepresentation &&
         lhs.samplesPerPixel == rhs.samplesPerPixel &&
         lhs.photometricInterpretation == rhs.photometricInterpretation &&

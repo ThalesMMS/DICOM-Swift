@@ -175,6 +175,15 @@ let mqSwitchMPS: [UInt8] = mqStateTable.map { $0.switchMPS ? 1 : 0 }
     return qe | (nMPS << 16) | (nLPS << 22) | (sw << 28)
 }
 
+/// `mqStatePacked` in storage that lives for the whole process. The decoder captures this pointer once per
+/// codeword segment: reading the lazily initialised global array for every symbol cost a one-time-init check and a
+/// bounds check per decision (issue #3051).
+nonisolated(unsafe) let mqStatePackedPointer: UnsafePointer<UInt32> = {
+    let storage = UnsafeMutablePointer<UInt32>.allocate(capacity: mqStatePacked.count)
+    storage.initialize(from: mqStatePacked, count: mqStatePacked.count)
+    return UnsafePointer(storage)
+}()
+
 /// Bit positions inside `mqStatePacked` entries (kept as constants so
 /// the decoder/encoder hot paths read clearly without literal noise).
 @usableFromInline let mqQeMask: UInt32      = 0xFFFF
@@ -773,6 +782,8 @@ struct MQDecoder: @unchecked Sendable {
     private var position: Int = 0
     private var buffer: UInt8 = 0
     private var nextBuffer: UInt8 = 0
+    /// `mqStatePacked`, indexed by a context's state index (always below its 47 entries).
+    private let states: UnsafePointer<UInt32> = mqStatePackedPointer
 
     /// Debug access to internal state for trace verification
     var debugA: UInt32 { a }
@@ -893,7 +904,7 @@ struct MQDecoder: @unchecked Sendable {
         // co-resident in the same UInt32. Replaces 3-4 separate
         // `mq*[si]` array loads (each potentially a different cache
         // line) on the hottest method in the EBCOT decoder.
-        let entry = mqStatePacked[si]
+        let entry = states[si]
         let qe = entry & mqQeMask
 
         a -= qe

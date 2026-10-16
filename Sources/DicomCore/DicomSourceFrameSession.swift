@@ -36,12 +36,12 @@ public actor DicomSourceFrameSession {
     }
 
     private enum Representation: Hashable {
-        case raw, part10, decoded, arrayDecoded, capabilities, qualityIndexedCapabilities
+        case raw, part10, decoded, arrayDecoded, storedSamples, capabilities, qualityIndexedCapabilities
         case partial(DicomPartialFrameDecodeRequest)
 
         var decodesPixels: Bool {
             switch self {
-            case .decoded, .arrayDecoded, .partial: true
+            case .decoded, .arrayDecoded, .storedSamples, .partial: true
             case .raw, .part10, .capabilities, .qualityIndexedCapabilities: false
             }
         }
@@ -56,6 +56,7 @@ public actor DicomSourceFrameSession {
         case bytes(Data)
         case decoded(DicomDataBackedDecodedFrame)
         case arrayDecoded(DicomDecodedFrame)
+        case stored(DicomStoredSampleFrame)
         case partial(DicomPartialFrameDecodeResult)
         case capabilities(DicomPartialFrameDecodeCapabilities)
         case qualityIndexedCapabilities(DicomPartialFrameDecodeCapabilities)
@@ -64,6 +65,7 @@ public actor DicomSourceFrameSession {
             switch self {
             case .bytes(let data): data.count
             case .decoded(let frame): frame.pixels.data.count
+            case .stored(let frame): frame.data.count
             case .capabilities, .qualityIndexedCapabilities: 0
             case .partial(let result): Self.arrayByteCount(result.frame)
             case .arrayDecoded(let frame): Self.arrayByteCount(frame)
@@ -87,6 +89,9 @@ public actor DicomSourceFrameSession {
             case .arrayDecoded(let frame):
                 return .arrayDecoded(DicomDecodedFrame(index: frame.index, pixels: frame.pixels,
                                                        metadata: frame.metadata, memoryOwner: owner))
+            case .stored(let frame):
+                return .stored(DicomStoredSampleFrame(index: frame.index, data: frame.data,
+                                                      metadata: frame.metadata, memoryOwner: owner))
             case .partial(let result):
                 let frame = DicomDecodedFrame(index: result.frame.index, pixels: result.frame.pixels,
                                               metadata: result.frame.metadata, memoryOwner: owner)
@@ -182,6 +187,19 @@ public actor DicomSourceFrameSession {
 
     public func frame(at frame: Int) async throws -> DicomDecodedFrame {
         guard case .arrayDecoded(let frame) = try await request(Key(frame: frame, representation: .arrayDecoded)) else {
+            throw DicomSourceFrameIndex.Failure.invalidLayout
+        }
+        return frame
+    }
+
+    /// One frame in the stored-sample convention, read at its offset without a Part 10 copy of its pixels (issue
+    /// #3111): byte-identical to `frame(at:)` followed by `storedSampleData()`, with the same metadata. Only layouts
+    /// for which `index.readsStoredSamplesDirectly` holds; any other throws `DicomSourceFrameIndex.Failure.unsupportedLayout`.
+    public func storedSampleFrame(at frame: Int) async throws -> DicomStoredSampleFrame {
+        guard index.readsStoredSamplesDirectly else {
+            throw DicomSourceFrameIndex.Failure.unsupportedLayout("Stored samples are read directly only from native monochrome 8/16-bit frames.")
+        }
+        guard case .stored(let frame) = try await request(Key(frame: frame, representation: .storedSamples)) else {
             throw DicomSourceFrameIndex.Failure.invalidLayout
         }
         return frame
@@ -286,36 +304,41 @@ public actor DicomSourceFrameSession {
                                 var result: Result<Output, Error>
                                 do {
                                     try Task.checkCancellation()
-                                    let raw = try await index.frameData(at: frame, from: source, maximumFrameBytes: maximumFrameBytes)
-                                    if key.representation == .raw {
-                                        if let layout = index.nativeLayout, layout.eightBitSamplesAreWordSwapped {
-                                            var ordered = raw
-                                            for offset in stride(from: 0, to: ordered.count - 1, by: 2) {
-                                                ordered.swapAt(offset, offset + 1)
-                                            }
-                                            let leading = try index.wordSwapLeadingBytes(forFrame: frame)
-                                            result = .success(.bytes(Data(ordered.dropFirst(leading).prefix(layout.bitsPerFrame / 8))))
-                                        } else {
-                                            result = .success(.bytes(raw))
-                                        }
+                                    if key.representation == .storedSamples {
+                                        result = .success(.stored(try await index.storedSampleFrame(
+                                            frame: frame, from: source, maximumFrameBytes: maximumFrameBytes)))
                                     } else {
-                                        let part10 = try index.part10Data(frame: frame, rawFrame: raw)
-                                        await source.recordCompatibilityCopy(part10.count)
-                                        if key.representation == .decoded {
-                                            let decoded = try await index.decode(frame: frame, part10: part10)
-                                            guard decoded.pixels.data.count <= maximumFrameBytes else { throw DicomSourceFrameIndex.Failure.frameLimit }
-                                            result = .success(.decoded(decoded))
-                                        } else if key.representation == .arrayDecoded {
-                                            result = .success(.arrayDecoded(try await index.decodeArray(frame: frame, part10: part10)))
-                                        } else if case .partial(let request) = key.representation {
-                                            result = .success(.partial(try await index.decodePartial(frame: frame, part10: part10, request: request)))
-                                        } else if key.representation == .capabilities {
-                                            let reader = try DicomDecodedFrameReader(decoder: DCMDecoder(data: part10))
-                                            result = .success(.capabilities(try await reader.partialDecodeCapabilities(at: 0)))
-                                        } else if key.representation == .qualityIndexedCapabilities {
-                                            let reader = try DicomDecodedFrameReader(decoder: DCMDecoder(data: part10))
-                                            result = .success(.qualityIndexedCapabilities(try await reader.partialDecodeCapabilitiesWithQualityIndex(at: 0)))
-                                        } else { result = .success(.bytes(part10)) }
+                                        let raw = try await index.frameData(at: frame, from: source, maximumFrameBytes: maximumFrameBytes)
+                                        if key.representation == .raw {
+                                            if let layout = index.nativeLayout, layout.eightBitSamplesAreWordSwapped {
+                                                var ordered = raw
+                                                for offset in stride(from: 0, to: ordered.count - 1, by: 2) {
+                                                    ordered.swapAt(offset, offset + 1)
+                                                }
+                                                let leading = try index.wordSwapLeadingBytes(forFrame: frame)
+                                                result = .success(.bytes(Data(ordered.dropFirst(leading).prefix(layout.bitsPerFrame / 8))))
+                                            } else {
+                                                result = .success(.bytes(raw))
+                                            }
+                                        } else {
+                                            let part10 = try index.part10Data(frame: frame, rawFrame: raw)
+                                            await source.recordCompatibilityCopy(part10.count)
+                                            if key.representation == .decoded {
+                                                let decoded = try await index.decode(frame: frame, part10: part10)
+                                                guard decoded.pixels.data.count <= maximumFrameBytes else { throw DicomSourceFrameIndex.Failure.frameLimit }
+                                                result = .success(.decoded(decoded))
+                                            } else if key.representation == .arrayDecoded {
+                                                result = .success(.arrayDecoded(try await index.decodeArray(frame: frame, part10: part10)))
+                                            } else if case .partial(let request) = key.representation {
+                                                result = .success(.partial(try await index.decodePartial(frame: frame, part10: part10, request: request)))
+                                            } else if key.representation == .capabilities {
+                                                let reader = try DicomDecodedFrameReader(decoder: DCMDecoder(data: part10))
+                                                result = .success(.capabilities(try await reader.partialDecodeCapabilities(at: 0)))
+                                            } else if key.representation == .qualityIndexedCapabilities {
+                                                let reader = try DicomDecodedFrameReader(decoder: DCMDecoder(data: part10))
+                                                result = .success(.qualityIndexedCapabilities(try await reader.partialDecodeCapabilitiesWithQualityIndex(at: 0)))
+                                            } else { result = .success(.bytes(part10)) }
+                                        }
                                     }
                                     if key.representation.decodesPixels, let memory, case .success(let output) = result {
                                         let owner = try memory.retainOutput(byteCount: output.byteCount)

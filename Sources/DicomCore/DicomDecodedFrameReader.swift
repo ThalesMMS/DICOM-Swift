@@ -1649,14 +1649,18 @@ public struct DicomDecodedFrameReader: Sendable {
         }
 
         let identifier = selectedBackendIdentifier ?? legacyBackendIdentifier(environment: environment)
-        let status = DicomCodecCapabilities.backendStatuses(environment: environment)
-            .first { $0.identifier == identifier }
+        // The backend's own report first: the registry lists the same values for these backends, and building every
+        // backend's status for one frame probed the dynamic codec runtimes (dlopen) on the first frame of a process
+        // and repeated the whole enumeration on every frame (issue #3082).
         let directCapability = directCapability(identifier: identifier, environment: environment)
+        let status = directCapability == nil
+            ? DicomCodecCapabilities.backendStatuses(environment: environment).first { $0.identifier == identifier }
+            : nil
         return DicomDecodedFrameExecution(
             frame: frame,
             backendIdentifier: identifier,
-            backendVersion: status?.version ?? directCapability?.version,
-            backendSource: status?.source ?? directCapability?.source ?? legacyBackendSource(identifier: identifier),
+            backendVersion: directCapability?.version ?? status?.version,
+            backendSource: directCapability?.source ?? status?.source ?? legacyBackendSource(identifier: identifier),
             rolloutMode: rolloutMode,
             fallbackReason: fallbackReason,
             shadowBackendIdentifier: shadowBackendIdentifier

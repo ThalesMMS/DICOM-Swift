@@ -364,6 +364,145 @@ final class DicomJPEG2000CodecTests: XCTestCase {
         } catch {}
     }
 
+    /// An encoder may drop the trailing run of 0xFF 0x7F pairs of a codeword segment: Annex C feeds the same all-ones
+    /// bits past the end, so the block decodes the same while reading that run past its declared bytes. A MELANIX slice
+    /// read 21 bytes past them and was refused as corrupted (#3077).
+    func test_segmentWithoutItsAllOnesTail_decodesUnderTheIntegrityChecks() throws {
+        let side = 64
+        // Magnitude 8 at 15 % density: the last three bit-planes code only zeros, so the segment ends in a long
+        // all-ones run.
+        var state: UInt32 = 43 &* 2_654_435_761
+        func next() -> UInt32 {
+            state = state &* 1_664_525 &+ 1_013_904_223
+            return state >> 8
+        }
+        let source: [Int32] = (0..<(side * side)).map { _ in
+            guard next() % 100 < 15 else { return 0 }
+            _ = next()
+            return next() % 2 == 0 ? 8 : -8
+        }
+        let encoded = try BitPlaneCoder(width: side, height: side, subband: .hl).encode(coefficients: source, bitDepth: 14)
+        var stripped = [UInt8](encoded.data)
+        while stripped.count >= 2, Array(stripped.suffix(2)) == [0xFF, 0x7F] { stripped.removeLast(2) }
+        XCTAssertGreaterThanOrEqual(encoded.data.count - stripped.count, 20, "the block must end in a long all-ones run")
+        let decoder = BitPlaneDecoder(width: side, height: side, subband: .hl,
+                                      options: CodingOptions(checksEntropyIntegrity: true))
+        for data in [encoded.data, Data(stripped)] {
+            XCTAssertEqual(try decoder.decode(data: data, passCount: encoded.passCount, bitDepth: 14,
+                                              zeroBitPlanes: encoded.zeroBitPlanes), source, "\(data.count) bytes")
+        }
+    }
+
+    /// A rate-controlled encoder may declare fewer passes than a block's bit-planes hold and cut the last declared pass
+    /// short: Annex C decodes the rest of that pass from the 0xFF fill, as OpenJPEG does. A Gruselambix XA frame (lossy
+    /// 5/3) has a block whose last cleanup pass has 20 declared bytes and reads 202 past them, and was refused (#3095).
+    /// The reads past the end of a block with every pass declared still count.
+    func test_lastPassCutShortByRateControl_decodesUnderTheIntegrityChecks() throws {
+        let side = 64
+        var state: UInt32 = 3095
+        func next() -> UInt32 {
+            state = state &* 1_664_525 &+ 1_013_904_223
+            return state >> 8
+        }
+        /// The C block decoder and the Swift one.
+        func decodings(_ options: CodingOptions) -> [(Data, Int, Int) throws -> [Int32]] {
+            let decoder = BitPlaneDecoder(width: side, height: side, subband: .hh, options: options)
+            return [
+                { try decoder.decode(data: $0, passCount: $1, bitDepth: 14, zeroBitPlanes: $2) },
+                { try decoder.decodeInSwift(data: $0, passCount: $1, bitDepth: 14, zeroBitPlanes: $2) },
+            ]
+        }
+        let checked = decodings(CodingOptions(checksEntropyIntegrity: true))
+        let unchecked = decodings(.default)[0]
+        func assertRefused(_ data: Data, passCount: Int, zeroBitPlanes: Int, _ label: String) {
+            for decode in checked {
+                XCTAssertThrowsError(try decode(data, passCount, zeroBitPlanes), label) {
+                    guard case J2KError.corruptedEntropyData(let reason) = $0 else { return XCTFail("\(label): \($0)") }
+                    XCTAssertTrue(reason.contains("bytes past the"), "\(label): \(reason)")
+                }
+            }
+        }
+
+        // 10 bit-planes, 28 passes. Rate control drops the last pass (the cleanup of plane 0) and keeps 4 bytes of the
+        // refinement pass of plane 0, which needs about 520.
+        let dense: [Int32] = (0..<(side * side)).map { _ in
+            let value = Int32(next() % 1024)
+            return next() % 2 == 0 ? value : -value
+        }
+        let encoded = try BitPlaneCoder(width: side, height: side, subband: .hh).encode(coefficients: dense, bitDepth: 14)
+        XCTAssertEqual(encoded.passCount, 3 * (14 - encoded.zeroBitPlanes) - 2, "the encoder writes every pass")
+        let passCount = encoded.passCount - 1
+        let lastPassStart = encoded.cumulativePassBytes[passCount - 2]
+        XCTAssertGreaterThan(encoded.cumulativePassBytes[passCount - 1] - lastPassStart,
+                             4 * EntropyIntegrity.maximumOverRead)
+        let rateCut = encoded.data.prefix(lastPassStart + 4)
+        let expected = try unchecked(rateCut, passCount, encoded.zeroBitPlanes)
+        for decode in checked {
+            XCTAssertEqual(try decode(rateCut, passCount, encoded.zeroBitPlanes), expected)
+        }
+        // The same bytes with every pass declared: the block was cut, not rate-controlled.
+        assertRefused(rateCut, passCount: encoded.passCount, zeroBitPlanes: encoded.zeroBitPlanes, "every pass declared")
+
+        // One bit-plane, one pass, and only 4 of its bytes: the reads past the end during that last pass count.
+        let ones: [Int32] = (0..<(side * side)).map { _ in next() % 2 == 0 ? 0 : (next() % 2 == 0 ? 1 : -1) }
+        let single = try BitPlaneCoder(width: side, height: side, subband: .hh).encode(coefficients: ones, bitDepth: 14)
+        XCTAssertEqual(single.passCount, 1)
+        XCTAssertGreaterThan(single.data.count, 4 * EntropyIntegrity.maximumOverRead)
+        assertRefused(single.data.prefix(4), passCount: 1, zeroBitPlanes: single.zeroBitPlanes, "one complete pass")
+    }
+
+    /// The GDCM/OpenJPEG 2.0 encoder writes a COC and a QCC for every component in each tile-part header, restating
+    /// the main header (pydicom `SC_rgb_gdcm_KY`, which GDCM displays; #3076). Restatements decode like the plain
+    /// codestream; a real per-tile override stays refused.
+    func test_tilePartRestatingTheMainHeader_decodesAndARealOverrideStaysRefused() async throws {
+        let width = 40, height = 24
+        let descriptor = Self.descriptor(width: width, height: height, bitsStored: 8, samples: 3, photometric: "RGB")
+        let codestream = try await Self.ownCodestream(Self.samples(width: width, height: height, precision: 8, components: 3),
+                                                      descriptor: descriptor)
+        let bytes = [UInt8](codestream)
+        // Main-header segments up to the first SOT.
+        var segments: [UInt8: [UInt8]] = [:]
+        var sot = 2
+        while bytes[sot + 1] != 0x90 {
+            let length = Int(bytes[sot + 2]) << 8 | Int(bytes[sot + 3])
+            segments[bytes[sot + 1]] = Array(bytes[(sot + 4)..<(sot + 2 + length)])
+            sot += 2 + length
+        }
+        let cod = try XCTUnwrap(segments[0x52]), qcd = try XCTUnwrap(segments[0x5C])
+        func segment(_ code: UInt8, _ body: [UInt8]) -> [UInt8] {
+            [0xFF, code, UInt8((body.count + 2) >> 8), UInt8((body.count + 2) & 0xFF)] + body
+        }
+        func withTilePartHeader(_ extra: [UInt8]) -> Data {
+            var out = Array(bytes[..<(sot + 12)])
+            let psot = (6..<10).reduce(0) { $0 << 8 | Int(out[sot + $1]) }
+            if psot != 0 {
+                for byte in 0..<4 { out[sot + 6 + byte] = UInt8(truncatingIfNeeded: (psot + extra.count) >> (24 - 8 * byte)) }
+            }
+            return Data(out + extra + bytes[(sot + 12)...])
+        }
+        let spcod = Array(cod.dropFirst(5))
+        let restated = segment(0x52, cod) + segment(0x5C, qcd) + [UInt8(1), 2].flatMap { component in
+            segment(0x53, [component, cod[0] & 0x01] + spcod) + segment(0x5D, [component] + qcd)
+        }
+        let backend = DicomJ2KSwiftBackend()
+        func decode(_ frame: Data) async throws -> Data {
+            try await backend.decode(DicomFrameDecodeRequest(frameData: frame, descriptor: descriptor, frameIndex: 0)).buffer.data
+        }
+        let plain = try await decode(codestream)
+        let decoded = try await decode(withTilePartHeader(restated))
+        XCTAssertEqual(decoded, plain)
+
+        // One decomposition level fewer for component 1 is a real override.
+        var levels = spcod
+        levels[0] -= 1
+        do {
+            _ = try await decode(withTilePartHeader(segment(0x53, [1, cod[0] & 0x01] + levels)))
+            XCTFail("a tile-part COC that changes the coding parameters must be refused")
+        } catch {
+            XCTAssertTrue(String(describing: error).contains("0xFF53"), String(describing: error))
+        }
+    }
+
     /// The decoder writes 16-bit samples in the requested byte order and tags them, so the DICOM backend needs no swap
     /// pass (#2902); the power-of-two downscale reads and writes in the component's order.
     func test_sampleByteOrder_isWrittenAndTaggedAsRequested() async throws {

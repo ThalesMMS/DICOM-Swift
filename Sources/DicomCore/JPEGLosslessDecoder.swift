@@ -100,12 +100,19 @@ internal final class JPEGLosslessDecoder {
         try validateFrameParameters(sof3: sof3, sos: sos)
 
         // Decode pixels
-        let pixels = try decodePixels(
-            data: data,
-            sof3: sof3,
-            sos: sos,
-            compressedDataStart: compressedDataStart
-        )
+        let pixels: [UInt16]
+        do {
+            pixels = try decodePixels(data: data, sof3: sof3, sos: sos, compressedDataStart: compressedDataStart)
+        } catch {
+            // Issue #3053: a 16-bit stream that fails where a table codes SSSS 16 may come from the Cornell encoder,
+            // which writes 16 bits after that code. GDCM retries such a stream with that reading; so does this
+            // decoder. A conformant stream decodes on the first pass, so its samples never take this path.
+            let codesCategory16 = huffmanTables.values.contains { $0.tableClass == 0 && $0.symbolValues.contains(16) }
+            guard sof3.precision == 16, codesCategory16 else { throw error }
+            pixels = try decodePixels(data: data, sof3: sof3, sos: sos, compressedDataStart: compressedDataStart,
+                                      cornellCategory16: true)
+            logger?.warning("JPEG Lossless stream decoded with the Cornell reading of SSSS 16 (16 extra bits)")
+        }
 
         let elapsed = CFAbsoluteTimeGetCurrent() - startTime
         logger?.info("JPEG Lossless decode completed in \(String(format: "%.3f", elapsed))s")

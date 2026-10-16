@@ -12,11 +12,13 @@ extension JPEGLosslessDecoder {
     /// - Returns: `width × height` samples for one component, or interleaved (R,G,B per pixel) for three.
     /// - Throws: `DICOMError.invalidDICOMFormat` for missing tables, invalid codes, malformed restart framing,
     ///   out-of-range categories or unsupported component layouts.
+    /// - Parameter cornellCategory16: reads 16 bits after each SSSS 16 code, as the Cornell encoder wrote them.
     func decodePixels(
         data: Data,
         sof3: SOF3Info,
         sos: SOSInfo,
-        compressedDataStart: Int
+        compressedDataStart: Int,
+        cornellCategory16: Bool = false
     ) throws -> [UInt16] {
         let width = sof3.width
         let height = sof3.height
@@ -95,7 +97,8 @@ extension JPEGLosslessDecoder {
         defer { tables.forEach { $0.deallocate() } }
         try data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
             let bytes = raw.bindMemory(to: UInt8.self)
-            var reader = JPEGLosslessEntropyReader(bytes: bytes, start: compressedDataStart, end: data.count)
+            var reader = JPEGLosslessEntropyReader(bytes: bytes, start: compressedDataStart, end: data.count,
+                                                   cornellCategory16: cornellCategory16)
             try samples.withUnsafeMutableBufferPointer { buffer in
                 var restartCount = 0
                 for y in 0..<height {
@@ -168,6 +171,18 @@ extension JPEGLosslessDecoder {
         initialPredictor: Int, transformedMask: Int, precision: Int, table: JPEGLosslessDecodingTable,
         reader: inout JPEGLosslessEntropyReader
     ) throws {
+        if mode == 1, !firstLine {
+            // Selection value 1 (Ra) on a later line, the common DICOM case (#3079): Rb at the line start, then the
+            // left neighbour kept in a register.
+            let base = planeBase + rowBase
+            var left = Int(buffer[base - width])
+            for x in 0..<width {
+                let difference = try decodeDifference(precision: precision, table: table, reader: &reader)
+                left = (left + difference) & 0xFFFF & transformedMask
+                buffer[base + x] = UInt16(truncatingIfNeeded: left)
+            }
+            return
+        }
         for x in 0..<width {
             try decodeSample(buffer: buffer, planeBase: planeBase, rowBase: rowBase, x: x, width: width, firstLine: firstLine,
                              mode: mode, initialPredictor: initialPredictor, transformedMask: transformedMask,
@@ -184,14 +199,22 @@ extension JPEGLosslessDecoder {
         let index = planeBase + rowBase + x
         let predictor = predict(buffer: buffer, index: index, x: x, width: width, firstLine: firstLine,
                                 mode: mode, initialPredictor: initialPredictor)
+        let difference = try decodeDifference(precision: precision, table: table, reader: &reader)
+        buffer[index] = UInt16(truncatingIfNeeded: (predictor + difference) & 0xFFFF & transformedMask)
+    }
+
+    /// The next sample's difference: the reader's one-step path for short codes, else the checked symbol and bits.
+    @inline(__always)
+    private static func decodeDifference(precision: Int, table: JPEGLosslessDecodingTable,
+                                         reader: inout JPEGLosslessEntropyReader) throws -> Int {
+        if let difference = reader.decodeShortDifference(table) { return difference }
         let category = try reader.decodeSymbol(table)
         // Predictors 4...7 can predict outside the sample range, so a P-bit image legitimately carries categories
         // above P (libjpeg-turbo writes them); only categories above 16 are impossible (T.81 Table H.2).
         guard category <= 16 else {
             throw DICOMError.invalidDICOMFormat(reason: "Invalid SSSS value: \(category) exceeds the maximum difference category 16 (sample precision \(precision))")
         }
-        let difference = try reader.readDifference(category: category)
-        buffer[index] = UInt16(truncatingIfNeeded: (predictor + difference) & 0xFFFF & transformedMask)
+        return try reader.readDifference(category: category)
     }
 
     /// T.81 H.1.2.1 prediction: selection 0 is no prediction; the first line of a scan or restart interval uses
@@ -217,34 +240,38 @@ extension JPEGLosslessDecoder {
         }
     }
 
+    /// Scans raw bytes, not `Data` subscripts (#3079: the scan of a whole entropy segment was a sixth of a decode).
     private func containsRestartMarker(data: Data, startIndex: Int, endIndex: Int) -> Bool {
-        var index = startIndex
-        while index + 1 < endIndex {
-            guard data[index] == JPEGMarker.prefix else {
-                index += 1
-                continue
-            }
+        data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) -> Bool in
+            let bytes = raw.bindMemory(to: UInt8.self)
+            var index = startIndex
+            while index + 1 < endIndex {
+                guard bytes[index] == JPEGMarker.prefix else {
+                    index += 1
+                    continue
+                }
 
-            var markerIndex = index + 1
-            while markerIndex < endIndex && data[markerIndex] == JPEGMarker.prefix {
-                markerIndex += 1
-            }
+                var markerIndex = index + 1
+                while markerIndex < endIndex && bytes[markerIndex] == JPEGMarker.prefix {
+                    markerIndex += 1
+                }
 
-            guard markerIndex < endIndex else { return false }
+                guard markerIndex < endIndex else { return false }
 
-            let marker = data[markerIndex]
-            if marker == JPEGMarker.stuffingByte {
+                let marker = bytes[markerIndex]
+                if marker == JPEGMarker.stuffingByte {
+                    index = markerIndex + 1
+                    continue
+                }
+
+                if JPEGMarker.isRestart(marker) {
+                    return true
+                }
+
                 index = markerIndex + 1
-                continue
             }
 
-            if JPEGMarker.isRestart(marker) {
-                return true
-            }
-
-            index = markerIndex + 1
+            return false
         }
-
-        return false
     }
 }

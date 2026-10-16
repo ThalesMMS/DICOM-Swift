@@ -1,3 +1,75 @@
+# 3.0.0
+
+This major release synchronizes the reviewed canonical sources since 2.0.4,
+from the IsiX migration of decoding to DICOM-Swift. Swift tools 6.2, Swift 6
+language mode, Apple-platform 26.0 minimums and the announced products remain
+unchanged. The `DicomWebClient` and `DicomWebOIDC` sources are identical to
+2.0.4; `DicomData` changes are additive or internal.
+
+## Breaking
+
+- `DicomSeriesLoader` builds a single-frame series with unevenly spaced slice
+  positions at the median interval instead of throwing `variableSliceSpacing`,
+  and reports the new `SliceSpacingSource.irregularImagePositionPatient`.
+- `DicomSeriesLoader` builds a series whose Bits Stored and High Bit vary
+  between slices instead of throwing `unsupportedPixelFormat`.
+- `DCMDecoder.displayRGB8(decodedFrame:)` displays signed PALETTE COLOR
+  indices; a negative index takes the first entry.
+- `DicomIngestJournalEntry.Disposition` gains `lost`.
+
+Exhaustive switches over `SliceSpacingSource` or `Disposition` need the new
+cases. Callers that relied on the refusals above now receive a volume or an
+image.
+
+## Added
+
+- `DicomSourceFrameSession.storedSampleFrame(at:)` and `DicomStoredSampleFrame`
+  read native monochrome 8/16-bit frames in place, byte-identical to the
+  decoded path.
+- `DicomByteSource.fileIdentity` (`DicomFileIdentity`) and
+  `DicomIngestJournalEntry.expectedChecksum`.
+- `DicomJ2KFallbackLedger` counts OpenJPEG and CharLS fallbacks in `preferred`
+  mode.
+
+## Changed and fixed
+
+- Faster JPEG 2000 (C code-block decoder), JPEG lossless, header scanning and
+  series builds, with lower peak memory; lossless output stays bit-exact.
+- The standard dictionary is a compiled table, and the generated `DicomData`
+  tables compile in about 0.5 GB per frontend instead of exhausting memory.
+- JPEG 2000 tile-part headers that restate the main header, dropped all-ones
+  segment tails and rate-control-truncated last passes are decoded.
+- Seven structures GDCM tolerates (odd fragments, unaddressed offset tables,
+  overrunning File Meta length, defined-length encapsulated Pixel Data,
+  JPEG Lossless Se and SSSS 16, compressed 12-bit) are read; Rescale Slope 0 is
+  read as 1 with a warning.
+- ASCII text survives an undefined Specific Character Set in the single-frame
+  codec input, and ingest replay no longer republishes bytes that failed their
+  checksum or replays ingests it cannot advance.
+
+See CHANGELOG.md for details.
+
+## Validation and limits
+
+The isolated export was validated on macOS 27 (arm64) with Xcode's Swift 6.4
+(swiftlang-6.4.0.34.1): the target-boundary validator passed; the minimal
+`DicomWebClient`/`DicomWebOIDC`/`DicomData` consumer built and passed in Debug
+and Release; `DicomCore` built in Release; focused XCTest passed for 85 tests
+in `DicomStandardDictionaryTableTests`, `DicomColorPixelDataTests`,
+`DicomSeriesLoaderBitsStoredTests`, `DicomSeriesLoaderDecoderReleaseTests`,
+`DicomSeriesLoaderIrregularSpacingTests`, `DicomSourceMetadataBlockScanTests`,
+`DicomStoredSampleFrameTests`, `GDCMToleratedStructureTests`,
+`J2KBitPlaneNativeDecodingTests`, `DicomWebContractCorpusTests`,
+`DicomWebLegacyMultipartTests`, `DicomWebSearchParametersTests` and
+`DicomWebOIDCProviderTests`.
+
+The codec changes reuse their canonical qualification in the consuming
+application, run without external codec runtimes. The full suite and the
+optional codec runtime matrix were not repeated. Unsupported profiles and known
+codec/volume readiness gaps remain; this is not a universal codec claim.
+Publication verifies the exported tree and remote version resolution;
+application integration is checked separately.
+
 # 2.0.4
 
 This patch synchronizes the remaining reviewed canonical codec and frame-input

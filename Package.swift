@@ -79,7 +79,8 @@ let package = Package(
         .target(name: "DicomJPEGXL", path: "Sources/DicomJPEGXL", swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]),
         // Vendored JPEG 2000 Part 1/15 CPU codec: Raster-Lab/J2KSwift 11.0.2 J2KCore+J2KCodec without GPU/NEON/MJ2 (MIT; BSD-2-Clause), plus later upstream fixes listed in ThirdPartyNotices.txt.
         .target(name: "DicomJPEG2000", dependencies: ["DicomJPEG2000NEON"], path: "Sources/DicomJPEG2000"),
-        // HT tier-1 block coder hot path of the same J2KSwift core (plain C, no unsafe flags).
+        // Tier-1 hot paths of the same J2KSwift core in plain C, no unsafe flags: the HT block coder and the EBCOT block
+        // decoder (#3078).
         .target(name: "DicomJPEG2000NEON", path: "Sources/DicomJPEG2000NEON", publicHeadersPath: "include"),
         .target(name: "DicomObjects", dependencies: ["DicomData"]),
         .target(name: "DicomNetwork", dependencies: ["DicomData"]),

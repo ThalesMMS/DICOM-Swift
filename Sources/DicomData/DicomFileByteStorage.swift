@@ -66,6 +66,13 @@ package final class DicomFileByteStorage: @unchecked Sendable {
 
     deinit { if descriptor >= 0 { _ = systemClose(descriptor) } }
 
+    /// The status the file had when it was opened, which every validating read checks.
+    package var identity: DicomFileIdentity {
+        DicomFileIdentity(device: snapshot.device, inode: snapshot.inode, size: snapshot.size,
+                          modifiedSeconds: snapshot.modifiedSeconds, modifiedNanoseconds: snapshot.modifiedNanos,
+                          changedSeconds: snapshot.changedSeconds, changedNanoseconds: snapshot.changedNanos)
+    }
+
     package static func openFile(_ url: URL) async throws -> DicomFileByteStorage {
         guard url.isFileURL else { throw DicomByteSource.Failure.invalidSource }
         let queue = DispatchQueue(label: "dicom.byte-source.file", qos: .userInitiated)
@@ -75,12 +82,20 @@ package final class DicomFileByteStorage: @unchecked Sendable {
         }
     }
 
-    package func read(_ range: Range<Int>, mapped: Bool) async throws -> Data {
+    /// `validatesRevision: false` is for a caller that validates the revision itself once its sequence of reads is
+    /// complete and discards everything it read when that fails (the metadata scan, issue #3051).
+    package func read(_ range: Range<Int>, mapped: Bool, validatesRevision: Bool = true) async throws -> Data {
         try await Self.perform(on: queue) { cancelled in
             if cancelled() { throw CancellationError() }
-            try self.validateRevision()
+            guard self.descriptor >= 0 else { throw DicomByteSource.Failure.closed }
             let length = range.count
-            guard length > 0 else { return Data() }
+            // One revision check, after the bytes are copied, covers a change before or during the read: the
+            // snapshot is the one taken at open. A failed read reports the change when there is one. Checking
+            // before the read as well doubled the stat calls of the metadata scan's many small reads (#3051).
+            guard length > 0 else {
+                try self.validateRevision()
+                return Data()
+            }
             let allocation: UnsafeMutableRawPointer?
             if mapped {
                 allocation = mmap(nil, length, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0)
@@ -96,20 +111,25 @@ package final class DicomFileByteStorage: @unchecked Sendable {
                 }
             }
             var received = 0
-            while received < length {
-                if cancelled() { throw CancellationError() }
-                let amount = pread(self.descriptor, buffer.advanced(by: received),
-                                   min(length - received, 256 * 1024), off_t(range.lowerBound + received))
-                if amount < 0 {
-                    if errno == EINTR { continue }
-                    throw DicomByteSource.Failure.io(errno)
+            do {
+                while received < length {
+                    if cancelled() { throw CancellationError() }
+                    let amount = pread(self.descriptor, buffer.advanced(by: received),
+                                       min(length - received, 256 * 1024), off_t(range.lowerBound + received))
+                    if amount < 0 {
+                        if errno == EINTR { continue }
+                        throw DicomByteSource.Failure.io(errno)
+                    }
+                    guard amount > 0 else {
+                        throw DicomByteSource.Failure.shortRead(expected: length, actual: received)
+                    }
+                    received += amount
                 }
-                guard amount > 0 else {
-                    throw DicomByteSource.Failure.shortRead(expected: length, actual: received)
-                }
-                received += amount
+            } catch let failure as DicomByteSource.Failure {
+                try self.validateRevision()
+                throw failure
             }
-            try self.validateRevision()
+            if validatesRevision { try self.validateRevision() }
             if cancelled() { throw CancellationError() }
             transferred = true
             return Data(bytesNoCopy: buffer, count: length, deallocator: .custom { pointer, count in

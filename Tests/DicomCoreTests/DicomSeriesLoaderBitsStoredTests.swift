@@ -5,6 +5,8 @@
 //  Issue #2781: series with fewer bits stored than allocated — 12 of 16, as
 //  most CT stores them — assemble a volume of their stored values, the unused
 //  high bits masked away and a signed sample extended from its top stored bit.
+//  Issue #3113: a series whose Bits Stored varies between slices (GE MR) reads
+//  each slice by its own Bits Stored.
 //
 
 import Foundation
@@ -33,6 +35,33 @@ final class DicomSeriesLoaderBitsStoredTests: XCTestCase {
 
         XCTAssertTrue(volume.isSignedPixel)
         XCTAssertEqual(Self.voxels(of: volume), (stored + stored).map(Int16.init))
+    }
+
+    func test_unsignedSeries_whoseBitsStoredVariesBetweenSlices_loadsEachSlicesStoredValues() throws {
+        let thirteenBits: [Int] = [0, 1, 4_096, 8_191, 4_095, 6_000, 300, 3_000, 17, 8_000, 5, 6, 7, 8, 9, 10]
+        let twelveBits: [Int] = [0, 1, 1_024, 2_047, 2_048, 4_095, 300, 3_000, 17, 4_000, 5, 6, 7, 8, 9, 10]
+        let directory = try Self.makeSeries(storedValues: [], pixelRepresentation: 0,
+                                            slices: [(thirteenBits, 13), (twelveBits, 12)])
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let volume = try DicomSeriesLoader().loadSeries(in: directory)
+
+        XCTAssertEqual(volume.depth, 2)
+        XCTAssertFalse(volume.isSignedPixel)
+        XCTAssertEqual(Self.voxels(of: volume), (thirteenBits + twelveBits).map(Int16.init))
+    }
+
+    func test_signedSeries_whoseBitsStoredVariesBetweenSlices_extendsEachSliceFromItsOwnTopBit() throws {
+        let thirteenBits: [Int] = [0, 1, -1, -4_096, 4_095, -3_000, 3_000, -2, 2, 100, -100, 512, -512, 7, -7, 0]
+        let twelveBits: [Int] = [0, 1, -1, -2_048, 2_047, -1_000, 1_000, -2, 2, 100, -100, 512, -512, 7, -7, 0]
+        let directory = try Self.makeSeries(storedValues: [], pixelRepresentation: 1,
+                                            slices: [(thirteenBits, 13), (twelveBits, 12)])
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let volume = try DicomSeriesLoader().loadSeries(in: directory)
+
+        XCTAssertTrue(volume.isSignedPixel)
+        XCTAssertEqual(Self.voxels(of: volume), (thirteenBits + twelveBits).map(Int16.init))
     }
 
     func test_unsigned24Of32BitSeries_masksDirtyHighBitsBeforeClamping() throws {
@@ -75,15 +104,19 @@ final class DicomSeriesLoaderBitsStoredTests: XCTestCase {
 
     // MARK: - Fixtures
 
-    /// Two 4×4 slices; unused high bits carry a pattern a reader must drop.
+    /// Two 4×4 slices; unused high bits carry a pattern a reader must drop. `slices` gives each slice its own
+    /// values and Bits Stored instead.
     private static func makeSeries(storedValues: [Int], pixelRepresentation: Int,
-                                   bitsAllocated: Int = 16, bitsStored: Int = 12) throws -> URL {
+                                   bitsAllocated: Int = 16, bitsStored: Int = 12,
+                                   slices: [(values: [Int], bitsStored: Int)]? = nil) throws -> URL {
+        let slices = slices ?? [(storedValues, bitsStored), (storedValues, bitsStored)]
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("series-12bit-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        for sliceIndex in 0..<2 {
+        for (sliceIndex, slice) in slices.enumerated() {
+            let bitsStored = slice.bitsStored
             var pixelData = Data()
-            for value in storedValues {
+            for value in slice.values {
                 let mask = (UInt32(1) << bitsStored) - 1
                 let dirtyHighBits: UInt32 = bitsAllocated == 32 ? 0xAA00_0000 : 0xA000
                 let word = (UInt32(truncatingIfNeeded: value) & mask) | dirtyHighBits
