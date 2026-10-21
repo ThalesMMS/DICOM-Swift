@@ -29,3 +29,4 @@ benchmark-results-*.md
 /.build-codex-pr
 /.build-codex-pr2
 /.build-codex
+/.codeatlas
