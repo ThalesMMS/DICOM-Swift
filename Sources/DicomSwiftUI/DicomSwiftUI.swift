@@ -56,7 +56,7 @@ import DicomCore
 /// All components support:
 /// - Dark mode with automatic color adaptation
 /// - VoiceOver and accessibility features
-/// - iOS, visionOS, and macOS 26+ deployment targets
+/// - iOS 26+, visionOS 26+ and macOS 15+ deployment targets
 /// - Async/await for non‑blocking image loading
 ///
 /// ## Usage

@@ -3,7 +3,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Swift-6.2+-orange.svg" />
   <img src="https://img.shields.io/badge/iOS-26.0+-blue.svg" />
-  <img src="https://img.shields.io/badge/macOS-26.0+-blue.svg" />
+  <img src="https://img.shields.io/badge/macOS-15.0+-blue.svg" />
   <img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" />
   <br/>
 </p>
@@ -865,7 +865,7 @@ targets: [
 
 - Swift 6.2+ toolchain. DICOM-Swift targets compile in Swift 6 language mode, which enables complete
   strict-concurrency checking; consuming targets retain their own language-mode setting.
-- iOS 26.0+, visionOS 26.0+, or macOS 26.0+
+- iOS 26.0+, visionOS 26.0+, or macOS 15.0+
 - Xcode 26.0+
 
 ---
@@ -1372,7 +1372,7 @@ All commands support `--format json` for programmatic parsing:
 
 ### Requirements
 
-- macOS 26.0+
+- macOS 15.0+
 - Swift 6.2+
 - Xcode 26.0+ (for building from source)
 
@@ -1382,7 +1382,7 @@ All commands support `--format json` for programmatic parsing:
 ## SwiftUI Components
 
 The library includes **DicomSwiftUI**, a complete set of pre-built SwiftUI components for building DICOM medical image viewers with minimal code.
-> Requires iOS 26+ / visionOS 26+ / macOS 26+.
+> Requires iOS 26+ / visionOS 26+ / macOS 15+.
 
 ### Available Components
 
@@ -1718,7 +1718,7 @@ See [Examples/DicomSwiftUIExample/README.md](Examples/DicomSwiftUIExample/README
 
 ### Platform Support
 
-- **Core and SwiftUI**: the package supports iOS 26.0+ / visionOS 26.0+ / macOS 26.0+.
+- **Core and SwiftUI**: the package supports iOS 26.0+ / visionOS 26.0+ / macOS 15.0+.
 - **Concurrency**: async frame decode uses native async/await and does not bridge through semaphores.
 
 ---

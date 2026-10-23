@@ -1,3 +1,26 @@
+# 3.0.1
+
+This patch release lowers the macOS minimum from 26.0 to 15.0. iOS and
+visionOS stay at 26.0. Swift tools 6.2, Swift 6 language mode, the announced
+products and their APIs are unchanged.
+
+## Changed
+
+- `Package.swift` declares macOS 15.0.
+- `J2KThermalStateMonitor` removes its thermal-state observer from a plain
+  `deinit`; the isolated `deinit` it used needs macOS 15.4. Behaviour is the
+  same.
+
+## Validation
+
+- `swift build` and `swift build --build-tests` for the whole package with the
+  macOS 15.0 target (arm64, Xcode 26 toolchain with the macOS 27 SDK).
+- `swift test` for `DicomWebClientTests` and `DicomWebOIDCTests`: 199 tests,
+  2 skipped because their external servers or budgets were not configured,
+  no failures.
+- Not run on a Mac with macOS 15: the build only shows that the package
+  compiles for that target.
+
 # 3.0.0
 
 This major release synchronizes the reviewed canonical sources since 2.0.4,

@@ -21,7 +21,7 @@ private var platformSystemBackground: Color {
 // MARK: - Platform And Migration Notes
 
 /// Platform compatibility for these examples:
-/// - iOS, visionOS, or macOS 26.0 or later
+/// - iOS 26.0, visionOS 26.0 or macOS 15.0 or later
 ///
 /// Recommended vs legacy DICOM loading:
 ///

@@ -36,7 +36,7 @@ Before you start, ensure you have:
 - Xcode 26.0+
 - Swift 6.2+ toolchain. DICOM-Swift targets compile in Swift 6 language mode, which enables complete
   strict-concurrency checking; consuming targets retain their own language-mode setting.
-- macOS 26+ or iOS 26+
+- macOS 15+ or iOS 26+
 - Basic Swift knowledge
 - At least one DICOM file to test (`.dcm`)
 

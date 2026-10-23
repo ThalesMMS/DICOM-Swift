@@ -13,7 +13,7 @@ private func exampleSeriesPath(named name: String) -> String {
 
 /// Presents a simple series viewer composed of a DicomImageView and a SeriesNavigatorView.
 ///
-/// Requires iOS, visionOS, or macOS 26+ because it relies on SwiftUI concurrency and async/await. The view displays the current DICOM image and loads a selected slice into the image view when navigation occurs; it is initialized with 100 sample slice URLs.
+/// Requires iOS 26+, visionOS 26+ or macOS 15+ because it relies on SwiftUI concurrency and async/await. The view displays the current DICOM image and loads a selected slice into the image view when navigation occurs; it is initialized with 100 sample slice URLs.
 /// - Returns: A view containing a DicomImageView and a SeriesNavigatorView wired to load selected images.
 func basicSeriesNavigation() -> some View {
     struct BasicSeriesView: View {

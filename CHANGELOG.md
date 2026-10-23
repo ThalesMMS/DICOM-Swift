@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.0.1] - 2026-10-23
+
+The macOS minimum drops from 26.0 to 15.0; iOS and visionOS stay at 26.0. Swift tools 6.2, Swift 6 language
+mode, the announced products and their APIs are unchanged.
+
+### Changed
+
+- `Package.swift` declares macOS 15.0.
+- `J2KThermalStateMonitor` removes its observer from a plain `deinit` instead of an isolated one, which needs
+  macOS 15.4.
+
+---
+
 ## [3.0.0] - 2026-10-16
 
 Major release of the reviewed canonical sources since 2.0.4. Swift tools 6.2, Swift 6 language mode,

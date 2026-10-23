@@ -6,7 +6,7 @@ import UIKit
 #endif
 
 /// DocC Preface
-/// - Platform support: iOS, visionOS, and macOS 26.0+.
+/// - Platform support: iOS 26.0+, visionOS 26.0+ and macOS 15.0+.
 /// - Recommended loading pattern: use `Task`/`.task` with `try await DCMDecoder(contentsOfFile:)`.
 /// - Deprecated pattern: synchronous `DCMDecoder(contentsOf:)` / `DCMDecoder(contentsOfFile:)`.
 /// - Migration hint: move decoder creation into an async function called from `.task`,

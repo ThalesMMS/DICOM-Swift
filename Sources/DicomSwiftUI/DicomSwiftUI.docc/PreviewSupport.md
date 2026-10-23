@@ -450,7 +450,7 @@ If previews fail to render:
 
 1. **Check Xcode Canvas**: Enable Canvas with Cmd+Option+Enter
 2. **Verify Import**: Ensure `import DicomSwiftUI` is present
-3. **Check macOS Target**: Preview requires the macOS 26+ deployment target
+3. **Check macOS Target**: Preview requires the macOS 15+ deployment target
 4. **Restart Canvas**: Resume preview or click "Try Again"
 
 ### Slow Preview Loading

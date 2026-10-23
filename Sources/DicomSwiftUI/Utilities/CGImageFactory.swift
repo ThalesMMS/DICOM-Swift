@@ -106,7 +106,7 @@ import AppKit
 ///
 /// ### Platform Compatibility
 ///
-/// Available on the package's iOS, visionOS, and macOS 26+ targets.
+/// Available on the package's iOS 26+, visionOS 26+ and macOS 15+ targets.
 ///
 public enum CGImageFactory {
 

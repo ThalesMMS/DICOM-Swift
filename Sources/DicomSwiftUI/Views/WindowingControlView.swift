@@ -15,7 +15,7 @@
 //
 //  Platform Availability:
 //
-//  Available on the package's iOS, visionOS, and macOS 26+ targets.
+//  Available on the package's iOS 26+, visionOS 26+ and macOS 15+ targets.
 //  Uses native SwiftUI components for optimal performance and platform integration.
 //
 //  Accessibility:

@@ -2,7 +2,7 @@
 
 Use the public HTTPS package URL `https://github.com/ThalesMMS/DICOM-Swift.git`
 with an exact released version. The manifest requires Swift tools 6.2, Swift 6
-language mode and iOS, visionOS or macOS 26.0+. The public source mirror preserves
+language mode, iOS or visionOS 26.0+ and macOS 15.0+. The public source mirror preserves
 its release history; application history and local development instructions are
 not exported. Package consumers do not need a sibling application checkout.
 

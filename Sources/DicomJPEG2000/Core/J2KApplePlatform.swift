@@ -297,13 +297,16 @@ public actor J2KThermalStateMonitor {
     private var currentThermalState: J2KThermalState = .nominal
     private var isMonitoring: Bool = false
     #if !os(Linux) && !os(Windows)
-    private var thermalObserver: (any NSObjectProtocol)?
+    // nonisolated(unsafe): written only by the actor's own methods; the deinit,
+    // which has the instance to itself, only reads it. An isolated deinit would
+    // need macOS 15.4.
+    nonisolated(unsafe) private var thermalObserver: (any NSObjectProtocol)?
     #endif
 
     /// Creates a new thermal state monitor.
     public init() {}
 
-    isolated deinit {
+    deinit {
         #if !os(Linux) && !os(Windows)
         if let thermalObserver { NotificationCenter.default.removeObserver(thermalObserver) }
         #endif

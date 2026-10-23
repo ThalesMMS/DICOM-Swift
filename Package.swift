@@ -7,7 +7,7 @@ let package = Package(
     platforms: [
         .iOS("26.0"),
         .visionOS("26.0"),
-        .macOS("26.0")
+        .macOS("15.0")
     ],
     products: [
         .library(name: "HL7v3CDA", targets: ["HL7v3CDA"]),

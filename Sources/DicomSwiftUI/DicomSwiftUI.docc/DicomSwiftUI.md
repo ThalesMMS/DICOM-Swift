@@ -6,7 +6,7 @@ Production-ready SwiftUI components for DICOM medical imaging. Build medical ima
 
 DicomSwiftUI provides high-level SwiftUI components for displaying and interacting with DICOM medical images. Built on top of `DicomCore`, it handles common tasks like image display with automatic scaling, interactive windowing controls, series navigation, and metadata presentation.
 
-All components follow SwiftUI best practices, support dark mode, include accessibility features, and are optimized for iOS, visionOS, and macOS 26+ deployment targets.
+All components follow SwiftUI best practices, support dark mode, include accessibility features, and are optimized for the iOS 26+, visionOS 26+ and macOS 15+ deployment targets.
 
 ### Key Features
 
