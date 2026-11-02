@@ -301,10 +301,12 @@ public final class DicomFileSetExporter: @unchecked Sendable {
                 in: &seriesByInstance,
                 label: "instance"
             )
+            // Scoped to the study: one Patient ID may carry different names across
+            // studies, and each name then gets its own PATIENT record.
             try Self.validateDirectoryValue(
                 source.patientName,
                 field: "Patient Name",
-                scope: source.patientID,
+                scope: source.studyInstanceUID,
                 values: &directoryValues
             )
             try Self.validateDirectoryValue(
@@ -379,8 +381,18 @@ public final class DicomFileSetExporter: @unchecked Sendable {
     }
 
     private static func makeDirectory(fileSetID: String, sources: [Source]) -> DicomDirectory {
-        let patients = Dictionary(grouping: sources, by: \.patientID).keys.sorted().map { patientID in
-            let patientSources = sources.filter { $0.patientID == patientID }
+        // A study takes the one name its files carry: a file without the name
+        // must not split the study into a second PATIENT record.
+        var studyPatientNames: [String: String] = [:]
+        for source in sources where !source.patientName.isEmpty {
+            studyPatientNames[source.studyInstanceUID] = source.patientName
+        }
+        func directoryPatientKey(of source: Source) -> [String] {
+            [source.patientID, studyPatientNames[source.studyInstanceUID] ?? ""]
+        }
+        let patientKeys = Dictionary(grouping: sources, by: directoryPatientKey).keys
+        let patients = patientKeys.sorted { $0.lexicographicallyPrecedes($1) }.map { patientKey in
+            let patientSources = sources.filter { directoryPatientKey(of: $0) == patientKey }
             let studies = Dictionary(grouping: patientSources, by: \.studyInstanceUID).keys.sorted().map { studyUID in
                 let studySources = patientSources.filter { $0.studyInstanceUID == studyUID }
                 let seriesKeys = Dictionary(grouping: studySources, by: \.seriesInstanceUID).keys.sorted()
@@ -416,8 +428,8 @@ public final class DicomFileSetExporter: @unchecked Sendable {
                 )
             }
             return DicomDirectoryPatient(
-                patientID: patientID,
-                patientName: patientSources[0].patientName,
+                patientID: patientKey[0],
+                patientName: patientKey[1],
                 studies: studies
             )
         }

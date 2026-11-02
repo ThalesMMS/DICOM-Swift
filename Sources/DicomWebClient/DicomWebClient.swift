@@ -845,6 +845,7 @@ public struct DicomWebClient: Sendable {
             throw DicomWebError(statusCode: response.statusCode, headers: response.headers,
                                 body: await Self.bodyPreview(of: response), credentials: credentials(adding: provided))
         }
+        response.sentCredentials = forwardsCredentials ? credentials(adding: provided) : [:]
         return response
     }
 
@@ -1219,12 +1220,19 @@ public struct DicomWebClient: Sendable {
         }
         let response = try await collect(streamed, maximumBytes: configuration.maximumMetadataBytes)
         let contentType = response.headers.dicomWebHeaderValue("Content-Type")
-        let parts = try multipartPartsIfNeeded(body: response.body, contentType: contentType)
         let decoded: DicomWebStoreResponse
-        if let first = parts.first(where: \.isRoot) ?? parts.first {
-            decoded = try DicomWebStoreResponse.decode(first.body, contentType: first.contentType)
-        } else {
-            decoded = try DicomWebStoreResponse.decode(response.body, contentType: contentType)
+        let parts: [DicomWebMultipartPart]
+        do {
+            parts = try multipartPartsIfNeeded(body: response.body, contentType: contentType)
+            if let first = parts.first(where: \.isRoot) ?? parts.first {
+                decoded = try DicomWebStoreResponse.decode(first.body, contentType: first.contentType)
+            } else {
+                decoded = try DicomWebStoreResponse.decode(response.body, contentType: contentType)
+            }
+        } catch where !(200..<300).contains(response.statusCode) {
+            // A refusal whose body is no store response says nothing about the instances: it stays the HTTP refusal.
+            throw DicomWebError(statusCode: response.statusCode, headers: response.headers, body: response.body,
+                                credentials: streamed.sentCredentials)
         }
         var result = DicomWebStoreResult(statusCode: response.statusCode, responseData: response.body,
                                          responseParts: parts, storeResponse: decoded)

@@ -655,6 +655,9 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
     let decoderFactory: @Sendable (String) throws -> DicomDecoderProtocol
     let logger: LoggerProtocol
     let allocateVoxelData: @Sendable (Int) throws -> Data
+    /// Called with the slices decoded so far and the total after each slice of `loadSeries(in:)`, in no particular
+    /// order of slices, and without making the decode sequential as `progress` does.
+    let sliceDecodeObserver: (@Sendable (_ decoded: Int, _ total: Int) -> Void)?
 
     // MARK: - Initialization
 
@@ -665,10 +668,12 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
 
     /// Host allocation boundary for the final CPU volume. The allocator must return
     /// zero-initialized storage of exactly the requested length and retain its accounting.
-    public convenience init(allocateVoxelData: @escaping @Sendable (Int) throws -> Data) {
+    public convenience init(allocateVoxelData: @escaping @Sendable (Int) throws -> Data,
+                            sliceDecodeObserver: (@Sendable (_ decoded: Int, _ total: Int) -> Void)? = nil) {
         self.init(decoderFactory: { path in try DCMDecoder(mappingContentsOfFile: path) },
                   logger: DicomLogger.make(subsystem: "com.dicomcore", category: "series-loader"),
-                  allocateVoxelData: allocateVoxelData)
+                  allocateVoxelData: allocateVoxelData,
+                  sliceDecodeObserver: sliceDecodeObserver)
     }
 
     /// Required protocol initializer with injected logging.
@@ -690,9 +695,11 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
     ///   - logger: Logger used for diagnostics emitted during series loading.
     public init(decoderFactory: @escaping @Sendable (String) throws -> DicomDecoderProtocol,
                 logger: LoggerProtocol,
-                allocateVoxelData: @escaping @Sendable (Int) throws -> Data = { Data(count: $0) }) {
+                allocateVoxelData: @escaping @Sendable (Int) throws -> Data = { Data(count: $0) },
+                sliceDecodeObserver: (@Sendable (_ decoded: Int, _ total: Int) -> Void)? = nil) {
         self.decoderFactory = decoderFactory
         self.logger = logger
+        self.sliceDecodeObserver = sliceDecodeObserver
         self.allocateVoxelData = { byteCount in
             let data = try allocateVoxelData(byteCount)
             guard data.count == byteCount else {
@@ -1121,6 +1128,7 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
                         }
                         let base = state.destination.advanced(by: index * sliceVoxelCount)
                         base.update(from: buffer, count: sliceVoxelCount)
+                        if let observer = self.sliceDecodeObserver { observer(state.markDecoded(), slices.count) }
                     }
                 }
                 return state.firstFailure
@@ -1159,6 +1167,7 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
 
                     let base = dest.baseAddress!.advanced(by: index * sliceVoxelCount)
                     base.update(from: sliceBuffer, count: sliceVoxelCount)
+                    sliceDecodeObserver?(index + 1, depth)
 
                     if let progress {
                         let fraction = Double(index + 1) / Double(depth)
@@ -1262,6 +1271,7 @@ private final class ParallelSliceDecodeState: @unchecked Sendable {
     private var decoders: [URL: DicomDecoderProtocol]
     private let lock = DicomLock()
     private var nextSlice = 0
+    private var decodedSlices = 0
     private var failures: [Int: Error] = [:]
     private var reportedClamp = false
 
@@ -1281,6 +1291,14 @@ private final class ParallelSliceDecodeState: @unchecked Sendable {
 
     func fail(_ index: Int, _ error: Error) {
         lock.withLock { failures[index] = error }
+    }
+
+    /// One more slice is in the volume; returns how many are.
+    func markDecoded() -> Int {
+        lock.withLock {
+            decodedSlices += 1
+            return decodedSlices
+        }
     }
 
     /// The failure of the first slice in series order, as the sequential loop reports it.

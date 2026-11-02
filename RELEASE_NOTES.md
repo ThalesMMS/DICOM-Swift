@@ -1,3 +1,41 @@
+# 3.1.0
+
+This minor release synchronizes the reviewed canonical sources since 3.0.1.
+Swift tools 6.2, Swift 6 language mode, the platform minimums (iOS and
+visionOS 26.0, macOS 15.0) and the announced products are unchanged. The one
+API change is an addition with a default value.
+
+## Added
+
+- `DicomSeriesLoader(allocateVoxelData:sliceDecodeObserver:)` reports the
+  slices decoded so far after each slice, in the parallel build too, without
+  making the decode sequential as `progress` does.
+
+## Fixed
+
+- `DicomSeriesLoader` builds a series whose files are symbolic links to
+  regular files instead of failing with `noDicomFiles`.
+- `DicomWebClient`: a STOW-RS refusal whose body is no store response stays
+  the HTTP refusal (`DicomWebError`) instead of becoming a decode error; echoed
+  credentials in that body are still redacted.
+- `DicomFileSetExporter` exports studies in which one Patient ID carries
+  different Patient Names, with one PATIENT record per ID and name, and keeps
+  a study whose files omit the name in some of them in one PATIENT record.
+  Conflicting names inside one study are still refused.
+
+## Validation
+
+- `swift build --build-tests` for the whole package (arm64, Swift 6.4.2 with
+  the macOS 27.2 SDK).
+- `Scripts/validate_target_boundaries.py`: passed.
+- `swift test` for `DicomFileSetExporterTests`, `DicomSeriesLoaderHelpersTests`,
+  `DicomSeriesLoaderDecoderReleaseTests`, `DicomWebStoreBatchTests`,
+  `DicomWebClientTests` and `DicomWebOIDCTests`: 249 tests, 3 skipped because
+  their external fixture, server or benchmark budget was not configured, no
+  failures.
+- Codec runtimes and the other suites were not rerun: their sources are
+  unchanged since 3.0.1.
+
 # 3.0.1
 
 This patch release lowers the macOS minimum from 26.0 to 15.0. iOS and

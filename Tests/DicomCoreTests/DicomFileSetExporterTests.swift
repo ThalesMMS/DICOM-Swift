@@ -121,6 +121,72 @@ final class DicomFileSetExporterTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
     }
 
+    func testExportKeepsEveryPatientNameOfAPatientIDAcrossStudies() async throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let first = root.appendingPathComponent("first.dcm")
+        let second = root.appendingPathComponent("second.dcm")
+        try makePart10Data(sopInstanceUID: "2.25.1").write(to: first)
+        try makePart10Data(
+            sopInstanceUID: "2.25.2",
+            patientName: "Doe^Jane^M",
+            studyInstanceUID: "2.25.20",
+            seriesInstanceUID: "2.25.21"
+        ).write(to: second)
+        let destination = root.appendingPathComponent("DICOM.ZIP")
+
+        let result = try await DicomFileSetExporter().export(files: [first, second], to: destination)
+
+        XCTAssertEqual(result.instanceCount, 2)
+        let archive = try Archive(url: destination, accessMode: .read)
+        var directoryData = Data()
+        _ = try archive.extract(try XCTUnwrap(archive["DICOMDIR"])) { directoryData.append($0) }
+        let directory = try DicomDirectoryReader.read(data: directoryData)
+        XCTAssertEqual(directory.patients.map(\.patientID), ["PATIENT1", "PATIENT1"])
+        XCTAssertEqual(directory.patients.map(\.patientName), ["Doe^Jane", "Doe^Jane^M"])
+        XCTAssertEqual(directory.patients.map { $0.studies.map(\.studyInstanceUID) }, [["2.25.10"], ["2.25.20"]])
+    }
+
+    func testExportKeepsAStudyWhoseFilesOmitThePatientNameInOnePatientRecord() async throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let named = root.appendingPathComponent("named.dcm")
+        let unnamed = root.appendingPathComponent("unnamed.dcm")
+        try makePart10Data(sopInstanceUID: "2.25.1").write(to: named)
+        try makePart10Data(sopInstanceUID: "2.25.2", patientName: "").write(to: unnamed)
+        let destination = root.appendingPathComponent("DICOM.ZIP")
+
+        let result = try await DicomFileSetExporter().export(files: [named, unnamed], to: destination)
+
+        XCTAssertEqual(result.instanceCount, 2)
+        let archive = try Archive(url: destination, accessMode: .read)
+        var directoryData = Data()
+        _ = try archive.extract(try XCTUnwrap(archive["DICOMDIR"])) { directoryData.append($0) }
+        let directory = try DicomDirectoryReader.read(data: directoryData)
+        XCTAssertEqual(directory.patients.map(\.patientName), ["Doe^Jane"])
+        XCTAssertEqual(directory.patients.map { $0.studies.map(\.studyInstanceUID) }, [["2.25.10"]])
+        XCTAssertEqual(directory.patients.first?.studies.first?.series.first?.images.count, 2)
+    }
+
+    func testExportRejectsConflictingPatientNamesWithinAStudyWithoutLeavingArtifact() async throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let first = root.appendingPathComponent("first.dcm")
+        let second = root.appendingPathComponent("second.dcm")
+        try makePart10Data(sopInstanceUID: "2.25.1").write(to: first)
+        try makePart10Data(sopInstanceUID: "2.25.2", patientName: "Doe^Jane^M").write(to: second)
+        let destination = root.appendingPathComponent("DICOM.ZIP")
+
+        await XCTAssertThrowsErrorAsync(
+            try await DicomFileSetExporter().export(files: [first, second], to: destination)
+        ) { error in
+            guard case DicomFileSetExporter.ExportError.inconsistentHierarchy = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+    }
+
     func testExportHonorsCancellationWithoutLeavingArtifact() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -167,20 +233,23 @@ final class DicomFileSetExporterTests: XCTestCase {
         sopInstanceUID: String = "2.25.1",
         instanceNumber: Int = 1,
         modality: String = "CT",
-        fileMetaSOPClassUID: String? = nil
+        fileMetaSOPClassUID: String? = nil,
+        patientName: String = "Doe^Jane",
+        studyInstanceUID: String = "2.25.10",
+        seriesInstanceUID: String = "2.25.11"
     ) throws -> Data {
         let dataSet = DicomDataSet(elements: [
             string(.sopClassUID, .UI, sopClassUID),
             string(.sopInstanceUID, .UI, sopInstanceUID),
             string(.patientID, .LO, "PATIENT1"),
-            string(.patientName, .PN, "Doe^Jane"),
-            string(.studyInstanceUID, .UI, "2.25.10"),
+            string(.patientName, .PN, patientName),
+            string(.studyInstanceUID, .UI, studyInstanceUID),
             string(.studyID, .SH, "STUDY1"),
             string(.studyDate, .DA, "20260824"),
             string(.studyTime, .TM, "120000"),
             string(.studyDescription, .LO, "HEAD"),
             string(.accessionNumber, .SH, "ACC1"),
-            string(.seriesInstanceUID, .UI, "2.25.11"),
+            string(.seriesInstanceUID, .UI, seriesInstanceUID),
             string(.modality, .CS, modality),
             DicomDataElement(tag: DicomTag.seriesNumber.rawValue, vr: .IS, value: .signedIntegers([1])),
             DicomDataElement(tag: DicomTag.instanceNumber.rawValue, vr: .IS, value: .signedIntegers([instanceNumber])),

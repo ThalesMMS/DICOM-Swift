@@ -259,6 +259,26 @@ final class DicomSeriesLoaderHelpersTests: XCTestCase {
         XCTAssertEqual(files.count, 1, "Should find file with no extension")
     }
 
+    /// A series staged in another volume than its files is staged as symbolic links (Isis-DICOM-Viewer #3188).
+    func testListDicomFilesFollowsSymbolicLinksToFiles() throws {
+        let loader = DicomSeriesLoader()
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test_symlink_\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let source = tempDir.appendingPathComponent("source.bin")
+        try Data().write(to: source)
+        let staged = tempDir.appendingPathComponent("staged", isDirectory: true)
+        try FileManager.default.createDirectory(at: staged, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: staged.appendingPathComponent("000001.dcm"), withDestinationURL: source)
+        try FileManager.default.createSymbolicLink(at: staged.appendingPathComponent("000002.dcm"),
+                                                   withDestinationURL: tempDir.appendingPathComponent("missing.dcm"))
+
+        let files = try loader.listDicomFiles(in: staged)
+        XCTAssertEqual(files.map(\.lastPathComponent), ["000001.dcm"], "a link to a file is listed, a dangling one is not")
+    }
+
     func testListDicomFilesIgnoresNonDCMFiles() throws {
         let loader = DicomSeriesLoader()
         let tempDir = FileManager.default.temporaryDirectory

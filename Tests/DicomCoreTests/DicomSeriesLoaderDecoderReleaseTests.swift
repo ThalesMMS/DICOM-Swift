@@ -47,6 +47,28 @@ final class DicomSeriesLoaderDecoderReleaseTests: XCTestCase {
         XCTAssertEqual(liveAtProgress.values, (0..<depth).map { depth - 1 - $0 })
     }
 
+    /// Isis-DICOM-Viewer #3165: the slice observer counts every slice of the parallel build, without making it
+    /// sequential, so the app can show how far a volume got.
+    func test_parallelFullBuild_reportsEveryDecodedSliceToTheObserver() throws {
+        let depth = max(16, 4 * ProcessInfo.processInfo.activeProcessorCount)
+        let directory = try Self.makeUnsignedSeries(depth: depth)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let reports = LockedValues()
+        let loader = DicomSeriesLoader(
+            decoderFactory: { path in try DCMDecoder(contentsOfFile: path) },
+            logger: DicomLogger.make(subsystem: "com.dicomcore.tests", category: "slice-observer"),
+            sliceDecodeObserver: { decoded, total in
+                XCTAssertEqual(total, depth)
+                reports.append(decoded)
+            }
+        )
+
+        let volume = try loader.loadSeries(in: directory)
+
+        XCTAssertEqual(Self.voxels(of: volume), Self.expectedVoxels(depth: depth))
+        XCTAssertEqual(reports.values.sorted(), Array(1...depth), "each slice once, counted up to the depth")
+    }
+
     func test_mappedSliceDecoder_readsWhatAHeapCopyReads() throws {
         let directory = try Self.makeUnsignedSeries(depth: 1)
         defer { try? FileManager.default.removeItem(at: directory) }

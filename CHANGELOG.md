@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.1.0] - 2026-11-02
+
+Minor release of the reviewed canonical sources since 3.0.1. Swift tools 6.2, Swift 6 language mode, the platform
+minimums (iOS and visionOS 26.0, macOS 15.0) and the announced products are unchanged. The one API change is an
+addition with a default value; existing callers compile unchanged.
+
+### Added
+
+- `DicomSeriesLoader` takes an optional `sliceDecodeObserver`, called with the slices decoded so far and the total
+  after each slice of `loadSeries(in:)`, in the parallel build too. Unlike `progress`, whose order is part of its
+  contract, it does not make the decode sequential (IsiX issue #3165).
+
+### Fixed
+
+- `DicomSeriesLoader` lists a symbolic link that resolves to a regular file as a candidate. A series staged as links
+  across volumes was skipped and its build failed with `noDicomFiles`; a dangling link is still skipped (IsiX issue
+  #3188).
+- `DicomWebClient`: a STOW-RS refusal (non-2xx) whose body is no store response stays the HTTP refusal
+  (`DicomWebError`) instead of becoming a decode error that implied instances may have been accepted. The error built
+  from that body still redacts the credential headers the client sent if the server echoes them (IsiX issue #3188).
+- `DicomFileSetExporter` scopes the Patient Name check to the study. A selection in which one Patient ID carries
+  different names across studies is exported with one PATIENT record per ID and name, as `DicomFileSet.build`
+  builds it, instead of being refused; conflicting names inside one study are still refused. A study whose files omit
+  the Patient Name in some of them stays in one PATIENT record instead of failing with `generatedDirectoryInvalid`
+  (IsiX issue #3212).
+
+---
+
 ## [3.0.1] - 2026-10-23
 
 The macOS minimum drops from 26.0 to 15.0; iOS and visionOS stay at 26.0. Swift tools 6.2, Swift 6 language

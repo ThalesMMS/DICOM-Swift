@@ -119,14 +119,15 @@ extension DicomSeriesLoader {
         return (row: row, column: col)
     }
 
-    /// Finds DICOM candidate files by recursively enumerating a directory and returning regular files with a `.dcm` extension or no extension.
+    /// Finds DICOM candidate files by recursively enumerating a directory and returning regular files (or symbolic links
+    /// to regular files, as a series staged across volumes is) with a `.dcm` extension or no extension.
     /// - Parameters:
     ///   - directory: The directory URL to search.
     /// - Returns: An array of file URLs for regular files within `directory` whose path extension is `"dcm"` (case-insensitive) or is empty. Returns an empty array if the directory cannot be enumerated.
     /// - Throws: An error from `URL.resourceValues(forKeys:)` if reading resource values for an entry fails.
     func listDicomFiles(in directory: URL) throws -> [URL] {
         let fm = FileManager.default
-        let keys: [URLResourceKey] = [.isRegularFileKey, .isDirectoryKey, .nameKey]
+        let keys: [URLResourceKey] = [.isRegularFileKey, .isDirectoryKey, .isSymbolicLinkKey, .nameKey]
         guard let enumerator = fm.enumerator(at: directory,
                                              includingPropertiesForKeys: keys,
                                              options: [.skipsHiddenFiles]) else {
@@ -137,7 +138,10 @@ extension DicomSeriesLoader {
         for case let fileURL as URL in enumerator {
             let resourceValues = try fileURL.resourceValues(forKeys: Set(keys))
             if resourceValues.isDirectory == true { continue }
-            if resourceValues.isRegularFile == true {
+            let isRegularFile = resourceValues.isSymbolicLink == true
+                ? (try? fileURL.resolvingSymlinksInPath().resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true
+                : resourceValues.isRegularFile == true
+            if isRegularFile {
                 if fileURL.pathExtension.lowercased() == "dcm" || fileURL.pathExtension.isEmpty {
                     urls.append(fileURL)
                 }

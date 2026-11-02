@@ -7,6 +7,9 @@ public struct DicomWebHTTPStreamedResponse: Sendable {
     /// Called before every WebSocket event. Throwing closes the connection before sending the event.
     public var authorizeNotification: (@Sendable (String) async throws -> Void)?
     public var cancel: @Sendable () -> Void
+    /// The credential headers the client sent with the request, so an error built from the body later can still
+    /// redact a provider's token the server echoes.
+    var sentCredentials: [String: String] = [:]
 
     public init(statusCode: Int, headers: [String: String] = [:], body: AsyncThrowingStream<Data, Error>,
                 cancel: @escaping @Sendable () -> Void = {},

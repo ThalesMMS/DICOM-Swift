@@ -19,7 +19,7 @@ Comprehensive DICOM conformance documentation detailing supported transfer synta
 
 ## Overview
 
-This DICOM Conformance Statement describes the capabilities and limitations of the DicomCore library (version 2.0.2) in accordance with DICOM Part 2: Conformance. DicomCore is a Swift DICOM file library for iOS, visionOS, and macOS 26+ that parses DICOM medical imaging files, extracts metadata, provides pixel data access with optional GPU-accelerated image processing, writes controlled Part 10 datasets, and exposes transport-injected DICOMweb service helpers covered by package tests.
+This DICOM Conformance Statement describes the capabilities and limitations of the DicomCore library (version 2.0.2) in accordance with DICOM Part 2: Conformance. DicomCore is a Swift DICOM file library for iOS 26+, visionOS 26+ and macOS 15+ that parses DICOM medical imaging files, extracts metadata, provides pixel data access with optional GPU-accelerated image processing, writes controlled Part 10 datasets, and exposes transport-injected DICOMweb service helpers covered by package tests.
 
 **Implementation Type:** DICOM File Decoder/Writer Library with transport-injected DICOMweb helpers and bounded stateless JPIP progressive pixel streaming
 

@@ -265,6 +265,44 @@ final class DicomWebStoreBatchTests: XCTestCase {
         XCTAssertEqual(result.storeResponse?.instances.map(\.failureReason), [0xC000, 0xA700])
     }
 
+    func test_a4xxWhoseBodyIsNoStoreResponseStaysTheHTTPRefusal() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("stow-413-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("0.dcm")
+        try Self.part10("2.25.2945901").write(to: file)
+        // Labelled DICOM JSON, but the body is the server's plain text.
+        let server = ScriptedSTOWServer(responses: [(413, Data("archive limit".utf8))])
+        let client = DicomWebClient(configuration: .init(baseURL: try await server.start()))
+        defer { server.stop() }
+
+        let results = await client.storeFiles([file])
+
+        XCTAssertEqual(results.map(\.state), [.failed])
+        XCTAssertEqual(results[0].httpStatus, 413)
+        XCTAssertEqual(results[0].error?.statusCode, 413)
+        XCTAssertEqual(results[0].error?.bodyPreview, "archive limit", "the server's reason reaches the caller")
+    }
+
+    /// The preview of such a refusal redacts the provider's token the server echoes, as every other refusal does.
+    func test_a4xxRefusalBodyEchoingTheProvidersToken_redactsIt() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("stow-echo-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("0.dcm")
+        try Self.part10("2.25.2945902").write(to: file)
+        let server = ScriptedSTOWServer(responses: [(413, Data("token stow-provider-secret is over quota".utf8))])
+        let client = DicomWebClient(configuration: .init(baseURL: try await server.start()),
+                                    authorizationProvider: DicomWebAuthentication.bearer(token: "stow-provider-secret"))
+        defer { server.stop() }
+
+        let results = await client.storeFiles([file])
+
+        let preview = try XCTUnwrap(results.first?.error?.bodyPreview)
+        XCTAssertFalse(preview.contains("stow-provider-secret"), preview)
+        XCTAssertTrue(preview.contains("over quota"), preview)
+    }
+
     func test_theWarningHeaderReachesEveryResult() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("stow-warning-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
