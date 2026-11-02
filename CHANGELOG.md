@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.1.1] - 2026-11-02
+
+Documentation-only patch release. Source comments, test descriptions and this changelog now describe the slice-gap
+and signed-palette behaviour by what the package does and by GDCM, the open toolkit it is checked against. No code,
+API, product, toolchain or platform changes.
+
+---
+
 ## [3.1.0] - 2026-11-02
 
 Minor release of the reviewed canonical sources since 3.0.1. Swift tools 6.2, Swift 6 language mode, the platform
@@ -61,7 +69,7 @@ RELEASE_NOTES.md.
 ### Breaking
 
 - `DicomSeriesLoader` builds a single-frame series whose slice positions are unevenly spaced (a missing slice, two
-  stacks in one series) at the median interval, as GDCM and Horos build one, instead of throwing
+  stacks in one series) at the median interval, as GDCM builds one, instead of throwing
   `variableSliceSpacing` (IsiX issue #3116). The volume reports it in the new
   `DicomSeriesVolumeGeometryProvenance.SliceSpacingSource.irregularImagePositionPatient`; its out-of-plane geometry
   is approximate. Exhaustive switches over `SliceSpacingSource` need the new case.
@@ -69,7 +77,7 @@ RELEASE_NOTES.md.
   `unsupportedPixelFormat` (IsiX issue #3113). Bits Allocated, Pixel Representation, samples, photometric
   interpretation and planar configuration must still match.
 - `DCMDecoder.displayRGB8(decodedFrame:)` displays signed PALETTE COLOR indices (Pixel Representation 1) like
-  unsigned ones instead of refusing them, a negative index taking the first entry, as Horos does (IsiX issue #3117).
+  unsigned ones instead of refusing them, a negative index taking the first entry (IsiX issue #3117).
 - `DicomIngestJournalEntry.Disposition` gains `lost`: replay closes once an ingest whose temporary and final files
   are both gone instead of retrying it at every launch (IsiX issue #3070). Exhaustive switches need the new case.
 

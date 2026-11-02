@@ -3,7 +3,7 @@
 //  DicomCoreTests
 //
 //  Issue #3116: a series whose slice positions are unevenly spaced (a missing slice, two stacks in one series) builds
-//  one grid at the median interval and says so, as GDCM and Horos build one, instead of refusing.
+//  one grid at the median interval and says so, as GDCM builds one, instead of refusing.
 //
 
 import Foundation

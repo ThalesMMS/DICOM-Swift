@@ -17,8 +17,8 @@ final class DicomColorPixelDataTests: XCTestCase {
         XCTAssertEqual(try decoder.displayRGB8(decodedFrame: frame), expected)
     }
 
-    /// Issue #3117: signed palette indices (Pixel Representation 1) display through the palette, as Horos shows them; a
-    /// negative index takes the first entry, as any index below the first mapped value does.
+    /// Issue #3117: signed palette indices (Pixel Representation 1) display through the palette by their unsigned bit
+    /// pattern; a negative index takes the first entry, as any index below the first mapped value does.
     func test_signedPaletteIndices_displayThroughThePalette_negativeAsTheFirstEntry() throws {
         let url = try makeTemporaryDICOM(
             photometricInterpretation: "PALETTE COLOR", samplesPerPixel: 1, width: 3, height: 1,

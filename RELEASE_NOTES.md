@@ -1,3 +1,10 @@
+# 3.1.1
+
+Documentation-only patch release: source comments, test descriptions and the
+changelog describe the slice-gap and signed-palette behaviour by what the
+package does and by GDCM. No code, API, product, Swift tools, language mode or
+platform changes from 3.1.0.
+
 # 3.1.0
 
 This minor release synchronizes the reviewed canonical sources since 3.0.1.

@@ -535,8 +535,8 @@ extension DCMDecoder {
         try synchronized {
             var stored = decodedFrame.storedSampleData()
             let metadata = makeNativeColorMetadataUnsafe(descriptor: nil)
-            // Issue #3117: signed palette indices (Pixel Representation 1) are read like unsigned ones, as Horos reads
-            // them, except that a negative index takes the first entry, as any index below the first mapped value does.
+            // Issue #3117: signed palette indices (Pixel Representation 1) are read as their unsigned bit pattern,
+            // except that a negative index takes the first entry, as any index below the first mapped value does.
             if metadata.photometricInterpretation == .paletteColor, decodedFrame.metadata.pixelRepresentation == 1,
                case .gray16 = decodedFrame.pixels {
                 stored.withUnsafeMutableBytes { bytes in

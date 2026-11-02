@@ -26,7 +26,7 @@ public struct DicomSeriesVolumeGeometryProvenance: Equatable, Sendable {
         /// The median distance between adjacent slice positions along the normal.
         case imagePositionPatient
         /// The slice positions are not evenly spaced (issue #3116): the median distance between adjacent positions,
-        /// one interval for the whole volume, as Horos takes one; out-of-plane geometry is approximate.
+        /// one interval for the whole volume, as GDCM takes one; out-of-plane geometry is approximate.
         case irregularImagePositionPatient
         case spacingBetweenSlices
         case sliceThickness

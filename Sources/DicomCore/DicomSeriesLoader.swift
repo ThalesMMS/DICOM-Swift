@@ -1010,7 +1010,7 @@ public final class DicomSeriesLoader: DicomSeriesLoaderProtocol, Sendable {
             computedZ = try computeZSpacing(from: slices, normal: normal)
         } catch DicomSeriesLoaderError.variableSliceSpacing(let median, _) {
             // Issue #3116: uneven positions (a missing slice, two stacks in one series) build one grid at the median
-            // interval, as GDCM and Horos build one, and the volume says so instead of refusing.
+            // interval, as GDCM builds one, and the volume says so instead of refusing.
             computedZ = median
             isSliceSpacingIrregular = true
         }
