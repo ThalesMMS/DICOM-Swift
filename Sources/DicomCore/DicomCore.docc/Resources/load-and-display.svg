@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-labelledby="title description">
+  <title id="title">Load and display DICOM images</title>
+  <desc id="description">Three DICOM slices flow into a windowed medical image display.</desc>
+  <rect width="800" height="450" rx="32" fill="#101820"/>
+  <g fill="#D9F0FF" stroke="#5CC8FF" stroke-width="8">
+    <rect x="90" y="105" width="190" height="230" rx="18" opacity="0.45"/>
+    <rect x="125" y="85" width="190" height="230" rx="18" opacity="0.7"/>
+    <rect x="160" y="65" width="190" height="230" rx="18"/>
+  </g>
+  <path d="M390 225h90" stroke="#7EE787" stroke-width="18" stroke-linecap="round"/>
+  <path d="m455 185 45 40-45 40" fill="none" stroke="#7EE787" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="520" y="65" width="190" height="270" rx="24" fill="#EAF7FF" stroke="#5CC8FF" stroke-width="8"/>
+  <circle cx="615" cy="200" r="72" fill="#52616B"/>
+  <circle cx="615" cy="200" r="44" fill="#D6DEE3"/>
+  <path d="M550 365h130" stroke="#D9F0FF" stroke-width="14" stroke-linecap="round"/>
+</svg>

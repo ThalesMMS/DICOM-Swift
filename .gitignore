@@ -1,0 +1,32 @@
+.DS_Store
+.build/
+.build-test-support/
+.build-*/
+Packages/
+.swiftpm/
+DerivedData/
+xcuserdata/
+
+# DocC generated documentation
+docs/
+
+# Auto Claude data directory
+.auto-claude/
+
+# Auto Claude generated files
+.auto-claude-security.json
+.auto-claude-status
+.claude_settings.json
+.worktrees/
+.security-key
+logs/security/
+
+# Test output artifacts
+test-summary.txt
+test_output.txt
+benchmark-results-*.json
+benchmark-results-*.md
+/.build-codex-pr
+/.build-codex-pr2
+/.build-codex
+/.codeatlas

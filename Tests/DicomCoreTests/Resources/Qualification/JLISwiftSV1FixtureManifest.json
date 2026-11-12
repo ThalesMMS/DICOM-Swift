@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "generator": "JLISwiftJPEGLosslessQualificationTests.testGenerateCommittedGDCMOracleFixturesWhenRequested",
+  "jliSwift": {
+    "version": "0.5.0",
+    "revision": "9f1c6eb609fe6f26498db82b13df6b305630a374"
+  },
+  "provenance": "Deterministic synthetic non-PHI 8x4 unsigned gray12 samples",
+  "license": "Repository-generated test data under the project license",
+  "transferSyntaxUID": "1.2.840.10008.1.2.4.70",
+  "predictor": 1,
+  "pointTransform": 0,
+  "geometry": {
+    "rows": 4,
+    "columns": 8,
+    "samplesPerPixel": 1,
+    "bitsAllocated": 16,
+    "bitsStored": 12,
+    "highBit": 11,
+    "pixelRepresentation": 0
+  },
+  "decodedFrameLittleEndianSHA256": [
+    "2971fd1b76913581473deacc961d9e0bf785b964a707ef7efccb2374db6800a2",
+    "03f28e7b37362d9ecdaae59d6da5a5c82d5fd123f46f5f9a20bc178a13393630"
+  ],
+  "fixtures": [
+    {
+      "file": "jliswift_sv1_gray12_bot.dcm",
+      "sha256": "b280fb64e889b744ff78cd8f6b4a7f596ca36211732dab3e223fdbbb656c8924",
+      "frames": 2,
+      "fragmentCount": 2,
+      "itemPadding": "all fragment item values are even length",
+      "offsetTable": "BOT"
+    },
+    {
+      "file": "jliswift_sv1_gray12_eot.dcm",
+      "sha256": "540cbfe02eaff2c2d6611566a9f6f27920e7c6196192dbfd29291d964b0c83e9",
+      "frames": 2,
+      "fragmentCount": 4,
+      "itemPadding": "all fragment item values are even length",
+      "offsetTable": "EOT with empty BOT and two fragments per frame"
+    }
+  ]
+}

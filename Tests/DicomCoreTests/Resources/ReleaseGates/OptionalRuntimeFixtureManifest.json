@@ -1,0 +1,237 @@
+{
+  "version": 1,
+  "ciPolicy": {
+    "default": "Default CI must run deterministic bundled-fixture tests and report optional runtime status without failing when optional runtimes are absent.",
+    "requiredCapabilityEnv": "Set DICOM_REQUIRE_<CAPABILITY>=1, or DICOM_REQUIRE_OPTIONAL_RUNTIMES=1 for all optional runtimes, to turn an absent optional runtime into a test failure.",
+    "networkSmoke": "Set DICOM_INTEROP_SMOKE=1 and DICOM_REQUIRE_NETWORK_INTEROP_SMOKE=1 when CI provisions local Orthanc or dcm4chee smoke endpoints."
+  },
+  "capabilities": [
+    {
+      "id": "bundled-synthetic-fixtures",
+      "kind": "fixture",
+      "source": "Committed synthetic DICOM Part 10 files under Tests/DicomCoreTests/Fixtures.",
+      "phiStatus": "Synthetic non-PHI. Patient names and identifiers use TEST or PARITY placeholders.",
+      "expectedMetadata": "CT, MR, US, XR, and decoder parity fixtures expose deterministic modality, dimensions, transfer syntax, UIDs, geometry, VOI, rescale, and character-set fields.",
+      "expectedPixelBehavior": "Tiny synthetic images decode deterministically and are safe for default CI.",
+      "testCoverage": [
+        "Tests/DicomCoreTests/DCMDecoderAsyncTests.swift",
+        "Tests/DicomCoreTests/DCMDecoderIntegrationTests.swift",
+        "Tests/DicomCoreTests/ClinicalParityFixtureManifestTests.swift",
+        "Tests/dicomtoolIntegrationTests/TestFixturesIntegrationTests.swift"
+      ],
+      "preflight": "DicomTestRuntimePreflight.status(for: .bundledSyntheticFixtures)",
+      "ciBehavior": "Required in default CI; absence is treated as a regression, not an optional skip."
+    },
+    {
+      "id": "large-dicom-fixtures",
+      "kind": "optional-fixture",
+      "source": "Local non-PHI DICOM files larger than 1 MB placed under Tests/DicomCoreTests/Fixtures.",
+      "phiStatus": "Must be synthetic, public, or fully de-identified non-PHI before use.",
+      "expectedMetadata": "The file must be valid Part 10 DICOM and expose enough metadata for DCMDecoder validity checks.",
+      "expectedPixelBehavior": "Large image fixtures must load without exhausting memory and preserve decoder validity.",
+      "testCoverage": [
+        "Tests/DicomCoreTests/DCMDecoderIntegrationTests.swift"
+      ],
+      "preflight": "DicomTestRuntimePreflight.status(for: .largeDicomFixtures)",
+      "ciBehavior": "Optional by default. Set DICOM_REQUIRE_LARGE_DICOM_FIXTURES=1 when CI installs large non-PHI fixtures."
+    },
+    {
+      "id": "jpeg-lossless-conformance-fixtures",
+      "kind": "optional-fixture",
+      "source": "Public dcm4che/NEMA JPEG Lossless samples or locally converted non-PHI files placed under Tests/DicomCoreTests/Fixtures/Compressed.",
+      "phiStatus": "Must be public, synthetic, or fully de-identified non-PHI before use.",
+      "expectedMetadata": "TransferSyntaxUID must be 1.2.840.10008.1.2.4.70 or 1.2.840.10008.1.2.4.57, with valid image dimensions and bit-depth tags.",
+      "expectedPixelBehavior": "DCMDecoder must extract JPEG Lossless pixel buffers and expose stable selection-value coverage.",
+      "testCoverage": [
+        "Tests/DicomCoreTests/JPEGLosslessConformanceTests.swift"
+      ],
+      "preflight": "DicomTestRuntimePreflight.status(for: .jpegLosslessConformanceFixtures)",
+      "ciBehavior": "Optional by default. Set DICOM_REQUIRE_JPEG_LOSSLESS_CONFORMANCE_FIXTURES=1 when CI installs these fixtures."
+    },
+    {
+      "id": "j2kswift-backend",
+      "kind": "package-runtime",
+      "source": "J2KSwift 11.0.2 J2KCore/J2KCodec core vendored as the DicomJPEG2000 target (#2329); no package pin or host installation is required.",
+      "phiStatus": "Package dependency only; qualification uses synthetic pixel buffers and provenance-tracked fixtures.",
+      "expectedMetadata": "Backend status reports vendored source, version 11.0.2-vendored, JPEG 2000 and HTJ2K decode and encode, and explicit experimental/fallback verdicts.",
+      "expectedPixelBehavior": "J2KSwift and OpenJPEG cross-decode lossless samples exactly; lossy cases declare a fixture-specific metric; the pinned OpenJPH HTJ2K fixture decodes exactly.",
+      "testCoverage": [
+        "Tests/DicomCoreTests/DicomJ2KSwiftBackendTests.swift",
+        "Tests/DicomCoreTests/DicomJ2KSwiftEncoderTests.swift"
+      ],
+      "preflight": "DicomCodecCapabilities.backendStatuses() contains the own j2kswift-cpu backend at version 11.0.2-vendored",
+      "ciBehavior": "Required in default CI because the backend is compiled into DicomCore and deterministic."
+    },
+    {
+      "id": "jlswift-backend",
+      "kind": "package-runtime",
+      "source": "JLSwift 0.9.1 core vendored as the DicomJPEGLS target (#2328); no package pin or host installation is required.",
+      "phiStatus": "Package dependency only; qualification uses synthetic pixel buffers.",
+      "expectedMetadata": "Backend status reports vendored source, version 0.9.1-vendored, JPEG-LS .80/.81 decode and encode, and qualified bit-depth ranges.",
+      "expectedPixelBehavior": "JLSwift and CharLS cross-decode lossless frames bit-exactly and near-lossless frames within the explicit NEAR bound.",
+      "testCoverage": [
+        "Tests/DicomCoreTests/DicomJLSwiftBackendTests.swift",
+        "Tests/DicomCoreTests/DicomTranscoderTests.swift"
+      ],
+      "preflight": "DicomCodecCapabilities.backendStatuses() contains the own jlswift backend at version 0.9.1-vendored",
+      "ciBehavior": "Required in default CI because the codec is compiled into DicomCore and deterministic."
+    },
+    {
+      "id": "jxlswift-backend",
+      "kind": "package-runtime",
+      "source": "JXLSwift 1.4.0 linked through SwiftPM; no host installation is required.",
+      "phiStatus": "Package dependency only; qualification uses synthetic pixel buffers.",
+      "expectedMetadata": "Backend status reports package-linked source, version 1.4.0, JPEG XL .110/.111/.112 decode, raster .110/.112 encode, and explicit experimental status; the specialized .111 JPEG bridge is covered separately.",
+      "expectedPixelBehavior": "Qualified 8/16-bit grayscale and RGB8 frames round-trip; JPEG Baseline recompression reconstructs byte-for-byte.",
+      "testCoverage": [
+        "Tests/DicomCoreTests/DicomJXLSwiftBackendTests.swift",
+        "Tests/DicomCoreTests/DicomTranscoderTests.swift"
+      ],
+      "preflight": "DicomCodecCapabilities.backendStatuses() contains the package-linked jxlswift backend at version 1.4.0",
+      "ciBehavior": "Required in default CI because the backend is compiled into DicomCore; clinical use remains disabled by default."
+    },
+    {
+      "id": "charls-runtime",
+      "kind": "optional-runtime",
+      "source": "System CharLS dynamic library resolved by DicomCodecRuntimePreflight. Set DICOM_DECODER_CHARLS_LIBRARY_PATH for a non-standard install.",
+      "phiStatus": "Runtime dependency only; no fixture data.",
+      "expectedMetadata": "Not applicable.",
+      "expectedPixelBehavior": "JPEG-LS lossless and near-lossless frames round-trip in DicomLosslessCodecTests.",
+      "testCoverage": [
+        "Tests/DicomCoreTests/DicomCodecRuntimePreflightTests.swift",
+        "Tests/DicomCoreTests/DicomLosslessCodecTests.swift"
+      ],
+      "preflight": "DicomCodecRuntimePreflight.status(for: .charLS) and DicomTestRuntimePreflight.status(for: .charLS)",
+      "ciBehavior": "Optional by default. Set DICOM_REQUIRE_CHARLS=1 or DICOM_REQUIRE_OPTIONAL_RUNTIMES=1 when CI provisions CharLS."
+    },
+    {
+      "id": "openjpeg-runtime",
+      "kind": "optional-runtime",
+      "source": "System OpenJPEG dynamic library resolved by DicomCodecRuntimePreflight. Set DICOM_DECODER_OPENJPEG_LIBRARY_PATH for a non-standard install.",
+      "phiStatus": "Runtime dependency only; no fixture data.",
+      "expectedMetadata": "Not applicable.",
+      "expectedPixelBehavior": "JPEG 2000 16-bit grayscale and JP3D multi-component volume codestreams decode without ImageIO precision loss.",
+      "testCoverage": [
+        "Tests/DicomCoreTests/DicomCodecRuntimePreflightTests.swift",
+        "Tests/DicomCoreTests/DicomLossyCodecBackendTests.swift",
+        "Tests/DicomCoreTests/DicomJP3DVolumeDocumentTests.swift"
+      ],
+      "preflight": "DicomCodecRuntimePreflight.status(for: .openJPEG) and DicomTestRuntimePreflight.status(for: .openJPEG)",
+      "ciBehavior": "Optional by default. Set DICOM_REQUIRE_OPENJPEG=1 or DICOM_REQUIRE_OPTIONAL_RUNTIMES=1 when CI provisions OpenJPEG."
+    },
+    {
+      "id": "opj-compress-tool",
+      "kind": "optional-tool",
+      "source": "opj_compress executable from OpenJPEG, discovered through PATH, /opt/homebrew/bin, or /usr/local/bin.",
+      "phiStatus": "Tool dependency only; generated codestreams use synthetic pixel buffers.",
+      "expectedMetadata": "Not applicable.",
+      "expectedPixelBehavior": "Synthetic 16-bit PGM/PPM inputs produce deterministic JPEG 2000 codestreams for codec tests.",
+      "testCoverage": [
+        "Tests/DicomCoreTests/DicomLossyCodecBackendTests.swift",
+        "Tests/DicomCoreTests/DicomJP3DVolumeDocumentTests.swift"
+      ],
+      "preflight": "DicomTestRuntimePreflight.status(for: .opjCompress)",
+      "ciBehavior": "Optional by default. Set DICOM_REQUIRE_OPJ_COMPRESS=1 when CI provisions opj_compress."
+    },
+    {
+      "id": "libjxl-tools",
+      "kind": "optional-tool",
+      "source": "cjxl and djxl executables from libjxl, discovered through PATH, /opt/homebrew/bin, or /usr/local/bin.",
+      "phiStatus": "Tool dependency only; generated codestreams use synthetic pixel buffers.",
+      "expectedMetadata": "Not applicable.",
+      "expectedPixelBehavior": "JXLSwift output decodes byte-exactly with djxl, cjxl lossless output decodes byte-exactly with JXLSwift, and JPEG reconstruction is byte-identical.",
+      "testCoverage": [
+        "Tests/DicomCoreTests/DicomJXLSwiftBackendTests.swift"
+      ],
+      "preflight": "DicomTestRuntimePreflight.status(for: .libjxlTools)",
+      "ciBehavior": "Optional in quick CI and required by the release gate. Set DICOM_REQUIRE_LIBJXL_TOOLS=1 when provisioning manually."
+    },
+    {
+      "id": "kakadu-tools",
+      "kind": "optional-tool",
+      "source": "kdu_compress and kdu_expand demo executables from Kakadu (8.4.1 qualified), discovered through PATH, /opt/homebrew/bin, or /usr/local/bin; run out of process as test tools only, never linked or redistributed.",
+      "phiStatus": "Tool dependency only; generated codestreams use synthetic pixel buffers.",
+      "expectedMetadata": "Not applicable.",
+      "expectedPixelBehavior": "Own JPEG 2000 Part 2 .92 collections decode exactly with kdu_expand and 8-bit .93 within one code value of the own decoder; Kakadu dependency and SERM collections decode exactly with the own codec, Kakadu 8-bit irreversible matrices within two code values of kdu_expand.",
+      "testCoverage": [
+        "Tests/DicomCoreTests/JPEG2000Part2InteropTests.swift"
+      ],
+      "preflight": "DicomTestRuntimePreflight.status(for: .kakaduTools)",
+      "ciBehavior": "Optional: Kakadu is a licensed tool the CI does not provision. Set DICOM_REQUIRE_KAKADU_TOOLS=1 on a host that has it."
+    },
+    {
+      "id": "dicomkit-interop",
+      "kind": "optional-tool",
+      "source": "Pinned Raster-Lab DICOMKit checkout at commit 9348075fcd7500a1c15c2ff3e6a796f554c066b4 provided through DICOMKIT_CHECKOUT.",
+      "phiStatus": "Only DICOMKit synthetic CLI parity fixtures and DICOM-Swift synthetic non-PHI object fixtures are exchanged.",
+      "expectedMetadata": "DICOMKit level-1 validation and DICOM-Swift validation preserve Part 10, transfer syntax, object family, dimensions, and required geometry metadata.",
+      "expectedPixelBehavior": "DICOMKit synthetic CT and its RLE/JPEG Lossless transcodes decode to the exact stored sample sequence in DICOM-Swift.",
+      "testCoverage": [
+        "Tests/DicomCoreTests/ClinicalDICOMKitInteropTests.swift",
+        "Tests/DicomCoreTests/ClinicalInteropFixtureExportTests.swift",
+        "Scripts/conformance/run_dicomkit_interop.sh"
+      ],
+      "preflight": "dicomtool verifies DICOMKIT_CHECKOUT is a Git checkout at the manifest-pinned commit",
+      "ciBehavior": "Optional in default CI. Set DICOM_REQUIRE_DICOMKIT_INTEROP=1 when CI provisions the pinned checkout."
+    },
+    {
+      "id": "metal-device",
+      "kind": "optional-runtime",
+      "source": "Apple Metal device available through MTLCreateSystemDefaultDevice.",
+      "phiStatus": "Runtime dependency only; no fixture data.",
+      "expectedMetadata": "Not applicable.",
+      "expectedPixelBehavior": "Bundled Metal shader and DCMWindowingProcessor .metal mode match vDSP output within one grayscale value.",
+      "testCoverage": [
+        "Tests/DicomCoreTests/Metal/MetalWindowingTests.swift",
+        "Tests/DicomCoreTests/DCMWindowingProcessorPerformanceTests.swift",
+        "Tests/DicomCoreTests/PerformanceBenchmarks/BenchmarkRunnerTests.swift"
+      ],
+      "preflight": "DicomTestRuntimePreflight.status(for: .metalDevice)",
+      "ciBehavior": "Optional by default for CPU-only hosts. Set DICOM_REQUIRE_METAL=1 on Apple GPU CI."
+    },
+    {
+      "id": "network-interop-smoke",
+      "kind": "optional-network-runtime",
+      "source": "Local non-PHI Orthanc or dcm4chee endpoints launched by Scripts/interop/run_interop_smoke.sh.",
+      "phiStatus": "Synthetic fixture generated in DicomInteropSmokeTests; no PHI.",
+      "expectedMetadata": "The synthetic patient ID, study UID, series UID, and SOP UID must be discoverable through DICOMweb and DIMSE.",
+      "expectedPixelBehavior": "A one-pixel secondary capture object must store, query, retrieve, and C-MOVE into the local Storage SCP cache.",
+      "testCoverage": [
+        "Tests/DicomCoreTests/DicomInteropSmokeTests.swift",
+        "Scripts/interop/run_interop_smoke.sh"
+      ],
+      "preflight": "DicomTestRuntimePreflight.status(for: .networkInteropSmoke)",
+      "ciBehavior": "Skipped unless DICOM_INTEROP_SMOKE=1. Set DICOM_REQUIRE_NETWORK_INTEROP_SMOKE=1 when endpoints are provisioned."
+    },
+    {
+      "id": "pynetdicom-peer",
+      "kind": "optional-network-runtime",
+      "source": "pynetdicom 3.0.4 (with pydicom 3.0.2) in the Python interpreter named by DICOM_SWIFT_PYNETDICOM_PYTHON (default /tmp/isis-2321-iod-oracle/bin/python), driven by Scripts/interop/pynetdicom_peer.py over loopback TCP.",
+      "phiStatus": "Synthetic data sets built in the tests; no PHI.",
+      "expectedMetadata": "The peer echoes the negotiated presentation contexts, extended negotiation, user identity and asynchronous window it accepted, and the Message IDs it answered.",
+      "expectedPixelBehavior": "Native and RLE payloads stored through the peer are returned byte-identical (SHA-256) by C-GET/C-MOVE; a refused syntax or a failed persistence callback is isolated per object.",
+      "testCoverage": [
+        "Tests/DicomCoreTests/DicomDIMSEPynetdicomPeerTests.swift",
+        "Tests/DicomCoreTests/DicomDIMSEServerPynetdicomTests.swift",
+        "Tests/DicomTestSupport/PynetdicomPeer.swift",
+        "Scripts/interop/pynetdicom_peer.py"
+      ],
+      "preflight": "DicomTestRuntimePreflight.status(for: .pynetdicomPeer)",
+      "ciBehavior": "Skipped unless DICOM_SWIFT_PYNETDICOM_PYTHON names an interpreter with pynetdicom (or the default oracle interpreter exists)."
+    },
+    {
+      "id": "network-security-tls",
+      "kind": "platform-runtime",
+      "source": "Apple Network and Security frameworks used by DICOM TLS option and listener tests.",
+      "phiStatus": "Runtime dependency only; TLS test material is generated under temporary directories.",
+      "expectedMetadata": "Not applicable.",
+      "expectedPixelBehavior": "Not applicable.",
+      "testCoverage": [
+        "Tests/DicomCoreTests/DicomDIMSEServiceSCUTests.swift",
+        "Tests/DicomCoreTests/DicomStorageSCPTests.swift"
+      ],
+      "preflight": "DicomTestRuntimePreflight.status(for: .networkSecurityTLS)",
+      "ciBehavior": "Optional on unsupported platforms. Set DICOM_REQUIRE_NETWORK_SECURITY_TLS=1 when CI is expected to run TLS tests."
+    }
+  ]
+}

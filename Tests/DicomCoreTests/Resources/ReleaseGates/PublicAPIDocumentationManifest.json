@@ -1,0 +1,73 @@
+{
+  "issue": 283,
+  "policy": "Tests/DicomCoreTests/Resources/ReleaseGates/PublicAPIDocumentationPolicy.md",
+  "gate": {
+    "script": "Tooling/check_public_api_docs.py"
+  },
+  "ownerDocumentation": [
+    {
+      "owner": "DicomCore",
+      "apiDocumentation": [
+        "README.md",
+        "DICOM_GLOSSARY.md"
+      ],
+      "usageDocumentation": [
+        "README.md",
+        "BENCHMARKS.md",
+        "Examples/DicomSwiftUIExample/README.md"
+      ],
+      "limitations": [
+        {
+          "category": "codecs",
+          "path": "README.md"
+        },
+        {
+          "category": "network",
+          "path": "Scripts/interop/README.md"
+        },
+        {
+          "category": "clinicalObjects",
+          "path": "README.md"
+        },
+        {
+          "category": "rendering",
+          "path": "Examples/DicomSwiftUIExample/README.md"
+        },
+        {
+          "category": "fixtures",
+          "path": "Tests/DicomCoreTests/Resources/ReleaseGates/ClinicalParityFixtureManifest.json"
+        },
+        {
+          "category": "device",
+          "path": "BENCHMARKS.md"
+        }
+      ]
+    }
+  ],
+  "demoWorkflows": [
+    {
+      "id": "decode-local-dicom",
+      "path": "Tests/DicomCoreTests/Resources/ReleaseGates/PublicAPIDocumentationPolicy.md",
+      "visibleFlow": "Decode local DICOM file"
+    },
+    {
+      "id": "browse-decoded-series",
+      "path": "Tests/DicomCoreTests/Resources/ReleaseGates/PublicAPIDocumentationPolicy.md",
+      "visibleFlow": "Browse decoded series"
+    },
+    {
+      "id": "adjust-window-level",
+      "path": "Tests/DicomCoreTests/Resources/ReleaseGates/PublicAPIDocumentationPolicy.md",
+      "visibleFlow": "Adjust window and level"
+    },
+    {
+      "id": "inspect-metadata",
+      "path": "Tests/DicomCoreTests/Resources/ReleaseGates/PublicAPIDocumentationPolicy.md",
+      "visibleFlow": "Inspect DICOM metadata"
+    }
+  ],
+  "tests": [
+    "Tests/DicomCoreTests/PublicAPIDocumentationGateTests.swift",
+    "Tests/DicomCoreTests/PublicAPIDocumentationPolicyTests.swift"
+  ]
+}

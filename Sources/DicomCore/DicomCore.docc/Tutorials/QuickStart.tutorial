@@ -1,0 +1,26 @@
+@Tutorials(name: "DicomCore") {
+    @Intro(title: "Build DICOM Workflows in Swift") {
+        Learn how to load DICOM series, prepare pixels for display, and run
+        codec inspection, validation, decoding, comparison, and transcoding
+        workflows with DicomCore.
+    }
+
+    @Chapter(name: "Load and Display DICOM Images") {
+        Follow the package loading and window/level workflows using the public
+        DicomCore API.
+
+        @Image(source: "load-and-display.svg", alt: "DICOM slices arranged as a display volume")
+
+        @TutorialReference(tutorial: "doc:SeriesLoading")
+        @TutorialReference(tutorial: "doc:WindowLevel")
+    }
+
+    @Chapter(name: "Inspect and Transform Codec Data") {
+        Use the shared codec workflow to produce canonical reports and validated
+        in-memory artifacts.
+
+        @Image(source: "codec-workflow.svg", alt: "DICOM codec workflow from inspection to validated output")
+
+        @TutorialReference(tutorial: "doc:CodecWorkflow")
+    }
+}

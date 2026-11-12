@@ -1,0 +1,3 @@
+<?xml version="1.0"?>
+<!DOCTYPE Patient [<!ENTITY xxe SYSTEM "file:///etc/hosts">]>
+<Patient xmlns="http://hl7.org/fhir"><id value="&xxe;"/></Patient>

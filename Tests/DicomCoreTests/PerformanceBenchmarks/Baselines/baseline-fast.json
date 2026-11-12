@@ -1,0 +1,101 @@
+{
+  "timestamp": "2026-02-15T10:00:00Z",
+  "platform": {
+    "operatingSystem": "macOS",
+    "osVersion": "Version 26.2 (Build 25C56)",
+    "architecture": "arm64",
+    "processorCount": 10,
+    "modelIdentifier": "Mac16,12"
+  },
+  "configuration": {
+    "warmupIterations": 10,
+    "benchmarkIterations": 100,
+    "imageWidth": 1024,
+    "imageHeight": 1024,
+    "totalPixels": 1048576,
+    "windowCenter": 50.0,
+    "windowWidth": 400.0
+  },
+  "results": [
+    {
+      "operation": "Lock Overhead",
+      "iterations": 1000,
+      "meanTimeSeconds": 2.0e-08,
+      "meanTimeMilliseconds": 0.00002,
+      "stdDevSeconds": 1.0e-07,
+      "minTimeSeconds": 0,
+      "maxTimeSeconds": 5.0e-07,
+      "medianTimeSeconds": 0,
+      "p95TimeSeconds": 0,
+      "p99TimeSeconds": 5.0e-07,
+      "coefficientOfVariation": 500.0
+    },
+    {
+      "operation": "Decoder Initialization",
+      "iterations": 100,
+      "meanTimeSeconds": 1.0e-06,
+      "meanTimeMilliseconds": 0.001,
+      "stdDevSeconds": 5.0e-06,
+      "minTimeSeconds": 5.0e-07,
+      "maxTimeSeconds": 5.0e-05,
+      "medianTimeSeconds": 1.0e-06,
+      "p95TimeSeconds": 2.0e-06,
+      "p99TimeSeconds": 3.0e-06,
+      "coefficientOfVariation": 500.0
+    },
+    {
+      "operation": "Decoder Validation",
+      "iterations": 100,
+      "meanTimeSeconds": 2.0e-06,
+      "meanTimeMilliseconds": 0.002,
+      "stdDevSeconds": 1.0e-06,
+      "minTimeSeconds": 1.0e-06,
+      "maxTimeSeconds": 1.0e-05,
+      "medianTimeSeconds": 2.0e-06,
+      "p95TimeSeconds": 5.0e-06,
+      "p99TimeSeconds": 8.0e-06,
+      "coefficientOfVariation": 50.0
+    },
+    {
+      "operation": "Metadata Access",
+      "iterations": 100,
+      "meanTimeSeconds": 1.0e-06,
+      "meanTimeMilliseconds": 0.001,
+      "stdDevSeconds": 5.0e-07,
+      "minTimeSeconds": 5.0e-07,
+      "maxTimeSeconds": 5.0e-06,
+      "medianTimeSeconds": 1.0e-06,
+      "p95TimeSeconds": 2.0e-06,
+      "p99TimeSeconds": 3.0e-06,
+      "coefficientOfVariation": 50.0
+    },
+    {
+      "operation": "Windowing (vDSP)",
+      "iterations": 100,
+      "meanTimeSeconds": 0.120,
+      "meanTimeMilliseconds": 120.0,
+      "stdDevSeconds": 0.001,
+      "minTimeSeconds": 0.118,
+      "maxTimeSeconds": 0.123,
+      "medianTimeSeconds": 0.120,
+      "p95TimeSeconds": 0.122,
+      "p99TimeSeconds": 0.123,
+      "coefficientOfVariation": 0.83,
+      "throughputPixelsPerSecond": 8738133
+    },
+    {
+      "operation": "Windowing (Metal)",
+      "iterations": 100,
+      "meanTimeSeconds": 0.030,
+      "meanTimeMilliseconds": 30.0,
+      "stdDevSeconds": 0.0005,
+      "minTimeSeconds": 0.029,
+      "maxTimeSeconds": 0.032,
+      "medianTimeSeconds": 0.030,
+      "p95TimeSeconds": 0.031,
+      "p99TimeSeconds": 0.032,
+      "coefficientOfVariation": 1.67,
+      "throughputPixelsPerSecond": 34952533
+    }
+  ]
+}

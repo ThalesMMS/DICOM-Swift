@@ -1,0 +1,1065 @@
+{
+ "version": 1,
+ "policy": {
+  "storage": "Small synthetic DICOM Part 10 fixtures are kept under Tests/DicomCoreTests/Fixtures/DecoderParity. Existing small compressed fixtures remain under Tests/DicomCoreTests/Fixtures/Compressed.",
+  "privacy": "Fixtures are synthetic and non-PHI. Patient names and identifiers use PARITY or TEST placeholders only.",
+  "ci": "Validate with swift test --package-path DICOM-Swift --filter ClinicalParityFixtureManifestTests and the Isis all-target test script."
+ },
+ "decoderParity": {
+  "issue": "#1052",
+  "description": "Golden fixture manifest shared by Isis tests and the repository-local DICOM-Swift package for decoder parity proof.",
+  "manifestRoot": "DICOM-Swift",
+  "mtkValidation": {
+   "eligibleFixtureIDs": [
+    "ct-explicit-vr-le-rescale",
+    "mr-utf8-specific-character-set",
+    "ct-missing-optional-voi"
+   ]
+  },
+  "fixtures": [
+   {
+    "id": "ct-explicit-vr-le-rescale",
+    "path": "Tests/DicomCoreTests/Fixtures/DecoderParity/ct_explicit_vr_le_rescale.dcm",
+    "coverage": [
+     "explicit-vr-little-endian-ct-or-mr",
+     "rescale",
+     "geometry",
+     "windowing",
+     "mtk-validation"
+    ],
+    "sopClassUID": "1.2.840.10008.5.1.4.1.1.2",
+    "transferSyntaxUID": "1.2.840.10008.1.2.1",
+    "transferSyntaxName": "Explicit VR Little Endian",
+    "modality": "CT",
+    "specificCharacterSet": "ISO_IR 6",
+    "specificCharacterSetPresent": true,
+    "expectedUIDs": {
+     "studyInstanceUID": "2.25.1052001001",
+     "seriesInstanceUID": "2.25.1052001002",
+     "sopInstanceUID": "2.25.1052001004",
+     "frameOfReferenceUID": "2.25.1052001003"
+    },
+    "text": {
+     "patientName": "PARITY^CT",
+     "patientID": "PARITY-001",
+     "studyDescription": "Parity CT Explicit",
+     "seriesDescription": "CT explicit rescale",
+     "accessionNumber": "ACC-1052-001",
+     "institutionName": "Synthetic Parity Lab",
+     "referringPhysicianName": "PARITY^REF",
+     "bodyPartExamined": "CHEST",
+     "protocolName": "CT parity protocol",
+     "patientBirthDate": "19700101",
+     "patientSex": "O",
+     "patientAge": "050Y"
+    },
+    "dates": {
+     "studyDate": "20260603",
+     "studyTime": "120000",
+     "seriesDate": "20260603",
+     "seriesTime": "120100",
+     "acquisitionDate": "20260603",
+     "acquisitionTime": "120030"
+    },
+    "counts": {
+     "numberOfStudyRelatedSeries": 1,
+     "numberOfStudyRelatedInstances": 1,
+     "numberOfSeriesRelatedInstances": 1
+    },
+    "instance": {
+     "seriesNumber": 1,
+     "acquisitionNumber": 1,
+     "instanceNumber": 1
+    },
+    "dimensions": {
+     "rows": 4,
+     "columns": 4,
+     "frames": 1
+    },
+    "geometry": {
+     "pixelSpacing": [
+      0.5,
+      0.5
+     ],
+     "imagePositionPatient": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "imageOrientationPatient": [
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0
+     ],
+     "sliceThickness": 1.25
+    },
+    "window": {
+     "present": true,
+     "center": 40.0,
+     "width": 400.0
+    },
+    "rescale": {
+     "present": true,
+     "slope": 1.0,
+     "intercept": -1024.0,
+     "type": "HU"
+    },
+    "pixel": {
+     "pixelRepresentation": 1,
+     "samplesPerPixel": 1,
+     "photometricInterpretation": "MONOCHROME2",
+     "bitsAllocated": 16,
+     "bitsStored": 16,
+     "highBit": 15,
+     "smallestImagePixelValue": -16,
+     "largestImagePixelValue": 31
+    },
+    "status": {
+     "multiframe": false,
+     "compressed": false
+    }
+   },
+   {
+    "id": "mr-implicit-vr-le",
+    "path": "Tests/DicomCoreTests/Fixtures/DecoderParity/mr_implicit_vr_le.dcm",
+    "coverage": [
+     "implicit-vr-little-endian",
+     "ct-or-mr",
+     "geometry",
+     "windowing"
+    ],
+    "sopClassUID": "1.2.840.10008.5.1.4.1.1.4",
+    "transferSyntaxUID": "1.2.840.10008.1.2",
+    "transferSyntaxName": "Implicit VR Little Endian",
+    "modality": "MR",
+    "specificCharacterSet": "ISO_IR 6",
+    "specificCharacterSetPresent": true,
+    "expectedUIDs": {
+     "studyInstanceUID": "2.25.1052002001",
+     "seriesInstanceUID": "2.25.1052002002",
+     "sopInstanceUID": "2.25.1052002004",
+     "frameOfReferenceUID": "2.25.1052002003"
+    },
+    "text": {
+     "patientName": "PARITY^MR",
+     "patientID": "PARITY-002",
+     "studyDescription": "Parity MR Implicit",
+     "seriesDescription": "MR implicit syntax",
+     "accessionNumber": "ACC-1052-002",
+     "institutionName": "Synthetic Parity Lab",
+     "referringPhysicianName": "PARITY^REF",
+     "bodyPartExamined": "BRAIN",
+     "protocolName": "MR parity protocol",
+     "patientBirthDate": "19700101",
+     "patientSex": "O",
+     "patientAge": "050Y"
+    },
+    "dates": {
+     "studyDate": "20260603",
+     "studyTime": "120000",
+     "seriesDate": "20260603",
+     "seriesTime": "120100",
+     "acquisitionDate": "20260603",
+     "acquisitionTime": "120030"
+    },
+    "counts": {
+     "numberOfStudyRelatedSeries": 1,
+     "numberOfStudyRelatedInstances": 1,
+     "numberOfSeriesRelatedInstances": 1
+    },
+    "instance": {
+     "seriesNumber": 2,
+     "acquisitionNumber": 1,
+     "instanceNumber": 1
+    },
+    "dimensions": {
+     "rows": 4,
+     "columns": 4,
+     "frames": 1
+    },
+    "geometry": {
+     "pixelSpacing": [
+      0.8,
+      0.8
+     ],
+     "imagePositionPatient": [
+      0.0,
+      0.0,
+      5.0
+     ],
+     "imageOrientationPatient": [
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0
+     ],
+     "sliceThickness": 2.5
+    },
+    "window": {
+     "present": true,
+     "center": 500.0,
+     "width": 1000.0
+    },
+    "rescale": {
+     "present": true,
+     "slope": 1.0,
+     "intercept": 0.0,
+     "type": "US"
+    },
+    "pixel": {
+     "pixelRepresentation": 0,
+     "samplesPerPixel": 1,
+     "photometricInterpretation": "MONOCHROME2",
+     "bitsAllocated": 16,
+     "bitsStored": 16,
+     "highBit": 15,
+     "smallestImagePixelValue": 0,
+     "largestImagePixelValue": 31
+    },
+    "status": {
+     "multiframe": false,
+     "compressed": false
+    }
+   },
+   {
+    "id": "secondary-capture-rgb",
+    "path": "Tests/DicomCoreTests/Fixtures/DecoderParity/secondary_capture_rgb.dcm",
+    "coverage": [
+     "secondary-capture",
+     "explicit-vr-little-endian",
+     "rgb-pixel-metadata"
+    ],
+    "sopClassUID": "1.2.840.10008.5.1.4.1.1.7",
+    "transferSyntaxUID": "1.2.840.10008.1.2.1",
+    "transferSyntaxName": "Explicit VR Little Endian",
+    "modality": "OT",
+    "specificCharacterSet": "ISO_IR 6",
+    "specificCharacterSetPresent": true,
+    "expectedUIDs": {
+     "studyInstanceUID": "2.25.1052003001",
+     "seriesInstanceUID": "2.25.1052003002",
+     "sopInstanceUID": "2.25.1052003004",
+     "frameOfReferenceUID": "2.25.1052003003"
+    },
+    "text": {
+     "patientName": "PARITY^SC",
+     "patientID": "PARITY-003",
+     "studyDescription": "Parity Secondary Capture",
+     "seriesDescription": "Secondary capture RGB",
+     "accessionNumber": "ACC-1052-003",
+     "institutionName": "Synthetic Parity Lab",
+     "referringPhysicianName": "PARITY^REF",
+     "bodyPartExamined": "WHOLEBODY",
+     "protocolName": "SC parity protocol",
+     "patientBirthDate": "19700101",
+     "patientSex": "O",
+     "patientAge": "050Y"
+    },
+    "dates": {
+     "studyDate": "20260603",
+     "studyTime": "120000",
+     "seriesDate": "20260603",
+     "seriesTime": "120100",
+     "acquisitionDate": "20260603",
+     "acquisitionTime": "120030"
+    },
+    "counts": {
+     "numberOfStudyRelatedSeries": 1,
+     "numberOfStudyRelatedInstances": 1,
+     "numberOfSeriesRelatedInstances": 1
+    },
+    "instance": {
+     "seriesNumber": 3,
+     "acquisitionNumber": 1,
+     "instanceNumber": 1
+    },
+    "dimensions": {
+     "rows": 2,
+     "columns": 2,
+     "frames": 1
+    },
+    "geometry": {
+     "pixelSpacing": [
+      1.0,
+      1.0
+     ],
+     "imagePositionPatient": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "imageOrientationPatient": [
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0
+     ],
+     "sliceThickness": 1.0
+    },
+    "window": {
+     "present": true,
+     "center": 128.0,
+     "width": 255.0
+    },
+    "rescale": {
+     "present": true,
+     "slope": 1.0,
+     "intercept": 0.0,
+     "type": "US"
+    },
+    "pixel": {
+     "pixelRepresentation": 0,
+     "samplesPerPixel": 3,
+     "photometricInterpretation": "RGB",
+     "bitsAllocated": 8,
+     "bitsStored": 8,
+     "highBit": 7,
+     "smallestImagePixelValue": 0,
+     "largestImagePixelValue": 255
+    },
+    "status": {
+     "multiframe": false,
+     "compressed": false
+    }
+   },
+   {
+    "id": "mr-utf8-specific-character-set",
+    "path": "Tests/DicomCoreTests/Fixtures/DecoderParity/mr_utf8_specific_charset.dcm",
+    "coverage": [
+     "specific-character-set-non-ascii",
+     "explicit-vr-little-endian-ct-or-mr",
+     "geometry",
+     "windowing",
+     "mtk-validation"
+    ],
+    "sopClassUID": "1.2.840.10008.5.1.4.1.1.4",
+    "transferSyntaxUID": "1.2.840.10008.1.2.1",
+    "transferSyntaxName": "Explicit VR Little Endian",
+    "modality": "MR",
+    "specificCharacterSet": "ISO_IR 192",
+    "specificCharacterSetPresent": true,
+    "expectedUIDs": {
+     "studyInstanceUID": "2.25.1052004001",
+     "seriesInstanceUID": "2.25.1052004002",
+     "sopInstanceUID": "2.25.1052004004",
+     "frameOfReferenceUID": "2.25.1052004003"
+    },
+    "text": {
+     "patientName": "PARIDADE^São",
+     "patientID": "PARITY-004",
+     "studyDescription": "Estudo São Paulo",
+     "seriesDescription": "Série acentuação",
+     "accessionNumber": "ACC-1052-004",
+     "institutionName": "Synthetic Parity Lab",
+     "referringPhysicianName": "MÉDICO^São",
+     "bodyPartExamined": "BRAIN",
+     "protocolName": "Protocolo São Paulo",
+     "patientBirthDate": "19700101",
+     "patientSex": "O",
+     "patientAge": "050Y"
+    },
+    "dates": {
+     "studyDate": "20260603",
+     "studyTime": "120000",
+     "seriesDate": "20260603",
+     "seriesTime": "120100",
+     "acquisitionDate": "20260603",
+     "acquisitionTime": "120030"
+    },
+    "counts": {
+     "numberOfStudyRelatedSeries": 1,
+     "numberOfStudyRelatedInstances": 1,
+     "numberOfSeriesRelatedInstances": 1
+    },
+    "instance": {
+     "seriesNumber": 4,
+     "acquisitionNumber": 1,
+     "instanceNumber": 1
+    },
+    "dimensions": {
+     "rows": 4,
+     "columns": 4,
+     "frames": 1
+    },
+    "geometry": {
+     "pixelSpacing": [
+      0.7,
+      0.7
+     ],
+     "imagePositionPatient": [
+      1.0,
+      2.0,
+      3.0
+     ],
+     "imageOrientationPatient": [
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0
+     ],
+     "sliceThickness": 1.5
+    },
+    "window": {
+     "present": true,
+     "center": 300.0,
+     "width": 700.0
+    },
+    "rescale": {
+     "present": true,
+     "slope": 1.0,
+     "intercept": 0.0,
+     "type": "US"
+    },
+    "pixel": {
+     "pixelRepresentation": 0,
+     "samplesPerPixel": 1,
+     "photometricInterpretation": "MONOCHROME2",
+     "bitsAllocated": 16,
+     "bitsStored": 16,
+     "highBit": 15,
+     "smallestImagePixelValue": 0,
+     "largestImagePixelValue": 31
+    },
+    "status": {
+     "multiframe": false,
+     "compressed": false
+    }
+   },
+   {
+    "id": "ct-missing-optional-voi",
+    "path": "Tests/DicomCoreTests/Fixtures/DecoderParity/ct_missing_optional_voi.dcm",
+    "coverage": [
+     "missing-optional-voi",
+     "rescale",
+     "geometry",
+     "mtk-validation"
+    ],
+    "sopClassUID": "1.2.840.10008.5.1.4.1.1.2",
+    "transferSyntaxUID": "1.2.840.10008.1.2.1",
+    "transferSyntaxName": "Explicit VR Little Endian",
+    "modality": "CT",
+    "specificCharacterSet": "ISO_IR 6",
+    "specificCharacterSetPresent": true,
+    "expectedUIDs": {
+     "studyInstanceUID": "2.25.1052005001",
+     "seriesInstanceUID": "2.25.1052005002",
+     "sopInstanceUID": "2.25.1052005004",
+     "frameOfReferenceUID": "2.25.1052005003"
+    },
+    "text": {
+     "patientName": "PARITY^NOVOI",
+     "patientID": "PARITY-005",
+     "studyDescription": "Parity CT Missing VOI",
+     "seriesDescription": "CT without optional VOI",
+     "accessionNumber": "ACC-1052-005",
+     "institutionName": "Synthetic Parity Lab",
+     "referringPhysicianName": "PARITY^REF",
+     "bodyPartExamined": "ABDOMEN",
+     "protocolName": "CT missing VOI protocol",
+     "patientBirthDate": "19700101",
+     "patientSex": "O",
+     "patientAge": "050Y"
+    },
+    "dates": {
+     "studyDate": "20260603",
+     "studyTime": "120000",
+     "seriesDate": "20260603",
+     "seriesTime": "120100",
+     "acquisitionDate": "20260603",
+     "acquisitionTime": "120030"
+    },
+    "counts": {
+     "numberOfStudyRelatedSeries": 1,
+     "numberOfStudyRelatedInstances": 1,
+     "numberOfSeriesRelatedInstances": 1
+    },
+    "instance": {
+     "seriesNumber": 5,
+     "acquisitionNumber": 1,
+     "instanceNumber": 1
+    },
+    "dimensions": {
+     "rows": 4,
+     "columns": 4,
+     "frames": 1
+    },
+    "geometry": {
+     "pixelSpacing": [
+      0.6,
+      0.6
+     ],
+     "imagePositionPatient": [
+      0.0,
+      0.0,
+      10.0
+     ],
+     "imageOrientationPatient": [
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0
+     ],
+     "sliceThickness": 1.25
+    },
+    "window": {
+     "present": false,
+     "center": null,
+     "width": null
+    },
+    "rescale": {
+     "present": true,
+     "slope": 1.0,
+     "intercept": -1024.0,
+     "type": "HU"
+    },
+    "pixel": {
+     "pixelRepresentation": 1,
+     "samplesPerPixel": 1,
+     "photometricInterpretation": "MONOCHROME2",
+     "bitsAllocated": 16,
+     "bitsStored": 16,
+     "highBit": 15,
+     "smallestImagePixelValue": -16,
+     "largestImagePixelValue": 31
+    },
+    "status": {
+     "multiframe": false,
+     "compressed": false
+    }
+   },
+   {
+    "id": "us-multiframe-metadata",
+    "path": "Tests/DicomCoreTests/Fixtures/DecoderParity/us_multiframe_metadata.dcm",
+    "coverage": [
+     "multiframe",
+     "explicit-vr-little-endian",
+     "pixel-metadata"
+    ],
+    "sopClassUID": "1.2.840.10008.5.1.4.1.1.3.1",
+    "transferSyntaxUID": "1.2.840.10008.1.2.1",
+    "transferSyntaxName": "Explicit VR Little Endian",
+    "modality": "US",
+    "specificCharacterSet": "ISO_IR 6",
+    "specificCharacterSetPresent": true,
+    "expectedUIDs": {
+     "studyInstanceUID": "2.25.1052006001",
+     "seriesInstanceUID": "2.25.1052006002",
+     "sopInstanceUID": "2.25.1052006004",
+     "frameOfReferenceUID": "2.25.1052006003"
+    },
+    "text": {
+     "patientName": "PARITY^US",
+     "patientID": "PARITY-006",
+     "studyDescription": "Parity US Multiframe",
+     "seriesDescription": "US multiframe metadata",
+     "accessionNumber": "ACC-1052-006",
+     "institutionName": "Synthetic Parity Lab",
+     "referringPhysicianName": "PARITY^REF",
+     "bodyPartExamined": "HEART",
+     "protocolName": "US multiframe protocol",
+     "patientBirthDate": "19700101",
+     "patientSex": "O",
+     "patientAge": "050Y"
+    },
+    "dates": {
+     "studyDate": "20260603",
+     "studyTime": "120000",
+     "seriesDate": "20260603",
+     "seriesTime": "120100",
+     "acquisitionDate": "20260603",
+     "acquisitionTime": "120030"
+    },
+    "counts": {
+     "numberOfStudyRelatedSeries": 1,
+     "numberOfStudyRelatedInstances": 2,
+     "numberOfSeriesRelatedInstances": 2
+    },
+    "instance": {
+     "seriesNumber": 6,
+     "acquisitionNumber": 1,
+     "instanceNumber": 1
+    },
+    "dimensions": {
+     "rows": 2,
+     "columns": 2,
+     "frames": 2
+    },
+    "geometry": {
+     "pixelSpacing": [
+      0.4,
+      0.4
+     ],
+     "imagePositionPatient": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "imageOrientationPatient": [
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0
+     ],
+     "sliceThickness": 1.0
+    },
+    "window": {
+     "present": true,
+     "center": 100.0,
+     "width": 200.0
+    },
+    "rescale": {
+     "present": true,
+     "slope": 1.0,
+     "intercept": 0.0,
+     "type": "US"
+    },
+    "pixel": {
+     "pixelRepresentation": 0,
+     "samplesPerPixel": 1,
+     "photometricInterpretation": "MONOCHROME2",
+     "bitsAllocated": 8,
+     "bitsStored": 8,
+     "highBit": 7,
+     "smallestImagePixelValue": 0,
+     "largestImagePixelValue": 255
+    },
+    "status": {
+     "multiframe": true,
+     "compressed": false
+    }
+   },
+   {
+    "id": "jpeg-baseline-secondary-capture",
+    "path": "Tests/DicomCoreTests/Fixtures/Compressed/jpeg_baseline_synthetic.dcm",
+    "coverage": [
+     "compressed-transfer-syntax",
+     "secondary-capture",
+     "pixel-metadata"
+    ],
+    "sopClassUID": "1.2.840.10008.5.1.4.1.1.7",
+    "transferSyntaxUID": "1.2.840.10008.1.2.4.50",
+    "transferSyntaxName": "JPEG Baseline",
+    "modality": "OT",
+    "specificCharacterSet": "ISO_IR 6",
+    "specificCharacterSetPresent": false,
+    "expectedUIDs": {
+     "studyInstanceUID": "1.2.826.0.1.3680043.8.498.54343348096259289332589413047516181100",
+     "seriesInstanceUID": "1.2.826.0.1.3680043.8.498.31855674706791963911718072962709964939",
+     "sopInstanceUID": "1.2.826.0.1.3680043.8.498.91236739668987235199804639391516562109",
+     "frameOfReferenceUID": null
+    },
+    "text": {
+     "patientName": "Test^Patient",
+     "patientID": "TEST123",
+     "studyDescription": null,
+     "seriesDescription": null,
+     "accessionNumber": null,
+     "institutionName": null,
+     "referringPhysicianName": null,
+     "bodyPartExamined": null,
+     "protocolName": null,
+     "patientBirthDate": null,
+     "patientSex": null,
+     "patientAge": null
+    },
+    "dates": {
+     "studyDate": null,
+     "studyTime": null,
+     "seriesDate": null,
+     "seriesTime": null,
+     "acquisitionDate": null,
+     "acquisitionTime": null
+    },
+    "counts": {
+     "numberOfStudyRelatedSeries": null,
+     "numberOfStudyRelatedInstances": null,
+     "numberOfSeriesRelatedInstances": null
+    },
+    "instance": {
+     "seriesNumber": null,
+     "acquisitionNumber": null,
+     "instanceNumber": null
+    },
+    "dimensions": {
+     "rows": 4,
+     "columns": 4,
+     "frames": 1
+    },
+    "geometry": {
+     "pixelSpacing": [
+      0.5,
+      0.5
+     ],
+     "imagePositionPatient": [],
+     "imageOrientationPatient": [],
+     "sliceThickness": 1.0
+    },
+    "window": {
+     "present": false,
+     "center": null,
+     "width": null
+    },
+    "rescale": {
+     "present": false,
+     "slope": null,
+     "intercept": null,
+     "type": null
+    },
+    "pixel": {
+     "pixelRepresentation": 0,
+     "samplesPerPixel": 1,
+     "photometricInterpretation": "MONOCHROME2",
+     "bitsAllocated": 8,
+     "bitsStored": 8,
+     "highBit": 7,
+     "smallestImagePixelValue": null,
+     "largestImagePixelValue": null
+    },
+    "status": {
+     "multiframe": false,
+     "compressed": true
+    }
+   }
+  ]
+ },
+ "features": [
+  {
+   "id": "uncompressed",
+   "label": "Uncompressed image metadata",
+   "issues": [
+    "#1052"
+   ],
+   "goldens": [
+    "metadata",
+    "pixel-hash",
+    "frame-count",
+    "geometry",
+    "sr-tree",
+    "segment-metadata"
+   ],
+   "representation": "decoder parity fixtures include explicit and implicit VR little endian image files.",
+   "artifact": "Tests/DicomCoreTests/Resources/ReleaseGates/ClinicalParityFixtureManifest.json",
+   "synthesis": "Synthetic non-PHI files are generated as deterministic Part 10 fixtures.",
+   "tests": [
+    "Tests/DicomCoreTests/ClinicalParityFixtureManifestTests.swift"
+   ],
+   "ci": "swift test --package-path DICOM-Swift --filter ClinicalParityFixtureManifestTests"
+  },
+  {
+   "id": "jpeg-lossless",
+   "label": "JPEG Lossless (SV1) compressed parity",
+   "issues": [
+    "#1065",
+    "#1224"
+   ],
+   "goldens": [
+    "pixel-hash",
+    "frame-count",
+    "metadata"
+   ],
+   "representation": "Encapsulated JPEG Lossless Process 14 SV1 (1.2.840.10008.1.2.4.70), 2x2 16-bit monochrome, decoded natively with a stable FNV-1a pixel hash. Stored under DecoderParity so the conformance-sample scanner in Fixtures/Compressed keeps targeting real conformance files only.",
+   "artifact": "Tests/DicomCoreTests/Fixtures/DecoderParity/jpeg_lossless_sv1_parity.dcm",
+   "synthesis": "Deterministic SOF3 codestream from the in-repo JPEG test data builder, wrapped as encapsulated Part 10 by DicomDataSetWriter.",
+   "tests": [
+    "Tests/DicomCoreTests/ClinicalParityCuratedFixtureTests.swift"
+   ],
+   "ci": "swift test --package-path DICOM-Swift --filter ClinicalParityCuratedFixtureTests",
+   "provenance": "Generated in-repo by ClinicalParityCuratedFixtureTests deterministic builders (regenerate with DICOM_REGENERATE_PARITY_FIXTURES=1). Synthetic non-PHI; identifiers use PARITY placeholders. License: same as repository."
+  },
+  {
+   "id": "jpeg-2000",
+   "label": "JPEG 2000 parity placeholder",
+   "issues": [
+    "#1065"
+   ],
+   "goldens": [
+    "pixel-hash"
+   ],
+   "representation": "Placeholder by decision (#1224): the first deterministic compressed parity pair is JPEG Lossless + RLE because both decode natively in default CI; JPEG 2000 requires the optional OpenJPEG runtime and an external, non-deterministic encoder (opj_compress), so its fixture lands with the preflight-gated codec work.",
+   "artifact": "Tests/DicomCoreTests/Resources/ReleaseGates/ClinicalParityFixtureManifest.json",
+   "synthesis": "Deferred: generate with opj_compress and wrap via DicomDataSetWriter once a deterministic generation path is pinned.",
+   "tests": [
+    "Tests/DicomCoreTests/ClinicalParityFixtureManifestTests.swift"
+   ],
+   "ci": "swift test --package-path DICOM-Swift --filter ClinicalParityFixtureManifestTests"
+  },
+  {
+   "id": "rle",
+   "label": "RLE compressed parity",
+   "issues": [
+    "#1065",
+    "#1224"
+   ],
+   "goldens": [
+    "pixel-hash",
+    "frame-count",
+    "metadata"
+   ],
+   "representation": "Encapsulated RLE Lossless (1.2.840.10008.1.2.5), 2x2 8-bit monochrome with a hand-rolled single-segment PackBits payload, decoded natively with stable pixel values and hash.",
+   "artifact": "Tests/DicomCoreTests/Fixtures/DecoderParity/rle_parity.dcm",
+   "synthesis": "Deterministic 64-byte RLE header plus PackBits literal run, wrapped as encapsulated Part 10 by DicomDataSetWriter.",
+   "tests": [
+    "Tests/DicomCoreTests/ClinicalParityCuratedFixtureTests.swift"
+   ],
+   "ci": "swift test --package-path DICOM-Swift --filter ClinicalParityCuratedFixtureTests",
+   "provenance": "Generated in-repo by ClinicalParityCuratedFixtureTests deterministic builders (regenerate with DICOM_REGENERATE_PARITY_FIXTURES=1). Synthetic non-PHI; identifiers use PARITY placeholders. License: same as repository."
+  },
+  {
+   "id": "multiframe",
+   "label": "Multiframe metadata",
+   "issues": [
+    "#1052"
+   ],
+   "goldens": [
+    "frame-count"
+   ],
+   "representation": "US multiframe metadata fixture declares NumberOfFrames and pixel metadata.",
+   "artifact": "Tests/DicomCoreTests/Fixtures/DecoderParity/us_multiframe_metadata.dcm",
+   "synthesis": "Synthetic two-frame fixture with known rows, columns, and frame count.",
+   "tests": [
+    "Tests/DicomCoreTests/ClinicalParityFixtureManifestTests.swift"
+   ],
+   "ci": "swift test --package-path DICOM-Swift --filter ClinicalParityFixtureManifestTests"
+  },
+  {
+   "id": "seg",
+   "label": "Segmentation metadata placeholder",
+   "issues": [
+    "#1073"
+   ],
+   "goldens": [
+    "segment-metadata"
+   ],
+   "representation": "Manifest slot retained for segmentation fixture expansion.",
+   "artifact": "Tests/DicomCoreTests/Resources/ReleaseGates/ClinicalParityFixtureManifest.json",
+   "synthesis": "Covered by manifest policy until SEG fixtures are added.",
+   "tests": [
+    "Tests/DicomCoreTests/ClinicalParityFixtureManifestTests.swift"
+   ],
+   "ci": "swift test --package-path DICOM-Swift --filter ClinicalParityFixtureManifestTests"
+  },
+  {
+   "id": "rtstruct",
+   "label": "RTSTRUCT metadata placeholder",
+   "issues": [
+    "#1073"
+   ],
+   "goldens": [
+    "segment-metadata"
+   ],
+   "representation": "Manifest slot retained for RTSTRUCT fixture expansion.",
+   "artifact": "Tests/DicomCoreTests/Resources/ReleaseGates/ClinicalParityFixtureManifest.json",
+   "synthesis": "Covered by manifest policy until RTSTRUCT fixtures are added.",
+   "tests": [
+    "Tests/DicomCoreTests/ClinicalParityFixtureManifestTests.swift"
+   ],
+   "ci": "swift test --package-path DICOM-Swift --filter ClinicalParityFixtureManifestTests"
+  },
+  {
+   "id": "rtdose",
+   "label": "RTDOSE metadata placeholder",
+   "issues": [
+    "#1073"
+   ],
+   "goldens": [
+    "metadata"
+   ],
+   "representation": "Manifest slot retained for RTDOSE fixture expansion.",
+   "artifact": "Tests/DicomCoreTests/Resources/ReleaseGates/ClinicalParityFixtureManifest.json",
+   "synthesis": "Covered by manifest policy until RTDOSE fixtures are added.",
+   "tests": [
+    "Tests/DicomCoreTests/ClinicalParityFixtureManifestTests.swift"
+   ],
+   "ci": "swift test --package-path DICOM-Swift --filter ClinicalParityFixtureManifestTests"
+  },
+  {
+   "id": "sr-tid1500",
+   "label": "SR TID1500 measurement report",
+   "issues": [
+    "#1065",
+    "#1224"
+   ],
+   "goldens": [
+    "sr-tree",
+    "metadata"
+   ],
+   "representation": "Enhanced SR with TID1500 template: Imaging Measurement Report container, measurement group, NUM 12.5 mm (UCUM) with tracking IDs and image reference, RADLEX finding code, and study/series evidence.",
+   "artifact": "Tests/DicomCoreTests/Fixtures/StructuredReports/sr_tid1500_measurement_report.dcm",
+   "synthesis": "Built with DicomStructuredReportBuilder from a DicomSRDocument model.",
+   "tests": [
+    "Tests/DicomCoreTests/ClinicalParityCuratedFixtureTests.swift"
+   ],
+   "ci": "swift test --package-path DICOM-Swift --filter ClinicalParityCuratedFixtureTests",
+   "provenance": "Generated in-repo by ClinicalParityCuratedFixtureTests deterministic builders (regenerate with DICOM_REGENERATE_PARITY_FIXTURES=1). Synthetic non-PHI; identifiers use PARITY placeholders. License: same as repository."
+  },
+  {
+   "id": "kos",
+   "label": "Key Object Selection document",
+   "issues": [
+    "#1065",
+    "#1224"
+   ],
+   "goldens": [
+    "sr-tree",
+    "metadata"
+   ],
+   "representation": "KOS document (SOP class 1.2.840.10008.5.1.4.1.1.88.59, modality KO) with an Of Interest container, an IMAGE content reference and matching evidence sequence.",
+   "artifact": "Tests/DicomCoreTests/Fixtures/StructuredReports/kos_key_object_selection.dcm",
+   "synthesis": "Built with DicomStructuredReportBuilder from a DicomSRDocument model.",
+   "tests": [
+    "Tests/DicomCoreTests/ClinicalParityCuratedFixtureTests.swift"
+   ],
+   "ci": "swift test --package-path DICOM-Swift --filter ClinicalParityCuratedFixtureTests",
+   "provenance": "Generated in-repo by ClinicalParityCuratedFixtureTests deterministic builders (regenerate with DICOM_REGENERATE_PARITY_FIXTURES=1). Synthetic non-PHI; identifiers use PARITY placeholders. License: same as repository."
+  },
+  {
+   "id": "pr",
+   "label": "Presentation state placeholder",
+   "issues": [
+    "#1073"
+   ],
+   "goldens": [
+    "metadata"
+   ],
+   "representation": "Manifest slot retained for presentation state fixture expansion.",
+   "artifact": "Tests/DicomCoreTests/Resources/ReleaseGates/ClinicalParityFixtureManifest.json",
+   "synthesis": "Covered by manifest policy until PR fixtures are added.",
+   "tests": [
+    "Tests/DicomCoreTests/ClinicalParityFixtureManifestTests.swift"
+   ],
+   "ci": "swift test --package-path DICOM-Swift --filter ClinicalParityFixtureManifestTests"
+  },
+  {
+   "id": "hp",
+   "label": "Hanging protocol placeholder",
+   "issues": [
+    "#1073"
+   ],
+   "goldens": [
+    "metadata"
+   ],
+   "representation": "Manifest slot retained for hanging protocol fixture expansion.",
+   "artifact": "Tests/DicomCoreTests/Resources/ReleaseGates/ClinicalParityFixtureManifest.json",
+   "synthesis": "Covered by manifest policy until HP fixtures are added.",
+   "tests": [
+    "Tests/DicomCoreTests/ClinicalParityFixtureManifestTests.swift"
+   ],
+   "ci": "swift test --package-path DICOM-Swift --filter ClinicalParityFixtureManifestTests"
+  },
+  {
+   "id": "rwv",
+   "label": "Real world value map placeholder",
+   "issues": [
+    "#1073"
+   ],
+   "goldens": [
+    "metadata"
+   ],
+   "representation": "Manifest slot retained for RWV fixture expansion.",
+   "artifact": "Tests/DicomCoreTests/Resources/ReleaseGates/ClinicalParityFixtureManifest.json",
+   "synthesis": "Covered by manifest policy until RWV fixtures are added.",
+   "tests": [
+    "Tests/DicomCoreTests/ClinicalParityFixtureManifestTests.swift"
+   ],
+   "ci": "swift test --package-path DICOM-Swift --filter ClinicalParityFixtureManifestTests"
+  },
+  {
+   "id": "pmap",
+   "label": "Parametric map placeholder",
+   "issues": [
+    "#1073"
+   ],
+   "goldens": [
+    "metadata"
+   ],
+   "representation": "Manifest slot retained for parametric map fixture expansion.",
+   "artifact": "Tests/DicomCoreTests/Resources/ReleaseGates/ClinicalParityFixtureManifest.json",
+   "synthesis": "Covered by manifest policy until parametric map fixtures are added.",
+   "tests": [
+    "Tests/DicomCoreTests/ClinicalParityFixtureManifestTests.swift"
+   ],
+   "ci": "swift test --package-path DICOM-Swift --filter ClinicalParityFixtureManifestTests"
+  },
+  {
+   "id": "dicomdir",
+   "label": "DICOMDIR placeholder",
+   "issues": [
+    "#1073"
+   ],
+   "goldens": [
+    "metadata"
+   ],
+   "representation": "Manifest slot retained for DICOMDIR fixture expansion.",
+   "artifact": "Tests/DicomCoreTests/Resources/ReleaseGates/ClinicalParityFixtureManifest.json",
+   "synthesis": "Covered by manifest policy until DICOMDIR fixtures are added.",
+   "tests": [
+    "Tests/DicomCoreTests/ClinicalParityFixtureManifestTests.swift"
+   ],
+   "ci": "swift test --package-path DICOM-Swift --filter ClinicalParityFixtureManifestTests"
+  },
+  {
+   "id": "encapsulated-pdf",
+   "label": "Encapsulated PDF placeholder",
+   "issues": [
+    "#1073"
+   ],
+   "goldens": [
+    "metadata"
+   ],
+   "representation": "Manifest slot retained for encapsulated PDF fixture expansion.",
+   "artifact": "Tests/DicomCoreTests/Resources/ReleaseGates/ClinicalParityFixtureManifest.json",
+   "synthesis": "Covered by manifest policy until encapsulated PDF fixtures are added.",
+   "tests": [
+    "Tests/DicomCoreTests/ClinicalParityFixtureManifestTests.swift"
+   ],
+   "ci": "swift test --package-path DICOM-Swift --filter ClinicalParityFixtureManifestTests"
+  },
+  {
+   "id": "waveform",
+   "label": "Waveform placeholder",
+   "issues": [
+    "#1073"
+   ],
+   "goldens": [
+    "metadata"
+   ],
+   "representation": "Manifest slot retained for waveform fixture expansion.",
+   "artifact": "Tests/DicomCoreTests/Resources/ReleaseGates/ClinicalParityFixtureManifest.json",
+   "synthesis": "Covered by manifest policy until waveform fixtures are added.",
+   "tests": [
+    "Tests/DicomCoreTests/ClinicalParityFixtureManifestTests.swift"
+   ],
+   "ci": "swift test --package-path DICOM-Swift --filter ClinicalParityFixtureManifestTests"
+  },
+  {
+   "id": "video",
+   "label": "Video placeholder",
+   "issues": [
+    "#1073"
+   ],
+   "goldens": [
+    "metadata"
+   ],
+   "representation": "Manifest slot retained for video fixture expansion.",
+   "artifact": "Tests/DicomCoreTests/Resources/ReleaseGates/ClinicalParityFixtureManifest.json",
+   "synthesis": "Covered by manifest policy until video fixtures are added.",
+   "tests": [
+    "Tests/DicomCoreTests/ClinicalParityFixtureManifestTests.swift"
+   ],
+   "ci": "swift test --package-path DICOM-Swift --filter ClinicalParityFixtureManifestTests"
+  }
+ ]
+}

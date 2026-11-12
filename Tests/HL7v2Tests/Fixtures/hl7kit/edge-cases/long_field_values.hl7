@@ -1,0 +1,4 @@
+MSH|^~\&|SENDING_APP|SENDING_FACILITY|RECEIVING_APP|RECEIVING_FACILITY|20240207120000||ADT^A01|MSG00010|P|2.5.1
+EVN|A01|20240207120000
+PID|1||123456789012345678901234567890123456789012345678901234567890^^^HOSPITAL^MR||VeryLongLastNameThatExceedsNormalLengthExpectations^VeryLongFirstNameAlsoExceedingNormalLength^VeryLongMiddleNameToo||19800115|M||2106-3|123456789 Main Street That Has An Extremely Long Name For A Street Address^Apartment Complex Building Name That Is Also Very Long^Boston^MA^02101^USA||(617)555-1234567890||EN^English|S||1000001^^^HOSPITAL^AN
+PV1|1|I|VeryLongPointOfCareNameThatExceedsNormal^RoomNumberThatIsVeryLong^BedDesignationThatIsAlsoVeryLong

@@ -1,0 +1,23 @@
+/*
+ * jdphuff.c
+ *
+ * This file was part of the Independent JPEG Group's software:
+ * Copyright (C) 1995-1997, Thomas G. Lane.
+ * Lossless JPEG Modifications:
+ * Copyright (C) 1999, Ken Murchison.
+ * libjpeg-turbo Modifications:
+ * Copyright (C) 2015-2016, 2018-2022, D. R. Commander.
+ * For conditions of distribution and use, see the accompanying README.ijg
+ * file.
+ *
+ * This file contains Huffman entropy decoding routines for progressive JPEG.
+ *
+ * Much of the complexity here has to do with supporting input suspension.
+ * If the data source module demands suspension, we want to be able to back
+ * up to the start of the current MCU.  To do this, we copy state variables
+ * into local working storage, and update them back to the permanent
+ * storage only upon successful completion of an MCU.
+ *
+ * NOTE: All referenced figures are from
+ * Recommendation ITU-T T.81 (1992) | ISO/IEC 10918-1:1994.
+ */

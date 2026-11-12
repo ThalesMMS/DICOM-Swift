@@ -1,0 +1,207 @@
+{
+  "_comment": "Baseline Performance Benchmark Template",
+  "_description": "This template defines the schema for storing baseline benchmark results. Baselines are used for regression detection - new benchmark runs are compared against these stored results to detect performance degradations.",
+  "_usage": "To create a new baseline: 1) Run benchmark suite, 2) Copy JSON output to this directory with naming pattern: baseline_<platform>_<date>.json (e.g., baseline_macOS_2026-02-15.json), 3) Commit to version control",
+  "_schema_version": "1.0",
+
+  "timestamp": "2026-02-15T10:00:00Z",
+  "_timestamp_note": "ISO8601 formatted timestamp when benchmark was executed",
+
+  "platform": {
+    "operatingSystem": "macOS",
+    "_operatingSystem_note": "Operating system name (macOS, iOS, Linux, etc.)",
+
+    "osVersion": "Version 14.0 (Build 23A344)",
+    "_osVersion_note": "Detailed OS version string from ProcessInfo",
+
+    "architecture": "arm64",
+    "_architecture_note": "CPU architecture (arm64, x86_64, etc.)",
+
+    "processorCount": 8,
+    "_processorCount_note": "Number of logical processors/cores",
+
+    "modelIdentifier": "MacBookPro18,1",
+    "_modelIdentifier_note": "Hardware model identifier (macOS only, 'Unknown' on other platforms)"
+  },
+
+  "configuration": {
+    "warmupIterations": 3,
+    "_warmupIterations_note": "Number of warmup iterations before timing measurements",
+
+    "benchmarkIterations": 10,
+    "_benchmarkIterations_note": "Number of timed iterations for statistical analysis",
+
+    "imageWidth": 512,
+    "_imageWidth_note": "Width of test images in pixels",
+
+    "imageHeight": 512,
+    "_imageHeight_note": "Height of test images in pixels",
+
+    "totalPixels": 262144,
+    "_totalPixels_note": "Total pixel count (width × height)",
+
+    "windowCenter": 50.0,
+    "_windowCenter_note": "Window center value for windowing operations",
+
+    "windowWidth": 400.0,
+    "_windowWidth_note": "Window width value for windowing operations"
+  },
+
+  "results": [
+    {
+      "operation": "decoder_lock_overhead",
+      "_operation_note": "Benchmark operation identifier (see BenchmarkType enum)",
+
+      "iterations": 10,
+      "_iterations_note": "Number of iterations performed",
+
+      "meanTimeSeconds": 0.000050,
+      "_meanTimeSeconds_note": "Mean execution time in seconds",
+
+      "meanTimeMilliseconds": 0.050,
+      "_meanTimeMilliseconds_note": "Mean execution time in milliseconds (convenience field)",
+
+      "stdDevSeconds": 0.000005,
+      "_stdDevSeconds_note": "Standard deviation of execution time in seconds",
+
+      "minTimeSeconds": 0.000045,
+      "_minTimeSeconds_note": "Minimum execution time observed",
+
+      "maxTimeSeconds": 0.000060,
+      "_maxTimeSeconds_note": "Maximum execution time observed",
+
+      "medianTimeSeconds": 0.000049,
+      "_medianTimeSeconds_note": "Median execution time (50th percentile)",
+
+      "p95TimeSeconds": 0.000058,
+      "_p95TimeSeconds_note": "95th percentile execution time",
+
+      "p99TimeSeconds": 0.000059,
+      "_p99TimeSeconds_note": "99th percentile execution time",
+
+      "coefficientOfVariation": 10.0,
+      "_coefficientOfVariation_note": "Coefficient of variation as percentage (stdDev/mean × 100)",
+
+      "throughputPixelsPerSecond": null,
+      "_throughputPixelsPerSecond_note": "Pixels processed per second (only for windowing operations, null otherwise)"
+    },
+    {
+      "operation": "decoder_initialization",
+      "iterations": 10,
+      "meanTimeSeconds": 0.000100,
+      "meanTimeMilliseconds": 0.100,
+      "stdDevSeconds": 0.000010,
+      "minTimeSeconds": 0.000090,
+      "maxTimeSeconds": 0.000115,
+      "medianTimeSeconds": 0.000098,
+      "p95TimeSeconds": 0.000112,
+      "p99TimeSeconds": 0.000114,
+      "coefficientOfVariation": 10.0,
+      "throughputPixelsPerSecond": null
+    },
+    {
+      "operation": "file_validation",
+      "iterations": 10,
+      "meanTimeSeconds": 0.000200,
+      "meanTimeMilliseconds": 0.200,
+      "stdDevSeconds": 0.000020,
+      "minTimeSeconds": 0.000180,
+      "maxTimeSeconds": 0.000230,
+      "medianTimeSeconds": 0.000198,
+      "p95TimeSeconds": 0.000225,
+      "p99TimeSeconds": 0.000228,
+      "coefficientOfVariation": 10.0,
+      "throughputPixelsPerSecond": null
+    },
+    {
+      "operation": "metadata_access",
+      "iterations": 10,
+      "meanTimeSeconds": 0.000150,
+      "meanTimeMilliseconds": 0.150,
+      "stdDevSeconds": 0.000015,
+      "minTimeSeconds": 0.000135,
+      "maxTimeSeconds": 0.000172,
+      "medianTimeSeconds": 0.000148,
+      "p95TimeSeconds": 0.000168,
+      "p99TimeSeconds": 0.000171,
+      "coefficientOfVariation": 10.0,
+      "throughputPixelsPerSecond": null
+    },
+    {
+      "operation": "windowing_vdsp",
+      "iterations": 10,
+      "meanTimeSeconds": 0.002000,
+      "meanTimeMilliseconds": 2.000,
+      "stdDevSeconds": 0.000100,
+      "minTimeSeconds": 0.001900,
+      "maxTimeSeconds": 0.002200,
+      "medianTimeSeconds": 0.001990,
+      "p95TimeSeconds": 0.002150,
+      "p99TimeSeconds": 0.002180,
+      "coefficientOfVariation": 5.0,
+      "throughputPixelsPerSecond": 131072000.0,
+      "_throughputPixelsPerSecond_calculation": "totalPixels / meanTimeSeconds = 262144 / 0.002 = 131,072,000"
+    },
+    {
+      "operation": "windowing_metal",
+      "iterations": 10,
+      "meanTimeSeconds": 0.001160,
+      "meanTimeMilliseconds": 1.160,
+      "stdDevSeconds": 0.000080,
+      "minTimeSeconds": 0.001080,
+      "maxTimeSeconds": 0.001300,
+      "medianTimeSeconds": 0.001150,
+      "p95TimeSeconds": 0.001270,
+      "p99TimeSeconds": 0.001290,
+      "coefficientOfVariation": 6.9,
+      "throughputPixelsPerSecond": 226003448.0,
+      "_throughputPixelsPerSecond_calculation": "totalPixels / meanTimeSeconds = 262144 / 0.001160 ≈ 226,003,448",
+      "_metal_speedup_note": "Metal should show ~1.7x speedup vs vDSP for 512×512 images, ~3.9x for 1024×1024 images"
+    },
+    {
+      "operation": "windowing_comparison",
+      "iterations": 10,
+      "meanTimeSeconds": 0.003200,
+      "meanTimeMilliseconds": 3.200,
+      "stdDevSeconds": 0.000150,
+      "minTimeSeconds": 0.003000,
+      "maxTimeSeconds": 0.003500,
+      "medianTimeSeconds": 0.003180,
+      "p95TimeSeconds": 0.003450,
+      "p99TimeSeconds": 0.003480,
+      "coefficientOfVariation": 4.7,
+      "throughputPixelsPerSecond": null,
+      "_comparison_note": "Runs both vDSP and Metal windowing to compare results"
+    }
+  ],
+
+  "_baseline_comparison_notes": [
+    "Regression detection thresholds:",
+    "  - Warning: >10% slower than baseline (mean time)",
+    "  - Failure: >20% slower than baseline (mean time)",
+    "Comparison should account for:",
+    "  - Different hardware configurations (compare within same platform/model)",
+    "  - Statistical variance (use confidence intervals)",
+    "  - Expected Metal acceleration ratios (1.7-4.4× depending on image size)"
+  ],
+
+  "_expected_performance_ranges": {
+    "decoder_lock_overhead": "0.02-0.10 ms (should be negligible)",
+    "decoder_initialization": "0.05-0.20 ms (lightweight object creation)",
+    "file_validation": "0.10-0.50 ms (basic header checks)",
+    "metadata_access": "0.05-0.30 ms (cached tag lookups)",
+    "windowing_vdsp_512x512": "1.5-3.0 ms (CPU-based SIMD processing)",
+    "windowing_metal_512x512": "0.9-2.0 ms (GPU-based, ~1.7× speedup expected)",
+    "windowing_vdsp_1024x1024": "6-12 ms (4× more pixels than 512×512)",
+    "windowing_metal_1024x1024": "1.5-3.5 ms (GPU scales better, ~3.9× speedup expected)"
+  },
+
+  "_file_naming_convention": "baseline_<platform>_<architecture>_<YYYY-MM-DD>.json",
+  "_file_naming_examples": [
+    "baseline_macOS_arm64_2026-02-15.json - Apple Silicon Mac baseline",
+    "baseline_macOS_x86_64_2026-02-15.json - Intel Mac baseline",
+    "baseline_iOS_arm64_2026-02-15.json - iOS device baseline"
+  ],
+
+  "_version_control": "Baseline files should be committed to Git for historical tracking and regression detection across branches/PRs"
+}
