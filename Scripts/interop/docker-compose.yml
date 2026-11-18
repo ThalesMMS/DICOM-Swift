@@ -1,0 +1,117 @@
+services:
+  orthanc:
+    image: ${ORTHANC_IMAGE:-orthancteam/orthanc:latest}
+    ports:
+      - "${ORTHANC_HTTP_PORT:-8042}:8042"
+      - "${ORTHANC_DIMSE_PORT:-4242}:4242"
+    environment:
+      VERBOSE_ENABLED: "true"
+      DICOM_WEB_PLUGIN_ENABLED: "true"
+      ORTHANC_JSON: |
+        {
+          "Name": "MTK Interop Orthanc",
+          "DicomAet": "ORTHANC",
+          "RemoteAccessAllowed": true,
+          "AuthenticationEnabled": false,
+          "DicomWeb": {
+            "Enable": true,
+            "Root": "/dicom-web/"
+          },
+          "DicomModalities": {
+            "MTKSMOKE": [
+              "MTKSMOKE",
+              "host.docker.internal",
+              11114
+            ]
+          }
+        }
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - orthanc-storage:/var/lib/orthanc/db
+
+  orthanc-auth:
+    image: ${ORTHANC_IMAGE:-orthancteam/orthanc:latest}
+    ports:
+      - "${ORTHANC_AUTH_HTTP_PORT:-8043}:8042"
+    environment:
+      VERBOSE_ENABLED: "true"
+      DICOM_WEB_PLUGIN_ENABLED: "true"
+      ORTHANC_JSON: |
+        {
+          "Name": "MTK Interop Orthanc (auth)",
+          "DicomAet": "ORTHANCAUTH",
+          "RemoteAccessAllowed": true,
+          "AuthenticationEnabled": true,
+          "RegisteredUsers": {
+            "smoke": "${ORTHANC_AUTH_PASSWORD:-smoke-secret}"
+          },
+          "DicomWeb": {
+            "Enable": true,
+            "Root": "/dicom-web/"
+          }
+        }
+    volumes:
+      - orthanc-auth-storage:/var/lib/orthanc/db
+
+  dcm4chee-ldap:
+    image: ${DCM4CHEE_LDAP_IMAGE:-dcm4che/slapd-dcm4chee:2.6.14-35.2}
+    environment:
+      ARCHIVE_HOST: dcm4chee-arc
+      STORAGE_DIR: /storage/fs1
+    volumes:
+      - dcm4chee-ldap:/var/lib/openldap/openldap-data
+      - dcm4chee-slapd:/etc/openldap/slapd.d
+
+  dcm4chee-db:
+    image: ${DCM4CHEE_DB_IMAGE:-dcm4che/postgres-dcm4chee:18.3-35}
+    environment:
+      POSTGRES_DB: pacsdb
+      POSTGRES_USER: pacs
+      POSTGRES_PASSWORD: pacs
+      # The image's init scripts edit /var/lib/postgresql/data/postgresql.conf, so the data stays in the directory
+      # used before PostgreSQL 18 changed its default PGDATA.
+      PGDATA: /var/lib/postgresql/data
+    volumes:
+      - dcm4chee-db:/var/lib/postgresql/data
+
+  dcm4chee-arc:
+    image: ${DCM4CHEE_ARC_IMAGE:-dcm4che/dcm4chee-arc-psql:5.35.2}
+    depends_on:
+      - dcm4chee-ldap
+      - dcm4chee-db
+    ports:
+      - "${DCM4CHEE_HTTP_PORT:-8080}:8080"
+      - "${DCM4CHEE_DIMSE_PORT:-11112}:11112"
+    environment:
+      WILDFLY_ADMIN_USER: admin
+      WILDFLY_ADMIN_PASSWORD: admin
+      WILDFLY_DEPLOY_UI: "false"
+      WILDFLY_PACSDS_USE_CCM: "false"
+      LDAP_URL: ldap://dcm4chee-ldap:389
+      POSTGRES_HOST: dcm4chee-db
+      POSTGRES_DB: pacsdb
+      POSTGRES_USER: pacs
+      POSTGRES_PASSWORD: pacs
+      WILDFLY_CHOWN: /storage
+      WILDFLY_WAIT_FOR: dcm4chee-ldap:389 dcm4chee-db:5432
+      JAVA_OPTS: >-
+        -Xms64m
+        -Xmx512m
+        -XX:MetaspaceSize=96M
+        -XX:MaxMetaspaceSize=256m
+        -Djava.net.preferIPv4Stack=true
+        -Djboss.modules.system.pkgs=org.jboss.byteman
+        -Djava.awt.headless=true
+    volumes:
+      - dcm4chee-wildfly:/opt/wildfly/standalone
+      - dcm4chee-storage:/storage
+
+volumes:
+  orthanc-auth-storage:
+  orthanc-storage:
+  dcm4chee-ldap:
+  dcm4chee-slapd:
+  dcm4chee-db:
+  dcm4chee-wildfly:
+  dcm4chee-storage:

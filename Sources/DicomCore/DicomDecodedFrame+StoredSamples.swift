@@ -1,0 +1,109 @@
+//
+//  DicomDecodedFrame+StoredSamples.swift
+//  DicomCore
+//
+//  PS3.5 8.1.1: only Bits Stored bits, ending at High Bit, belong to a sample; any others in the
+//  allocated word are ignored (issue #2851). A signed sample takes its sign from its own top bit.
+//  The direct native read applies it too (issue #3111).
+//
+//  Thales Matheus Mendonça Santos — September 2026
+//
+
+import Foundation
+
+extension DicomDecodedFrame {
+    /// The frame as little-endian stored sample bytes: the display normalisation of the typed buffer
+    /// (signed level shift to unsigned, MONOCHROME1 full-range inversion) is undone so signed samples are
+    /// two's complement again and MONOCHROME1 samples are the values written in the object. Colour frames
+    /// are interleaved RGB regardless of the source Planar Configuration; 16-bit colour comes out as little-endian
+    /// words holding the right-aligned stored values (issue #3034). This is the sample contract that
+    /// native readers and the GDCM bridge deliver, so consumers can mix providers without a second convention.
+    public func storedSampleData() -> Data {
+        let inverted = metadata.photometricInterpretation == "MONOCHROME1"
+        let signed = metadata.pixelRepresentation == 1
+        switch pixels {
+        case .gray16(let values):
+            let bits = StoredBits(metadata, width: 16)
+            // Written in place: appending two bytes per sample cost more than the JPEG 2000 decode of a
+            // 512x512 frame (issue #3041). Same per-sample conversion, little-endian words.
+            // `UInt16.max - value` is `~value`, and adding Int16.min to a 16-bit pattern flips its top bit, so the
+            // un-inversion and the signed shift are one XOR hoisted out of the loop (issue #3051).
+            let pattern: UInt16 = (inverted ? 0xFFFF : 0) ^ (signed ? 0x8000 : 0)
+            var bytes = Data(count: values.count * 2)
+            bytes.withUnsafeMutableBytes { (output: UnsafeMutableRawBufferPointer) in
+                let words = output.bindMemory(to: UInt16.self)
+                values.withUnsafeBufferPointer { samples in
+                    guard let out = words.baseAddress, let source = samples.baseAddress else { return }
+                    let count = samples.count
+                    if bits.isWholeWord {
+                        for index in 0..<count {
+                            out[index] = (source[index] ^ pattern).littleEndian
+                        }
+                    } else {
+                        // `StoredBits.sample` truncated to 16 bits, without its branches: shifting the stored bits
+                        // to the top of the word and back sign-extends a signed sample. Every shift is below 16.
+                        let shift = UInt16(bits.shift)
+                        let mask = UInt16(truncatingIfNeeded: bits.mask)
+                        let lead = UInt16(16 - bits.mask.nonzeroBitCount)
+                        if signed {
+                            for index in 0..<count {
+                                let value = ((source[index] ^ pattern) &>> shift) & mask
+                                out[index] = UInt16(bitPattern: Int16(bitPattern: value &<< lead) &>> lead).littleEndian
+                            }
+                        } else {
+                            for index in 0..<count {
+                                out[index] = (((source[index] ^ pattern) &>> shift) & mask).littleEndian
+                            }
+                        }
+                    }
+                }
+            }
+            return bytes
+        case .gray8(let values):
+            let bits = StoredBits(metadata, width: 8)
+            return Data(values.map { value -> UInt8 in
+                let unInverted = inverted ? UInt8.max - value : value
+                let pattern = signed ? UInt8(bitPattern: Int8(truncatingIfNeeded: Int(unInverted) - 128)) : unInverted
+                return UInt8(truncatingIfNeeded: bits.sample(Int(pattern), signed: signed))
+            })
+        case .rgb8(let interleaved):
+            return Data(interleaved)
+        case .rgb16(let interleaved):
+            // Already the stored values (right-aligned, unsigned): little-endian words, interleaved.
+            var bytes = Data(count: interleaved.count * 2)
+            bytes.withUnsafeMutableBytes { (output: UnsafeMutableRawBufferPointer) in
+                for (index, value) in interleaved.enumerated() {
+                    output[index * 2] = UInt8(truncatingIfNeeded: value)
+                    output[index * 2 + 1] = UInt8(truncatingIfNeeded: value >> 8)
+                }
+            }
+            return bytes
+        }
+    }
+}
+
+/// PS3.5 8.1.1: only Bits Stored bits, ending at High Bit, belong to a sample; any others in the allocated
+/// word are ignored (issue #2851). A signed sample takes its sign from its own top bit. The direct native read
+/// applies it too (issue #3111).
+struct StoredBits {
+    let shift: Int
+    let mask: Int
+    let signBit: Int
+    let isWholeWord: Bool
+
+    init(_ metadata: DicomDecodedFrameMetadata, width: Int) {
+        let bitsStored = metadata.bitsStored
+        let highBit = metadata.highBit
+        let valid = bitsStored > 0 && bitsStored <= width && highBit >= bitsStored - 1 && highBit < width
+        shift = valid ? highBit - bitsStored + 1 : 0
+        mask = valid ? (1 << bitsStored) - 1 : (1 << width) - 1
+        signBit = valid ? 1 << (bitsStored - 1) : 1 << (width - 1)
+        isWholeWord = !valid || (bitsStored == width && shift == 0)
+    }
+
+    func sample(_ pattern: Int, signed: Bool) -> Int {
+        guard !isWholeWord else { return pattern }
+        let value = (pattern >> shift) & mask
+        return signed && value & signBit != 0 ? value | ~mask : value
+    }
+}

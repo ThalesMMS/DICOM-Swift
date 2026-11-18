@@ -1,0 +1,24 @@
+[
+  {
+    "tag": "30040016",
+    "vrs": [
+      "SQ"
+    ],
+    "vm": "1",
+    "name": "Recommended Isodose Level Sequence",
+    "keyword": "RecommendedIsodoseLevelSequence",
+    "retired": false,
+    "source": "PS3.6 2026c"
+  },
+  {
+    "tag": "00480304",
+    "vrs": [
+      "CS"
+    ],
+    "vm": "1",
+    "name": "Tiles Overlap",
+    "keyword": "TilesOverlap",
+    "retired": false,
+    "source": "PS3.6 2026c"
+  }
+]

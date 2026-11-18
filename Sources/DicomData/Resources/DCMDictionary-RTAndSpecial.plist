@@ -1,0 +1,2412 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>30020002</key>
+	<string>SHRT Image Label</string>
+	<key>30020003</key>
+	<string>LORT Image Name</string>
+	<key>30020004</key>
+	<string>STRT Image Description</string>
+	<key>3002000A</key>
+	<string>CSReported Values Origin</string>
+	<key>3002000C</key>
+	<string>CSRT Image Plane</string>
+	<key>3002000D</key>
+	<string>DSX-Ray Image Receptor Translation</string>
+	<key>3002000E</key>
+	<string>DSX-Ray Image Receptor Angle</string>
+	<key>30020010</key>
+	<string>DSRT Image Orientation</string>
+	<key>30020011</key>
+	<string>DSImage Plane Pixel Spacing</string>
+	<key>30020012</key>
+	<string>DSRT Image Position</string>
+	<key>30020020</key>
+	<string>SHRadiation Machine Name</string>
+	<key>30020022</key>
+	<string>DSRadiation Machine SAD</string>
+	<key>30020024</key>
+	<string>DSRadiation Machine SSD</string>
+	<key>30020026</key>
+	<string>DSRT Image SID</string>
+	<key>30020028</key>
+	<string>DSSource to Reference Object Distance</string>
+	<key>30020029</key>
+	<string>ISFraction Number</string>
+	<key>30020030</key>
+	<string>SQExposure Sequence</string>
+	<key>30020032</key>
+	<string>DSMeterset Exposure</string>
+	<key>30020034</key>
+	<string>DSDiaphragm Position</string>
+	<key>30020040</key>
+	<string>SQFluence Map Sequence</string>
+	<key>30020041</key>
+	<string>CSFluence Data Source</string>
+	<key>30020042</key>
+	<string>DSFluence Data Scale</string>
+	<key>30020050</key>
+	<string>SQPrimary Fluence Mode Sequence</string>
+	<key>30020051</key>
+	<string>CSFluence Mode</string>
+	<key>30020052</key>
+	<string>SHFluence Mode ID</string>
+	<key>30020100</key>
+	<string>ISSelected Frame Number</string>
+	<key>30020101</key>
+	<string>SQSelected Frame Functional Groups Sequence</string>
+	<key>30020102</key>
+	<string>SQRT Image Frame General Content Sequence</string>
+	<key>30020103</key>
+	<string>SQRT Image Frame Context Sequence</string>
+	<key>30020104</key>
+	<string>SQRT Image Scope Sequence</string>
+	<key>30020105</key>
+	<string>CSBeam Modifier Coordinates Presence Flag</string>
+	<key>30020106</key>
+	<string>FDStart Cumulative Meterset</string>
+	<key>30020107</key>
+	<string>FDStop Cumulative Meterset</string>
+	<key>30020108</key>
+	<string>SQRT Acquisition Patient Position Sequence</string>
+	<key>30020109</key>
+	<string>SQRT Image Frame Imaging Device Position Sequence</string>
+	<key>3002010A</key>
+	<string>SQRT Image Frame kV Radiation Acquisition Sequence</string>
+	<key>3002010B</key>
+	<string>SQRT Image Frame MV Radiation Acquisition Sequence</string>
+	<key>3002010C</key>
+	<string>SQRT Image Frame Radiation Acquisition Sequence</string>
+	<key>3002010D</key>
+	<string>SQImaging Source Position Sequence</string>
+	<key>3002010E</key>
+	<string>SQImage Receptor Position Sequence</string>
+	<key>3002010F</key>
+	<string>FDDevice Position to Equipment Mapping Matrix</string>
+	<key>30020110</key>
+	<string>SQDevice Position Parameter Sequence</string>
+	<key>30020111</key>
+	<string>CSImaging Source Location Specification Type</string>
+	<key>30020112</key>
+	<string>SQImaging Device Location Matrix Sequence</string>
+	<key>30020113</key>
+	<string>SQImaging Device Location Parameter Sequence</string>
+	<key>30020114</key>
+	<string>SQImaging Aperture Sequence</string>
+	<key>30020115</key>
+	<string>CSImaging Aperture Specification Type</string>
+	<key>30020116</key>
+	<string>USNumber of Acquisition Devices</string>
+	<key>30020117</key>
+	<string>SQAcquisition Device Sequence</string>
+	<key>30020118</key>
+	<string>SQAcquisition Task Sequence</string>
+	<key>30020119</key>
+	<string>SQAcquisition Task Workitem Code Sequence</string>
+	<key>3002011A</key>
+	<string>SQAcquisition Subtask Sequence</string>
+	<key>3002011B</key>
+	<string>SQSubtask Workitem Code Sequence</string>
+	<key>3002011C</key>
+	<string>USAcquisition Task Index</string>
+	<key>3002011D</key>
+	<string>USAcquisition Subtask Index</string>
+	<key>3002011E</key>
+	<string>SQReferenced Baseline Parameters RT Radiation Instance Sequence</string>
+	<key>3002011F</key>
+	<string>SQPosition Acquisition Template Identification Sequence</string>
+	<key>30020120</key>
+	<string>STPosition Acquisition Template ID</string>
+	<key>30020121</key>
+	<string>LOPosition Acquisition Template Name</string>
+	<key>30020122</key>
+	<string>SQPosition Acquisition Template Code Sequence</string>
+	<key>30020123</key>
+	<string>LTPosition Acquisition Template Description</string>
+	<key>30020124</key>
+	<string>SQAcquisition Task Applicability Sequence</string>
+	<key>30020125</key>
+	<string>SQProjection Imaging Acquisition Parameter Sequence</string>
+	<key>30020126</key>
+	<string>SQCT Imaging Acquisition Parameter Sequence</string>
+	<key>30020127</key>
+	<string>SQKV Imaging Generation Parameters Sequence</string>
+	<key>30020128</key>
+	<string>SQMV Imaging Generation Parameters Sequence</string>
+	<key>30020129</key>
+	<string>CSAcquisition Signal Type</string>
+	<key>3002012A</key>
+	<string>CSAcquisition Method</string>
+	<key>3002012B</key>
+	<string>SQScan Start Position Sequence</string>
+	<key>3002012C</key>
+	<string>SQScan Stop Position Sequence</string>
+	<key>3002012D</key>
+	<string>FDImaging Source to Beam Modifier Definition Plane Distance</string>
+	<key>3002012E</key>
+	<string>CSScan Arc Type</string>
+	<key>3002012F</key>
+	<string>CSDetector Positioning Type</string>
+	<key>30020130</key>
+	<string>SQAdditional RT Accessory Device Sequence</string>
+	<key>30020131</key>
+	<string>SQDevice-Specific Acquisition Parameter Sequence</string>
+	<key>30020132</key>
+	<string>SQReferenced Position Reference Instance Sequence</string>
+	<key>30020133</key>
+	<string>SQEnergy Derivation Code Sequence</string>
+	<key>30020134</key>
+	<string>FDMaximum Cumulative Meterset Exposure</string>
+	<key>30020135</key>
+	<string>SQAcquisition Initiation Sequence</string>
+	<key>30020136</key>
+	<string>SQRT Cone-Beam Imaging Geometry Sequence</string>
+	<key>30040001</key>
+	<string>CSDVH Type</string>
+	<key>30040002</key>
+	<string>CSDose Units</string>
+	<key>30040004</key>
+	<string>CSDose Type</string>
+	<key>30040005</key>
+	<string>CSSpatial Transform of Dose</string>
+	<key>30040006</key>
+	<string>LODose Comment</string>
+	<key>30040008</key>
+	<string>DSNormalization Point</string>
+	<key>3004000A</key>
+	<string>CSDose Summation Type</string>
+	<key>3004000C</key>
+	<string>DSGrid Frame Offset Vector</string>
+	<key>3004000E</key>
+	<string>DSDose Grid Scaling</string>
+	<key>30040010</key>
+	<string>SQRT Dose ROI Sequence</string>
+	<key>30040012</key>
+	<string>DSDose Value</string>
+	<key>30040014</key>
+	<string>CSTissue Heterogeneity Correction</string>
+	<key>30040016</key>
+	<string>SQRecommended Isodose Level Sequence</string>
+	<key>30040040</key>
+	<string>DSDVH Normalization Point</string>
+	<key>30040042</key>
+	<string>DSDVH Normalization Dose Value</string>
+	<key>30040050</key>
+	<string>SQDVH Sequence</string>
+	<key>30040052</key>
+	<string>DSDVH Dose Scaling</string>
+	<key>30040054</key>
+	<string>CSDVH Volume Units</string>
+	<key>30040056</key>
+	<string>ISDVH Number of Bins</string>
+	<key>30040058</key>
+	<string>DSDVH Data</string>
+	<key>30040060</key>
+	<string>SQDVH Referenced ROI Sequence</string>
+	<key>30040062</key>
+	<string>CSDVH ROI Contribution Type</string>
+	<key>30040070</key>
+	<string>DSDVH Minimum Dose</string>
+	<key>30040072</key>
+	<string>DSDVH Maximum Dose</string>
+	<key>30040074</key>
+	<string>DSDVH Mean Dose</string>
+	<key>30060002</key>
+	<string>SHStructure Set Label</string>
+	<key>30060004</key>
+	<string>LOStructure Set Name</string>
+	<key>30060006</key>
+	<string>STStructure Set Description</string>
+	<key>30060008</key>
+	<string>DAStructure Set Date</string>
+	<key>30060009</key>
+	<string>TMStructure Set Time</string>
+	<key>30060010</key>
+	<string>SQReferenced Frame of Reference Sequence</string>
+	<key>30060012</key>
+	<string>SQRT Referenced Study Sequence</string>
+	<key>30060014</key>
+	<string>SQRT Referenced Series Sequence</string>
+	<key>30060016</key>
+	<string>SQContour Image Sequence</string>
+	<key>30060018</key>
+	<string>SQPredecessor Structure Set Sequence</string>
+	<key>30060020</key>
+	<string>SQStructure Set ROI Sequence</string>
+	<key>30060022</key>
+	<string>ISROI Number</string>
+	<key>30060024</key>
+	<string>UIReferenced Frame of Reference UID</string>
+	<key>30060026</key>
+	<string>LOROI Name</string>
+	<key>30060028</key>
+	<string>STROI Description</string>
+	<key>3006002A</key>
+	<string>ISROI Display Color</string>
+	<key>3006002C</key>
+	<string>DSROI Volume</string>
+	<key>3006002D</key>
+	<string>DTROI DateTime</string>
+	<key>3006002E</key>
+	<string>DTROI Observation DateTime</string>
+	<key>30060030</key>
+	<string>SQRT Related ROI Sequence</string>
+	<key>30060033</key>
+	<string>CSRT ROI Relationship</string>
+	<key>30060036</key>
+	<string>CSROI Generation Algorithm</string>
+	<key>30060037</key>
+	<string>SQROI Derivation Algorithm Identification Sequence</string>
+	<key>30060038</key>
+	<string>LOROI Generation Description</string>
+	<key>30060039</key>
+	<string>SQROI Contour Sequence</string>
+	<key>30060040</key>
+	<string>SQContour Sequence</string>
+	<key>30060042</key>
+	<string>CSContour Geometric Type</string>
+	<key>30060044</key>
+	<string>DSContour Slab Thickness</string>
+	<key>30060045</key>
+	<string>DSContour Offset Vector</string>
+	<key>30060046</key>
+	<string>ISNumber of Contour Points</string>
+	<key>30060048</key>
+	<string>ISContour Number</string>
+	<key>30060049</key>
+	<string>ISAttached Contours</string>
+	<key>3006004A</key>
+	<string>SQSource Pixel Planes Characteristics Sequence</string>
+	<key>3006004B</key>
+	<string>SQSource Series Sequence</string>
+	<key>3006004C</key>
+	<string>SQSource Series Information Sequence</string>
+	<key>3006004D</key>
+	<string>SQROI Creator Sequence</string>
+	<key>3006004E</key>
+	<string>SQROI Interpreter Sequence</string>
+	<key>3006004F</key>
+	<string>SQROI Observation Context Code Sequence</string>
+	<key>30060050</key>
+	<string>DSContour Data</string>
+	<key>30060080</key>
+	<string>SQRT ROI Observations Sequence</string>
+	<key>30060082</key>
+	<string>ISObservation Number</string>
+	<key>30060084</key>
+	<string>ISReferenced ROI Number</string>
+	<key>30060085</key>
+	<string>SHROI Observation Label</string>
+	<key>30060086</key>
+	<string>SQRT ROI Identification Code Sequence</string>
+	<key>30060088</key>
+	<string>STROI Observation Description</string>
+	<key>300600A0</key>
+	<string>SQRelated RT ROI Observations Sequence</string>
+	<key>300600A4</key>
+	<string>CSRT ROI Interpreted Type</string>
+	<key>300600A6</key>
+	<string>PNROI Interpreter</string>
+	<key>300600B0</key>
+	<string>SQROI Physical Properties Sequence</string>
+	<key>300600B2</key>
+	<string>CSROI Physical Property</string>
+	<key>300600B4</key>
+	<string>DSROI Physical Property Value</string>
+	<key>300600B6</key>
+	<string>SQROI Elemental Composition Sequence</string>
+	<key>300600B7</key>
+	<string>USROI Elemental Composition Atomic Number</string>
+	<key>300600B8</key>
+	<string>FLROI Elemental Composition Atomic Mass Fraction</string>
+	<key>300600B9</key>
+	<string>SQAdditional RT ROI Identification Code Sequence</string>
+	<key>300600C0</key>
+	<string>SQFrame of Reference Relationship Sequence</string>
+	<key>300600C2</key>
+	<string>UIRelated Frame of Reference UID</string>
+	<key>300600C4</key>
+	<string>CSFrame of Reference Transformation Type</string>
+	<key>300600C6</key>
+	<string>DSFrame of Reference Transformation Matrix</string>
+	<key>300600C8</key>
+	<string>LOFrame of Reference Transformation Comment</string>
+	<key>300600C9</key>
+	<string>SQPatient Location Coordinates Sequence</string>
+	<key>300600CA</key>
+	<string>SQPatient Location Coordinates Code Sequence</string>
+	<key>300600CB</key>
+	<string>SQPatient Support Position Sequence</string>
+	<key>30080010</key>
+	<string>SQMeasured Dose Reference Sequence</string>
+	<key>30080012</key>
+	<string>STMeasured Dose Description</string>
+	<key>30080014</key>
+	<string>CSMeasured Dose Type</string>
+	<key>30080016</key>
+	<string>DSMeasured Dose Value</string>
+	<key>30080020</key>
+	<string>SQTreatment Session Beam Sequence</string>
+	<key>30080021</key>
+	<string>SQTreatment Session Ion Beam Sequence</string>
+	<key>30080022</key>
+	<string>ISCurrent Fraction Number</string>
+	<key>30080024</key>
+	<string>DATreatment Control Point Date</string>
+	<key>30080025</key>
+	<string>TMTreatment Control Point Time</string>
+	<key>3008002A</key>
+	<string>CSTreatment Termination Status</string>
+	<key>3008002B</key>
+	<string>SHTreatment Termination Code</string>
+	<key>3008002C</key>
+	<string>CSTreatment Verification Status</string>
+	<key>30080030</key>
+	<string>SQReferenced Treatment Record Sequence</string>
+	<key>30080032</key>
+	<string>DSSpecified Primary Meterset</string>
+	<key>30080033</key>
+	<string>DSSpecified Secondary Meterset</string>
+	<key>30080036</key>
+	<string>DSDelivered Primary Meterset</string>
+	<key>30080037</key>
+	<string>DSDelivered Secondary Meterset</string>
+	<key>3008003A</key>
+	<string>DSSpecified Treatment Time</string>
+	<key>3008003B</key>
+	<string>DSDelivered Treatment Time</string>
+	<key>30080040</key>
+	<string>SQControl Point Delivery Sequence</string>
+	<key>30080041</key>
+	<string>SQIon Control Point Delivery Sequence</string>
+	<key>30080042</key>
+	<string>DSSpecified Meterset</string>
+	<key>30080044</key>
+	<string>DSDelivered Meterset</string>
+	<key>30080045</key>
+	<string>FLMeterset Rate Set</string>
+	<key>30080046</key>
+	<string>FLMeterset Rate Delivered</string>
+	<key>30080047</key>
+	<string>FLScan Spot Metersets Delivered</string>
+	<key>30080048</key>
+	<string>DSDose Rate Delivered</string>
+	<key>30080050</key>
+	<string>SQTreatment Summary Calculated Dose Reference Sequence</string>
+	<key>30080052</key>
+	<string>DSCumulative Dose to Dose Reference</string>
+	<key>30080054</key>
+	<string>DAFirst Treatment Date</string>
+	<key>30080056</key>
+	<string>DAMost Recent Treatment Date</string>
+	<key>3008005A</key>
+	<string>ISNumber of Fractions Delivered</string>
+	<key>30080060</key>
+	<string>SQOverride Sequence</string>
+	<key>30080061</key>
+	<string>ATParameter Sequence Pointer</string>
+	<key>30080062</key>
+	<string>ATOverride Parameter Pointer</string>
+	<key>30080063</key>
+	<string>ISParameter Item Index</string>
+	<key>30080064</key>
+	<string>ISMeasured Dose Reference Number</string>
+	<key>30080065</key>
+	<string>ATParameter Pointer</string>
+	<key>30080066</key>
+	<string>STOverride Reason</string>
+	<key>30080067</key>
+	<string>USParameter Value Number</string>
+	<key>30080068</key>
+	<string>SQCorrected Parameter Sequence</string>
+	<key>3008006A</key>
+	<string>FLCorrection Value</string>
+	<key>30080070</key>
+	<string>SQCalculated Dose Reference Sequence</string>
+	<key>30080072</key>
+	<string>ISCalculated Dose Reference Number</string>
+	<key>30080074</key>
+	<string>STCalculated Dose Reference Description</string>
+	<key>30080076</key>
+	<string>DSCalculated Dose Reference Dose Value</string>
+	<key>30080078</key>
+	<string>DSStart Meterset</string>
+	<key>3008007A</key>
+	<string>DSEnd Meterset</string>
+	<key>30080080</key>
+	<string>SQReferenced Measured Dose Reference Sequence</string>
+	<key>30080082</key>
+	<string>ISReferenced Measured Dose Reference Number</string>
+	<key>30080090</key>
+	<string>SQReferenced Calculated Dose Reference Sequence</string>
+	<key>30080092</key>
+	<string>ISReferenced Calculated Dose Reference Number</string>
+	<key>300800A0</key>
+	<string>SQBeam Limiting Device Leaf Pairs Sequence</string>
+	<key>300800A1</key>
+	<string>SQEnhanced RT Beam Limiting Device Sequence</string>
+	<key>300800A2</key>
+	<string>SQEnhanced RT Beam Limiting Opening Sequence</string>
+	<key>300800A3</key>
+	<string>CSEnhanced RT Beam Limiting Device Definition Flag</string>
+	<key>300800A4</key>
+	<string>FDParallel RT Beam Delimiter Opening Extents</string>
+	<key>300800B0</key>
+	<string>SQRecorded Wedge Sequence</string>
+	<key>300800C0</key>
+	<string>SQRecorded Compensator Sequence</string>
+	<key>300800D0</key>
+	<string>SQRecorded Block Sequence</string>
+	<key>300800D1</key>
+	<string>SQRecorded Block Slab Sequence</string>
+	<key>300800E0</key>
+	<string>SQTreatment Summary Measured Dose Reference Sequence</string>
+	<key>300800F0</key>
+	<string>SQRecorded Snout Sequence</string>
+	<key>300800F2</key>
+	<string>SQRecorded Range Shifter Sequence</string>
+	<key>300800F4</key>
+	<string>SQRecorded Lateral Spreading Device Sequence</string>
+	<key>300800F6</key>
+	<string>SQRecorded Range Modulator Sequence</string>
+	<key>30080100</key>
+	<string>SQRecorded Source Sequence</string>
+	<key>30080105</key>
+	<string>LOSource Serial Number</string>
+	<key>30080110</key>
+	<string>SQTreatment Session Application Setup Sequence</string>
+	<key>30080116</key>
+	<string>CSApplication Setup Check</string>
+	<key>30080120</key>
+	<string>SQRecorded Brachy Accessory Device Sequence</string>
+	<key>30080122</key>
+	<string>ISReferenced Brachy Accessory Device Number</string>
+	<key>30080130</key>
+	<string>SQRecorded Channel Sequence</string>
+	<key>30080132</key>
+	<string>DSSpecified Channel Total Time</string>
+	<key>30080134</key>
+	<string>DSDelivered Channel Total Time</string>
+	<key>30080136</key>
+	<string>ISSpecified Number of Pulses</string>
+	<key>30080138</key>
+	<string>ISDelivered Number of Pulses</string>
+	<key>3008013A</key>
+	<string>DSSpecified Pulse Repetition Interval</string>
+	<key>3008013C</key>
+	<string>DSDelivered Pulse Repetition Interval</string>
+	<key>30080140</key>
+	<string>SQRecorded Source Applicator Sequence</string>
+	<key>30080142</key>
+	<string>ISReferenced Source Applicator Number</string>
+	<key>30080150</key>
+	<string>SQRecorded Channel Shield Sequence</string>
+	<key>30080152</key>
+	<string>ISReferenced Channel Shield Number</string>
+	<key>30080160</key>
+	<string>SQBrachy Control Point Delivered Sequence</string>
+	<key>30080162</key>
+	<string>DASafe Position Exit Date</string>
+	<key>30080164</key>
+	<string>TMSafe Position Exit Time</string>
+	<key>30080166</key>
+	<string>DASafe Position Return Date</string>
+	<key>30080168</key>
+	<string>TMSafe Position Return Time</string>
+	<key>30080171</key>
+	<string>SQPulse Specific Brachy Control Point Delivered Sequence</string>
+	<key>30080172</key>
+	<string>USPulse Number</string>
+	<key>30080173</key>
+	<string>SQBrachy Pulse Control Point Delivered Sequence</string>
+	<key>30080200</key>
+	<string>CSCurrent Treatment Status</string>
+	<key>30080202</key>
+	<string>STTreatment Status Comment</string>
+	<key>30080220</key>
+	<string>SQFraction Group Summary Sequence</string>
+	<key>30080223</key>
+	<string>ISReferenced Fraction Number</string>
+	<key>30080224</key>
+	<string>CSFraction Group Type</string>
+	<key>30080230</key>
+	<string>CSBeam Stopper Position</string>
+	<key>30080240</key>
+	<string>SQFraction Status Summary Sequence</string>
+	<key>30080250</key>
+	<string>DATreatment Date</string>
+	<key>30080251</key>
+	<string>TMTreatment Time</string>
+	<key>300A0002</key>
+	<string>SHRT Plan Label</string>
+	<key>300A0003</key>
+	<string>LORT Plan Name</string>
+	<key>300A0004</key>
+	<string>STRT Plan Description</string>
+	<key>300A0006</key>
+	<string>DART Plan Date</string>
+	<key>300A0007</key>
+	<string>TMRT Plan Time</string>
+	<key>300A0009</key>
+	<string>LOTreatment Protocols</string>
+	<key>300A000A</key>
+	<string>CSPlan Intent</string>
+	<key>300A000B</key>
+	<string>LOTreatment Sites</string>
+	<key>300A000C</key>
+	<string>CSRT Plan Geometry</string>
+	<key>300A000E</key>
+	<string>STPrescription Description</string>
+	<key>300A0010</key>
+	<string>SQDose Reference Sequence</string>
+	<key>300A0012</key>
+	<string>ISDose Reference Number</string>
+	<key>300A0013</key>
+	<string>UIDose Reference UID</string>
+	<key>300A0014</key>
+	<string>CSDose Reference Structure Type</string>
+	<key>300A0015</key>
+	<string>CSNominal Beam Energy Unit</string>
+	<key>300A0016</key>
+	<string>LODose Reference Description</string>
+	<key>300A0018</key>
+	<string>DSDose Reference Point Coordinates</string>
+	<key>300A001A</key>
+	<string>DSNominal Prior Dose</string>
+	<key>300A0020</key>
+	<string>CSDose Reference Type</string>
+	<key>300A0021</key>
+	<string>DSConstraint Weight</string>
+	<key>300A0022</key>
+	<string>DSDelivery Warning Dose</string>
+	<key>300A0023</key>
+	<string>DSDelivery Maximum Dose</string>
+	<key>300A0025</key>
+	<string>DSTarget Minimum Dose</string>
+	<key>300A0026</key>
+	<string>DSTarget Prescription Dose</string>
+	<key>300A0027</key>
+	<string>DSTarget Maximum Dose</string>
+	<key>300A0028</key>
+	<string>DSTarget Underdose Volume Fraction</string>
+	<key>300A002A</key>
+	<string>DSOrgan at Risk Full-volume Dose</string>
+	<key>300A002B</key>
+	<string>DSOrgan at Risk Limit Dose</string>
+	<key>300A002C</key>
+	<string>DSOrgan at Risk Maximum Dose</string>
+	<key>300A002D</key>
+	<string>DSOrgan at Risk Overdose Volume Fraction</string>
+	<key>300A0040</key>
+	<string>SQTolerance Table Sequence</string>
+	<key>300A0042</key>
+	<string>ISTolerance Table Number</string>
+	<key>300A0043</key>
+	<string>SHTolerance Table Label</string>
+	<key>300A0044</key>
+	<string>DSGantry Angle Tolerance</string>
+	<key>300A0046</key>
+	<string>DSBeam Limiting Device Angle Tolerance</string>
+	<key>300A0048</key>
+	<string>SQBeam Limiting Device Tolerance Sequence</string>
+	<key>300A004A</key>
+	<string>DSBeam Limiting Device Position Tolerance</string>
+	<key>300A004B</key>
+	<string>FLSnout Position Tolerance</string>
+	<key>300A004C</key>
+	<string>DSPatient Support Angle Tolerance</string>
+	<key>300A004E</key>
+	<string>DSTable Top Eccentric Angle Tolerance</string>
+	<key>300A004F</key>
+	<string>FLTable Top Pitch Angle Tolerance</string>
+	<key>300A0050</key>
+	<string>FLTable Top Roll Angle Tolerance</string>
+	<key>300A0051</key>
+	<string>DSTable Top Vertical Position Tolerance</string>
+	<key>300A0052</key>
+	<string>DSTable Top Longitudinal Position Tolerance</string>
+	<key>300A0053</key>
+	<string>DSTable Top Lateral Position Tolerance</string>
+	<key>300A0054</key>
+	<string>UITable Top Position Alignment UID</string>
+	<key>300A0055</key>
+	<string>CSRT Plan Relationship</string>
+	<key>300A0070</key>
+	<string>SQFraction Group Sequence</string>
+	<key>300A0071</key>
+	<string>ISFraction Group Number</string>
+	<key>300A0072</key>
+	<string>LOFraction Group Description</string>
+	<key>300A0078</key>
+	<string>ISNumber of Fractions Planned</string>
+	<key>300A0079</key>
+	<string>ISNumber of Fraction Pattern Digits Per Day</string>
+	<key>300A007A</key>
+	<string>ISRepeat Fraction Cycle Length</string>
+	<key>300A007B</key>
+	<string>LTFraction Pattern</string>
+	<key>300A0080</key>
+	<string>ISNumber of Beams</string>
+	<key>300A0082</key>
+	<string>DSBeam Dose Specification Point</string>
+	<key>300A0083</key>
+	<string>UIReferenced Dose Reference UID</string>
+	<key>300A0084</key>
+	<string>DSBeam Dose</string>
+	<key>300A0086</key>
+	<string>DSBeam Meterset</string>
+	<key>300A0088</key>
+	<string>FLBeam Dose Point Depth</string>
+	<key>300A0089</key>
+	<string>FLBeam Dose Point Equivalent Depth</string>
+	<key>300A008A</key>
+	<string>FLBeam Dose Point SSD</string>
+	<key>300A008B</key>
+	<string>CSBeam Dose Meaning</string>
+	<key>300A008C</key>
+	<string>SQBeam Dose Verification Control Point Sequence</string>
+	<key>300A008D</key>
+	<string>FLAverage Beam Dose Point Depth</string>
+	<key>300A008E</key>
+	<string>FLAverage Beam Dose Point Equivalent Depth</string>
+	<key>300A008F</key>
+	<string>FLAverage Beam Dose Point SSD</string>
+	<key>300A0090</key>
+	<string>CSBeam Dose Type</string>
+	<key>300A0091</key>
+	<string>DSAlternate Beam Dose</string>
+	<key>300A0092</key>
+	<string>CSAlternate Beam Dose Type</string>
+	<key>300A0093</key>
+	<string>CSDepth Value Averaging Flag</string>
+	<key>300A0094</key>
+	<string>DSBeam Dose Point Source to External Contour Distance</string>
+	<key>300A00A0</key>
+	<string>ISNumber of Brachy Application Setups</string>
+	<key>300A00A2</key>
+	<string>DSBrachy Application Setup Dose Specification Point</string>
+	<key>300A00A4</key>
+	<string>DSBrachy Application Setup Dose</string>
+	<key>300A00B0</key>
+	<string>SQBeam Sequence</string>
+	<key>300A00B2</key>
+	<string>SHTreatment Machine Name</string>
+	<key>300A00B3</key>
+	<string>CSPrimary Dosimeter Unit</string>
+	<key>300A00B4</key>
+	<string>DSSource-Axis Distance</string>
+	<key>300A00B6</key>
+	<string>SQBeam Limiting Device Sequence</string>
+	<key>300A00B8</key>
+	<string>CSRT Beam Limiting Device Type</string>
+	<key>300A00BA</key>
+	<string>DSSource to Beam Limiting Device Distance</string>
+	<key>300A00BB</key>
+	<string>FLIsocenter to Beam Limiting Device Distance</string>
+	<key>300A00BC</key>
+	<string>ISNumber of Leaf/Jaw Pairs</string>
+	<key>300A00BE</key>
+	<string>DSLeaf Position Boundaries</string>
+	<key>300A00C0</key>
+	<string>ISBeam Number</string>
+	<key>300A00C2</key>
+	<string>LOBeam Name</string>
+	<key>300A00C3</key>
+	<string>STBeam Description</string>
+	<key>300A00C4</key>
+	<string>CSBeam Type</string>
+	<key>300A00C5</key>
+	<string>FDBeam Delivery Duration Limit</string>
+	<key>300A00C6</key>
+	<string>CSRadiation Type</string>
+	<key>300A00C7</key>
+	<string>CSHigh-Dose Technique Type</string>
+	<key>300A00C8</key>
+	<string>ISReference Image Number</string>
+	<key>300A00CA</key>
+	<string>SQPlanned Verification Image Sequence</string>
+	<key>300A00CC</key>
+	<string>LOImaging Device-Specific Acquisition Parameters</string>
+	<key>300A00CE</key>
+	<string>CSTreatment Delivery Type</string>
+	<key>300A00D0</key>
+	<string>ISNumber of Wedges</string>
+	<key>300A00D1</key>
+	<string>SQWedge Sequence</string>
+	<key>300A00D2</key>
+	<string>ISWedge Number</string>
+	<key>300A00D3</key>
+	<string>CSWedge Type</string>
+	<key>300A00D4</key>
+	<string>SHWedge ID</string>
+	<key>300A00D5</key>
+	<string>ISWedge Angle</string>
+	<key>300A00D6</key>
+	<string>DSWedge Factor</string>
+	<key>300A00D7</key>
+	<string>FLTotal Wedge Tray Water-Equivalent Thickness</string>
+	<key>300A00D8</key>
+	<string>DSWedge Orientation</string>
+	<key>300A00D9</key>
+	<string>FLIsocenter to Wedge Tray Distance</string>
+	<key>300A00DA</key>
+	<string>DSSource to Wedge Tray Distance</string>
+	<key>300A00DB</key>
+	<string>FLWedge Thin Edge Position</string>
+	<key>300A00DC</key>
+	<string>SHBolus ID</string>
+	<key>300A00DD</key>
+	<string>STBolus Description</string>
+	<key>300A00DE</key>
+	<string>DSEffective Wedge Angle</string>
+	<key>300A00E0</key>
+	<string>ISNumber of Compensators</string>
+	<key>300A00E1</key>
+	<string>SHMaterial ID</string>
+	<key>300A00E2</key>
+	<string>DSTotal Compensator Tray Factor</string>
+	<key>300A00E3</key>
+	<string>SQCompensator Sequence</string>
+	<key>300A00E4</key>
+	<string>ISCompensator Number</string>
+	<key>300A00E5</key>
+	<string>SHCompensator ID</string>
+	<key>300A00E6</key>
+	<string>DSSource to Compensator Tray Distance</string>
+	<key>300A00E7</key>
+	<string>ISCompensator Rows</string>
+	<key>300A00E8</key>
+	<string>ISCompensator Columns</string>
+	<key>300A00E9</key>
+	<string>DSCompensator Pixel Spacing</string>
+	<key>300A00EA</key>
+	<string>DSCompensator Position</string>
+	<key>300A00EB</key>
+	<string>DSCompensator Transmission Data</string>
+	<key>300A00EC</key>
+	<string>DSCompensator Thickness Data</string>
+	<key>300A00ED</key>
+	<string>ISNumber of Boli</string>
+	<key>300A00EE</key>
+	<string>CSCompensator Type</string>
+	<key>300A00EF</key>
+	<string>SHCompensator Tray ID</string>
+	<key>300A00F0</key>
+	<string>ISNumber of Blocks</string>
+	<key>300A00F2</key>
+	<string>DSTotal Block Tray Factor</string>
+	<key>300A00F3</key>
+	<string>FLTotal Block Tray Water-Equivalent Thickness</string>
+	<key>300A00F4</key>
+	<string>SQBlock Sequence</string>
+	<key>300A00F5</key>
+	<string>SHBlock Tray ID</string>
+	<key>300A00F6</key>
+	<string>DSSource to Block Tray Distance</string>
+	<key>300A00F7</key>
+	<string>FLIsocenter to Block Tray Distance</string>
+	<key>300A00F8</key>
+	<string>CSBlock Type</string>
+	<key>300A00F9</key>
+	<string>LOAccessory Code</string>
+	<key>300A00FA</key>
+	<string>CSBlock Divergence</string>
+	<key>300A00FB</key>
+	<string>CSBlock Mounting Position</string>
+	<key>300A00FC</key>
+	<string>ISBlock Number</string>
+	<key>300A00FE</key>
+	<string>LOBlock Name</string>
+	<key>300A0100</key>
+	<string>DSBlock Thickness</string>
+	<key>300A0102</key>
+	<string>DSBlock Transmission</string>
+	<key>300A0104</key>
+	<string>ISBlock Number of Points</string>
+	<key>300A0106</key>
+	<string>DSBlock Data</string>
+	<key>300A0107</key>
+	<string>SQApplicator Sequence</string>
+	<key>300A0108</key>
+	<string>SHApplicator ID</string>
+	<key>300A0109</key>
+	<string>CSApplicator Type</string>
+	<key>300A010A</key>
+	<string>LOApplicator Description</string>
+	<key>300A010C</key>
+	<string>DSCumulative Dose Reference Coefficient</string>
+	<key>300A010E</key>
+	<string>DSFinal Cumulative Meterset Weight</string>
+	<key>300A0110</key>
+	<string>ISNumber of Control Points</string>
+	<key>300A0111</key>
+	<string>SQControl Point Sequence</string>
+	<key>300A0112</key>
+	<string>ISControl Point Index</string>
+	<key>300A0114</key>
+	<string>DSNominal Beam Energy</string>
+	<key>300A0115</key>
+	<string>DSDose Rate Set</string>
+	<key>300A0116</key>
+	<string>SQWedge Position Sequence</string>
+	<key>300A0118</key>
+	<string>CSWedge Position</string>
+	<key>300A011A</key>
+	<string>SQBeam Limiting Device Position Sequence</string>
+	<key>300A011C</key>
+	<string>DSLeaf/Jaw Positions</string>
+	<key>300A011E</key>
+	<string>DSGantry Angle</string>
+	<key>300A011F</key>
+	<string>CSGantry Rotation Direction</string>
+	<key>300A0120</key>
+	<string>DSBeam Limiting Device Angle</string>
+	<key>300A0121</key>
+	<string>CSBeam Limiting Device Rotation Direction</string>
+	<key>300A0122</key>
+	<string>DSPatient Support Angle</string>
+	<key>300A0123</key>
+	<string>CSPatient Support Rotation Direction</string>
+	<key>300A0124</key>
+	<string>DSTable Top Eccentric Axis Distance</string>
+	<key>300A0125</key>
+	<string>DSTable Top Eccentric Angle</string>
+	<key>300A0126</key>
+	<string>CSTable Top Eccentric Rotation Direction</string>
+	<key>300A0128</key>
+	<string>DSTable Top Vertical Position</string>
+	<key>300A0129</key>
+	<string>DSTable Top Longitudinal Position</string>
+	<key>300A012A</key>
+	<string>DSTable Top Lateral Position</string>
+	<key>300A012C</key>
+	<string>DSIsocenter Position</string>
+	<key>300A012E</key>
+	<string>DSSurface Entry Point</string>
+	<key>300A0130</key>
+	<string>DSSource to Surface Distance</string>
+	<key>300A0131</key>
+	<string>FLAverage Beam Dose Point Source to External Contour Distance</string>
+	<key>300A0132</key>
+	<string>FLSource to External Contour Distance</string>
+	<key>300A0133</key>
+	<string>FLExternal Contour Entry Point</string>
+	<key>300A0134</key>
+	<string>DSCumulative Meterset Weight</string>
+	<key>300A0135</key>
+	<string>OBRetired-blank</string>
+	<key>300A0140</key>
+	<string>FLTable Top Pitch Angle</string>
+	<key>300A0142</key>
+	<string>CSTable Top Pitch Rotation Direction</string>
+	<key>300A0144</key>
+	<string>FLTable Top Roll Angle</string>
+	<key>300A0146</key>
+	<string>CSTable Top Roll Rotation Direction</string>
+	<key>300A0148</key>
+	<string>FLHead Fixation Angle</string>
+	<key>300A014A</key>
+	<string>FLGantry Pitch Angle</string>
+	<key>300A014C</key>
+	<string>CSGantry Pitch Rotation Direction</string>
+	<key>300A014E</key>
+	<string>FLGantry Pitch Angle Tolerance</string>
+	<key>300A0150</key>
+	<string>CSFixation Eye</string>
+	<key>300A0151</key>
+	<string>DSChair Head Frame Position</string>
+	<key>300A0152</key>
+	<string>DSHead Fixation Angle Tolerance</string>
+	<key>300A0153</key>
+	<string>DSChair Head Frame Position Tolerance</string>
+	<key>300A0154</key>
+	<string>DSFixation Light Azimuthal Angle Tolerance</string>
+	<key>300A0155</key>
+	<string>DSFixation Light Polar Angle Tolerance</string>
+	<key>300A0180</key>
+	<string>SQPatient Setup Sequence</string>
+	<key>300A0182</key>
+	<string>ISPatient Setup Number</string>
+	<key>300A0183</key>
+	<string>LOPatient Setup Label</string>
+	<key>300A0184</key>
+	<string>LOPatient Additional Position</string>
+	<key>300A0190</key>
+	<string>SQFixation Device Sequence</string>
+	<key>300A0192</key>
+	<string>CSFixation Device Type</string>
+	<key>300A0194</key>
+	<string>SHFixation Device Label</string>
+	<key>300A0196</key>
+	<string>STFixation Device Description</string>
+	<key>300A0198</key>
+	<string>SHFixation Device Position</string>
+	<key>300A0199</key>
+	<string>FLFixation Device Pitch Angle</string>
+	<key>300A019A</key>
+	<string>FLFixation Device Roll Angle</string>
+	<key>300A01A0</key>
+	<string>SQShielding Device Sequence</string>
+	<key>300A01A2</key>
+	<string>CSShielding Device Type</string>
+	<key>300A01A4</key>
+	<string>SHShielding Device Label</string>
+	<key>300A01A6</key>
+	<string>STShielding Device Description</string>
+	<key>300A01A8</key>
+	<string>SHShielding Device Position</string>
+	<key>300A01B0</key>
+	<string>CSSetup Technique</string>
+	<key>300A01B2</key>
+	<string>STSetup Technique Description</string>
+	<key>300A01B4</key>
+	<string>SQSetup Device Sequence</string>
+	<key>300A01B6</key>
+	<string>CSSetup Device Type</string>
+	<key>300A01B8</key>
+	<string>SHSetup Device Label</string>
+	<key>300A01BA</key>
+	<string>STSetup Device Description</string>
+	<key>300A01BC</key>
+	<string>DSSetup Device Parameter</string>
+	<key>300A01D0</key>
+	<string>STSetup Reference Description</string>
+	<key>300A01D2</key>
+	<string>DSTable Top Vertical Setup Displacement</string>
+	<key>300A01D4</key>
+	<string>DSTable Top Longitudinal Setup Displacement</string>
+	<key>300A01D6</key>
+	<string>DSTable Top Lateral Setup Displacement</string>
+	<key>300A0200</key>
+	<string>CSBrachy Treatment Technique</string>
+	<key>300A0202</key>
+	<string>CSBrachy Treatment Type</string>
+	<key>300A0206</key>
+	<string>SQTreatment Machine Sequence</string>
+	<key>300A0210</key>
+	<string>SQSource Sequence</string>
+	<key>300A0212</key>
+	<string>ISSource Number</string>
+	<key>300A0214</key>
+	<string>CSSource Type</string>
+	<key>300A0216</key>
+	<string>LOSource Manufacturer</string>
+	<key>300A0218</key>
+	<string>DSActive Source Diameter</string>
+	<key>300A021A</key>
+	<string>DSActive Source Length</string>
+	<key>300A021B</key>
+	<string>SHSource Model ID</string>
+	<key>300A021C</key>
+	<string>LOSource Description</string>
+	<key>300A0222</key>
+	<string>DSSource Encapsulation Nominal Thickness</string>
+	<key>300A0224</key>
+	<string>DSSource Encapsulation Nominal Transmission</string>
+	<key>300A0226</key>
+	<string>LOSource Isotope Name</string>
+	<key>300A0228</key>
+	<string>DSSource Isotope Half Life</string>
+	<key>300A0229</key>
+	<string>CSSource Strength Units</string>
+	<key>300A022A</key>
+	<string>DSReference Air Kerma Rate</string>
+	<key>300A022B</key>
+	<string>DSSource Strength</string>
+	<key>300A022C</key>
+	<string>DASource Strength Reference Date</string>
+	<key>300A022E</key>
+	<string>TMSource Strength Reference Time</string>
+	<key>300A0230</key>
+	<string>SQApplication Setup Sequence</string>
+	<key>300A0232</key>
+	<string>CSApplication Setup Type</string>
+	<key>300A0234</key>
+	<string>ISApplication Setup Number</string>
+	<key>300A0236</key>
+	<string>LOApplication Setup Name</string>
+	<key>300A0238</key>
+	<string>LOApplication Setup Manufacturer</string>
+	<key>300A0240</key>
+	<string>ISTemplate Number</string>
+	<key>300A0242</key>
+	<string>SHTemplate Type</string>
+	<key>300A0244</key>
+	<string>LOTemplate Name</string>
+	<key>300A0250</key>
+	<string>DSTotal Reference Air Kerma</string>
+	<key>300A0260</key>
+	<string>SQBrachy Accessory Device Sequence</string>
+	<key>300A0262</key>
+	<string>ISBrachy Accessory Device Number</string>
+	<key>300A0263</key>
+	<string>SHBrachy Accessory Device ID</string>
+	<key>300A0264</key>
+	<string>CSBrachy Accessory Device Type</string>
+	<key>300A0266</key>
+	<string>LOBrachy Accessory Device Name</string>
+	<key>300A026A</key>
+	<string>DSBrachy Accessory Device Nominal Thickness</string>
+	<key>300A026C</key>
+	<string>DSBrachy Accessory Device Nominal Transmission</string>
+	<key>300A0271</key>
+	<string>DSChannel Effective Length</string>
+	<key>300A0272</key>
+	<string>DSChannel Inner Length</string>
+	<key>300A0273</key>
+	<string>SHAfterloader Channel ID</string>
+	<key>300A0274</key>
+	<string>DSSource Applicator Tip Length</string>
+	<key>300A0280</key>
+	<string>SQChannel Sequence</string>
+	<key>300A0282</key>
+	<string>ISChannel Number</string>
+	<key>300A0284</key>
+	<string>DSChannel Length</string>
+	<key>300A0286</key>
+	<string>DSChannel Total Time</string>
+	<key>300A0288</key>
+	<string>CSSource Movement Type</string>
+	<key>300A028A</key>
+	<string>ISNumber of Pulses</string>
+	<key>300A028C</key>
+	<string>DSPulse Repetition Interval</string>
+	<key>300A0290</key>
+	<string>ISSource Applicator Number</string>
+	<key>300A0291</key>
+	<string>SHSource Applicator ID</string>
+	<key>300A0292</key>
+	<string>CSSource Applicator Type</string>
+	<key>300A0294</key>
+	<string>LOSource Applicator Name</string>
+	<key>300A0296</key>
+	<string>DSSource Applicator Length</string>
+	<key>300A0298</key>
+	<string>LOSource Applicator Manufacturer</string>
+	<key>300A029C</key>
+	<string>DSSource Applicator Wall Nominal Thickness</string>
+	<key>300A029E</key>
+	<string>DSSource Applicator Wall Nominal Transmission</string>
+	<key>300A02A0</key>
+	<string>DSSource Applicator Step Size</string>
+	<key>300A02A1</key>
+	<string>ISApplicator Shape Referenced ROI Number</string>
+	<key>300A02A2</key>
+	<string>ISTransfer Tube Number</string>
+	<key>300A02A4</key>
+	<string>DSTransfer Tube Length</string>
+	<key>300A02B0</key>
+	<string>SQChannel Shield Sequence</string>
+	<key>300A02B2</key>
+	<string>ISChannel Shield Number</string>
+	<key>300A02B3</key>
+	<string>SHChannel Shield ID</string>
+	<key>300A02B4</key>
+	<string>LOChannel Shield Name</string>
+	<key>300A02B8</key>
+	<string>DSChannel Shield Nominal Thickness</string>
+	<key>300A02BA</key>
+	<string>DSChannel Shield Nominal Transmission</string>
+	<key>300A02C8</key>
+	<string>DSFinal Cumulative Time Weight</string>
+	<key>300A02D0</key>
+	<string>SQBrachy Control Point Sequence</string>
+	<key>300A02D2</key>
+	<string>DSControl Point Relative Position</string>
+	<key>300A02D4</key>
+	<string>DSControl Point 3D Position</string>
+	<key>300A02D6</key>
+	<string>DSCumulative Time Weight</string>
+	<key>300A02E0</key>
+	<string>CSCompensator Divergence</string>
+	<key>300A02E1</key>
+	<string>CSCompensator Mounting Position</string>
+	<key>300A02E2</key>
+	<string>DSSource to Compensator Distance</string>
+	<key>300A02E3</key>
+	<string>FLTotal Compensator Tray Water-Equivalent Thickness</string>
+	<key>300A02E4</key>
+	<string>FLIsocenter to Compensator Tray Distance</string>
+	<key>300A02E5</key>
+	<string>FLCompensator Column Offset</string>
+	<key>300A02E6</key>
+	<string>FLIsocenter to Compensator Distances</string>
+	<key>300A02E7</key>
+	<string>FLCompensator Relative Stopping Power Ratio</string>
+	<key>300A02E8</key>
+	<string>FLCompensator Milling Tool Diameter</string>
+	<key>300A02EA</key>
+	<string>SQIon Range Compensator Sequence</string>
+	<key>300A02EB</key>
+	<string>LTCompensator Description</string>
+	<key>300A0302</key>
+	<string>ISRadiation Mass Number</string>
+	<key>300A0304</key>
+	<string>ISRadiation Atomic Number</string>
+	<key>300A0306</key>
+	<string>SSRadiation Charge State</string>
+	<key>300A0308</key>
+	<string>CSScan Mode</string>
+	<key>300A0309</key>
+	<string>CSModulated Scan Mode Type</string>
+	<key>300A030A</key>
+	<string>FLVirtual Source-Axis Distances</string>
+	<key>300A030C</key>
+	<string>SQSnout Sequence</string>
+	<key>300A030D</key>
+	<string>FLSnout Position</string>
+	<key>300A030F</key>
+	<string>SHSnout ID</string>
+	<key>300A0312</key>
+	<string>ISNumber of Range Shifters</string>
+	<key>300A0314</key>
+	<string>SQRange Shifter Sequence</string>
+	<key>300A0316</key>
+	<string>ISRange Shifter Number</string>
+	<key>300A0318</key>
+	<string>SHRange Shifter ID</string>
+	<key>300A0320</key>
+	<string>CSRange Shifter Type</string>
+	<key>300A0322</key>
+	<string>LORange Shifter Description</string>
+	<key>300A0330</key>
+	<string>ISNumber of Lateral Spreading Devices</string>
+	<key>300A0332</key>
+	<string>SQLateral Spreading Device Sequence</string>
+	<key>300A0334</key>
+	<string>ISLateral Spreading Device Number</string>
+	<key>300A0336</key>
+	<string>SHLateral Spreading Device ID</string>
+	<key>300A0338</key>
+	<string>CSLateral Spreading Device Type</string>
+	<key>300A033A</key>
+	<string>LOLateral Spreading Device Description</string>
+	<key>300A033C</key>
+	<string>FLLateral Spreading Device Water Equivalent Thickness</string>
+	<key>300A0340</key>
+	<string>ISNumber of Range Modulators</string>
+	<key>300A0342</key>
+	<string>SQRange Modulator Sequence</string>
+	<key>300A0344</key>
+	<string>ISRange Modulator Number</string>
+	<key>300A0346</key>
+	<string>SHRange Modulator ID</string>
+	<key>300A0348</key>
+	<string>CSRange Modulator Type</string>
+	<key>300A034A</key>
+	<string>LORange Modulator Description</string>
+	<key>300A034C</key>
+	<string>SHBeam Current Modulation ID</string>
+	<key>300A0350</key>
+	<string>CSPatient Support Type</string>
+	<key>300A0352</key>
+	<string>SHPatient Support ID</string>
+	<key>300A0354</key>
+	<string>LOPatient Support Accessory Code</string>
+	<key>300A0355</key>
+	<string>LOTray Accessory Code</string>
+	<key>300A0356</key>
+	<string>FLFixation Light Azimuthal Angle</string>
+	<key>300A0358</key>
+	<string>FLFixation Light Polar Angle</string>
+	<key>300A035A</key>
+	<string>FLMeterset Rate</string>
+	<key>300A0360</key>
+	<string>SQRange Shifter Settings Sequence</string>
+	<key>300A0362</key>
+	<string>LORange Shifter Setting</string>
+	<key>300A0364</key>
+	<string>FLIsocenter to Range Shifter Distance</string>
+	<key>300A0366</key>
+	<string>FLRange Shifter Water Equivalent Thickness</string>
+	<key>300A0370</key>
+	<string>SQLateral Spreading Device Settings Sequence</string>
+	<key>300A0372</key>
+	<string>LOLateral Spreading Device Setting</string>
+	<key>300A0374</key>
+	<string>FLIsocenter to Lateral Spreading Device Distance</string>
+	<key>300A0380</key>
+	<string>SQRange Modulator Settings Sequence</string>
+	<key>300A0382</key>
+	<string>FLRange Modulator Gating Start Value</string>
+	<key>300A0384</key>
+	<string>FLRange Modulator Gating Stop Value</string>
+	<key>300A0386</key>
+	<string>FLRange Modulator Gating Start Water Equivalent Thickness</string>
+	<key>300A0388</key>
+	<string>FLRange Modulator Gating Stop Water Equivalent Thickness</string>
+	<key>300A038A</key>
+	<string>FLIsocenter to Range Modulator Distance</string>
+	<key>300A038F</key>
+	<string>FLScan Spot Time Offset</string>
+	<key>300A0390</key>
+	<string>SHScan Spot Tune ID</string>
+	<key>300A0391</key>
+	<string>ISScan Spot Prescribed Indices</string>
+	<key>300A0392</key>
+	<string>ISNumber of Scan Spot Positions</string>
+	<key>300A0393</key>
+	<string>CSScan Spot Reordered</string>
+	<key>300A0394</key>
+	<string>FLScan Spot Position Map</string>
+	<key>300A0395</key>
+	<string>CSScan Spot Reordering Allowed</string>
+	<key>300A0396</key>
+	<string>FLScan Spot Meterset Weights</string>
+	<key>300A0398</key>
+	<string>FLScanning Spot Size</string>
+	<key>300A0399</key>
+	<string>FLScan Spot Sizes Delivered</string>
+	<key>300A039A</key>
+	<string>ISNumber of Paintings</string>
+	<key>300A03A0</key>
+	<string>SQIon Tolerance Table Sequence</string>
+	<key>300A03A2</key>
+	<string>SQIon Beam Sequence</string>
+	<key>300A03A4</key>
+	<string>SQIon Beam Limiting Device Sequence</string>
+	<key>300A03A6</key>
+	<string>SQIon Block Sequence</string>
+	<key>300A03A8</key>
+	<string>SQIon Control Point Sequence</string>
+	<key>300A03AA</key>
+	<string>SQIon Wedge Sequence</string>
+	<key>300A03AC</key>
+	<string>SQIon Wedge Position Sequence</string>
+	<key>300A0401</key>
+	<string>SQReferenced Setup Image Sequence</string>
+	<key>300A0402</key>
+	<string>STSetup Image Comment</string>
+	<key>300A0410</key>
+	<string>SQMotion Synchronization Sequence</string>
+	<key>300A0412</key>
+	<string>FLControl Point Orientation</string>
+	<key>300A0420</key>
+	<string>SQGeneral Accessory Sequence</string>
+	<key>300A0421</key>
+	<string>SHGeneral Accessory ID</string>
+	<key>300A0422</key>
+	<string>STGeneral Accessory Description</string>
+	<key>300A0423</key>
+	<string>CSGeneral Accessory Type</string>
+	<key>300A0424</key>
+	<string>ISGeneral Accessory Number</string>
+	<key>300A0425</key>
+	<string>FLSource to General Accessory Distance</string>
+	<key>300A0426</key>
+	<string>DSIsocenter to General Accessory Distance</string>
+	<key>300A0431</key>
+	<string>SQApplicator Geometry Sequence</string>
+	<key>300A0432</key>
+	<string>CSApplicator Aperture Shape</string>
+	<key>300A0433</key>
+	<string>FLApplicator Opening</string>
+	<key>300A0434</key>
+	<string>FLApplicator Opening X</string>
+	<key>300A0435</key>
+	<string>FLApplicator Opening Y</string>
+	<key>300A0436</key>
+	<string>FLSource to Applicator Mounting Position Distance</string>
+	<key>300A0440</key>
+	<string>ISNumber of Block Slab Items</string>
+	<key>300A0441</key>
+	<string>SQBlock Slab Sequence</string>
+	<key>300A0442</key>
+	<string>DSBlock Slab Thickness</string>
+	<key>300A0443</key>
+	<string>USBlock Slab Number</string>
+	<key>300A0450</key>
+	<string>SQDevice Motion Control Sequence</string>
+	<key>300A0451</key>
+	<string>CSDevice Motion Execution Mode</string>
+	<key>300A0452</key>
+	<string>CSDevice Motion Observation Mode</string>
+	<key>300A0453</key>
+	<string>SQDevice Motion Parameter Code Sequence</string>
+	<key>300A0501</key>
+	<string>FLDistal Depth Fraction</string>
+	<key>300A0502</key>
+	<string>FLDistal Depth</string>
+	<key>300A0503</key>
+	<string>FLNominal Range Modulation Fractions</string>
+	<key>300A0504</key>
+	<string>FLNominal Range Modulated Region Depths</string>
+	<key>300A0505</key>
+	<string>SQDepth Dose Parameters Sequence</string>
+	<key>300A0506</key>
+	<string>SQDelivered Depth Dose Parameters Sequence</string>
+	<key>300A0507</key>
+	<string>FLDelivered Distal Depth Fraction</string>
+	<key>300A0508</key>
+	<string>FLDelivered Distal Depth</string>
+	<key>300A0509</key>
+	<string>FLDelivered Nominal Range Modulation Fractions</string>
+	<key>300A0510</key>
+	<string>FLDelivered Nominal Range Modulated Region Depths</string>
+	<key>300A0511</key>
+	<string>CSDelivered Reference Dose Definition</string>
+	<key>300A0512</key>
+	<string>CSReference Dose Definition</string>
+	<key>300A0600</key>
+	<string>USRT Control Point Index</string>
+	<key>300A0601</key>
+	<string>USRadiation Generation Mode Index</string>
+	<key>300A0602</key>
+	<string>USReferenced Defined Device Index</string>
+	<key>300A0603</key>
+	<string>USRadiation Dose Identification Index</string>
+	<key>300A0604</key>
+	<string>USNumber of RT Control Points</string>
+	<key>300A0605</key>
+	<string>USReferenced Radiation Generation Mode Index</string>
+	<key>300A0606</key>
+	<string>USTreatment Position Index</string>
+	<key>300A0607</key>
+	<string>USReferenced Device Index</string>
+	<key>300A0608</key>
+	<string>LOTreatment Position Group Label</string>
+	<key>300A0609</key>
+	<string>UITreatment Position Group UID</string>
+	<key>300A060A</key>
+	<string>SQTreatment Position Group Sequence</string>
+	<key>300A060B</key>
+	<string>USReferenced Treatment Position Index</string>
+	<key>300A060C</key>
+	<string>USReferenced Radiation Dose Identification Index</string>
+	<key>300A060D</key>
+	<string>FDRT Accessory Holder Water-Equivalent Thickness</string>
+	<key>300A060E</key>
+	<string>USReferenced RT Accessory Holder Device Index</string>
+	<key>300A060F</key>
+	<string>CSRT Accessory Holder Slot Existence Flag</string>
+	<key>300A0610</key>
+	<string>SQRT Accessory Holder Slot Sequence</string>
+	<key>300A0611</key>
+	<string>LORT Accessory Holder Slot ID</string>
+	<key>300A0612</key>
+	<string>FDRT Accessory Holder Slot Distance</string>
+	<key>300A0613</key>
+	<string>FDRT Accessory Slot Distance</string>
+	<key>300A0614</key>
+	<string>SQRT Accessory Holder Definition Sequence</string>
+	<key>300A0615</key>
+	<string>LORT Accessory Device Slot ID</string>
+	<key>300A0616</key>
+	<string>SQRT Radiation Sequence</string>
+	<key>300A0617</key>
+	<string>SQRadiation Dose Sequence</string>
+	<key>300A0618</key>
+	<string>SQRadiation Dose Identification Sequence</string>
+	<key>300A0619</key>
+	<string>LORadiation Dose Identification Label</string>
+	<key>300A061A</key>
+	<string>CSReference Dose Type</string>
+	<key>300A061B</key>
+	<string>CSPrimary Dose Value Indicator</string>
+	<key>300A061C</key>
+	<string>SQDose Values Sequence</string>
+	<key>300A061D</key>
+	<string>CSDose Value Purpose</string>
+	<key>300A061E</key>
+	<string>FDReference Dose Point Coordinates</string>
+	<key>300A061F</key>
+	<string>SQRadiation Dose Values Parameters Sequence</string>
+	<key>300A0620</key>
+	<string>SQMeterset to Dose Mapping Sequence</string>
+	<key>300A0621</key>
+	<string>SQExpected In-Vivo Measurement Values Sequence</string>
+	<key>300A0622</key>
+	<string>USExpected In-Vivo Measurement Value Index</string>
+	<key>300A0623</key>
+	<string>LORadiation Dose In-Vivo Measurement Label</string>
+	<key>300A0624</key>
+	<string>FDRadiation Dose Central Axis Displacement</string>
+	<key>300A0625</key>
+	<string>FDRadiation Dose Value</string>
+	<key>300A0626</key>
+	<string>FDRadiation Dose Source to Skin Distance</string>
+	<key>300A0627</key>
+	<string>FDRadiation Dose Measurement Point Coordinates</string>
+	<key>300A0628</key>
+	<string>FDRadiation Dose Source to External Contour Distance</string>
+	<key>300A0629</key>
+	<string>SQRT Tolerance Set Sequence</string>
+	<key>300A062A</key>
+	<string>LORT Tolerance Set Label</string>
+	<key>300A062B</key>
+	<string>SQAttribute Tolerance Values Sequence</string>
+	<key>300A062C</key>
+	<string>FDTolerance Value</string>
+	<key>300A062D</key>
+	<string>SQPatient Support Position Tolerance Sequence</string>
+	<key>300A062E</key>
+	<string>FDTreatment Time Limit</string>
+	<key>300A062F</key>
+	<string>SQC-Arm Photon-Electron Control Point Sequence</string>
+	<key>300A0630</key>
+	<string>SQReferenced RT Radiation Sequence</string>
+	<key>300A0631</key>
+	<string>SQReferenced RT Instance Sequence</string>
+	<key>300A0632</key>
+	<string>SQReferenced RT Patient Setup Sequence</string>
+	<key>300A0634</key>
+	<string>FDSource to Patient Surface Distance</string>
+	<key>300A0635</key>
+	<string>SQTreatment Machine Special Mode Code Sequence</string>
+	<key>300A0636</key>
+	<string>USIntended Number of Fractions</string>
+	<key>300A0637</key>
+	<string>CSRT Radiation Set Intent</string>
+	<key>300A0638</key>
+	<string>CSRT Radiation Physical and Geometric Content Detail Flag</string>
+	<key>300A0639</key>
+	<string>CSRT Record Flag</string>
+	<key>300A063A</key>
+	<string>SQTreatment Device Identification Sequence</string>
+	<key>300A063B</key>
+	<string>SQReferenced RT Physician Intent Sequence</string>
+	<key>300A063C</key>
+	<string>FDCumulative Meterset</string>
+	<key>300A063D</key>
+	<string>FDDelivery Rate</string>
+	<key>300A063E</key>
+	<string>SQDelivery Rate Unit Sequence</string>
+	<key>300A063F</key>
+	<string>SQTreatment Position Sequence</string>
+	<key>300A0640</key>
+	<string>FDRadiation Source-Axis Distance</string>
+	<key>300A0641</key>
+	<string>USNumber of RT Beam Limiting Devices</string>
+	<key>300A0642</key>
+	<string>FDRT Beam Limiting Device Proximal Distance</string>
+	<key>300A0643</key>
+	<string>FDRT Beam Limiting Device Distal Distance</string>
+	<key>300A0644</key>
+	<string>SQParallel RT Beam Delimiter Device Orientation Label Code Sequence</string>
+	<key>300A0645</key>
+	<string>FDBeam Modifier Orientation Angle</string>
+	<key>300A0646</key>
+	<string>SQFixed RT Beam Delimiter Device Sequence</string>
+	<key>300A0647</key>
+	<string>SQParallel RT Beam Delimiter Device Sequence</string>
+	<key>300A0648</key>
+	<string>USNumber of Parallel RT Beam Delimiters</string>
+	<key>300A0649</key>
+	<string>FDParallel RT Beam Delimiter Boundaries</string>
+	<key>300A064A</key>
+	<string>FDParallel RT Beam Delimiter Positions</string>
+	<key>300A064B</key>
+	<string>FDRT Beam Limiting Device Offset</string>
+	<key>300A064C</key>
+	<string>SQRT Beam Delimiter Geometry Sequence</string>
+	<key>300A064D</key>
+	<string>SQRT Beam Limiting Device Definition Sequence</string>
+	<key>300A064E</key>
+	<string>CSParallel RT Beam Delimiter Opening Mode</string>
+	<key>300A064F</key>
+	<string>CSParallel RT Beam Delimiter Leaf Mounting Side</string>
+	<key>300A0650</key>
+	<string>UIPatient Setup UID</string>
+	<key>300A0651</key>
+	<string>SQWedge Definition Sequence</string>
+	<key>300A0652</key>
+	<string>FDRadiation Beam Wedge Angle</string>
+	<key>300A0653</key>
+	<string>FDRadiation Beam Wedge Thin Edge Distance</string>
+	<key>300A0654</key>
+	<string>FDRadiation Beam Effective Wedge Angle</string>
+	<key>300A0655</key>
+	<string>USNumber of Wedge Positions</string>
+	<key>300A0656</key>
+	<string>SQRT Beam Limiting Device Opening Sequence</string>
+	<key>300A0657</key>
+	<string>USNumber of RT Beam Limiting Device Openings</string>
+	<key>300A0658</key>
+	<string>SQRadiation Dosimeter Unit Sequence</string>
+	<key>300A0659</key>
+	<string>SQRT Device Distance Reference Location Code Sequence</string>
+	<key>300A065A</key>
+	<string>SQRadiation Device Configuration and Commissioning Key Sequence</string>
+	<key>300A065B</key>
+	<string>SQPatient Support Position Parameter Sequence</string>
+	<key>300A065C</key>
+	<string>CSPatient Support Position Specification Method</string>
+	<key>300A065D</key>
+	<string>SQPatient Support Position Device Parameter Sequence</string>
+	<key>300A065E</key>
+	<string>USDevice Order Index</string>
+	<key>300A065F</key>
+	<string>USPatient Support Position Parameter Order Index</string>
+	<key>300A0660</key>
+	<string>SQPatient Support Position Device Tolerance Sequence</string>
+	<key>300A0661</key>
+	<string>USPatient Support Position Tolerance Order Index</string>
+	<key>300A0662</key>
+	<string>SQCompensator Definition Sequence</string>
+	<key>300A0663</key>
+	<string>CSCompensator Map Orientation</string>
+	<key>300A0664</key>
+	<string>OFCompensator Proximal Thickness Map</string>
+	<key>300A0665</key>
+	<string>OFCompensator Distal Thickness Map</string>
+	<key>300A0666</key>
+	<string>FDCompensator Base Plane Offset</string>
+	<key>300A0667</key>
+	<string>SQCompensator Shape Fabrication Code Sequence</string>
+	<key>300A0668</key>
+	<string>SQCompensator Shape Sequence</string>
+	<key>300A0669</key>
+	<string>FDRadiation Beam Compensator Milling Tool Diameter</string>
+	<key>300A066A</key>
+	<string>SQBlock Definition Sequence</string>
+	<key>300A066B</key>
+	<string>OFBlock Edge Data</string>
+	<key>300A066C</key>
+	<string>CSBlock Orientation</string>
+	<key>300A066D</key>
+	<string>FDRadiation Beam Block Thickness</string>
+	<key>300A066E</key>
+	<string>FDRadiation Beam Block Slab Thickness</string>
+	<key>300A066F</key>
+	<string>SQBlock Edge Data Sequence</string>
+	<key>300A0670</key>
+	<string>USNumber of RT Accessory Holders</string>
+	<key>300A0671</key>
+	<string>SQGeneral Accessory Definition Sequence</string>
+	<key>300A0672</key>
+	<string>USNumber of General Accessories</string>
+	<key>300A0673</key>
+	<string>SQBolus Definition Sequence</string>
+	<key>300A0674</key>
+	<string>USNumber of Boluses</string>
+	<key>300A0675</key>
+	<string>UIEquipment Frame of Reference UID</string>
+	<key>300A0676</key>
+	<string>STEquipment Frame of Reference Description</string>
+	<key>300A0677</key>
+	<string>SQEquipment Reference Point Coordinates Sequence</string>
+	<key>300A0678</key>
+	<string>SQEquipment Reference Point Code Sequence</string>
+	<key>300A0679</key>
+	<string>FDRT Beam Limiting Device Angle</string>
+	<key>300A067A</key>
+	<string>FDSource Roll Angle</string>
+	<key>300A067B</key>
+	<string>SQRadiation GenerationMode Sequence</string>
+	<key>300A067C</key>
+	<string>SHRadiation GenerationMode Label</string>
+	<key>300A067D</key>
+	<string>STRadiation GenerationMode Description</string>
+	<key>300A067E</key>
+	<string>SQRadiation GenerationMode Machine Code Sequence</string>
+	<key>300A067F</key>
+	<string>SQRadiation Type Code Sequence</string>
+	<key>300A0680</key>
+	<string>DSNominal Energy</string>
+	<key>300A0681</key>
+	<string>DSMinimum Nominal Energy</string>
+	<key>300A0682</key>
+	<string>DSMaximum Nominal Energy</string>
+	<key>300A0683</key>
+	<string>SQRadiation Fluence Modifier Code Sequence</string>
+	<key>300A0684</key>
+	<string>SQEnergy Unit Code Sequence</string>
+	<key>300A0685</key>
+	<string>USNumber of Radiation GenerationModes</string>
+	<key>300A0686</key>
+	<string>SQPatient Support Devices Sequence</string>
+	<key>300A0687</key>
+	<string>USNumber of Patient Support Devices</string>
+	<key>300A0688</key>
+	<string>FDRT Beam Modifier Definition Distance</string>
+	<key>300A0689</key>
+	<string>SQBeam Area Limit Sequence</string>
+	<key>300A068A</key>
+	<string>SQReferenced RT Prescription Sequence</string>
+	<key>300A068B</key>
+	<string>CSDose Value Interpretation</string>
+	<key>300A0700</key>
+	<string>UITreatment Session UID</string>
+	<key>300A0701</key>
+	<string>CSRT Radiation Usage</string>
+	<key>300A0702</key>
+	<string>SQReferenced RT Radiation Set Sequence</string>
+	<key>300A0703</key>
+	<string>SQReferenced RT Radiation Record Sequence</string>
+	<key>300A0704</key>
+	<string>USRT Radiation Set Delivery Number</string>
+	<key>300A0705</key>
+	<string>USClinical Fraction Number</string>
+	<key>300A0706</key>
+	<string>CSRT Treatment Fraction Completion Status</string>
+	<key>300A0707</key>
+	<string>CSRT Radiation Set Usage</string>
+	<key>300A0708</key>
+	<string>CSTreatment Delivery Continuation Flag</string>
+	<key>300A0709</key>
+	<string>CSTreatment Record Content Origin</string>
+	<key>300A0714</key>
+	<string>CSRT Treatment Termination Status</string>
+	<key>300A0715</key>
+	<string>SQRT Treatment Termination Reason Code Sequence</string>
+	<key>300A0716</key>
+	<string>SQMachine-Specific Treatment Termination Code Sequence</string>
+	<key>300A0722</key>
+	<string>SQRT Radiation Salvage Record Control Point Sequence</string>
+	<key>300A0723</key>
+	<string>CSStarting Meterset Value Known Flag</string>
+	<key>300A0730</key>
+	<string>STTreatment Termination Description</string>
+	<key>300A0731</key>
+	<string>SQTreatment Tolerance Violation Sequence</string>
+	<key>300A0732</key>
+	<string>CSTreatment Tolerance Violation Category</string>
+	<key>300A0733</key>
+	<string>SQTreatment Tolerance Violation Attribute Sequence</string>
+	<key>300A0734</key>
+	<string>STTreatment Tolerance Violation Description</string>
+	<key>300A0735</key>
+	<string>STTreatment Tolerance Violation Identification</string>
+	<key>300A0736</key>
+	<string>DTTreatment Tolerance Violation DateTime</string>
+	<key>300A073A</key>
+	<string>DTRecorded RT Control Point DateTime</string>
+	<key>300A073B</key>
+	<string>USReferenced Radiation RT Control Point Index</string>
+	<key>300A073E</key>
+	<string>SQAlternate Value Sequence</string>
+	<key>300A073F</key>
+	<string>SQConfirmation Sequence</string>
+	<key>300A0740</key>
+	<string>SQInterlock Sequence</string>
+	<key>300A0741</key>
+	<string>DTInterlock DateTime</string>
+	<key>300A0742</key>
+	<string>STInterlock Description</string>
+	<key>300A0743</key>
+	<string>SQInterlock Originating Device Sequence</string>
+	<key>300A0744</key>
+	<string>SQInterlock Code Sequence</string>
+	<key>300A0745</key>
+	<string>SQInterlock Resolution Code Sequence</string>
+	<key>300A0746</key>
+	<string>SQInterlock Resolution User Sequence</string>
+	<key>300A0760</key>
+	<string>DTOverride DateTime</string>
+	<key>300A0761</key>
+	<string>SQTreatment Tolerance Violation Type Code Sequence</string>
+	<key>300A0762</key>
+	<string>SQTreatment Tolerance Violation Cause Code Sequence</string>
+	<key>300A0772</key>
+	<string>SQMeasured Meterset to Dose Mapping Sequence</string>
+	<key>300A0773</key>
+	<string>USReferenced Expected In-Vivo Measurement Value Index</string>
+	<key>300A0774</key>
+	<string>SQDose Measurement Device Code Sequence</string>
+	<key>300A0780</key>
+	<string>SQAdditional Parameter Recording Instance Sequence</string>
+	<key>300A0782</key>
+	<string>USRetired-blank</string>
+	<key>300A0783</key>
+	<string>STInterlock Origin Description</string>
+	<key>300A0784</key>
+	<string>SQRT Patient Position Scope Sequence</string>
+	<key>300A0785</key>
+	<string>UIReferenced Treatment Position Group UID</string>
+	<key>300A0786</key>
+	<string>USRadiation Order Index</string>
+	<key>300A0787</key>
+	<string>SQOmitted Radiation Sequence</string>
+	<key>300A0788</key>
+	<string>SQReason for Omission Code Sequence</string>
+	<key>300A0789</key>
+	<string>SQRT Delivery Start Patient Position Sequence</string>
+	<key>300A078A</key>
+	<string>SQRT Treatment Preparation Patient Position Sequence</string>
+	<key>300A078B</key>
+	<string>SQReferenced RT Treatment Preparation Sequence</string>
+	<key>300A078C</key>
+	<string>SQReferenced Patient Setup Photo Sequence</string>
+	<key>300A078D</key>
+	<string>SQPatient Treatment Preparation Method Code Sequence</string>
+	<key>300A078E</key>
+	<string>LTPatient Treatment Preparation Procedure Parameter Description</string>
+	<key>300A078F</key>
+	<string>SQPatient Treatment Preparation Device Sequence</string>
+	<key>300A0790</key>
+	<string>SQPatient Treatment Preparation Procedure Sequence</string>
+	<key>300A0791</key>
+	<string>SQPatient Treatment Preparation Procedure Code Sequence</string>
+	<key>300A0792</key>
+	<string>LTPatient Treatment Preparation Method Description</string>
+	<key>300A0793</key>
+	<string>SQPatient Treatment Preparation Procedure Parameter Sequence</string>
+	<key>300A0794</key>
+	<string>LTPatient Setup Photo Description</string>
+	<key>300A0795</key>
+	<string>USPatient Treatment Preparation Procedure Index</string>
+	<key>300A0796</key>
+	<string>USReferenced Patient Setup Procedure Index</string>
+	<key>300A0797</key>
+	<string>SQRT Radiation Task Sequence</string>
+	<key>300A0798</key>
+	<string>SQRT Patient Position Displacement Sequence</string>
+	<key>300A0799</key>
+	<string>SQRT Patient Position Sequence</string>
+	<key>300A079A</key>
+	<string>LODisplacement Reference Label</string>
+	<key>300A079B</key>
+	<string>FDDisplacement Matrix</string>
+	<key>300A079C</key>
+	<string>SQPatient Support Displacement Sequence</string>
+	<key>300A079D</key>
+	<string>SQDisplacement Reference Location Code Sequence</string>
+	<key>300A079E</key>
+	<string>CSRT Radiation Set Delivery Usage</string>
+	<key>300A079F</key>
+	<string>SQPatient Treatment Preparation Sequence</string>
+	<key>300A07A0</key>
+	<string>SQPatient to Equipment Relationship Sequence</string>
+	<key>300A07A1</key>
+	<string>SQImaging Equipment to Treatment Delivery Device Relationship Sequence</string>
+	<key>300C0002</key>
+	<string>SQReferenced RT Plan Sequence</string>
+	<key>300C0004</key>
+	<string>SQReferenced Beam Sequence</string>
+	<key>300C0006</key>
+	<string>ISReferenced Beam Number</string>
+	<key>300C0007</key>
+	<string>ISReferenced Reference Image Number</string>
+	<key>300C0008</key>
+	<string>DSStart Cumulative Meterset Weight</string>
+	<key>300C0009</key>
+	<string>DSEnd Cumulative Meterset Weight</string>
+	<key>300C000A</key>
+	<string>SQReferenced Brachy Application Setup Sequence</string>
+	<key>300C000C</key>
+	<string>ISReferenced Brachy Application Setup Number</string>
+	<key>300C000E</key>
+	<string>ISReferenced Source Number</string>
+	<key>300C0020</key>
+	<string>SQReferenced Fraction Group Sequence</string>
+	<key>300C0022</key>
+	<string>ISReferenced Fraction Group Number</string>
+	<key>300C0040</key>
+	<string>SQReferenced Verification Image Sequence</string>
+	<key>300C0042</key>
+	<string>SQReferenced Reference Image Sequence</string>
+	<key>300C0050</key>
+	<string>SQReferenced Dose Reference Sequence</string>
+	<key>300C0051</key>
+	<string>ISReferenced Dose Reference Number</string>
+	<key>300C0055</key>
+	<string>SQBrachy Referenced Dose Reference Sequence</string>
+	<key>300C0060</key>
+	<string>SQReferenced Structure Set Sequence</string>
+	<key>300C006A</key>
+	<string>ISReferenced Patient Setup Number</string>
+	<key>300C0080</key>
+	<string>SQReferenced Dose Sequence</string>
+	<key>300C00A0</key>
+	<string>ISReferenced Tolerance Table Number</string>
+	<key>300C00B0</key>
+	<string>SQReferenced Bolus Sequence</string>
+	<key>300C00C0</key>
+	<string>ISReferenced Wedge Number</string>
+	<key>300C00D0</key>
+	<string>ISReferenced Compensator Number</string>
+	<key>300C00E0</key>
+	<string>ISReferenced Block Number</string>
+	<key>300C00F0</key>
+	<string>ISReferenced Control Point Index</string>
+	<key>300C00F2</key>
+	<string>SQReferenced Control Point Sequence</string>
+	<key>300C00F4</key>
+	<string>ISReferenced Start Control Point Index</string>
+	<key>300C00F6</key>
+	<string>ISReferenced Stop Control Point Index</string>
+	<key>300C0100</key>
+	<string>ISReferenced Range Shifter Number</string>
+	<key>300C0102</key>
+	<string>ISReferenced Lateral Spreading Device Number</string>
+	<key>300C0104</key>
+	<string>ISReferenced Range Modulator Number</string>
+	<key>300C0111</key>
+	<string>SQOmitted Beam Task Sequence</string>
+	<key>300C0112</key>
+	<string>CSReason for Omission</string>
+	<key>300C0113</key>
+	<string>LOReason for Omission Description</string>
+	<key>300C0114</key>
+	<string>SQPrescription Overview Sequence</string>
+	<key>300C0115</key>
+	<string>FLTotal Prescription Dose</string>
+	<key>300C0116</key>
+	<string>SQPlan Overview Sequence</string>
+	<key>300C0117</key>
+	<string>USPlan Overview Index</string>
+	<key>300C0118</key>
+	<string>USReferenced Plan Overview Index</string>
+	<key>300C0119</key>
+	<string>USNumber of Fractions Included</string>
+	<key>300C0120</key>
+	<string>SQDose Calibration Conditions Sequence</string>
+	<key>300C0121</key>
+	<string>FDAbsorbed Dose to Meterset Ratio</string>
+	<key>300C0122</key>
+	<string>FDDelineated Radiation Field Size</string>
+	<key>300C0123</key>
+	<string>CSDose Calibration Conditions Verified Flag</string>
+	<key>300C0124</key>
+	<string>FDCalibration Reference Point Depth</string>
+	<key>300C0125</key>
+	<string>SQGating Beam Hold Transition Sequence</string>
+	<key>300C0126</key>
+	<string>CSBeam Hold Transition</string>
+	<key>300C0127</key>
+	<string>DTBeam Hold Transition DateTime</string>
+	<key>300C0128</key>
+	<string>SQBeam Hold Originating Device Sequence</string>
+	<key>300C0129</key>
+	<string>CSBeam Hold Transition Trigger Source</string>
+	<key>300E0002</key>
+	<string>CSApproval Status</string>
+	<key>300E0004</key>
+	<string>DAReview Date</string>
+	<key>300E0005</key>
+	<string>TMReview Time</string>
+	<key>300E0008</key>
+	<string>PNReviewer Name</string>
+	<key>30100001</key>
+	<string>SQRadiobiological Dose Effect Sequence</string>
+	<key>30100002</key>
+	<string>CSRadiobiological Dose Effect Flag</string>
+	<key>30100003</key>
+	<string>SQEffective Dose Calculation Method Category Code Sequence</string>
+	<key>30100004</key>
+	<string>SQEffective Dose Calculation Method Code Sequence</string>
+	<key>30100005</key>
+	<string>LOEffective Dose Calculation Method Description</string>
+	<key>30100006</key>
+	<string>UIConceptual Volume UID</string>
+	<key>30100007</key>
+	<string>SQOriginating SOP Instance Reference Sequence</string>
+	<key>30100008</key>
+	<string>SQConceptual Volume Constituent Sequence</string>
+	<key>30100009</key>
+	<string>SQEquivalent Conceptual Volume Instance Reference Sequence</string>
+	<key>3010000A</key>
+	<string>SQEquivalent Conceptual Volumes Sequence</string>
+	<key>3010000B</key>
+	<string>UIReferenced Conceptual Volume UID</string>
+	<key>3010000C</key>
+	<string>UTConceptual Volume Combination Expression</string>
+	<key>3010000D</key>
+	<string>USConceptual Volume Constituent Index</string>
+	<key>3010000E</key>
+	<string>CSConceptual Volume Combination Flag</string>
+	<key>3010000F</key>
+	<string>STConceptual Volume Combination Description</string>
+	<key>30100010</key>
+	<string>CSConceptual Volume Segmentation Defined Flag</string>
+	<key>30100011</key>
+	<string>SQConceptual Volume Segmentation Reference Sequence</string>
+	<key>30100012</key>
+	<string>SQConceptual Volume Constituent Segmentation Reference Sequence</string>
+	<key>30100013</key>
+	<string>UIConstituent Conceptual Volume UID</string>
+	<key>30100014</key>
+	<string>SQDerivation Conceptual Volume Sequence</string>
+	<key>30100015</key>
+	<string>UISource Conceptual Volume UID</string>
+	<key>30100016</key>
+	<string>SQConceptual Volume Derivation Algorithm Sequence</string>
+	<key>30100017</key>
+	<string>STConceptual Volume Description</string>
+	<key>30100018</key>
+	<string>SQSource Conceptual Volume Sequence</string>
+	<key>30100019</key>
+	<string>SQAuthor Identification Sequence</string>
+	<key>3010001A</key>
+	<string>LOManufacturer's Model Version</string>
+	<key>3010001B</key>
+	<string>UCDevice Alternate Identifier</string>
+	<key>3010001C</key>
+	<string>CSDevice Alternate Identifier Type</string>
+	<key>3010001D</key>
+	<string>LTDevice Alternate Identifier Format</string>
+	<key>3010001E</key>
+	<string>LOSegmentation Creation Template Label</string>
+	<key>3010001F</key>
+	<string>UISegmentation Template UID</string>
+	<key>30100020</key>
+	<string>USReferenced Segment Reference Index</string>
+	<key>30100021</key>
+	<string>SQSegment Reference Sequence</string>
+	<key>30100022</key>
+	<string>USSegment Reference Index</string>
+	<key>30100023</key>
+	<string>SQDirect Segment Reference Sequence</string>
+	<key>30100024</key>
+	<string>SQCombination Segment Reference Sequence</string>
+	<key>30100025</key>
+	<string>SQConceptual Volume Sequence</string>
+	<key>30100026</key>
+	<string>SQSegmented RT Accessory Device Sequence</string>
+	<key>30100027</key>
+	<string>SQSegment Characteristics Sequence</string>
+	<key>30100028</key>
+	<string>SQRelated Segment Characteristics Sequence</string>
+	<key>30100029</key>
+	<string>USSegment Characteristics Precedence</string>
+	<key>3010002A</key>
+	<string>SQRT Segment Annotation Sequence</string>
+	<key>3010002B</key>
+	<string>SQSegment Annotation Category Code Sequence</string>
+	<key>3010002C</key>
+	<string>SQSegment Annotation Type Code Sequence</string>
+	<key>3010002D</key>
+	<string>LODevice Label</string>
+	<key>3010002E</key>
+	<string>SQDevice Type Code Sequence</string>
+	<key>3010002F</key>
+	<string>SQSegment Annotation Type Modifier Code Sequence</string>
+	<key>30100030</key>
+	<string>SQPatient Equipment Relationship Code Sequence</string>
+	<key>30100031</key>
+	<string>UIReferenced Fiducials UID</string>
+	<key>30100032</key>
+	<string>SQPatient Treatment Orientation Sequence</string>
+	<key>30100033</key>
+	<string>SHUser Content Label</string>
+	<key>30100034</key>
+	<string>LOUser Content Long Label</string>
+	<key>30100035</key>
+	<string>SHEntity Label</string>
+	<key>30100036</key>
+	<string>LOEntity Name</string>
+	<key>30100037</key>
+	<string>STEntity Description</string>
+	<key>30100038</key>
+	<string>LOEntity Long Label</string>
+	<key>30100039</key>
+	<string>USDevice Index</string>
+	<key>3010003A</key>
+	<string>USRT Treatment Phase Index</string>
+	<key>3010003B</key>
+	<string>UIRT Treatment Phase UID</string>
+	<key>3010003C</key>
+	<string>USRT Prescription Index</string>
+	<key>3010003D</key>
+	<string>USRT Segment Annotation Index</string>
+	<key>3010003E</key>
+	<string>USBasis RT Treatment Phase Index</string>
+	<key>3010003F</key>
+	<string>USRelated RT Treatment Phase Index</string>
+	<key>30100040</key>
+	<string>USReferenced RT Treatment Phase Index</string>
+	<key>30100041</key>
+	<string>USReferenced RT Prescription Index</string>
+	<key>30100042</key>
+	<string>USReferenced Parent RT Prescription Index</string>
+	<key>30100043</key>
+	<string>STManufacturer's Device Identifier</string>
+	<key>30100044</key>
+	<string>SQInstance-Level Referenced Performed Procedure Step Sequence</string>
+	<key>30100045</key>
+	<string>CSRT Treatment Phase Intent Presence Flag</string>
+	<key>30100046</key>
+	<string>CSRadiotherapy Treatment Type</string>
+	<key>30100047</key>
+	<string>CSTeletherapy Radiation Type</string>
+	<key>30100048</key>
+	<string>CSBrachytherapy Source Type</string>
+	<key>30100049</key>
+	<string>SQReferenced RT Treatment Phase Sequence</string>
+	<key>3010004A</key>
+	<string>SQReferenced Direct Segment Instance Sequence</string>
+	<key>3010004B</key>
+	<string>SQIntended RT Treatment Phase Sequence</string>
+	<key>3010004C</key>
+	<string>DAIntended Phase Start Date</string>
+	<key>3010004D</key>
+	<string>DAIntended Phase End Date</string>
+	<key>3010004E</key>
+	<string>SQRT Treatment Phase Interval Sequence</string>
+	<key>3010004F</key>
+	<string>CSTemporal Relationship Interval Anchor</string>
+	<key>30100050</key>
+	<string>FDMinimum Number of Interval Days</string>
+	<key>30100051</key>
+	<string>FDMaximum Number of Interval Days</string>
+	<key>30100052</key>
+	<string>UIPertinent SOP Classes in Study</string>
+	<key>30100053</key>
+	<string>UIPertinent SOP Classes in Series</string>
+	<key>30100054</key>
+	<string>LORT Prescription Label</string>
+	<key>30100055</key>
+	<string>SQRT Physician Intent Predecessor Sequence</string>
+	<key>30100056</key>
+	<string>LORT Treatment Approach Label</string>
+	<key>30100057</key>
+	<string>SQRT Physician Intent Sequence</string>
+	<key>30100058</key>
+	<string>USRT Physician Intent Index</string>
+	<key>30100059</key>
+	<string>CSRT Treatment Intent Type</string>
+	<key>3010005A</key>
+	<string>UTRT Physician Intent Narrative</string>
+	<key>3010005B</key>
+	<string>SQRT Protocol Code Sequence</string>
+	<key>3010005C</key>
+	<string>STReason for Superseding</string>
+	<key>3010005D</key>
+	<string>SQRT Diagnosis Code Sequence</string>
+	<key>3010005E</key>
+	<string>USReferenced RT Physician Intent Index</string>
+	<key>3010005F</key>
+	<string>SQRT Physician Intent Input Instance Sequence</string>
+	<key>30100060</key>
+	<string>SQRT Anatomic Prescription Sequence</string>
+	<key>30100061</key>
+	<string>UTPrior Treatment Dose Description</string>
+	<key>30100062</key>
+	<string>SQPrior Treatment Reference Sequence</string>
+	<key>30100063</key>
+	<string>CSDosimetric Objective Evaluation Scope</string>
+	<key>30100064</key>
+	<string>SQTherapeutic Role Category Code Sequence</string>
+	<key>30100065</key>
+	<string>SQTherapeutic Role Type Code Sequence</string>
+	<key>30100066</key>
+	<string>USConceptual Volume Optimization Precedence</string>
+	<key>30100067</key>
+	<string>SQConceptual Volume Category Code Sequence</string>
+	<key>30100068</key>
+	<string>CSConceptual Volume Blocking Constraint</string>
+	<key>30100069</key>
+	<string>SQConceptual Volume Type Code Sequence</string>
+	<key>3010006A</key>
+	<string>SQConceptual Volume Type Modifier Code Sequence</string>
+	<key>3010006B</key>
+	<string>SQRT Prescription Sequence</string>
+	<key>3010006C</key>
+	<string>SQDosimetric Objective Sequence</string>
+	<key>3010006D</key>
+	<string>SQDosimetric Objective Type Code Sequence</string>
+	<key>3010006E</key>
+	<string>UIDosimetric Objective UID</string>
+	<key>3010006F</key>
+	<string>UIReferenced Dosimetric Objective UID</string>
+	<key>30100070</key>
+	<string>SQDosimetric Objective Parameter Sequence</string>
+	<key>30100071</key>
+	<string>SQReferenced Dosimetric Objectives Sequence</string>
+	<key>30100073</key>
+	<string>CSAbsolute Dosimetric Objective Flag</string>
+	<key>30100074</key>
+	<string>FDDosimetric Objective Weight</string>
+	<key>30100075</key>
+	<string>CSDosimetric Objective Purpose</string>
+	<key>30100076</key>
+	<string>SQPlanning Input Information Sequence</string>
+	<key>30100077</key>
+	<string>LOTreatment Site</string>
+	<key>30100078</key>
+	<string>SQTreatment Site Code Sequence</string>
+	<key>30100079</key>
+	<string>SQFraction Pattern Sequence</string>
+	<key>3010007A</key>
+	<string>UTTreatment Technique Notes</string>
+	<key>3010007B</key>
+	<string>UTPrescription Notes</string>
+	<key>3010007C</key>
+	<string>ISNumber of Interval Fractions</string>
+	<key>3010007D</key>
+	<string>USNumber of Fractions</string>
+	<key>3010007E</key>
+	<string>USIntended Delivery Duration</string>
+	<key>3010007F</key>
+	<string>UTFractionation Notes</string>
+	<key>30100080</key>
+	<string>SQRT Treatment Technique Code Sequence</string>
+	<key>30100081</key>
+	<string>SQPrescription Notes Sequence</string>
+	<key>30100082</key>
+	<string>SQFraction-Based Relationship Sequence</string>
+	<key>30100083</key>
+	<string>CSFraction-Based Relationship Interval Anchor</string>
+	<key>30100084</key>
+	<string>FDMinimum Hours between Fractions</string>
+	<key>30100085</key>
+	<string>TMIntended Fraction Start Time</string>
+	<key>30100086</key>
+	<string>LTIntended Start Day of Week</string>
+	<key>30100087</key>
+	<string>SQWeekday Fraction Pattern Sequence</string>
+	<key>30100088</key>
+	<string>SQDelivery Time Structure Code Sequence</string>
+	<key>30100089</key>
+	<string>SQTreatment Site Modifier Code Sequence</string>
+	<key>30100090</key>
+	<string>CSRobotic Base Location Indicator</string>
+	<key>30100091</key>
+	<string>SQRobotic Path Node Set Code Sequence</string>
+	<key>30100092</key>
+	<string>ULRobotic Node Identifier</string>
+	<key>30100093</key>
+	<string>FDRT Treatment Source Coordinates</string>
+	<key>30100094</key>
+	<string>FDRadiation Source Coordinate SystemYaw Angle</string>
+	<key>30100095</key>
+	<string>FDRadiation Source Coordinate SystemRoll Angle</string>
+	<key>30100096</key>
+	<string>FDRadiation Source Coordinate System Pitch Angle</string>
+	<key>30100097</key>
+	<string>SQRobotic Path Control Point Sequence</string>
+	<key>30100098</key>
+	<string>SQTomotherapeutic Control Point Sequence</string>
+	<key>30100099</key>
+	<string>FDTomotherapeutic Leaf Open Durations</string>
+	<key>3010009A</key>
+	<string>FDTomotherapeutic Leaf Initial Closed Durations</string>
+	<key>301000A0</key>
+	<string>SQConceptual Volume Identification Sequence</string>
+	<key>40000010</key>
+	<string>LTArbitrary</string>
+	<key>40004000</key>
+	<string>LTText Comments</string>
+	<key>40080040</key>
+	<string>SHResults ID</string>
+	<key>40080042</key>
+	<string>LOResults ID Issuer</string>
+	<key>40080050</key>
+	<string>SQReferenced Interpretation Sequence</string>
+	<key>400800FF</key>
+	<string>CSReport Production Status (Trial)</string>
+	<key>40080100</key>
+	<string>DAInterpretation Recorded Date</string>
+	<key>40080101</key>
+	<string>TMInterpretation Recorded Time</string>
+	<key>40080102</key>
+	<string>PNInterpretation Recorder</string>
+	<key>40080103</key>
+	<string>LOReference to Recorded Sound</string>
+	<key>40080108</key>
+	<string>DAInterpretation Transcription Date</string>
+	<key>40080109</key>
+	<string>TMInterpretation Transcription Time</string>
+	<key>4008010A</key>
+	<string>PNInterpretation Transcriber</string>
+	<key>4008010B</key>
+	<string>STInterpretation Text</string>
+	<key>4008010C</key>
+	<string>PNInterpretation Author</string>
+	<key>40080111</key>
+	<string>SQInterpretation Approver Sequence</string>
+	<key>40080112</key>
+	<string>DAInterpretation Approval Date</string>
+	<key>40080113</key>
+	<string>TMInterpretation Approval Time</string>
+	<key>40080114</key>
+	<string>PNPhysician Approving Interpretation</string>
+	<key>40080115</key>
+	<string>LTInterpretation Diagnosis Description</string>
+	<key>40080117</key>
+	<string>SQInterpretation Diagnosis Code Sequence</string>
+	<key>40080118</key>
+	<string>SQResults Distribution List Sequence</string>
+	<key>40080119</key>
+	<string>PNDistribution Name</string>
+	<key>4008011A</key>
+	<string>LODistribution Address</string>
+	<key>40080200</key>
+	<string>SHInterpretation ID</string>
+	<key>40080202</key>
+	<string>LOInterpretation ID Issuer</string>
+	<key>40080210</key>
+	<string>CSInterpretation Type ID</string>
+	<key>40080212</key>
+	<string>CSInterpretation Status ID</string>
+	<key>40080300</key>
+	<string>STImpressions</string>
+	<key>40084000</key>
+	<string>STResults Comments</string>
+	<key>40100001</key>
+	<string>CSLow Energy Detectors</string>
+	<key>40100002</key>
+	<string>CSHigh Energy Detectors</string>
+	<key>40100004</key>
+	<string>SQDetector Geometry Sequence</string>
+	<key>40101001</key>
+	<string>SQThreat ROI Voxel Sequence</string>
+	<key>40101004</key>
+	<string>FLThreat ROI Base</string>
+	<key>40101005</key>
+	<string>FLThreat ROI Extents</string>
+	<key>40101006</key>
+	<string>OBThreat ROI Bitmap</string>
+	<key>40101007</key>
+	<string>SHRoute Segment ID</string>
+	<key>40101008</key>
+	<string>CSGantry Type</string>
+	<key>40101009</key>
+	<string>CSOOI Owner Type</string>
+	<key>4010100A</key>
+	<string>SQRoute Segment Sequence</string>
+	<key>40101010</key>
+	<string>USPotential Threat Object ID</string>
+	<key>40101011</key>
+	<string>SQThreat Sequence</string>
+	<key>40101012</key>
+	<string>CSThreat Category</string>
+	<key>40101013</key>
+	<string>LTThreat Category Description</string>
+	<key>40101014</key>
+	<string>CSATD Ability Assessment</string>
+	<key>40101015</key>
+	<string>CSATD Assessment Flag</string>
+	<key>40101016</key>
+	<string>FLATD Assessment Probability</string>
+	<key>40101017</key>
+	<string>FLMass</string>
+	<key>40101018</key>
+	<string>FLDensity</string>
+	<key>40101019</key>
+	<string>FLZ Effective</string>
+	<key>4010101A</key>
+	<string>SHBoarding Pass ID</string>
+	<key>4010101B</key>
+	<string>FLCenter of Mass</string>
+	<key>4010101C</key>
+	<string>FLCenter of PTO</string>
+	<key>4010101D</key>
+	<string>FLBounding Polygon</string>
+	<key>4010101E</key>
+	<string>SHRoute Segment Start Location ID</string>
+	<key>4010101F</key>
+	<string>SHRoute Segment End Location ID</string>
+	<key>40101020</key>
+	<string>CSRoute Segment Location ID Type</string>
+	<key>40101021</key>
+	<string>CSAbort Reason</string>
+	<key>40101023</key>
+	<string>FLVolume of PTO</string>
+	<key>40101024</key>
+	<string>CSAbort Flag</string>
+	<key>40101025</key>
+	<string>DTRoute Segment Start Time</string>
+	<key>40101026</key>
+	<string>DTRoute Segment End Time</string>
+	<key>40101027</key>
+	<string>CSTDR Type</string>
+	<key>40101028</key>
+	<string>CSInternational Route Segment</string>
+	<key>40101029</key>
+	<string>LOThreat Detection Algorithm and Version</string>
+	<key>4010102A</key>
+	<string>SHAssigned Location</string>
+	<key>4010102B</key>
+	<string>DTAlarm Decision Time</string>
+	<key>40101031</key>
+	<string>CSAlarm Decision</string>
+	<key>40101033</key>
+	<string>USNumber of Total Objects</string>
+	<key>40101034</key>
+	<string>USNumber of Alarm Objects</string>
+	<key>40101037</key>
+	<string>SQPTO Representation Sequence</string>
+	<key>40101038</key>
+	<string>SQATD Assessment Sequence</string>
+	<key>40101039</key>
+	<string>CSTIP Type</string>
+	<key>4010103A</key>
+	<string>CSDICOS Version</string>
+	<key>40101041</key>
+	<string>DTOOI Owner Creation Time</string>
+	<key>40101042</key>
+	<string>CSOOI Type</string>
+	<key>40101043</key>
+	<string>FLOOI Size</string>
+	<key>40101044</key>
+	<string>CSAcquisition Status</string>
+	<key>40101045</key>
+	<string>SQBasis Materials Code Sequence</string>
+	<key>40101046</key>
+	<string>CSPhantom Type</string>
+	<key>40101047</key>
+	<string>SQOOI Owner Sequence</string>
+	<key>40101048</key>
+	<string>CSScan Type</string>
+	<key>40101051</key>
+	<string>LOItinerary ID</string>
+	<key>40101052</key>
+	<string>SHItinerary ID Type</string>
+	<key>40101053</key>
+	<string>LOItinerary ID Assigning Authority</string>
+	<key>40101054</key>
+	<string>SHRoute ID</string>
+	<key>40101055</key>
+	<string>SHRoute ID Assigning Authority</string>
+	<key>40101056</key>
+	<string>CSInbound Arrival Type</string>
+	<key>40101058</key>
+	<string>SHCarrier ID</string>
+	<key>40101059</key>
+	<string>CSCarrier ID Assigning Authority</string>
+	<key>40101060</key>
+	<string>FLSource Orientation</string>
+	<key>40101061</key>
+	<string>FLSource Position</string>
+	<key>40101062</key>
+	<string>FLBelt Height</string>
+	<key>40101064</key>
+	<string>SQAlgorithm Routing Code Sequence</string>
+	<key>40101067</key>
+	<string>CSTransport Classification</string>
+	<key>40101068</key>
+	<string>LTOOI Type Descriptor</string>
+	<key>40101069</key>
+	<string>FLTotal Processing Time</string>
+	<key>4010106C</key>
+	<string>OBDetector Calibration Data</string>
+	<key>4010106D</key>
+	<string>CSAdditional Screening Performed</string>
+	<key>4010106E</key>
+	<string>CSAdditional Inspection Selection Criteria</string>
+	<key>4010106F</key>
+	<string>SQAdditional Inspection Method Sequence</string>
+	<key>40101070</key>
+	<string>CSAIT Device Type</string>
+	<key>40101071</key>
+	<string>SQQR Measurements Sequence</string>
+	<key>40101072</key>
+	<string>SQTarget Material Sequence</string>
+	<key>40101073</key>
+	<string>FDSNR Threshold</string>
+	<key>40101075</key>
+	<string>DSImage Scale Representation</string>
+	<key>40101076</key>
+	<string>SQReferenced PTO Sequence</string>
+	<key>40101077</key>
+	<string>SQReferenced TDR Instance Sequence</string>
+	<key>40101078</key>
+	<string>STPTO Location Description</string>
+	<key>40101079</key>
+	<string>SQAnomaly Locator Indicator Sequence</string>
+	<key>4010107A</key>
+	<string>FLAnomaly Locator Indicator</string>
+	<key>4010107B</key>
+	<string>SQPTO Region Sequence</string>
+	<key>4010107C</key>
+	<string>CSInspection Selection Criteria</string>
+	<key>4010107D</key>
+	<string>SQSecondary Inspection Method Sequence</string>
+	<key>4010107E</key>
+	<string>DSPRCS to RCS Orientation</string>
+	<key>4FFE0001</key>
+	<string>SQMAC Parameters Sequence</string>
+</dict>
+</plist>

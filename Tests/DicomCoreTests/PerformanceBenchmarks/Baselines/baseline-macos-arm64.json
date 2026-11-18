@@ -1,0 +1,101 @@
+{
+  "configuration" : {
+    "benchmarkIterations" : 100,
+    "imageHeight" : 1024,
+    "imageWidth" : 1024,
+    "totalPixels" : 1048576,
+    "warmupIterations" : 10,
+    "windowCenter" : 50,
+    "windowWidth" : 400
+  },
+  "platform" : {
+    "architecture" : "arm64",
+    "modelIdentifier" : "Mac16,12",
+    "operatingSystem" : "macOS",
+    "osVersion" : "Version 26.2 (Build 25C56)",
+    "processorCount" : 10
+  },
+  "results" : [
+    {
+      "coefficientOfVariation" : 569.9224047344021,
+      "iterations" : 1000,
+      "maxTimeSeconds" : 1.0728836059570312e-06,
+      "meanTimeMilliseconds" : 3.039836883544922e-05,
+      "meanTimeSeconds" : 3.039836883544922e-08,
+      "medianTimeSeconds" : 0,
+      "minTimeSeconds" : 0,
+      "operation" : "Lock Overhead",
+      "p95TimeSeconds" : 0,
+      "p99TimeSeconds" : 1.0728836059570312e-06,
+      "stdDevSeconds" : 1.7324711466702527e-07
+    },
+    {
+      "coefficientOfVariation" : 612.391413402263,
+      "iterations" : 100,
+      "maxTimeSeconds" : 0.0001989603042602539,
+      "meanTimeMilliseconds" : 0.003229379653930664,
+      "meanTimeSeconds" : 3.229379653930664e-06,
+      "medianTimeSeconds" : 1.0728836059570312e-06,
+      "minTimeSeconds" : 9.5367431640625e-07,
+      "operation" : "Decoder Initialization",
+      "p95TimeSeconds" : 2.0265579223632812e-06,
+      "p99TimeSeconds" : 2.9802322387695312e-06,
+      "stdDevSeconds" : 1.9776443706831102e-05
+    },
+    {
+      "coefficientOfVariation" : 140.3317208080382,
+      "iterations" : 100,
+      "maxTimeSeconds" : 5.996227264404297e-05,
+      "meanTimeMilliseconds" : 0.005612373352050781,
+      "meanTimeSeconds" : 5.612373352050781e-06,
+      "medianTimeSeconds" : 3.933906555175781e-06,
+      "minTimeSeconds" : 2.9802322387695312e-06,
+      "operation" : "Decoder Validation",
+      "p95TimeSeconds" : 1.800060272216797e-05,
+      "p99TimeSeconds" : 4.100799560546875e-05,
+      "stdDevSeconds" : 7.875940103104636e-06
+    },
+    {
+      "coefficientOfVariation" : 322.62843256374015,
+      "iterations" : 100,
+      "maxTimeSeconds" : 7.605552673339844e-05,
+      "meanTimeMilliseconds" : 0.002313852310180664,
+      "meanTimeSeconds" : 2.313852310180664e-06,
+      "medianTimeSeconds" : 1.9073486328125e-06,
+      "minTimeSeconds" : 9.5367431640625e-07,
+      "operation" : "Metadata Access",
+      "p95TimeSeconds" : 2.0265579223632812e-06,
+      "p99TimeSeconds" : 2.0265579223632812e-06,
+      "stdDevSeconds" : 7.4651454401757665e-06
+    },
+    {
+      "coefficientOfVariation" : 1.092371782311547,
+      "iterations" : 100,
+      "maxTimeSeconds" : 0.16096997261047363,
+      "meanTimeMilliseconds" : 155.8082675933838,
+      "meanTimeSeconds" : 0.1558082675933838,
+      "medianTimeSeconds" : 0.1555975079536438,
+      "minTimeSeconds" : 0.1528860330581665,
+      "operation" : "Windowing (vDSP)",
+      "p95TimeSeconds" : 0.15873098373413086,
+      "p99TimeSeconds" : 0.16063308715820312,
+      "stdDevSeconds" : 0.001702005549698591,
+      "throughputPixelsPerSecond" : 6729912.450708274
+    },
+    {
+      "coefficientOfVariation" : 0.9699372725186992,
+      "iterations" : 100,
+      "maxTimeSeconds" : 0.16092491149902344,
+      "meanTimeMilliseconds" : 155.49699544906616,
+      "meanTimeSeconds" : 0.15549699544906617,
+      "medianTimeSeconds" : 0.1554049849510193,
+      "minTimeSeconds" : 0.15158796310424805,
+      "operation" : "Windowing (Metal)",
+      "p95TimeSeconds" : 0.1576859951019287,
+      "p99TimeSeconds" : 0.1598140001296997,
+      "stdDevSeconds" : 0.0015082233165071982,
+      "throughputPixelsPerSecond" : 6743384.314094136
+    }
+  ],
+  "timestamp" : "2026-02-15T11:26:59Z"
+}

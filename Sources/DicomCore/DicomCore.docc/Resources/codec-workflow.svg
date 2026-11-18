@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-labelledby="title description">
+  <title id="title">DICOM codec workflow</title>
+  <desc id="description">Inspection, validation, decoding, and transcoding produce a validated artifact.</desc>
+  <rect width="800" height="450" rx="32" fill="#101820"/>
+  <g fill="#D9F0FF" stroke="#5CC8FF" stroke-width="7">
+    <rect x="65" y="165" width="135" height="120" rx="20"/>
+    <rect x="250" y="165" width="135" height="120" rx="20"/>
+    <rect x="435" y="165" width="135" height="120" rx="20"/>
+    <rect x="620" y="165" width="135" height="120" rx="20"/>
+  </g>
+  <g stroke="#7EE787" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M205 225h35"/>
+    <path d="m225 205 20 20-20 20"/>
+    <path d="M390 225h35"/>
+    <path d="m410 205 20 20-20 20"/>
+    <path d="M575 225h35"/>
+    <path d="m595 205 20 20-20 20"/>
+    <path d="m665 225 25 25 45-55" stroke="#147D45" stroke-width="16"/>
+  </g>
+  <g fill="#101820">
+    <circle cx="132" cy="215" r="28"/>
+    <path d="M110 255h44" stroke="#101820" stroke-width="12" stroke-linecap="round"/>
+    <path d="m290 225 20 20 38-42" fill="none" stroke="#101820" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M475 195h55v60h-55z"/>
+    <path d="M486 183h33v14h-33z"/>
+  </g>
+</svg>

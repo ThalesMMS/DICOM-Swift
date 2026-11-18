@@ -1,0 +1,2 @@
+# This file ensures the Baselines directory is tracked by Git
+# Baseline files will be stored here for performance regression detection
